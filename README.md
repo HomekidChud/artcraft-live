@@ -20,7 +20,7 @@ Hosted on GitHub Pages, one path per app:
 | SoundCraft | Audio production (Pro Tools style) | [/soundcraft/](https://homekidchud.github.io/artcraft-live/soundcraft/) |
 | FigCraft | Interface design and prototyping | [/figcraft/](https://homekidchud.github.io/artcraft-live/figcraft/) |
 
-Each app folder at the repository root is the official `*-web-<version>.zip` static bundle from that app's GitHub release, unmodified. All apps use relative URLs, so they work at these subpaths. (Note: [AniCraft](https://github.com/storytold/AniCraft) has no release yet, and support projects like `artcraft`, `craft-libs` and `craft-fonts` are libraries rather than apps, so they are not hosted here.)
+Each app folder at the repository root is the official `*-web-<version>.zip` static bundle from that app's GitHub release, unmodified — with one exception: **DeckCraft is pinned to v0.7.0** because the v0.8.0 web bundle was observed to hang forever on its loading screen (tested 2026-10-18), while v0.7.0 boots correctly. All apps use relative URLs, so they work at these subpaths. (Note: [AniCraft](https://github.com/storytold/AniCraft) has no release yet, and support projects like `artcraft`, `craft-libs` and `craft-fonts` are libraries rather than apps, so they are not hosted here.)
 
 ## Credits
 
