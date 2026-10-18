@@ -20,7 +20,7 @@ Hosted on GitHub Pages, one path per app:
 | SoundCraft | Audio production (Pro Tools style) | [/soundcraft/](https://homekidchud.github.io/artcraft-live/soundcraft/) |
 | FigCraft | Interface design and prototyping | [/figcraft/](https://homekidchud.github.io/artcraft-live/figcraft/) |
 
-Each folder under `apps/` is the official `*-web-<version>.zip` static bundle from that app's GitHub release, unmodified. All apps use relative URLs, so they work at these subpaths.
+Each app folder at the repository root is the official `*-web-<version>.zip` static bundle from that app's GitHub release, unmodified. All apps use relative URLs, so they work at these subpaths. (Note: [AniCraft](https://github.com/storytold/AniCraft) has no release yet, and support projects like `artcraft`, `craft-libs` and `craft-fonts` are libraries rather than apps, so they are not hosted here.)
 
 ## Credits
 
@@ -28,4 +28,4 @@ All applications are built by the [ArtCraft team / storytold](https://github.com
 
 ## Updating
 
-Re-download each app's `-web-<version>.zip` from its latest GitHub release and replace the matching folder under `apps/` (contents only, no versioned subfolder).
+Re-download each app's `-web-<version>.zip` from its latest GitHub release and replace the matching app folder at the repository root (contents only, no versioned subfolder).
