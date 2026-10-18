@@ -9,7 +9,7 @@ A small, fully local assistant shared by all 13 Craft apps. It combines two neur
 - **Neural network:** NumPy implementation of token counts, L2-normalised inputs, a 40-unit tanh hidden layer, softmax output, cross-entropy, manual backpropagation and Adam. One network routes 13 Crafts and a second routes six supported request types. Browser inference is plain JavaScript with no external libraries.
 - **Initial training:** `model.json` is the actual trained checkpoint, not a placeholder. It includes the seed, timestamp, epoch count and test results. The small curated regression checks are useful smoke tests, not independent evidence of conversational intelligence. Some examples were expanded after early checks failed; the reported checks are therefore development/regression checks, not an untouched benchmark.
 - **Offline use:** once this assistant URL has been opened and its service worker installed successfully, its local scripts, catalog and model are cached. Reload once while connected. The chat can then reopen offline on the same origin, provided the browser has not evicted its cache. This does not download all editor WebAssembly bundles or make the entire suite offline.
-- **Privacy:** messages and attached files stay in the open tab's memory. Reload and New chat clear them; minimizing does not. No chat collection, analytics, automatic uploads, self-training from users, remote model calls or API keys.
+- **Privacy:** messages and attached files stay in the open tab's memory. Reload and New chat clear them; minimizing does not. No chat collection, analytics, automatic uploads, self-training from users, remote model calls or API keys. Image recognition runs in your browser; images never leave your device.
 
 ## Local file attachments
 
@@ -19,11 +19,11 @@ Use **Attach files** or drop files into the chat panel, then press **Send**. Sen
 - **Text and code:** bounded plain-text previews and word/line/character counts. HTML and SVG source are displayed as text, never executed or inserted as page markup.
 - **CSV and TSV:** data-row count, column count, header preview, inconsistent-field checks and quoted-field validation. Spreadsheet formulas are never evaluated.
 - **JSON:** syntax validation, top-level type and item/key counts. This is not schema validation.
-- **Raster images:** local PNG/JPEG/WebP/GIF preview and dimensions. No image recognition.
+- **Raster images:** local PNG/JPEG/WebP/GIF preview, dimensions, and on-device recognition: an attached image is classified by a small CLIP vision model that runs in your browser (first use downloads roughly 150 MB, cached afterwards). It recognises the kind of image (photo, logo, screenshot, scan, diagram…) and points to the matching Craft; it does not produce free-form descriptions, read text, or identify people.
 - **Audio:** local playback controls, subject to browser codec support. No transcription or content analysis.
 - **PDF, Office, video and native projects:** filename and size only. Their document contents are not parsed.
 
-File inspection is deterministic, not additional neural-network training or semantic AI analysis. The assistant does not rewrite arbitrary documents, interpret images, or import files into the WebAssembly editor. Use that editor's own open/import control where supported. File operations do not upload anything or add it to the training corpus.
+File inspection is deterministic for text and data files; attached images additionally get local neural recognition as described above. The assistant does not rewrite arbitrary documents, produce free-form image descriptions, or import files into the WebAssembly editor. Use that editor's own open/import control where supported. File operations do not upload anything or add it to the training corpus.
 
 ## Starter artifacts
 

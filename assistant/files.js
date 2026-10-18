@@ -89,7 +89,7 @@ export async function readAttachment(file) {
     const {width,height}=bitmap;bitmap.close();
     if(width*height>25000000)throw new Error("Image previews are limited to 25 megapixels. Resize it first.");
     result.previewBlob=blob;
-    result.summary=`Image: ${width} × ${height} pixels. Preview only; this model cannot recognise image contents.`;
+    result.summary=`Image: ${width} × ${height} pixels. Send to have its contents recognised by the on-device vision model; the file is never uploaded.`;
   }else if(kind==="audio"){
     const types={wav:"audio/wav",mp3:"audio/mpeg",ogg:"audio/ogg",m4a:"audio/mp4",flac:"audio/flac"};
     result.previewBlob=new Blob([file],{type:types[file.name.toLowerCase().split(".").pop()]});
@@ -101,7 +101,7 @@ export async function readAttachment(file) {
 }
 export function attachmentReply(files) {
   return files.map(file=>`${file.name} (${formatSize(file.size)})\n${file.summary}`).join("\n\n")+
-    "\n\nThese are deterministic local file checks, not neural content analysis. Files are not uploaded, used for training or automatically imported into the editor.";
+    "\n\nThese are deterministic local file checks; attached images additionally get on-device neural recognition when sent. Files are not uploaded, used for training or automatically imported into the editor.";
 }
 export function formatSize(bytes) {
   return bytes<1024?`${bytes} B`:bytes<1024*1024?`${(bytes/1024).toFixed(1)} KB`:`${(bytes/(1024*1024)).toFixed(1)} MB`;

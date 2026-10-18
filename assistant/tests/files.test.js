@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {fileKind,validateFile,parseTable,inspectText,readAttachment,attachmentReply,MAX_FILE_BYTES,MAX_TEXT_BYTES,formatSize} from "../files.js";
+import {formatVision, CANDIDATES} from "../vision.js";
 
 test("classifies safe previews and keeps complex formats metadata-only",()=>{
   assert.equal(fileKind("PLAN.CSV"),"text");
@@ -73,9 +74,22 @@ test("audio preview is a constrained local blob, not remote HTML",async()=>{
 });
 test("file reply and size formatting communicate privacy and limits",()=>{
   const result=attachmentReply([{name:"test.txt",size:10,summary:"Text preview."}]);
-  assert.match(result,/not neural content analysis/);
+  assert.match(result,/on-device neural recognition/);
   assert.match(result,/not uploaded/);
   assert.equal(formatSize(10),"10 B");
   assert.equal(formatSize(1024),"1.0 KB");
   assert.equal(formatSize(1024*1024),"1.0 MB");
+});
+test("vision candidates map to real crafts and format confidence honestly",()=>{
+  const crafts=new Set(["vectorcraft","photocraft","filmcraft","lightcraft","pdfcraft","designcraft","effectcraft","gridcraft","wordcraft","deckcraft","cadcraft","soundcraft","figcraft"]);
+  for(const candidate of CANDIDATES){
+    assert.ok(crafts.has(candidate.craft),`unknown craft ${candidate.craft}`);
+    assert.ok(candidate.text.length>10);
+  }
+  const confident=formatVision([{text:"a photograph taken with a camera",craft:"photocraft",craftName:"PhotoCraft",hint:"photo editing",confidence:0.82},
+    {text:"a frame from a video or film",craft:"filmcraft",craftName:"FilmCraft",hint:"video editing",confidence:0.11}]);
+  assert.match(confident,/82% confident/);
+  assert.match(confident,/PhotoCraft/);
+  assert.match(confident,/not uploaded/);
+  assert.match(formatVision([{text:"x",craft:"x",craftName:"X",hint:"x",confidence:0.1}]),/No confident match/);
 });

@@ -1,5 +1,6 @@
 import {respond} from "./engine.js";
 import {readAttachment, attachmentReply, formatSize, MAX_FILES} from "./files.js";
+import {recognizeImage, formatVision} from "./vision.js";
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -85,7 +86,7 @@ function syncCraft() {
   buttons[1].dataset.prompt = `${starterCraft.example} in ${starterCraft.name}`;
   buttons[1].lastChild.textContent = `Create a ${starterCraft.name} starter ↗`;
 }
-function submit(text) {
+async function submit(text) {
   text = text.trim().slice(0,2000);
   if ((!text&&!pending.length) || !model || importing) return;
   welcome.remove();
@@ -93,6 +94,25 @@ function submit(text) {
   const user=append("You",text||"Check these attached files.");
   files.forEach(file=>renderFile(file,user));
   if(files.length)append("ArtCraft · Local file checks",attachmentReply(files));
+  const images = files.filter(file=>file.kind==="image");
+  if (images.length) {
+    const article = append("ArtCraft · Image recognition","Preparing the local vision model…");
+    const body = article.querySelector(".body");
+    const say = message => { body.textContent = message; scroll(); };
+    const scroll = () => embedded ? $("messages").scrollTop=$("messages").scrollHeight : article.scrollIntoView({block:"nearest"});
+    try {
+      const parts = [];
+      for (const file of images) {
+        const ranked = await recognizeImage(file.previewBlob, status => say(`${file.name}: ${status}`));
+        parts.push(`${file.name} — ${formatVision(ranked)}`);
+      }
+      say(parts.join("\n\n"));
+    } catch (error) {
+      say("Image recognition is unavailable right now (" + (error?.message || "the vision model could not load") + "). "
+        + "The first analysis downloads the vision model, so it needs a connection once; after that it is cached. "
+        + "The image stayed on this device either way.");
+    }
+  }
   const result = text ? respond(catalog,model,text,$("craft").value,previousCraft) : null;
   if(!result||(files.length&&!result.intent)){
     $("message").value="";$("attachment-status").textContent="Files checked locally. They were not imported into the editor.";
