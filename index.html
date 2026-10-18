@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArtCraft Live — the Crafting Apps, in your browser</title>
+<meta name="description" content="ArtCraft Live — all 13 Crafting Apps (VectorCraft, PhotoCraft, WordCraft and more) running in your browser via WebAssembly.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0e13;
+    --surface: #13161d;
+    --surface-2: #1a1e27;
+    --border: #262b37;
+    --text: #e8eaf0;
+    --muted: #9aa3b5;
+    --accent: #f2b544;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-text-size-adjust: none; text-size-adjust: none; -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  header { padding: 72px 0 48px; text-align: center; }
+  .kicker {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 18px;
+  }
+  h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(38px, 6vw, 62px);
+    font-weight: 700; line-height: 1.05; letter-spacing: -0.02em;
+    margin-bottom: 18px;
+  }
+  .lede { color: var(--muted); font-size: 17px; max-width: 620px; margin: 0 auto; }
+
+  .grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px; padding-bottom: 24px;
+  }
+  .card {
+    display: flex; flex-direction: column; gap: 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    text-decoration: none; color: inherit;
+    transition: border-color .18s ease, transform .18s ease, background .18s ease;
+  }
+  .card:hover { border-color: var(--accent); transform: translateY(-2px); background: var(--surface-2); }
+  .card-top { display: flex; align-items: center; gap: 14px; }
+  .tile {
+    width: 46px; height: 46px; border-radius: 11px; flex-shrink: 0;
+    display: grid; place-items: center;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 19px;
+  }
+  .card h2 { font-family: 'Space Grotesk', sans-serif; font-size: 19px; font-weight: 600; letter-spacing: -0.01em; }
+  .card p { color: var(--muted); font-size: 14px; }
+  .card-foot { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .badge {
+    font-size: 11.5px; font-weight: 600; letter-spacing: .04em;
+    color: var(--muted); border: 1px solid var(--border);
+    padding: 3px 9px; border-radius: 99px; white-space: nowrap;
+  }
+  .launch { font-size: 13px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .card:hover .launch { text-decoration: underline; }
+
+  .note {
+    margin: 40px 0 0; padding: 18px 20px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    color: var(--muted); font-size: 14px;
+  }
+  footer { padding: 48px 0 64px; color: var(--muted); font-size: 13px; text-align: center; }
+  footer a { color: var(--text); }
+  @media (max-width: 480px) { header { padding: 52px 0 36px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">ArtCraft Live</div>
+    <h1>The Crafting Apps,<br>running in your browser</h1>
+    <p class="lede">All 13 open-source ArtCraft applications — vector art, photo editing, video, PDF, spreadsheets and more — compiled to WebAssembly and hosted as live web apps. No installs, no accounts.</p>
+  </header>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="note">
+    <strong>Tip:</strong> each app is a full WebAssembly build (10–60 MB on first load) — give it a moment to download, then it is cached. Best experienced in an up-to-date desktop browser.
+  </div>
+
+  <footer>
+    Apps by the <a href="https://github.com/storytold" rel="noopener">ArtCraft team (github.com/storytold)</a> ·
+    open source under MIT / Apache-2.0 · this mirror site is hosted on GitHub Pages.
+  </footer>
+</div>
+
+<script>
+const APPS = [
+  { name: "VectorCraft", path: "vectorcraft/", tag: "Vector illustration", desc: "Clean-room Adobe Illustrator alternative — pens, panels, artboards, exact booleans.", ver: "v0.13.1", src: "storytold/vectorcraft", hue: 16 },
+  { name: "PhotoCraft", path: "photocraft/", tag: "Photo editor", desc: "Clean-room Adobe Photoshop alternative — layers, masks, filters, retouching.", ver: "v0.10.0", src: "storytold/photocraft", hue: 200 },
+  { name: "FilmCraft", path: "filmcraft/", tag: "Video editing", desc: "Nonlinear video editor — a Premiere Pro alternative in pure Rust.", ver: "v0.9.0", src: "storytold/filmcraft", hue: 280 },
+  { name: "LightCraft", path: "lightcraft/", tag: "RAW photo workflow", desc: "Non-destructive photo editor — a Lightroom alternative for RAW processing.", ver: "v0.9.1", src: "storytold/lightcraft", hue: 45 },
+  { name: "PdfCraft", path: "pdfcraft/", tag: "PDF read & edit", desc: "PDF reader and editor — an Acrobat alternative built from scratch.", ver: "v0.9.0", src: "storytold/pdfcraft", hue: 0 },
+  { name: "DesignCraft", path: "designcraft/", tag: "Page & layout", desc: "Page and layout design editor — an InDesign alternative for print and PDF.", ver: "v0.9.0", src: "storytold/designcraft", hue: 160 },
+  { name: "EffectCraft", path: "effectcraft/", tag: "Motion graphics", desc: "Motion graphics and compositing — an After Effects alternative.", ver: "v0.11.1", src: "storytold/effectcraft", hue: 260 },
+  { name: "GridCraft", path: "gridcraft/", tag: "Spreadsheets", desc: "Clean-room Microsoft Excel-style spreadsheet with formulas and charts.", ver: "v0.8.0", src: "storytold/gridcraft", hue: 130 },
+  { name: "WordCraft", path: "wordcraft/", tag: "Documents", desc: "Clean-room Microsoft Word reimplementation for writing and documents.", ver: "v0.8.0", src: "storytold/wordcraft", hue: 220 },
+  { name: "DeckCraft", path: "deckcraft/", tag: "Presentations", desc: "Slides and presentations — a PowerPoint alternative in pure Rust.", ver: "v0.8.0", src: "storytold/deckcraft", hue: 30 },
+  { name: "CADCraft", path: "cadcraft/", tag: "CAD & drafting", desc: "Computer-aided design and drafting — an AutoCAD-style app.", ver: "v0.8.0", src: "storytold/cadcraft", hue: 190 },
+  { name: "SoundCraft", path: "soundcraft/", tag: "Audio & DAW", desc: "Clean-room Avid Pro Tools reimplementation for audio production.", ver: "v0.8.0", src: "storytold/soundcraft", hue: 100 },
+  { name: "FigCraft", path: "figcraft/", tag: "Interface design", desc: "Interface design and prototyping — collaborative design workflows.", ver: "v0.7.0", src: "storytold/figcraft", hue: 300 },
+];
+const grid = document.getElementById("grid");
+grid.innerHTML = APPS.map(a => `
+  <a class="card" href="${a.path}">
+    <div class="card-top">
+      <div class="tile" style="background:hsl(${a.hue} 42% 20%);color:hsl(${a.hue} 80% 72%)">${a.name[0]}</div>
+      <div>
+        <h2>${a.name}</h2>
+        <span style="color:var(--muted);font-size:13px">${a.tag} · ${a.ver}</span>
+      </div>
+    </div>
+    <p>${a.desc}</p>
+    <div class="card-foot">
+      <span class="badge">${a.src}</span>
+      <span class="launch">Launch →</span>
+    </div>
+  </a>`).join("");
+</script>
+</body>
+</html>
