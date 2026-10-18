@@ -30,7 +30,8 @@ function getPipeline(onStatus) {
       const {pipeline, env} = await import("./vendor/transformers.min.js");
       env.allowLocalModels = false;
       // Serve the ONNX runtime's WASM files from this site instead of a CDN.
-      env.backends.onnx.wasm.wasmPaths = "./vendor/ort/";
+      // wasmPaths resolves relative to the vendored bundle's own directory.
+      env.backends.onnx.wasm.wasmPaths = "./ort/";
       return await pipeline("zero-shot-image-classification", VISION_MODEL, {
         dtype: "q8",
         progress_callback: data => {
