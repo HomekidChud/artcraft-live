@@ -1,0 +1,18 @@
+[Unit]
+Description=ArtCraft reviewed-data offline training worker
+After=local-fs.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/artcraft-live
+Environment=OPENBLAS_NUM_THREADS=1
+Environment=OMP_NUM_THREADS=1
+ExecStart=%h/artcraft-live/.venv/bin/python assistant/training/train.py --watch --interval 3600
+Restart=on-failure
+RestartSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

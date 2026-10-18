@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+assistant/training/local-approved.jsonl
+assistant/training/.worker.lock
+assistant/training/*.log

@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#11141b">
+<title>ArtCraft Chat</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<a class="skip" href="#composer">Skip to message</a>
+<div class="shell">
+  <aside class="sidebar">
+    <a class="brand" href="../index.html" target="_top">ArtCraft <span>LIVE</span></a>
+    <div class="sidebar-label">YOUR WORKSPACE</div>
+    <a class="nav-link" href="../index.html" target="_top">The Crafting Apps <span>↗</span></a>
+    <div class="nav-link active">Chat assistant</div>
+    <div class="sidebar-label">MADE FOR YOUR CRAFT</div>
+    <p>Small local network.<br>Practical starting points.<br>Your work stays yours.</p>
+    <div class="sidebar-bottom">No accounts. No chat uploads.<br><a href="README.md" target="_blank" rel="noopener">Setup & limitations ↗</a></div>
+  </aside>
+  <main>
+    <header>
+      <div><div class="eyebrow">ARTCRAFT ASSISTANT</div><h1>A little help with your next idea.</h1></div>
+      <button id="reset" class="subtle" type="button">New chat</button>
+    </header>
+    <section class="context-bar" aria-label="Craft selection">
+      <label for="craft">Working in</label><select id="craft"><option value="auto">Choose automatically</option></select>
+      <a id="open-craft" hidden target="_blank" rel="noopener">Open editor ↗</a>
+    </section>
+    <div class="status" id="status" role="status">Loading the local neural network…</div>
+    <section id="messages" class="messages" aria-label="Conversation" aria-live="polite" aria-relevant="additions">
+      <div class="welcome" id="welcome">
+        <div class="eyebrow">FROM BLANK CANVAS TO FIRST STEP</div>
+        <h2>What are we making?</h2>
+        <p>Get craft-specific guidance, export advice or a starter file. Choose an app, or tell me where you’re working.</p>
+        <div class="suggestions">
+          <button type="button" data-prompt="Help me get started with VectorCraft"><span>Find your starting point</span>Help me get started with VectorCraft ↗</button>
+          <button type="button" data-prompt="Make a starter budget spreadsheet in GridCraft"><span>Make something useful</span>Create a GridCraft budget starter ↗</button>
+          <button type="button" data-prompt="How was the model trained?"><span>Under the hood</span>How does the local network work? ↗</button>
+        </div>
+      </div>
+    </section>
+    <div class="composer-area">
+      <form id="composer">
+        <label class="sr-only" for="message">Message the ArtCraft assistant</label>
+        <textarea id="message" rows="2" maxlength="2000" placeholder="Tell me your Craft and what you’d like to make…" required disabled></textarea>
+        <button id="send" type="submit" disabled>Send <span aria-hidden="true">↑</span></button>
+      </form>
+      <p class="disclosure">Neural routing + curated help, not a general LLM. Starter files are templates. No editor control.</p>
+      <details><summary>Offline, privacy & training</summary><div>
+        <p id="metrics">Model evaluation is loading.</p>
+        <p id="offline-status">Offline cache is not installed yet. Keep this tab open while it is prepared.</p>
+        <p>Messages stay in this tab’s memory and disappear on reload or New chat. No automatic learning from conversations. The Python worker is separate from this page and requires an always-on host; a closed browser cannot train.</p>
+        <a href="README.md" target="_blank" rel="noopener">Read training and setup instructions ↗</a>
+      </div></details>
+    </div>
+  </main>
+</div>
+</body>
+</html>

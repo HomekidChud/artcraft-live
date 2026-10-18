@@ -92,6 +92,11 @@
     <p class="lede">All 13 open-source ArtCraft applications — vector art, photo editing, video, PDF, spreadsheets and more — compiled to WebAssembly and hosted as live web apps. No installs, no accounts.</p>
   </header>
 
+  <nav aria-label="Workspace" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:24px">
+    <span style="color:var(--muted)">The Crafting Apps</span>
+    <a href="assistant/index.html" style="color:var(--accent);padding:12px 16px;border:1px solid var(--border);border-radius:8px;text-decoration:none">Chat assistant ↗</a>
+    <span style="color:var(--muted);font-size:13px">Local craft guidance &amp; starter templates</span>
+  </nav>
   <div class="grid" id="grid"></div>
 
   <div class="note">
@@ -137,5 +142,6 @@ grid.innerHTML = APPS.map(a => `
     </div>
   </a>`).join("");
 </script>
+<script src="assistant/widget.js" data-craft="auto" defer></script>
 </body>
 </html>

@@ -1,0 +1,22 @@
+name: Assistant regression checks
+on:
+  push:
+    paths: ["assistant/**", "package.json", ".github/workflows/assistant-tests.yml"]
+  pull_request:
+    paths: ["assistant/**", "package.json", ".github/workflows/assistant-tests.yml"]
+permissions:
+  contents: read
+jobs:
+  assistant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm test
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r assistant/training/requirements.txt
+      - run: python -m unittest discover -s assistant/tests -p 'test_*.py'

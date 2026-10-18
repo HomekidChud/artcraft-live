@@ -20,7 +20,13 @@ Hosted on GitHub Pages, one path per app:
 | SoundCraft | Audio production (Pro Tools style) | [/soundcraft/](https://homekidchud.github.io/artcraft-live/soundcraft/) |
 | FigCraft | Interface design and prototyping | [/figcraft/](https://homekidchud.github.io/artcraft-live/figcraft/) |
 
-Each app folder at the repository root is the official `*-web-<version>.zip` static bundle from that app's GitHub release, unmodified — with one exception: **DeckCraft is pinned to v0.7.0** because the v0.8.0 web bundle stalled on its loading screen in the test browser (2026-10-18), while v0.7.0 reached the editor. All apps use relative URLs, so they work at these subpaths. (Note: [AniCraft](https://github.com/storytold/AniCraft) has no release yet, and support projects like `artcraft`, `craft-libs` and `craft-fonts` are libraries rather than apps, so they are not hosted here.)
+Each app folder at the repository root comes from the official `*-web-<version>.zip` static bundle from that app's GitHub release. The generated application assets are preserved; the HTML entrypoints include the shared chat overlay described below. **DeckCraft is pinned to v0.7.0** because the v0.8.0 web bundle stalled on its loading screen in the test browser (2026-10-18), while v0.7.0 reached the editor. All apps use relative URLs, so they work at these subpaths. (Note: [AniCraft](https://github.com/storytold/AniCraft) has no release yet, and support projects like `artcraft`, `craft-libs` and `craft-fonts` are libraries rather than apps, so they are not hosted here.)
+
+## Local chat assistant
+
+Open [`assistant/`](assistant/) or use **Chat with ArtCraft** in any editor. The assistant uses two small neural classifiers trained from scratch, curated Craft guidance and downloadable starter templates. It is not a general-purpose language model and cannot control the editors. The chat can be cached for offline use; optional reviewed-data retraining runs on your own always-on host, not GitHub Pages. See the [assistant setup and limitations](assistant/README.md).
+
+The original application bundles are preserved except for one script tag added to each HTML entrypoint to load an isolated chat overlay. Generated application JavaScript, WebAssembly and upstream licenses are unchanged.
 
 ## Credits
 
