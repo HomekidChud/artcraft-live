@@ -1,5 +1,11 @@
 # Assistant verification inventory
 
+## Compact chat and file attachments
+
+The compact-chat revision adds a 44px launcher, a 360px compact panel, expand/restore, minimize/reopen and Escape from the message field. Check all controls on desktop and 375px mobile; verify that both the conversation and pending attachments survive minimizing and that the composer remains visible while the conversation scrolls.
+
+File checks cover picker and drag/drop, file-only submission, text previews, CSV/TSV shape and quoting, valid/invalid JSON, raster image previews, audio controls and metadata-only PDF/native files. Verify empty, oversized, malformed UTF-8, fake image and excess-file rejection; removal, cancellation with New chat, reset cleanup, unsupported requests and offline attachment use. Verify filenames and document markup are shown as plain text and that file operations cause no upload requests.
+
 ## Scope
 
 The changed surface is the new chat page plus one isolated chat script tag in each editor. Existing editor functionality, compiled JavaScript and WebAssembly are outside the change. The floating widget must not replace the editor canvas or touch project data.
@@ -41,3 +47,14 @@ Verified locally on 18 October 2026 using Chromium:
 - No assistant JavaScript page errors were observed in the tested standalone flows.
 
 The persistent worker was tested in a temporary local checkout and terminated afterward. No production always-on training service was enabled by these tests.
+
+## Compact revision results
+
+- JavaScript regression suite: 42 tests passed. Python trainer suite: three tests passed; no training changes or checkpoint updates are part of this revision.
+- In the real local GridCraft editor, the launcher measured 44 × 44 pixels. The compact panel measured 360 × 560 pixels at desktop, and fit within a 375px viewport. Expand/restore, minimize/reopen, Escape from the iframe message field and the full-tab link were exercised.
+- Pending files and submitted file-check messages survived minimize/reopen. New chat removed pending files and safely cancelled an intentionally delayed, in-flight file read. A rejected model stayed disabled even after New chat.
+- File picker and drag/drop flows were exercised. CSV shape, JSON validity, image dimensions/preview and audio playback were checked through the UI. PDF content remained unparsed and was clearly labelled as metadata-only.
+- Empty files, text over 1 MB, binary files over 10 MB, fake image content and a fourth pending attachment were rejected with visible feedback. Removing an attachment and submitting files without a text message both worked.
+- A script-containing HTML attachment was displayed in a plain-text preview and did not execute. Observed file-operation requests contained no upload/non-GET requests.
+- After service-worker installation and online refresh, the chat reopened offline and inspected a newly attached CSV with the network disabled.
+- Desktop/mobile screenshots were inspected, including the initial compact state, pending files, submitted file checks and expanded mobile state. The iframe composer stayed within its viewport in the tested 375px mobile flow; no horizontal overflow was detected.

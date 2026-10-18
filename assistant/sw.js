@@ -1,5 +1,5 @@
-const CACHE = "artcraft-assistant-v1";
-const FILES = ["./","./index.html","./style.css","./app.js","./engine.js","./catalog.json","./model.json","./README.md","./fonts/inter-regular.woff","./fonts/inter-semibold.woff"];
+const CACHE = "artcraft-assistant-v2";
+const FILES = ["./","./index.html","./style.css","./app.js","./engine.js","./files.js","./catalog.json","./model.json","./README.md","./fonts/inter-regular.woff","./fonts/inter-semibold.woff"];
 self.addEventListener("install",event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES)).then(()=>self.skipWaiting()));
 });
