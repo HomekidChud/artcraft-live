@@ -1,6 +1,6 @@
 import {respond} from "./engine.js";
 import {readAttachment, attachmentReply, formatSize, MAX_FILES} from "./files.js";
-import {recognizeImage, formatVision} from "./vision.js";
+import {recognizeImage, formatVision, MATCH_THRESHOLD} from "./vision.js";
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -95,6 +95,7 @@ async function submit(text) {
   files.forEach(file=>renderFile(file,user));
   if(files.length)append("ArtCraft · Local file checks",attachmentReply(files));
   const images = files.filter(file=>file.kind==="image");
+  let recognizedCraft=null;
   if (images.length) {
     const article = append("ArtCraft · Image recognition","Preparing the local vision model…");
     const body = article.querySelector(".body");
@@ -104,16 +105,19 @@ async function submit(text) {
       const parts = [];
       for (const file of images) {
         const ranked = await recognizeImage(file.previewBlob, status => say(`${file.name}: ${status}`));
+        if (ranked[0] && ranked[0].confidence >= MATCH_THRESHOLD) recognizedCraft = ranked[0].craft;
         parts.push(`${file.name} — ${formatVision(ranked)}`);
       }
       say(parts.join("\n\n"));
     } catch (error) {
       say("Image recognition is unavailable right now (" + (error?.message || "the vision model could not load") + "). "
-        + "The first analysis downloads the vision model, so it needs a connection once; after that it is cached. "
+        + "The first analysis downloads the vision model, which needs a connection; the browser caches it, though it may need downloading again if evicted. "
         + "The image stayed on this device either way.");
     }
   }
-  const result = text ? respond(catalog,model,text,$("craft").value,previousCraft) : null;
+  const namesCraft = text && catalog.crafts.some(craft => text.toLowerCase().includes(craft.id));
+  const craftChoice = (images.length && recognizedCraft && $("craft").value === "auto" && !namesCraft) ? recognizedCraft : $("craft").value;
+  const result = text ? respond(catalog,model,text,craftChoice,previousCraft) : null;
   if(!result||(files.length&&!result.intent)){
     $("message").value="";$("attachment-status").textContent="Files checked locally. They were not imported into the editor.";
     renderPending();

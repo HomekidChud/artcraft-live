@@ -19,7 +19,7 @@ Use **Attach files** or drop files into the chat panel, then press **Send**. Sen
 - **Text and code:** bounded plain-text previews and word/line/character counts. HTML and SVG source are displayed as text, never executed or inserted as page markup.
 - **CSV and TSV:** data-row count, column count, header preview, inconsistent-field checks and quoted-field validation. Spreadsheet formulas are never evaluated.
 - **JSON:** syntax validation, top-level type and item/key counts. This is not schema validation.
-- **Raster images:** local PNG/JPEG/WebP/GIF preview, dimensions, and on-device recognition: an attached image is classified by a small CLIP vision model that runs in your browser (first use downloads roughly 150 MB, cached afterwards). It recognises the kind of image (photo, logo, screenshot, scan, diagram…) and points to the matching Craft; it does not produce free-form descriptions, read text, or identify people.
+- **Raster images:** local PNG/JPEG/WebP/GIF preview, dimensions, and on-device recognition: an attached image is classified by a small CLIP vision model that runs in your browser. The assistant’s scripts and inference runtime (WASM) are served from this site; the first analysis downloads about 155 MB of model files, which the browser caches and may re-download if it evicts them. It recognises the kind of image (photo, logo, screenshot, scan, diagram…) and points to the matching Craft; it does not produce free-form descriptions, read text, or identify people.
 - **Audio:** local playback controls, subject to browser codec support. No transcription or content analysis.
 - **PDF, Office, video and native projects:** filename and size only. Their document contents are not parsed.
 

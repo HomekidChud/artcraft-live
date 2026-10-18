@@ -88,8 +88,8 @@ test("vision candidates map to real crafts and format confidence honestly",()=>{
   }
   const confident=formatVision([{text:"a photograph taken with a camera",craft:"photocraft",craftName:"PhotoCraft",hint:"photo editing",confidence:0.82},
     {text:"a frame from a video or film",craft:"filmcraft",craftName:"FilmCraft",hint:"video editing",confidence:0.11}]);
-  assert.match(confident,/82% confident/);
+  assert.match(confident,/relative match 82%/);
   assert.match(confident,/PhotoCraft/);
   assert.match(confident,/not uploaded/);
-  assert.match(formatVision([{text:"x",craft:"x",craftName:"X",hint:"x",confidence:0.1}]),/No confident match/);
+  assert.match(formatVision([{text:"x",craft:"x",craftName:"X",hint:"x",confidence:0.1}]),/No close match/);
 });

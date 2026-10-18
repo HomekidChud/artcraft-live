@@ -2,6 +2,10 @@
 // The model runs in this browser; attached images are never uploaded.
 export const VISION_MODEL = "Xenova/clip-vit-base-patch32";
 
+// Relative-match scores from CLIP rank the supported categories against each
+// other; they are not calibrated probabilities of being correct.
+export const MATCH_THRESHOLD = 0.35;
+
 export const CANDIDATES = [
   {text: "a photograph taken with a camera", craft: "photocraft", craftName: "PhotoCraft", hint: "photo editing"},
   {text: "an unedited raw photo that needs exposure fixes", craft: "lightcraft", craftName: "LightCraft", hint: "RAW workflow"},
@@ -25,11 +29,13 @@ function getPipeline(onStatus) {
     pipelinePromise = (async () => {
       const {pipeline, env} = await import("./vendor/transformers.min.js");
       env.allowLocalModels = false;
+      // Serve the ONNX runtime's WASM files from this site instead of a CDN.
+      env.backends.onnx.wasm.wasmPaths = "./vendor/ort/";
       return await pipeline("zero-shot-image-classification", VISION_MODEL, {
         dtype: "q8",
         progress_callback: data => {
           if (data.status === "progress" && data.total)
-            onStatus?.(`Downloading the local vision model (${Math.round(data.loaded / data.total * 100)}%)… one-time, cached for next time.`);
+            onStatus?.(`Downloading the local vision model (${Math.round(data.loaded / data.total * 100)}%)… the browser caches it afterwards.`);
         }
       });
     })().catch(error => {
@@ -43,13 +49,13 @@ function getPipeline(onStatus) {
 export function formatVision(results) {
   if (!results.length) return "No recognition result was produced.";
   const top = results[0];
-  if (top.confidence < 0.35)
-    return "No confident match for this image. Attach a clearer image, or name the craft you need help with.";
+  if (top.confidence < MATCH_THRESHOLD)
+    return "No close match among the supported categories. Attach a clearer image, or name the craft you need help with.";
   const rest = results.slice(1, 3).filter(r => r.confidence >= 0.05)
     .map(r => `${r.hint} (${Math.round(r.confidence * 100)}%)`).join(", ");
-  return `Looks like ${top.text} — ${Math.round(top.confidence * 100)}% confident. `
+  return `Closest supported category: ${top.text} (relative match ${Math.round(top.confidence * 100)}%). `
     + `Best handled in ${top.craftName} (${top.hint}).`
-    + (rest ? ` Also possible: ${rest}.` : "")
+    + (rest ? ` Also plausible: ${rest}.` : "")
     + " Recognition ran entirely on this device; the image was not uploaded.";
 }
 
