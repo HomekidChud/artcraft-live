@@ -1,8 +1,8 @@
 # RobloxCraft
 
-A browser reconstruction of the **Roblox** experience — a discovery launcher and a playable in-experience 3D world with the Roblox player UI (topbar, chat, leaderboard, health bar, Roblox Menu). Independently implemented: no Roblox Corporation code, assets, fonts, or trademarks are bundled or redistributed; all artwork is original.
+A browser reconstruction of the **Roblox** experience — a discovery launcher and a playable in-experience 3D world with the Roblox player UI (topbar, chat, leaderboard, health bar, Roblox Menu). Independently implemented — the downloaded client's code, assets, and fonts are not bundled in this repository; all artwork is original.
 
-- **Launcher** — dark discovery page with experience cards, live player counts, ratings and a Play flow.
+- **Launcher** — dark discovery page with experience cards, simulated player counts and ratings, and a Play flow.
 - **Experience** — Three.js baseplate world with a classic blocky R6-style avatar: WASD movement, jumping, third-person orbit camera, coin collection, hazard bricks with damage, respawn on falling off the edge.
 - **Player UI** — topbar with Chat/Leaderboard/Inventory/Menu buttons, chat window with the official welcome text and `/`-key focus, People leaderboard, health bar, Esc menu with Resume/Respawn Character/Screenshot/Volume/Sensitivity, and the leave-confirmation dialog.
 
@@ -38,7 +38,7 @@ Deep binary decompilation (Ghidra-class) was not available in the analysis envir
 | Movement: WASD camera-relative, Space jump, right-drag orbit, wheel zoom | Documentation-based (Roblox default controls) | Verified: 16 studs/s movement, jump with airborne state and landing (apex ≈ 6 studs, discrete steps), orbit drag changes camera yaw, zoom changes distance. Space taps are buffered (physics-step countdown) so a short press is not lost between frames under throttled rendering |
 | Coin collection with sound + chat notification + leaderboard update | Reconstruction decision (stand-in gameplay) | Verified |
 | Mobile: leaderboard hidden by default, compact chat | Documentation-based (Roblox mobile defaults) | Verified at 375 px (responsive layout only — touch movement controls are not implemented) |
-| Physics speed independent of frame rate (wall-clock catch-up) | Reconstruction decision | Verified under throttled software rendering |
+| Fixed-step physics with capped wall-clock catch-up | Reconstruction decision | Verified under throttled software rendering; very low frame rates can still affect input timing |
 
 Not implemented: Luau scripting, multiplayer, accounts, avatar customization, emotes (chat replies that they are unavailable), voice chat, tools/backpack items, friends, real experiences (the two playable worlds are original stand-ins), touch controls. The other players on the leaderboard are simulated demo data. This is a local single-player reconstruction — "1:1" is the design goal, not a claim; the client's runtime behavior was not execution-verified.
 
