@@ -542,6 +542,9 @@ const state = {
   keys: {},
   playing: false,
   invincibleUntil: 0,
+  jumpBuffer: 0, // physics-step countdown; survives frame gaps under throttling
+  jumpCount: 0,
+  maxY: 3,
 };
 
 function makeStudTexture(base = '#9d9ea1', stud = '#8e8f92', size = 256, cells = 8) {
@@ -744,7 +747,7 @@ function bindInput() {
       return;
     }
     state.keys[e.code] = true;
-    if (e.code === 'Space') e.preventDefault();
+    if (e.code === 'Space') { if (state.onGround) state.jumpBuffer = 15; e.preventDefault(); }
     if (e.code === 'Escape') toggleEscMenu();
     if (e.code === 'Slash' && !escOpen()) { e.preventDefault(); focusChat(); }
   };
@@ -805,17 +808,23 @@ function stepPhysics(dt) {
   state.vel.x = mx * speed;
   state.vel.z = mz * speed;
 
-  if (k['Space'] && state.onGround) {
+  // buffered jump: a short Space tap between frames (throttled rendering) still jumps.
+  // Expiry counts physics steps, not wall time, so it survives any frame gap.
+  if ((k['Space'] || state.jumpBuffer > 0) && state.onGround) {
     state.vel.y = CFG.jumpPower;
     state.onGround = false;
+    state.jumpBuffer = 0;
+    state.jumpCount++;
     sfxJump();
   }
+  state.jumpBuffer = Math.max(0, state.jumpBuffer - 1);
   state.vel.y -= CFG.gravity * dt;
 
   // integrate
   state.pos.x += state.vel.x * dt;
   state.pos.z += state.vel.z * dt;
   state.pos.y += state.vel.y * dt;
+  if (state.pos.y > state.maxY) state.maxY = state.pos.y;
 
   const groundY = groundHeightAt(state.pos.x, state.pos.z, state.pos.y);
   const feet = state.pos.y - 3; // feet = center - (legs 2 + torso offset 1)
@@ -967,7 +976,7 @@ function initChat() {
       if (text.startsWith('/')) {
         const cmd = text.slice(1).toLowerCase();
         if (cmd === '?' || cmd === 'help') {
-          addChat('cmd', 'Commands: /help — this list. /e dance, /e wave — emotes.');
+          addChat('cmd', 'Commands: /help — this list. (Emotes are not available in this reconstruction.)');
         } else if (cmd.startsWith('e ') || cmd.startsWith('e')) {
           addChat('cmd', 'Emotes are not available in this reconstruction.');
         } else {
@@ -1003,6 +1012,9 @@ function bindHud() {
   $('#esc-screenshot').addEventListener('click', () => {
     toggleEscMenu(false); sfxClick();
     try {
+      // re-render synchronously: WebGL buffers are cleared after compositing,
+      // so toDataURL outside the render loop would capture a blank frame
+      renderer.render(scene, camera);
       const url = renderer.domElement.toDataURL('image/png');
       const a = document.createElement('a');
       a.href = url; a.download = 'robloxcraft-screenshot.png'; a.click();
@@ -1152,6 +1164,7 @@ window.robloxcraft = {
       pos: { x: +state.pos.x.toFixed(2), y: +state.pos.y.toFixed(2), z: +state.pos.z.toFixed(2) },
       onGround: state.onGround, health: state.health, coins: state.coins,
       playing: state.playing, exp: currentExp,
+      jumpCount: state.jumpCount, maxY: +state.maxY.toFixed(2),
       coinsLeft: world.coins.length,
     };
   },
