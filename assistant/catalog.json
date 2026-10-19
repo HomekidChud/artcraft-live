@@ -1,25 +1,443 @@
 {
   "crafts": [
-    {"id":"vectorcraft","name":"VectorCraft","topic":"vector illustration logo paths pen bezier artboard shapes svg","guide":"Start with an artboard and simple shapes. Use the Pen and Direct Selection tools for editable paths; organise related objects in layers. Keep an editable project before exporting a delivery copy.","export":"Check the artboard bounds and document size, then use the available export command. SVG is useful for editable vector exchange. Inspect fonts, masks and effects in the exported result.","starter":"svg","example":"Make a starter logo for my bakery"},
-    {"id":"photocraft","name":"PhotoCraft","topic":"photo image retouch layers masks raster photoshop filter","guide":"Open a copy of your image. Work on separate layers and use masks rather than permanently erasing pixels. Adjust the composition first, then colour and detail. Save an editable project before flattening.","export":"Keep a layered project and export a separate delivery image. Check dimensions, transparency and colour appearance in the output. Format availability depends on this browser build.","starter":"md","example":"Make an editing checklist for a portrait"},
-    {"id":"filmcraft","name":"FilmCraft","topic":"video movie timeline clips trim cut subtitle captions srt premiere","guide":"Import footage, arrange clips on a timeline and trim the sequence. Balance dialogue before adding music. Review titles and captions, then preview the full sequence before exporting.","export":"Review sequence dimensions, frame rate, audio levels and export settings. Browser builds can have codec or hardware limitations; test a short export before a large job.","starter":"srt","example":"Make starter subtitles for a short video"},
-    {"id":"lightcraft","name":"LightCraft","topic":"raw photography exposure white balance highlights shadows lightroom grading","guide":"Begin with white balance and exposure, then recover highlights and shadows carefully. Refine the tone curve and colour. Use local masks sparingly and compare with the original before sharpening.","export":"Keep your original image and non-destructive project. Check crop, output dimensions and colour appearance when exporting. Test one image before processing a series.","starter":"md","example":"Make a RAW photo editing checklist"},
-    {"id":"pdfcraft","name":"PdfCraft","topic":"pdf pages annotate annotation reader redact document merge","guide":"Open a copy of the PDF and inspect page order and orientation. Add the required annotations or edits, save a new copy and reopen it to verify the result. Never treat a black rectangle as secure redaction.","export":"Save a separate PDF and reopen it. Verify page count, selectable text, annotations and links. For confidential documents, verify actual redaction removes underlying content.","starter":"md","example":"Make a PDF review checklist"},
-    {"id":"designcraft","name":"DesignCraft","topic":"page layout magazine print publishing bleed indesign typography","guide":"Define page size, margins and a consistent grid. Place text and images, apply repeatable styles and check overset text. Review image resolution and print requirements with the printer.","export":"Keep the editable project. Check page size, bleed, fonts and images before PDF export. Confirm the required PDF standard with your printer and inspect the exported pages.","starter":"svg","example":"Make a starter magazine cover"},
-    {"id":"effectcraft","name":"EffectCraft","topic":"motion animation compositing keyframe composition effects lottie","guide":"Create a composition with the intended duration and dimensions. Add layers and animate one property with keyframes. Preview timing before adding effects and check the final frame.","export":"Check duration, frame rate, dimensions and transparency requirements. Use an available export format and test a short composition first. Generated SVG assets are not native EffectCraft projects.","starter":"svg","example":"Make a title graphic for my animation"},
-    {"id":"gridcraft","name":"GridCraft","topic":"spreadsheet cells formula sum average budget csv xlsx excel table","guide":"Put clear headers in the first row and keep one record per row. Enter values consistently, then add formulas and check them against a small manual calculation. Save a workbook before importing unfamiliar data.","export":"Save an XLSX workbook to retain formulas and formatting. CSV contains plain table values and does not retain workbook features. Reopen the exported file and verify totals.","starter":"csv","example":"Make a starter budget spreadsheet"},
-    {"id":"wordcraft","name":"WordCraft","topic":"writing word processor document paragraphs headings docx report letter","guide":"Draft the content first and apply heading styles consistently. Use paragraph spacing instead of repeated blank lines. Check tables and page breaks, then review the document before sharing.","export":"Keep an editable document and use a separate delivery copy. DOCX is the native exchange format; PDF is useful for fixed-layout sharing. Check page breaks and fonts after export.","starter":"md","example":"Make a starter project report"},
-    {"id":"deckcraft","name":"DeckCraft","topic":"presentation slides powerpoint pptx speaker notes slideshow pitch","guide":"Give each slide one main message. Build a short outline, choose a consistent layout and use readable type. Add speaker notes and rehearse the presentation before sharing.","export":"Keep an editable presentation and inspect the delivery export. Check slide order, fonts, images and notes. This mirror pins an older web build, so upstream features may differ.","starter":"md","example":"Make a five slide presentation outline"},
-    {"id":"cadcraft","name":"CADCraft","topic":"cad drafting drawing dxf dwg dimensions circle rectangle autocad","guide":"Set units and work at the intended scale. Draw simple geometry, organise it into layers and add dimensions. Check key measurements before plotting or exchanging the drawing.","export":"Keep an editable drawing and test DXF exchange with the recipient. Confirm units, dimensions and scale. Inspect plotted PDFs before fabrication; this assistant cannot certify engineering safety.","starter":"dxf","example":"Make a starter rectangular CAD drawing"},
-    {"id":"soundcraft","name":"SoundCraft","topic":"audio music recording daw sound tracks mix wav eq protools","guide":"Create a session and check sample rate and routing. Import or record tracks, set safe levels and edit before mixing. Balance the mix at modest volume and leave headroom.","export":"Check the session range, sample rate, output format and clipping before bouncing. Listen to the exported file on another player. A generated test tone is not a finished mix.","starter":"wav","example":"Make a quiet test tone audio file"},
-    {"id":"figcraft","name":"FigCraft","topic":"interface ui ux design prototype frames components figma wireframe","guide":"Create frames for your target screen sizes. Establish reusable components and spacing rules before adding detail. Connect the main prototype flow, then check contrast and smaller screens.","export":"Keep the editable design. Export selected frames or assets using an available format, check bounds and scale, and review the result. SVG starters are assets, not full interactive prototypes.","starter":"svg","example":"Make a starter mobile screen wireframe"}
+    {
+      "id": "vectorcraft",
+      "name": "VectorCraft",
+      "topic": "vector illustration logo paths pen bezier artboard shapes svg",
+      "guide": "Start with an artboard and simple shapes. Use the Pen and Direct Selection tools for editable paths; organise related objects in layers. Keep an editable project before exporting a delivery copy.",
+      "export": "Check the artboard bounds and document size, then use the available export command. SVG is useful for editable vector exchange. Inspect fonts, masks and effects in the exported result.",
+      "starter": "svg",
+      "example": "Make a starter logo for my bakery",
+      "examples": [
+        "draw a logo with pen curves on a vector artboard",
+        "edit bezier paths in an svg illustration",
+        "create an icon from scalable vector shapes"
+      ],
+      "checks": [
+        "draw clean bezier curves for an icon",
+        "make an SVG brand mark from simple shapes"
+      ]
+    },
+    {
+      "id": "photocraft",
+      "name": "PhotoCraft",
+      "topic": "photo image retouch layers masks raster photoshop filter",
+      "guide": "Open a copy of your image. Work on separate layers and use masks rather than permanently erasing pixels. Adjust the composition first, then colour and detail. Save an editable project before flattening.",
+      "export": "Keep a layered project and export a separate delivery image. Check dimensions, transparency and colour appearance in the output. Format availability depends on this browser build.",
+      "starter": "md",
+      "example": "Make an editing checklist for a portrait",
+      "examples": [
+        "retouch a portrait with layers and masks",
+        "remove blemishes from a raster photo",
+        "adjust color and contrast in an image editor"
+      ],
+      "checks": [
+        "retouch this portrait without changing the original",
+        "mask part of a raster photo layer"
+      ]
+    },
+    {
+      "id": "filmcraft",
+      "name": "FilmCraft",
+      "topic": "video movie timeline clips trim cut subtitle captions srt premiere",
+      "guide": "Import footage, arrange clips on a timeline and trim the sequence. Balance dialogue before adding music. Review titles and captions, then preview the full sequence before exporting.",
+      "export": "Review sequence dimensions, frame rate, audio levels and export settings. Browser builds can have codec or hardware limitations; test a short export before a large job.",
+      "starter": "srt",
+      "example": "Make starter subtitles for a short video",
+      "examples": [
+        "trim footage on a video timeline and add subtitles",
+        "cut a movie into short clips",
+        "edit captions and sound for a video"
+      ],
+      "checks": [
+        "shorten a video and time its captions",
+        "arrange my footage in a movie timeline"
+      ]
+    },
+    {
+      "id": "lightcraft",
+      "name": "LightCraft",
+      "topic": "raw photography exposure white balance highlights shadows lightroom grading",
+      "guide": "Begin with white balance and exposure, then recover highlights and shadows carefully. Refine the tone curve and colour. Use local masks sparingly and compare with the original before sharpening.",
+      "export": "Keep your original image and non-destructive project. Check crop, output dimensions and colour appearance when exporting. Test one image before processing a series.",
+      "starter": "md",
+      "example": "Make a RAW photo editing checklist",
+      "examples": [
+        "develop raw photographs and correct exposure",
+        "adjust white balance in camera raw images",
+        "grade a batch of photographs non destructively"
+      ],
+      "checks": [
+        "adjust exposure on raw camera photographs",
+        "recover highlights and shadows in a raw image"
+      ]
+    },
+    {
+      "id": "pdfcraft",
+      "name": "PdfCraft",
+      "topic": "pdf pages annotate annotation reader redact document merge",
+      "guide": "Open a copy of the PDF and inspect page order and orientation. Add the required annotations or edits, save a new copy and reopen it to verify the result. Never treat a black rectangle as secure redaction.",
+      "export": "Save a separate PDF and reopen it. Verify page count, selectable text, annotations and links. For confidential documents, verify actual redaction removes underlying content.",
+      "starter": "md",
+      "example": "Make a PDF review checklist",
+      "examples": [
+        "combine pdf pages and add annotations",
+        "redact sensitive text from a pdf",
+        "reorder and review pdf pages"
+      ],
+      "checks": [
+        "merge several PDF pages and annotate them",
+        "securely redact a confidential PDF copy"
+      ]
+    },
+    {
+      "id": "designcraft",
+      "name": "DesignCraft",
+      "topic": "page layout magazine print publishing bleed indesign typography",
+      "guide": "Define page size, margins and a consistent grid. Place text and images, apply repeatable styles and check overset text. Review image resolution and print requirements with the printer.",
+      "export": "Keep the editable project. Check page size, bleed, fonts and images before PDF export. Confirm the required PDF standard with your printer and inspect the exported pages.",
+      "starter": "svg",
+      "example": "Make a starter magazine cover",
+      "examples": [
+        "lay out a magazine spread with print bleed",
+        "design a brochure with typography and margins",
+        "prepare publication pages for professional printing"
+      ],
+      "checks": [
+        "set bleed and margins for a print publication",
+        "make a magazine page layout with type"
+      ]
+    },
+    {
+      "id": "effectcraft",
+      "name": "EffectCraft",
+      "topic": "motion animation compositing keyframe composition effects lottie",
+      "guide": "Create a composition with the intended duration and dimensions. Add layers and animate one property with keyframes. Preview timing before adding effects and check the final frame.",
+      "export": "Check duration, frame rate, dimensions and transparency requirements. Use an available export format and test a short composition first. Generated SVG assets are not native EffectCraft projects.",
+      "starter": "svg",
+      "example": "Make a title graphic for my animation",
+      "examples": [
+        "animate a title with keyframes and glow effects",
+        "composite layers for a motion graphics sequence",
+        "create a lottie animation with moving text"
+      ],
+      "checks": [
+        "keyframe a text layer in an animated composition",
+        "add visual effects to a motion graphics title"
+      ]
+    },
+    {
+      "id": "gridcraft",
+      "name": "GridCraft",
+      "topic": "spreadsheet cells formula sum average budget csv xlsx excel table",
+      "guide": "Put clear headers in the first row and keep one record per row. Enter values consistently, then add formulas and check them against a small manual calculation. Save a workbook before importing unfamiliar data.",
+      "export": "Save an XLSX workbook to retain formulas and formatting. CSV contains plain table values and does not retain workbook features. Reopen the exported file and verify totals.",
+      "starter": "csv",
+      "example": "Make a starter budget spreadsheet",
+      "examples": [
+        "build formulas in a spreadsheet budget",
+        "calculate a sum across table cells",
+        "organize expenses in an xlsx workbook"
+      ],
+      "checks": [
+        "sum values in a workbook table",
+        "build a budget with spreadsheet formulas"
+      ]
+    },
+    {
+      "id": "wordcraft",
+      "name": "WordCraft",
+      "topic": "writing word processor document paragraphs headings docx report letter",
+      "guide": "Draft the content first and apply heading styles consistently. Use paragraph spacing instead of repeated blank lines. Check tables and page breaks, then review the document before sharing.",
+      "export": "Keep an editable document and use a separate delivery copy. DOCX is the native exchange format; PDF is useful for fixed-layout sharing. Check page breaks and fonts after export.",
+      "starter": "md",
+      "example": "Make a starter project report",
+      "examples": [
+        "write and format a report in a word processor",
+        "create headings and paragraphs in a docx",
+        "draft a business letter with styles"
+      ],
+      "checks": [
+        "format a report with heading styles and paragraphs",
+        "draft a letter in a document editor"
+      ]
+    },
+    {
+      "id": "deckcraft",
+      "name": "DeckCraft",
+      "topic": "presentation slides powerpoint pptx speaker notes slideshow pitch",
+      "guide": "Give each slide one main message. Build a short outline, choose a consistent layout and use readable type. Add speaker notes and rehearse the presentation before sharing.",
+      "export": "Keep an editable presentation and inspect the delivery export. Check slide order, fonts, images and notes. This mirror pins an older web build, so upstream features may differ.",
+      "starter": "md",
+      "example": "Make a five slide presentation outline",
+      "examples": [
+        "create powerpoint slides with speaker notes",
+        "outline a pitch deck for a presentation",
+        "build a slideshow with one key point per slide"
+      ],
+      "checks": [
+        "prepare a short presentation with speaker notes",
+        "make a powerpoint pitch deck"
+      ]
+    },
+    {
+      "id": "cadcraft",
+      "name": "CADCraft",
+      "topic": "cad drafting drawing dxf dwg dimensions circle rectangle autocad",
+      "guide": "Set units and work at the intended scale. Draw simple geometry, organise it into layers and add dimensions. Check key measurements before plotting or exchanging the drawing.",
+      "export": "Keep an editable drawing and test DXF exchange with the recipient. Confirm units, dimensions and scale. Inspect plotted PDFs before fabrication; this assistant cannot certify engineering safety.",
+      "starter": "dxf",
+      "example": "Make a starter rectangular CAD drawing",
+      "examples": [
+        "draw a scaled plan with dimensions in dxf",
+        "create rectangles and circles in cad",
+        "draft a technical drawing with exact units"
+      ],
+      "checks": [
+        "add dimensions to a DXF drawing",
+        "make a CAD rectangle with measured sides"
+      ]
+    },
+    {
+      "id": "soundcraft",
+      "name": "SoundCraft",
+      "topic": "audio music recording daw sound tracks mix wav eq protools",
+      "guide": "Create a session and check sample rate and routing. Import or record tracks, set safe levels and edit before mixing. Balance the mix at modest volume and leave headroom.",
+      "export": "Check the session range, sample rate, output format and clipping before bouncing. Listen to the exported file on another player. A generated test tone is not a finished mix.",
+      "starter": "wav",
+      "example": "Make a quiet test tone audio file",
+      "examples": [
+        "record tracks and balance a daw mix",
+        "edit audio and apply eq before exporting wav",
+        "mix music with safe headroom"
+      ],
+      "checks": [
+        "record and mix multiple audio tracks",
+        "apply EQ and export an audio mix"
+      ]
+    },
+    {
+      "id": "figcraft",
+      "name": "FigCraft",
+      "topic": "interface ui ux design prototype frames components figma wireframe",
+      "guide": "Create frames for your target screen sizes. Establish reusable components and spacing rules before adding detail. Connect the main prototype flow, then check contrast and smaller screens.",
+      "export": "Keep the editable design. Export selected frames or assets using an available format, check bounds and scale, and review the result. SVG starters are assets, not full interactive prototypes.",
+      "starter": "svg",
+      "example": "Make a starter mobile screen wireframe",
+      "examples": [
+        "design a mobile app wireframe with components",
+        "prototype responsive screens and links",
+        "create interface frames with consistent spacing"
+      ],
+      "checks": [
+        "create a clickable mobile interface prototype",
+        "make reusable UI components for a screen design"
+      ]
+    }
   ],
   "intents": [
-    {"id":"greeting","examples":["hello","hi there","hey assistant","good morning","hello how are you","nice to meet you","hi can we chat","greetings","hey there friend","hello craft helper"],"checks":["hi","good evening"]},
-    {"id":"help","examples":["what can you do","help me use this app","how does this work","show me the features","explain the tools","what is this application","tell me about the editor","I need help getting started","teach me the basics","how do I begin"],"checks":["show me how to start","explain this app to me"]},
-    {"id":"create","examples":["make a starter file","create a template","generate a starter","build me an example","make something for my project","produce a sample file","draft a project","create a starter asset","make me a new document","generate a downloadable template","make a starter logo for my bakery","make a starter budget spreadsheet","create something new","create a file to download","make something I can edit","build a downloadable asset","generate an example file","make starter subtitles for a short video","make an editing checklist for a portrait","make a RAW photo editing checklist","make a PDF review checklist","make a starter magazine cover","make a title graphic for my animation","make a starter project report","make a five slide presentation outline","make a starter rectangular CAD drawing","make a quiet test tone audio file","make a starter mobile screen wireframe"],"checks":["create something I can download","generate an example file for me"]},
-    {"id":"export","examples":["how do I export","save my project","download my work","export the finished file","which file format should I use","save as another format","how to share the result","convert my project for delivery","export settings help","keep an editable copy","can I save it","how can I save my work","I want to save this file","which export format is recommended","help me save a copy","what is the best export format","how do I download the result"],"checks":["how can I save this","which export format is best"]},
-    {"id":"troubleshoot","examples":["the editor is not loading","I see a blank screen","this app crashed","it is broken","my file will not open","error when loading wasm","the page is frozen","browser is slow","download failed","nothing works"],"checks":["it freezes when I open it","help fix the loading error"]},
-    {"id":"training","examples":["how was the model trained","train the neural network","does it learn from my chats","are you an llm","training status","can you train offline","run training all day","is my data private","how does the neural network work","can you control the editor","what are your limitations","do my conversations get uploaded","do you use conversations for training","learning from conversations","does this use my private chat data","is this a general language model","explain your learning process","is my conversation used for learning"],"checks":["do you use my conversations for learning","are you a general language model"]}
+    {
+      "id": "greeting",
+      "examples": [
+        "hello",
+        "hi there",
+        "hey assistant",
+        "good morning",
+        "hello how are you",
+        "nice to meet you",
+        "hi can we chat",
+        "greetings",
+        "hey there friend",
+        "hello craft helper",
+        "hi ArtCraft",
+        "hello there",
+        "hey folks",
+        "good afternoon"
+      ],
+      "checks": [
+        "hi",
+        "good evening",
+        "hello there assistant",
+        "good afternoon"
+      ]
+    },
+    {
+      "id": "help",
+      "examples": [
+        "what can you do",
+        "help me use this app",
+        "how does this work",
+        "show me the features",
+        "explain the tools",
+        "what is this application",
+        "tell me about the editor",
+        "I need help getting started",
+        "teach me the basics",
+        "how do I begin",
+        "show me how to use the timeline",
+        "give me a quick tour of the tools",
+        "what should I do first in this editor",
+        "where can I find the main controls",
+        "walk me through the basics",
+        "explain the workspace panels"
+      ],
+      "checks": [
+        "show me how to start",
+        "explain this app to me",
+        "give me a quick tour of the tools",
+        "what should I do first in this editor"
+      ]
+    },
+    {
+      "id": "create",
+      "examples": [
+        "make a starter file",
+        "create a template",
+        "generate a starter",
+        "build me an example",
+        "make something for my project",
+        "produce a sample file",
+        "draft a project",
+        "create a starter asset",
+        "make me a new document",
+        "generate a downloadable template",
+        "make a starter logo for my bakery",
+        "make a starter budget spreadsheet",
+        "create something new",
+        "create a file to download",
+        "make something I can edit",
+        "build a downloadable asset",
+        "generate an example file",
+        "make starter subtitles for a short video",
+        "make an editing checklist for a portrait",
+        "make a RAW photo editing checklist",
+        "make a PDF review checklist",
+        "make a starter magazine cover",
+        "make a title graphic for my animation",
+        "make a starter project report",
+        "make a five slide presentation outline",
+        "make a starter rectangular CAD drawing",
+        "make a quiet test tone audio file",
+        "make a starter mobile screen wireframe",
+        "make a downloadable title card template",
+        "create a spreadsheet starter with a budget",
+        "draft a project outline I can edit",
+        "build a starter for a vector icon",
+        "give me a basic layout I can customize",
+        "make a sample I can download",
+        "create a small example file for this project"
+      ],
+      "checks": [
+        "create something I can download",
+        "generate an example file for me",
+        "make a downloadable starter for a small poster",
+        "create an editable checklist file"
+      ]
+    },
+    {
+      "id": "export",
+      "examples": [
+        "how do I export",
+        "save my project",
+        "download my work",
+        "export the finished file",
+        "which file format should I use",
+        "save as another format",
+        "how to share the result",
+        "convert my project for delivery",
+        "export settings help",
+        "keep an editable copy",
+        "can I save it",
+        "how can I save my work",
+        "I want to save this file",
+        "which export format is recommended",
+        "help me save a copy",
+        "what is the best export format",
+        "how do I download the result",
+        "how do I render a finished video",
+        "what should I save as for sharing",
+        "how do I export a transparent image",
+        "where is the download option",
+        "keep an editable version and a final copy",
+        "help me choose an output format",
+        "save a copy with a different extension"
+      ],
+      "checks": [
+        "how can I save this",
+        "which export format is best",
+        "how can I render a movie to MP4",
+        "which file type should I use for delivery"
+      ]
+    },
+    {
+      "id": "troubleshoot",
+      "examples": [
+        "the editor is not loading",
+        "I see a blank screen",
+        "this app crashed",
+        "it is broken",
+        "my file will not open",
+        "error when loading wasm",
+        "the page is frozen",
+        "browser is slow",
+        "download failed",
+        "nothing works",
+        "the editor is stuck on its startup screen",
+        "the motion graphics app stays blank after loading",
+        "the canvas never appears",
+        "my browser stopped responding while opening the project",
+        "the webassembly file is failing to download",
+        "the animation editor crashes on launch",
+        "the app opens but shows an empty black canvas",
+        "the loading spinner never goes away",
+        "EffectCraft fails while opening",
+        "EffectCraft cannot get past loading"
+      ],
+      "checks": [
+        "it freezes when I open it",
+        "help fix the loading error",
+        "the web app is stuck loading on a blank screen",
+        "the webassembly file failed and the page will not start",
+        "EffectCraft is stuck on a blank loading screen",
+        "EffectCraft fails to start in the browser"
+      ]
+    },
+    {
+      "id": "training",
+      "examples": [
+        "how was the model trained",
+        "train the neural network",
+        "does it learn from my chats",
+        "are you an llm",
+        "training status",
+        "can you train offline",
+        "run training all day",
+        "is my data private",
+        "how does the neural network work",
+        "can you control the editor",
+        "what are your limitations",
+        "do my conversations get uploaded",
+        "do you use conversations for training",
+        "learning from conversations",
+        "does this use my private chat data",
+        "is this a general language model",
+        "explain your learning process",
+        "is my conversation used for learning",
+        "can you remember this preference",
+        "where does this assistant keep its memory",
+        "how many passes does the trainer use",
+        "what examples does the classifier learn from",
+        "can you improve routing with reviewed examples",
+        "is this assistant learning from our chat",
+        "do you train a language model",
+        "how is the classifier evaluated"
+      ],
+      "checks": [
+        "do you use my conversations for learning",
+        "are you a general language model",
+        "does this model learn from our messages",
+        "can you increase training with reviewed examples"
+      ]
+    }
   ]
 }

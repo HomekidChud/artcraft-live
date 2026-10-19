@@ -10,6 +10,7 @@ import time
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_EPOCHS = 1000
 
 
 def tokens(text):
@@ -34,7 +35,7 @@ def predict(net, texts):
     return np.argmax(np.tanh(x @ net["w1"] + net["b1"]) @ net["w2"] + net["b2"], axis=1)
 
 
-def fit(rows, labels, seed):
+def fit(rows, labels, seed, epochs=DEFAULT_EPOCHS):
     rng = np.random.default_rng(seed)
     vocab = sorted(set(word for text, _ in rows for word in tokens(text)))
     x = features([text for text, _ in rows], vocab)
@@ -44,7 +45,7 @@ def fit(rows, labels, seed):
               rng.normal(0, .12, (40, len(labels))), np.zeros(len(labels))]
     means = [np.zeros_like(p) for p in params]
     variances = [np.zeros_like(p) for p in params]
-    for step in range(1, 701):
+    for step in range(1, epochs + 1):
         w1, b1, w2, b2 = params
         h = np.tanh(x @ w1 + b1)
         z = h @ w2 + b2
@@ -71,8 +72,10 @@ def datasets(catalog, extra_path):
         for phrase in [craft["name"], *craft["topic"].split()]:
             for prefix in ["", "help with ", "I am using "]:
                 craft_rows.append((prefix + phrase, craft["id"]))
+        craft_rows.extend((phrase, craft["id"]) for phrase in craft.get("examples", []))
         craft_checks.extend([(f"I need {craft['name']} advice", craft["id"]),
-                             (f"working in {craft['topic'].split()[0]}", craft["id"])])
+                             (f"working in {craft['topic'].split()[0]}", craft["id"]),
+                             *((phrase, craft["id"]) for phrase in craft.get("checks", []))])
     for intent in catalog["intents"]:
         intent_rows.extend((s, intent["id"]) for s in intent["examples"])
         intent_checks.extend((s, intent["id"]) for s in intent["checks"])
@@ -93,7 +96,9 @@ def datasets(catalog, extra_path):
     return craft_rows, craft_checks, intent_rows, intent_checks
 
 
-def train(extra_path, seed=42):
+def train(extra_path, seed=42, epochs=DEFAULT_EPOCHS):
+    if not isinstance(epochs, int) or epochs < 1:
+        raise ValueError("Epochs must be a positive integer.")
     catalog = json.loads((ROOT / "catalog.json").read_text())
     cr, cc, ir, ic = datasets(catalog, extra_path)
     nets, report = {}, {}
@@ -101,7 +106,7 @@ def train(extra_path, seed=42):
         ("craft", cr, cc, [c["id"] for c in catalog["crafts"]]),
         ("intent", ir, ic, [i["id"] for i in catalog["intents"]]),
     ]:
-        net = fit(rows, labels, seed)
+        net = fit(rows, labels, seed, epochs)
         actual = predict(net, [text for text, _ in checks])
         passes = [labels[p] == label for p, (_, label) in zip(actual, checks)]
         per_label = {label: all(ok for ok, (_, expected) in zip(passes, checks)
@@ -117,7 +122,7 @@ def train(extra_path, seed=42):
     accepted = all(all(r["per_label_pass"].values()) for r in report.values())
     document = {"schema": 1, "architecture": "bag-of-words / tanh MLP / softmax",
                 "trained_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "seed": seed, "epochs": 700, "accepted": accepted,
+                "seed": seed, "epochs": epochs, "accepted": accepted,
                 "catalog_sha256": hashlib.sha256((ROOT / "catalog.json").read_bytes()).hexdigest(),
                 "evaluation_scope": "Small curated routing smoke test, not general chat/task competence.",
                 "metrics": report, "networks": nets}
@@ -135,12 +140,16 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--watch", action="store_true", help="Check for reviewed data changes; sleep when unchanged.")
     parser.add_argument("--interval", type=int, default=3600)
+    parser.add_argument("--epochs", type=int, default=DEFAULT_EPOCHS,
+                        help=f"Full-dataset training epochs (default: {DEFAULT_EPOCHS}).")
     parser.add_argument("--extra", type=Path, default=ROOT / "training/local-approved.jsonl")
     args = parser.parse_args()
     if args.interval < 60:
         parser.error("Minimum interval is 60 seconds.")
+    if args.epochs < 1:
+        parser.error("Epochs must be a positive integer.")
     if not args.watch:
-        raise SystemExit(0 if train(args.extra) else 1)
+        raise SystemExit(0 if train(args.extra, epochs=args.epochs) else 1)
     import fcntl
     lock = (ROOT / "training/.worker.lock").open("w")
     try:
@@ -154,7 +163,7 @@ def main():
                                     (args.extra.read_bytes() if args.extra.exists() else b"")).hexdigest()
             if digest != previous:
                 # Rejected candidates are not retried without new data.
-                train(args.extra)
+                train(args.extra, epochs=args.epochs)
                 previous = digest
             print(f"Worker idle; next reviewed-data check in {args.interval}s", flush=True)
         except (ValueError, OSError, KeyError) as error:

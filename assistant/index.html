@@ -3,42 +3,39 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#11141b">
-<title>ArtCraft Chat</title>
+<meta name="theme-color" content="#11151b">
+<title>ArtCraft · Assistant</title>
 <link rel="stylesheet" href="style.css">
 <script type="module" src="app.js"></script>
 </head>
 <body>
 <a class="skip" href="#composer">Skip to message</a>
-<div class="shell">
-  <aside class="sidebar">
-    <a class="brand" href="../index.html" target="_top">ArtCraft <span>LIVE</span></a>
-    <div class="sidebar-label">YOUR WORKSPACE</div>
-    <a class="nav-link" href="../index.html" target="_top">The Crafting Apps <span>↗</span></a>
-    <div class="nav-link active">Chat assistant</div>
-    <div class="sidebar-label">MADE FOR YOUR CRAFT</div>
-    <p>Small local network.<br>Practical starting points.<br>Your work stays yours.</p>
-    <div class="sidebar-bottom">No accounts. No chat uploads.<br><a href="README.md" target="_blank" rel="noopener">Setup & limitations ↗</a></div>
-  </aside>
+<div class="page-shell">
+  <header class="site-header">
+    <a class="brand" href="../index.html" target="_top" aria-label="ArtCraft home"><span class="brand-mark" aria-hidden="true">A</span>ArtCraft</a>
+    <a class="apps-link" href="../index.html" target="_top">Explore apps <span aria-hidden="true">↗</span></a>
+  </header>
   <main>
-    <header>
-      <div><div class="eyebrow">ARTCRAFT ASSISTANT</div><h1>A little help with your next idea.</h1></div>
-      <button id="reset" class="subtle" type="button">New chat</button>
-    </header>
-    <section class="context-bar" aria-label="Craft selection">
-      <label for="craft">Working in</label><select id="craft"><option value="auto">Choose automatically</option></select>
-      <a id="open-craft" hidden target="_blank" rel="noopener">Open editor ↗</a>
+    <section class="workspace-bar" aria-label="Assistant workspace">
+      <div><p class="eyebrow">ARTCRAFT · ASSISTANT</p><h1>What are you making?</h1></div>
+      <button id="reset" class="quiet-button" type="button">New chat</button>
     </section>
-    <div class="status" id="status" role="status">Loading the local neural network…</div>
+    <section class="context-bar" aria-label="Craft selection">
+      <label for="craft">Craft</label>
+      <select id="craft"><option value="auto">Choose automatically</option></select>
+      <button id="memory-toggle" class="memory-toggle" type="button" aria-pressed="false">Memory off</button>
+      <a id="open-craft" class="editor-link" hidden target="_blank" rel="noopener">Open editor <span aria-hidden="true">↗</span></a>
+    </section>
+    <div class="status" id="status" role="status">Getting things ready…</div>
     <section id="messages" class="messages" aria-label="Conversation" aria-live="polite" aria-relevant="additions">
       <div class="welcome" id="welcome">
-        <div class="eyebrow">FROM BLANK CANVAS TO FIRST STEP</div>
-        <h2>What are we making?</h2>
-        <p>Get craft-specific guidance, export advice or a starter file. Choose an app, or tell me where you’re working.</p>
-        <div class="suggestions">
-          <button type="button" data-prompt="Help me get started with VectorCraft"><span>Find your starting point</span>Help me get started with VectorCraft ↗</button>
-          <button type="button" data-prompt="Make a starter budget spreadsheet in GridCraft"><span>Make something useful</span>Create a GridCraft budget starter ↗</button>
-          <button type="button" data-prompt="How was the model trained?"><span>Under the hood</span>How does the local network work? ↗</button>
+        <div class="welcome-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <p class="welcome-kicker">A GOOD PLACE TO START</p>
+        <h2>Bring an idea. We’ll find the next step.</h2>
+        <p class="welcome-copy">Ask for a quick guide or make a starter you can download.</p>
+        <div class="suggestions" aria-label="Suggested prompts">
+          <button type="button" data-prompt="Help me get started with VectorCraft"><span class="prompt-label">GET GUIDANCE</span>Help me get started with VectorCraft ↗</button>
+          <button type="button" data-prompt="Make a starter budget spreadsheet in GridCraft"><span class="prompt-label">MAKE A STARTER</span>Create a GridCraft budget ↗</button>
         </div>
       </div>
     </section>
@@ -47,21 +44,26 @@
       <div id="attachment-status" class="attachment-status" role="status" aria-live="polite"></div>
       <form id="composer">
         <label class="sr-only" for="message">Message the ArtCraft assistant</label>
-        <textarea id="message" rows="2" maxlength="2000" placeholder="Ask a question, or attach a file…" disabled></textarea>
-        <button id="send" type="submit" disabled>Send <span aria-hidden="true">↑</span></button>
+        <textarea id="message" rows="2" maxlength="2000" placeholder="Ask a question or describe a starter…" disabled></textarea>
+        <button id="send" type="submit" disabled aria-label="Send message">Send <span aria-hidden="true">↑</span></button>
       </form>
       <div class="file-toolbar">
         <input id="file-input" class="sr-only" type="file" multiple aria-label="Choose local files to attach">
-        <button id="attach" type="button" class="subtle" disabled>Attach files</button>
-        <span>Or drop files here · 3 files · 10 MB each</span>
+        <button id="attach" type="button" class="attach-button" disabled><span aria-hidden="true">＋</span> Attach</button>
+        <span>Files stay on this device · up to 3</span>
       </div>
-      <p class="disclosure">Neural routing + curated help, not a general LLM. Starter files are templates. No editor control.</p>
-      <details><summary>Offline, privacy & training</summary><div>
-        <p id="metrics">Model evaluation is loading.</p>
-        <p id="offline-status">Offline cache is not installed yet. Keep this tab open while it is prepared.</p>
-        <p>Messages and attached files stay in this tab’s memory and disappear on reload or New chat. Files are not uploaded, used for training or automatically imported into the editor. Images are recognised by a vision model that runs on this device: the assistant’s scripts and inference runtime are served from this site, while the first analysis downloads about 155 MB of model files, which the browser caches (it may be re-downloaded if the browser evicts that cache). The image itself never leaves your machine. Text must be UTF-8 and 1 MB or smaller; images are limited to 25 megapixels. PDFs and native project formats show details only. The Python worker is separate from this page and requires an always-on host; a closed browser cannot train.</p>
-        <a href="README.md" target="_blank" rel="noopener">Read training and setup instructions ↗</a>
-      </div></details>
+      <div class="footline">
+        <span>Local chat · starter files are templates</span>
+        <details class="about-details"><summary>Details</summary><div class="details-panel">
+          <p id="metrics">Model evaluation is loading.</p>
+          <p id="offline-status">Offline cache is not installed yet.</p>
+          <p id="memory-info">Memory is off. Chat and files are not stored. Enable it to save only notes you explicitly ask it to remember.</p>
+          <button id="memory-clear" class="quiet-button" type="button" hidden>Clear saved memory</button>
+          <p>Messages and attachments last in this tab until reload or New chat. Optional memory saves only explicit notes and your last Craft on this browser; it is not chat training or cloud sync. Files are not uploaded or automatically imported. Image recognition runs on-device; its first model download is about 155 MB. Text previews are limited to 1 MB, images to 25 megapixels; PDFs and native project files show metadata only.</p>
+          <p>“Show task steps” lists local browser actions, not terminal commands. This assistant cannot edit an open project or control the editor. Its classifiers route to curated help and fixed starter templates; they are not a general-purpose language model.</p>
+          <a href="README.md" target="_blank" rel="noopener">Setup, training and limitations ↗</a>
+        </div></details>
+      </div>
     </div>
   </main>
 </div>

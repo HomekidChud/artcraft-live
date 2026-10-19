@@ -10,7 +10,7 @@ const model=JSON.parse(await readFile(new URL("model.json",root)));
 
 test("real accepted checkpoint contains two independently initialised MLPs",()=>{
   assert.equal(model.accepted,true);
-  assert.equal(model.epochs,700);
+  assert.equal(model.epochs,1000);
   assert.equal(model.networks.craft.labels.length,13);
   assert.equal(model.networks.intent.labels.length,6);
   for(const net of Object.values(model.networks)){
@@ -29,9 +29,10 @@ test("checkpoint matches the reviewed catalog",async()=>{
 for(const craft of catalog.crafts){
   test(`${craft.name}: neural craft routing and all four supported workflows`,async()=>{
     assert.equal(classify(model.networks.craft,`Help with ${craft.name}`).label,craft.id);
+    for(const phrase of craft.checks)assert.equal(classify(model.networks.craft,phrase).label,craft.id,phrase);
     assert.equal(respond(catalog,model,"help me get started",craft.id).text,craft.guide);
     assert.equal(respond(catalog,model,"how do I export",craft.id).text,craft.export);
-    assert.match(respond(catalog,model,"the editor is not loading",craft.id).text,/loading checklist/);
+    assert.match(respond(catalog,model,"the editor is not loading",craft.id).text,/quick check|startup check/);
     const result=respond(catalog,model,craft.example,craft.id);
     assert.equal(result.intent,"create");
     assert.ok(result.artifact?.blob.size>40);
@@ -58,11 +59,18 @@ test("auto routing remembers the craft and explicit craft names override history
   assert.equal(respond(catalog,model,"help with WordCraft","cadcraft","gridcraft").craft.id,"cadcraft");
 });
 test("no selected or identifiable craft asks instead of making up a project",()=>{
-  assert.match(respond(catalog,model,"make a starter file","auto").text,/Which Craft/);
+  assert.match(respond(catalog,model,"make a starter file","auto").text,/Choose a Craft/);
 });
 test("training and greeting explain the actual capability boundary",()=>{
   assert.match(respond(catalog,model,"hi","auto").text,/not a general-purpose chatbot/);
   assert.match(respond(catalog,model,"how was the model trained","auto").text,/cannot see or control/);
+});
+test("EffectCraft startup troubleshooting offers official renderer fallbacks",()=>{
+  const result=respond(catalog,model,"EffectCraft is stuck on a blank loading screen","auto");
+  assert.equal(result.intent,"troubleshoot");
+  assert.equal(result.craft.id,"effectcraft");
+  assert.deepEqual(result.recoveryOptions.map(option=>option.mode),["webgl","cpu"]);
+  assert.match(result.text,/application\/wasm/);
 });
 test("SVG starter escapes untrusted labels",async()=>{
   const artifact=makeStarter(catalog.crafts[0],'<script>alert("test")</script>&');
@@ -70,6 +78,26 @@ test("SVG starter escapes untrusted labels",async()=>{
   assert.ok(!text.includes("<script>"));
   assert.ok(text.includes("&lt;script&gt;"));
   assert.ok(text.includes("&amp;"));
+});
+test("saved local preferences tailor supported starters and appear in the action trace",async()=>{
+  const notes=[{text:"My brand colors are teal and cream",craftId:"vectorcraft"}];
+  const result=respond(catalog,model,"Make a starter logo for my bakery","vectorcraft",null,notes);
+  const svg=await result.artifact.blob.text();
+  assert.ok(svg.includes("#178f8a"));
+  assert.ok(svg.includes("Saved local preferences"));
+  assert.match(result.text,/saved local preferences were included/);
+  assert.ok(result.actions.some(action=>action.command==="findRelevantMemory(memoryEntries, craft.id, text)"));
+  assert.ok(result.actions.some(action=>action.command==="makeStarter(craft, text, relevant)"));
+  assert.ok(!JSON.stringify(result.actions).includes("My brand colors"));
+});
+test("Markdown starter receives saved notes without making unsupported native projects",async()=>{
+  const notes=[{text:"Keep portrait edits natural",craftId:"photocraft"}];
+  const result=respond(catalog,model,"Make an editing checklist for a portrait","photocraft",null,notes);
+  const markdown=await result.artifact.blob.text();
+  assert.match(markdown,/Saved local preferences/);
+  assert.match(markdown,/Keep portrait edits natural/);
+  assert.equal(result.artifact.memoryApplied,true);
+  assert.match(result.text,/fixed starter asset or outline outside the editor/);
 });
 test("CSV sample has consistent literal totals without injected formulas",async()=>{
   const text=await makeStarter(catalog.crafts.find(c=>c.id==="gridcraft"),"=HYPERLINK(\"bad\")").blob.text();

@@ -49,7 +49,9 @@ class TrainingTests(unittest.TestCase):
                 duplicate = subprocess.run(command, capture_output=True, text=True, env=env, timeout=5)
                 self.assertNotEqual(duplicate.returncode, 0)
                 self.assertIn("already running", duplicate.stderr)
-                self.assertTrue(json.loads((root / "model.json").read_text())["accepted"])
+                checkpoint = json.loads((root / "model.json").read_text())
+                self.assertTrue(checkpoint["accepted"])
+                self.assertEqual(checkpoint["epochs"], trainer.DEFAULT_EPOCHS)
             finally:
                 process.terminate()
                 process.communicate(timeout=5)

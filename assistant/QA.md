@@ -8,21 +8,25 @@ File checks cover picker and drag/drop, file-only submission, text previews, CSV
 
 ## Scope
 
-The changed surface is the new chat page plus one isolated chat script tag in each editor. Existing editor functionality, compiled JavaScript and WebAssembly are outside the change. The floating widget must not replace the editor canvas or touch project data.
+Changed surfaces include the assistant page, router/model/training data, shared chat widget, and EffectCraft entry page/service worker. The generated JavaScript and WebAssembly for all editor applications remain untouched. The floating widget must not replace the editor canvas or touch project data.
 
 ## Automated checks
 
-- Every Craft: neural Craft routing, start guidance, export guidance, loading checklist, starter artifact and correctly labelled widget injection.
+- Every Craft: neural Craft routing, start guidance, export guidance, concise loading recovery, starter artifact and correctly labelled widget injection.
 - Browser/NumPy parity: each request-routing regression phrase must predict the same expected label in JavaScript.
 - Context: auto Craft selection, follow-up memory, explicit name changes and selector precedence.
 - Defensive handling: no Craft selected, unknown words, SVG escaping and CSV formula-injection avoidance.
 - File structure: CSV totals, PCM WAV header/sample limits and closed DXF rectangle.
+- Local memory: off-by-default consent, explicit save/recall/forget, local-storage failures, bounded entries, Craft-scoped relevance and personalized supported starters.
+- Action traces: classifier, memory lookup, attachment checks and starter-generation function calls match the actions actually executed; no shell commands are claimed.
 - Training: unapproved examples rejected; a failed candidate must preserve the working checkpoint.
 
 ## Browser checks
 
 - Standalone chat at desktop and 375px: initial page, loaded model, all visible controls and readable disclosures.
 - Real message submission, Enter submission, Shift+Enter newline, starter download and New chat reset.
+- Enable local memory, save an explicit note, reload, verify the note and remembered Craft are reused, then recall and clear them. Confirm the browser contains no test note after QA.
+- Verify task traces are collapsed by default, expand to exact local calls/outcomes, and do not claim terminal/editor commands.
 - Craft selector changed and changed back; editor link destination.
 - Documentation link activated from a reply; no unexpected script injection from a message.
 - Widget opened, closed, reopened and expanded into a full tab; selected Craft follows its entrypoint.
@@ -58,3 +62,24 @@ The persistent worker was tested in a temporary local checkout and terminated af
 - A script-containing HTML attachment was displayed in a plain-text preview and did not execute. Observed file-operation requests contained no upload/non-GET requests.
 - After service-worker installation and online refresh, the chat reopened offline and inspected a newly attached CSV with the network disabled.
 - Desktop/mobile screenshots were inspected, including the initial compact state, pending files, submitted file checks and expanded mobile state. The iframe composer stayed within its viewport in the tested 375px mobile flow; no horizontal overflow was detected.
+
+
+## Memory and action-trace revision results
+
+Verified locally on 19 October 2026:
+
+- JavaScript suite: 52 tests passed, including opt-in storage, explicit remember/recall/forget, bounds, topic relevance, and memory-aware starter generation. Python training suite: three tests passed; the trained checkpoint was not changed.
+- Browser: enabled memory, saved an explicit note, reloaded, used the remembered Craft and relevant brand preference in a downloadable SVG starter, recalled the note, and cleared all test memory.
+- Historical behavior at that revision: starter actions were expanded by default, with function calls and outcomes. The current compact revision instead keeps “Show task steps” collapsed until opened.
+- Browser console: no output/errors observed during these flows. No test note remained in the browser after cleanup.
+
+## Expanded training, quieter UI, and EffectCraft recovery
+
+Verified locally on 19 October 2026:
+
+- Fresh accepted model: 1,000 epochs per classifier; 420 Craft training examples and 135 request examples. All 52 held-out Craft and 26 held-out request phrases passed. These curated checks remain smoke tests, not generalisation evidence.
+- JavaScript: 53 tests passed, including each Craft's held-out phrases and EffectCraft renderer fallback routing. Python: three trainer tests passed, including the temporary 1,000-epoch watch worker and checkpoint-rejection behavior. `node --check` and `git diff --check` passed.
+- Desktop assistant screenshot inspected at 1280×1100; a real 375×812 Chromium screenshot was inspected with no horizontal overflow. The assistant has two starter prompts, a compact Craft/memory row, and one persistent composer.
+- In the actual EffectCraft editor, the embedded chat iframe measured 358×513. After a troubleshooting response, its document remained 358×513; the composer, attach row, footer, collapsed “Show task steps” trace, and both renderer links stayed inside the panel.
+- EffectCraft default, `?webgl`, and `?cpu` URLs loaded the editor. The upstream `render.backend` status reported `active: cpu` on the CPU fallback URL. This sandbox has no usable GPU compositor, so the test does not establish performance or behavior on the user's device.
+- Verified local service-worker caches are `artcraft-assistant-v8` and `effectcraft-5d08653e92558abf-local-recovery1`. The EffectCraft application JS/WASM still match upstream v0.11.1; only its service-worker version and HTML entrypoint were locally customized.

@@ -1,6 +1,7 @@
 import {respond} from "./engine.js";
 import {readAttachment, attachmentReply, formatSize, MAX_FILES} from "./files.js";
 import {recognizeImage, formatVision, MATCH_THRESHOLD} from "./vision.js";
+import {loadMemory, setMemoryEnabled, addMemoryItem, clearMemory, forgetMemory, setLastCraft, parseMemoryCommand} from "./memory.js";
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -13,11 +14,41 @@ if (embedded) {
     if(event.key==="Escape")parent.postMessage({type:"artcraft-chat-minimize"},location.origin);
   });
 }
-let catalog, model, previousCraft, urls = [], pending = [], importing = false, generation = 0;
+let catalog, model, urls = [], pending = [], importing = false, generation = 0;
+let memory = loadMemory();
+let previousCraft = memory.enabled ? memory.lastCraft : null;
 const welcome = $("welcome");
+
 function updateControls() {
   $("attach").disabled=!model||importing;
-  $("send").disabled=!model||importing||(!$("message").value.trim()&&!pending.length);
+  $("send").disabled=!model||importing||(!$('message').value.trim()&&!pending.length);
+}
+function updateMemoryControls() {
+  const toggle=$("memory-toggle");
+  toggle.textContent=memory.enabled?`Memory on · ${memory.entries.length}`:"Memory off";
+  toggle.setAttribute("aria-pressed",String(memory.enabled));
+  toggle.disabled=!memory.available;
+  $("memory-clear").hidden=memory.entries.length===0;
+  $("memory-clear").disabled=!memory.available;
+  $("memory-info").textContent=!memory.available
+    ? "This browser blocked local storage, so persistent memory is unavailable. Chat still works without it."
+    : memory.enabled
+      ? `On this browser only: ${memory.entries.length} explicitly saved note(s)${memory.lastCraft?" and your last Craft" : ""}. Chats and files are not stored. Use “forget all” or the button below to erase notes.`
+      : `Off. Chat and files are not stored. ${memory.entries.length?`${memory.entries.length} saved note(s) remain on this browser but are not used until memory is enabled.`:"Enable it to save only notes you explicitly ask it to remember."}`;
+}
+function renderTrace(article, actions) {
+  if(!actions?.length)return;
+  const details=document.createElement("details");details.className="action-trace";
+  const summary=document.createElement("summary");summary.textContent=`Show task steps · ${actions.length}`;
+  const note=document.createElement("p");note.className="trace-note";
+  note.textContent="Local browser actions only. These are not terminal shell commands and do not control the editor.";
+  const list=document.createElement("ol");
+  for(const action of actions){
+    const item=document.createElement("li"),code=document.createElement("code"),result=document.createElement("span");
+    code.textContent=action.command;result.textContent=action.summary;
+    item.append(code,result);list.append(item);
+  }
+  details.append(summary,note,list);article.append(details);
 }
 function renderPending() {
   $("attachments").replaceChildren();
@@ -41,6 +72,7 @@ async function addFiles(files) {
     try{
       const attachment=await readAttachment(file);
       if(current!==generation)return;
+      attachment.actions=[{command:"readAttachment(file)",summary:"Checked the file locally; its contents were not uploaded or executed."}];
       pending.push(attachment);
     }catch(error){notices.push(`${file.name.slice(0,80)}: ${error.message}`);}
   }
@@ -86,6 +118,49 @@ function syncCraft() {
   buttons[1].dataset.prompt = `${starterCraft.example} in ${starterCraft.name}`;
   buttons[1].lastChild.textContent = `Create a ${starterCraft.name} starter ↗`;
 }
+function handleMemoryCommand(text) {
+  const command=parseMemoryCommand(text);
+  if(!command)return false;
+  const actions=[];
+  let answer="";
+  if(command.type==="remember"){
+    if(!memory.available){
+      answer="This browser blocks local storage, so I cannot save a persistent note here.";
+      actions.push({command:"addMemoryItem(memory, command.text, craftId)",summary:"Not run because browser storage is unavailable."});
+    }else if(!memory.enabled){
+      answer="Local memory is off, so I did not save that. Turn on the Memory control above, then send the remember request again. No conversation is saved automatically.";
+      actions.push({command:"addMemoryItem(memory, command.text, craftId)",summary:"Not run because you have not enabled local memory."});
+    }else{
+      const craftId=$("craft").value!=="auto"?$("craft").value:(previousCraft||memory.lastCraft||null);
+      const result=addMemoryItem(memory,command.text,craftId);
+      if(result.ok){
+        answer=`Saved locally on this browser: “${result.item.text}”${craftId?` (${craftId})`:""}. It is not training data and is not synced to other devices.`;
+        actions.push({command:"addMemoryItem(memory, command.text, craftId)",summary:"Saved one explicit note in this browser's local storage; no chat transcript was saved."});
+      }else{
+        answer="I could not save that note in browser storage. The chat still works without persistent memory.";
+        actions.push({command:"addMemoryItem(memory, command.text, craftId)",summary:"Save failed; no note was persisted."});
+      }
+    }
+  }else if(command.type==="recall"){
+    memory=loadMemory();
+    const visible=memory.entries.map((entry,index)=>`${index+1}. ${entry.text}${entry.craftId?` (${entry.craftId})`:""}`);
+    answer=visible.length?`${memory.enabled?"Your local saved notes":"Saved notes on this browser (memory is currently off)"}:\n${visible.join("\n")}`:"There are no saved local notes on this browser.";
+    actions.push({command:"loadMemory()",summary:`Read ${memory.entries.length} saved note(s) from this browser; nothing was sent anywhere.`});
+  }else if(command.type==="forget-all"){
+    const count=memory.entries.length;
+    const ok=clearMemory(memory);
+    previousCraft=null;
+    answer=ok?`Forgot ${count} saved note(s) and the remembered last Craft on this browser.`:"Could not clear browser storage; some saved data may remain.";
+    actions.push({command:"clearMemory(memory)",summary:ok?`Removed ${count} note(s) and the remembered last Craft from local storage.`:"Clear failed; storage may still contain the data."});
+  }else if(command.type==="forget-one"){
+    const result=forgetMemory(memory,command.query);
+    answer=result.storageError?"Could not update browser storage; the requested note may remain.":result.removed?`Forgot ${result.removed} matching note(s). ${result.remaining} note(s) remain.`:"I did not find a saved note containing that phrase.";
+    actions.push({command:"forgetMemory(memory, command.query)",summary:result.storageError?"Remove operation failed to persist.":`Removed ${result.removed} matching note(s) from local storage.`});
+  }
+  updateMemoryControls();
+  renderTrace(append("ArtCraft · Local memory",answer),actions);
+  return true;
+}
 async function submit(text) {
   text = text.trim().slice(0,2000);
   if ((!text&&!pending.length) || !model || importing) return;
@@ -93,31 +168,46 @@ async function submit(text) {
   const files=pending;pending=[];
   const user=append("You",text||"Check these attached files.");
   files.forEach(file=>renderFile(file,user));
-  if(files.length)append("ArtCraft · Local file checks",attachmentReply(files));
+  if(files.length){
+    const fileArticle=append("ArtCraft · Local file checks",attachmentReply(files));
+    renderTrace(fileArticle,files.flatMap(file=>file.actions||[]));
+  }
+  if(text&&handleMemoryCommand(text)){
+    $("message").value="";$("attachment-status").textContent=files.length?"Files checked locally. They were not imported into the editor.":"";
+    renderPending();
+    if(embedded)$("messages").scrollTop=$("messages").scrollHeight;
+    else $("messages").lastElementChild.scrollIntoView({block:"nearest"});
+    $("message").focus({preventScroll:true});return;
+  }
   const images = files.filter(file=>file.kind==="image");
   let recognizedCraft=null;
   if (images.length) {
     const article = append("ArtCraft · Image recognition","Preparing the local vision model…");
     const body = article.querySelector(".body");
+    const actions=[];
     const say = message => { body.textContent = message; scroll(); };
     const scroll = () => embedded ? $("messages").scrollTop=$("messages").scrollHeight : article.scrollIntoView({block:"nearest"});
     try {
       const parts = [];
       for (const file of images) {
-        const ranked = await recognizeImage(file.previewBlob, status => say(`${file.name}: ${status}`));
+        const onStatus = status => say(`${file.name}: ${status}`);
+        const ranked = await recognizeImage(file.previewBlob, onStatus);
+        actions.push({command:"recognizeImage(file.previewBlob, onStatus)",summary:`Compared ${file.name} against the supported Craft categories on this device.`});
         if (ranked[0] && ranked[0].confidence >= MATCH_THRESHOLD) recognizedCraft = ranked[0].craft;
         parts.push(`${file.name} — ${formatVision(ranked)}`);
       }
       say(parts.join("\n\n"));
     } catch (error) {
+      actions.push({command:"recognizeImage(file.previewBlob, status => say(...))",summary:"Attempted on-device image recognition; the local vision model was unavailable."});
       say("Image recognition is unavailable right now (" + (error?.message || "the vision model could not load") + "). "
         + "The first analysis downloads the vision model, which needs a connection; the browser caches it, though it may need downloading again if evicted. "
         + "The image stayed on this device either way.");
     }
+    renderTrace(article,actions);
   }
   const namesCraft = text && catalog.crafts.some(craft => text.toLowerCase().includes(craft.id));
   const craftChoice = (images.length && recognizedCraft && $("craft").value === "auto" && !namesCraft) ? recognizedCraft : $("craft").value;
-  const result = text ? respond(catalog,model,text,craftChoice,previousCraft) : null;
+  const result = text ? respond(catalog,model,text,craftChoice,previousCraft,memory.enabled?memory.entries:[]) : null;
   if(!result||(files.length&&!result.intent)){
     $("message").value="";$("attachment-status").textContent="Files checked locally. They were not imported into the editor.";
     renderPending();
@@ -125,8 +215,24 @@ async function submit(text) {
     else $("messages").lastElementChild.scrollIntoView({block:"nearest"});
     $("message").focus({preventScroll:true});return;
   }
-  if (result.craft) previousCraft = result.craft.id;
+  if (result.craft) {
+    previousCraft = result.craft.id;
+    if(memory.enabled&&memory.lastCraft!==result.craft.id){
+      if(setLastCraft(memory,result.craft.id)) result.actions.push({command:"setLastCraft(memory, result.craft.id)",summary:"Updated the remembered last Craft on this browser; no conversation content was saved."});
+      else result.actions.push({command:"setLastCraft(memory, result.craft.id)",summary:"Could not persist the last Craft to browser storage."});
+    }
+  }
   const article = append(result.craft ? `ArtCraft · ${result.craft.name}` : "ArtCraft",result.text);
+  renderTrace(article,result.actions);
+  if(result.recoveryOptions?.length){
+    const links=document.createElement("div");links.className="recovery-links";
+    for(const option of result.recoveryOptions){
+      const url=new URL("../effectcraft/",location.href);url.searchParams.set(option.mode,"");
+      const link=document.createElement("a");link.className="recovery-link";link.href=url.href;
+      link.target="_blank";link.rel="noopener";link.textContent=option.label;links.append(link);
+    }
+    article.append(links);
+  }
   if (result.artifact) {
     const a = document.createElement("a"); a.className = "download";
     a.href = URL.createObjectURL(result.artifact.blob); urls.push(a.href);
@@ -135,7 +241,7 @@ async function submit(text) {
     article.append(a,note);
   }
   if (result.docs && result.craft) {
-    const a = document.createElement("a"); a.className = "docs";
+    const a = document.createElement("a");
     a.href = `https://github.com/HomekidChud/artcraft-live/blob/main/${result.craft.id}/README.md`;
     a.target = "_blank"; a.rel = "noopener"; a.textContent = `Read the bundled ${result.craft.name} documentation ↗`;
     article.append(a);
@@ -157,29 +263,28 @@ $("message").addEventListener("keydown",event=>{
 $("message").addEventListener("input",updateControls);
 $("attach").addEventListener("click",()=>$("file-input").click());
 $("file-input").addEventListener("change",()=>addFiles([...$("file-input").files]));
-let dragDepth=0;
-document.addEventListener("dragenter",event=>{
-  if([...event.dataTransfer.types].includes("Files")){event.preventDefault();dragDepth++;document.body.classList.add("file-drag");}
+$("memory-toggle").addEventListener("click",()=>{
+  const enabled=!memory.enabled;
+  const ok=setMemoryEnabled(memory,enabled);
+  if(!ok)memory=loadMemory();
+  if(!memory.enabled)previousCraft=null;
+  else if(memory.lastCraft)previousCraft=memory.lastCraft;
+  updateMemoryControls();
+  $("attachment-status").textContent=ok?`Local memory ${enabled?"enabled":"disabled"}. ${enabled?"Only explicit notes and the last Craft are saved on this browser.":"Saved notes remain on this browser until you clear them."}`:"Could not change memory settings in this browser.";
 });
-document.addEventListener("dragover",event=>{
-  if([...event.dataTransfer.types].includes("Files")){event.preventDefault();event.dataTransfer.dropEffect="copy";}
+$("memory-clear").addEventListener("click",()=>{
+  const count=memory.entries.length;
+  const ok=clearMemory(memory);previousCraft=null;updateMemoryControls();
+  $("attachment-status").textContent=ok?`Cleared ${count} saved note(s) and the remembered last Craft from this browser.`:"Could not clear browser storage.";
 });
-document.addEventListener("dragleave",()=>{
-  if(--dragDepth<=0){dragDepth=0;document.body.classList.remove("file-drag");}
-});
-document.addEventListener("drop",event=>{
-  if(![...event.dataTransfer.types].includes("Files"))return;
-  event.preventDefault();dragDepth=0;document.body.classList.remove("file-drag");
-  if(event.dataTransfer.files.length)addFiles([...event.dataTransfer.files]);
-});
-document.querySelectorAll("[data-prompt]").forEach(button=>button.addEventListener("click",()=>submit(button.dataset.prompt)));
 $("craft").addEventListener("change",()=>{previousCraft=null;syncCraft();});
 $("reset").addEventListener("click",()=>{
   $("messages").querySelectorAll("audio").forEach(audio=>audio.pause());
-  urls.forEach(URL.revokeObjectURL);urls=[];previousCraft=null;
+  urls.forEach(URL.revokeObjectURL);urls=[];previousCraft=memory.enabled?memory.lastCraft:null;
   generation++;pending=[];importing=false;$("file-input").value="";$("attachment-status").textContent="";renderPending();
   $("messages").replaceChildren(welcome);$("message").value="";updateControls();$("message").focus();
 });
+updateMemoryControls();
 try {
   const responses = await Promise.all([fetch("./catalog.json"),fetch("./model.json")]);
   if (responses.some(r=>!r.ok)) throw new Error("Missing model or catalog.");
@@ -190,7 +295,7 @@ try {
   }
   if(catalog.crafts.some(c=>c.id===params.get("craft"))) $("craft").value=params.get("craft");
   syncCraft();
-  $("status").textContent="Local network ready · Runs on your device · No chat uploads";
+  $("status").textContent="Ready";
   $("status").classList.add("ready");
   $("message").disabled=false;updateControls();
   $("metrics").textContent=`Trained from scratch: ${model.epochs} epochs per network. Craft routing: ${model.metrics.craft.correct}/${model.metrics.craft.total}; request routing: ${model.metrics.intent.correct}/${model.metrics.intent.total}. These are small curated smoke tests, not proof of general chat ability. Checkpoint: ${model.trained_at}.`;
@@ -210,4 +315,4 @@ if ("serviceWorker" in navigator) {
   } catch {
     $("offline-status").textContent="Offline caching is unavailable here. Chat still works in this open tab; reopening offline is not guaranteed.";
   }
-} else $("offline-status").textContent="This browser does not support the offline cache. Chat works in this open tab only.";
+} else $("offline-status").textContent="This browser does not support the offline cache. Chat works in this tab only.";

@@ -1,15 +1,17 @@
 # ArtCraft Chat
 
-A small, fully local assistant shared by all 13 Craft apps. It combines two neural classifiers trained from random weights with curated workflow advice and fixed starter-file templates. It is not a pretrained foundation model, a generative LLM, or an autonomous editor agent.
+A small, fully local assistant shared by all 13 Craft apps. It combines two neural classifiers trained from random weights with curated workflow advice and fixed starter-file templates. It offers opt-in browser-local memory and an expandable trace of actions actually run. It is not a pretrained foundation model, a generative LLM, or an autonomous editor agent.
 
 ## What works
 
 - **Chat tab:** a standalone chat at `assistant/`, plus a 44px circular launcher in each editor. The panel starts compact, can expand or minimize, and retains the conversation and pending attachments while minimized. The selector automatically follows the editor where the panel was opened. Escape from the message field also minimizes the panel.
+- **Local memory:** off by default. Turn it on with the Memory control, then explicitly ask the assistant to “remember that …” or “remember my …”. It stores only those notes and the last Craft in this browser's `localStorage`, not chat transcripts, files or model weights. “What do you remember?”, “forget [phrase]” and “forget everything” manage the saved notes. The Memory panel also shows the saved-note count and has a clear-all control. It does not sync between browsers or devices.
+- **Action trace:** each reply keeps its exact browser calls and outcomes under a compact “Show task steps” disclosure, collapsed by default. Expand it to inspect request routing, file checks, image recognition and starter generation. These are not terminal shell commands; no arbitrary command execution is available.
 - **All Crafts:** getting-started guidance, export guidance, loading troubleshooting, and a starter artifact for each app.
 - **Neural network:** NumPy implementation of token counts, L2-normalised inputs, a 40-unit tanh hidden layer, softmax output, cross-entropy, manual backpropagation and Adam. One network routes 13 Crafts and a second routes six supported request types. Browser inference is plain JavaScript with no external libraries.
-- **Initial training:** `model.json` is the actual trained checkpoint, not a placeholder. It includes the seed, timestamp, epoch count and test results. The small curated regression checks are useful smoke tests, not independent evidence of conversational intelligence. Some examples were expanded after early checks failed; the reported checks are therefore development/regression checks, not an untouched benchmark.
+- **Training:** `model.json` is the actual trained checkpoint, not a placeholder. The current checkpoint uses 1,000 epochs, 420 Craft examples and 135 request examples; it records the seed, timestamp and held-out routing checks. The 52/52 Craft and 26/26 request checks are curated development smoke tests, not independent evidence of conversational intelligence or broad generalisation.
 - **Offline use:** once this assistant URL has been opened and its service worker installed successfully, its local scripts, catalog and model are cached. Reload once while connected. The chat can then reopen offline on the same origin, provided the browser has not evicted its cache. This does not download all editor WebAssembly bundles or make the entire suite offline.
-- **Privacy:** messages and attached files stay in the open tab's memory. Reload and New chat clear them; minimizing does not. No chat collection, analytics, automatic uploads, self-training from users, remote model calls or API keys. Image recognition runs in your browser; images never leave your device.
+- **Privacy:** messages and attached files stay in the open tab's memory. Reload and New chat clear them; minimizing does not. Optional local memory is disabled until enabled and saves only explicit notes and the last Craft. Saved notes are not used for automatic training or sent to a server. No chat collection, analytics, automatic uploads, self-training from users, remote model calls or API keys. Image recognition runs in your browser; images never leave your device.
 
 ## Local file attachments
 
@@ -27,7 +29,7 @@ File inspection is deterministic for text and data files; attached images additi
 
 ## Starter artifacts
 
-These use deterministic templates selected by the request router. They are useful starting points, not custom neural-generated finished work. The brief labels the template where applicable; this implementation does not fully interpret arbitrary specifications.
+These use deterministic templates selected by the request router. They are useful starting points, not custom neural-generated finished work. The brief labels the template where applicable; this implementation does not fully interpret arbitrary specifications. Relevant explicit memory can be included in Markdown, SVG metadata and DXF comments; other fixed formats do not automatically apply saved preferences.
 
 | Craft | Starter | Scope |
 |---|---|---|
@@ -46,6 +48,12 @@ These use deterministic templates selected by the request router. They are usefu
 | FigCraft | SVG | Static mobile wireframe asset, not a prototype |
 
 Import support differs across the bundled browser versions. Markdown checklists are meant to be read/copied; not every editor can import every starter. The browser apps are prebuilt upstream bundles and this assistant does not inspect, change or control their project state.
+
+## What “perform a task” means here
+
+The assistant can perform its supported local operations: inspect permitted attachments, classify a request, select a Craft and prepare a fixed starter download. Each response has a collapsed “Show task steps” trace of the calls it ran. It does not open or edit the current Craft document, run operating-system shell commands, install software, or execute arbitrary code. The editor folders contain upstream prebuilt WebAssembly bundles rather than source-level automation adapters. Real editor automation would require supported APIs or command adapters from those upstream apps, a reviewed allowlist of actions, previews and confirmation before changes.
+
+The assistant is not a general-purpose LLM. A server-hosted generative model would need a separate backend; embedding a provider API key in these static GitHub Pages files would expose it publicly. Opt-in local memory can personalize a few supported templates, but it does not change model weights. The reviewed catalog and routing checkpoint can be retrained; that improves request/Craft routing only, not factual knowledge or general reasoning.
 
 ## Run locally
 
@@ -68,7 +76,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python assistant/training/tra
 npm test
 ```
 
-Training uses the local `catalog.json`. A candidate must pass the curated regression checks for every Craft and intent label. Rejected candidates never replace the working checkpoint. Acceptance of these narrow checks does not establish safety or broad task competence; review changed answers and templates separately.
+Training uses the local `catalog.json` (default: 1,000 full-dataset epochs; override with `--epochs N`). The current checkpoint was trained from 420 Craft and 135 request examples. A candidate must pass every held-out check for every Craft and intent label; rejected candidates never replace the working checkpoint. Acceptance of these narrow checks does not establish safety or broad task competence; review changed answers and templates separately.
 
 ## Always-on worker
 
@@ -113,4 +121,4 @@ A fluent, general conversational model trained from scratch needs a much larger 
 
 ## Provenance
 
-The craft summaries are derived from the documentation already bundled in this repository, with conservative workflow guidance. Each craft-specific help reply links to its bundled README on GitHub. Those READMEs may discuss native or newer upstream features that are absent from the mirrored web build. Existing upstream licenses and notices are retained; the overlay does not modify generated JavaScript or WebAssembly.
+The craft summaries are derived from the documentation already bundled in this repository, with conservative workflow guidance. Each craft-specific help reply links to its bundled README on GitHub. Those READMEs may discuss native or newer upstream features that are absent from the mirrored web build. Existing upstream licenses and notices are retained; assistant changes do not modify generated JavaScript or WebAssembly. EffectCraft's official source tag and web-build provenance are recorded in [`../effectcraft/UPSTREAM.md`](../effectcraft/UPSTREAM.md).
