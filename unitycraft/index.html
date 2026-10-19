@@ -1297,6 +1297,7 @@ function togglePlay() {
       ed.objects = ed.playSnapshot.map(x => x.o);
     }
     ed.playSnapshot = null;
+    renderHierarchy();
     renderInspector();
     log('sys', 'Exited Play Mode (scene state restored)');
   }
