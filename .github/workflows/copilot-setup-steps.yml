@@ -1,0 +1,33 @@
+# Prepares the shell environment for the GitHub Copilot coding agent.
+# The job name "copilot-setup-steps" is required: the agent runs these steps
+# inside its own Actions environment before it starts work, which gives it
+# Node 22, Python 3.12 and the training dependencies it needs to run the
+# assistant test suites and retrain the model itself.
+name: Copilot setup steps
+on:
+  workflow_dispatch:
+  push:
+    paths: [".github/workflows/copilot-setup-steps.yml"]
+  pull_request:
+    paths: [".github/workflows/copilot-setup-steps.yml"]
+permissions: {}
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install assistant training dependencies
+        run: pip install -r assistant/training/requirements.txt
+      - name: Verify the agent toolchain
+        env:
+          OPENBLAS_NUM_THREADS: "1"
+          OMP_NUM_THREADS: "1"
+        run: |
+          npm test
+          python -m unittest discover -s assistant/tests -p 'test_*.py'

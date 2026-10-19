@@ -1,0 +1,69 @@
+# Keeps assistant/model.json in sync with assistant/catalog.json.
+# Whenever reviewed training data changes, this retrains the router with the
+# pinned settings (seed 42, 1,000 epochs), runs both test suites against the
+# candidate, and commits the accepted checkpoint to the same branch. The
+# trainer refuses to promote a candidate that fails any per-label check, so a
+# bad dataset fails the run instead of shipping a broken model.
+name: Assistant checkpoint retrain
+on:
+  workflow_dispatch:
+  push:
+    branches: ["**"]
+    paths: ["assistant/catalog.json", ".github/workflows/assistant-retrain.yml"]
+permissions:
+  contents: write
+concurrency:
+  group: assistant-retrain-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r assistant/training/requirements.txt
+      - name: Check whether the checkpoint already matches the catalog
+        id: state
+        run: |
+          sync=$(python3 -c "
+          import hashlib, json
+          catalog = hashlib.sha256(open('assistant/catalog.json','rb').read()).hexdigest()
+          try:
+              model = json.load(open('assistant/model.json'))
+              print('true' if model.get('catalog_sha256') == catalog else 'false')
+          except Exception:
+              print('false')
+          ")
+          echo "in_sync=$sync" >> "$GITHUB_OUTPUT"
+      - name: Retrain the checkpoint
+        if: steps.state.outputs.in_sync == 'false'
+        env:
+          OPENBLAS_NUM_THREADS: "1"
+          OMP_NUM_THREADS: "1"
+        run: python assistant/training/train.py
+      - name: Verify the candidate with both suites
+        if: steps.state.outputs.in_sync == 'false'
+        env:
+          OPENBLAS_NUM_THREADS: "1"
+          OMP_NUM_THREADS: "1"
+        run: |
+          npm test
+          python -m unittest discover -s assistant/tests -p 'test_*.py'
+      - name: Commit the accepted checkpoint
+        if: steps.state.outputs.in_sync == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "$GITHUB_REF_NAME"
+          git rebase "origin/$GITHUB_REF_NAME"
+          git add assistant/model.json
+          git commit -m "Retrain assistant checkpoint for updated catalog"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+      - name: Checkpoint already in sync
+        if: steps.state.outputs.in_sync == 'true'
+        run: echo "assistant/model.json already matches assistant/catalog.json; nothing to do."
