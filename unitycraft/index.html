@@ -689,14 +689,21 @@ function toast(msg) {
 let editorReady = false;
 function openEditor(project) {
   $('#hub').classList.add('hidden');
-  const ed = $('#editor');
-  ed.style.display = 'flex';
+  const edEl = $('#editor');
+  edEl.style.display = 'flex';
   status(`Opening project "${project.name}" (Editor ${project.ver})…`);
   if (!editorReady) { initEditor(); editorReady = true; }
   resetSceneFor(project);
   status(`Loaded SampleScene — ${project.name} (Editor ${project.ver})`);
   log('sys', `Project opened: ${project.name} @ ${$('#proj-loc').value || '~/UnityProjects'}`);
 }
+
+/* storage: localStorage when available, in-memory fallback (e.g. sandboxed preview) */
+const store = (() => {
+  let mem = null;
+  try { const t = window.localStorage; t.setItem('__uc', '1'); t.removeItem('__uc'); return t; }
+  catch (e) { return { getItem: () => mem, setItem: (k, v) => { mem = v; }, removeItem: () => { mem = null; } }; }
+})();
 
 const ed = {
   objects: [], selected: null, idSeq: 1, tool: 'move', playing: false, paused: false,
@@ -1103,19 +1110,22 @@ function handleAction(d) {
   if (d.act === 'new-scene') { resetSceneFor({ target: 'cube', name: 'Untitled', ver: '6000.1.7f1' }); log('sys', 'New SampleScene created'); }
   if (d.act === 'save-scene') {
     const data = JSON.stringify(ed.objects.map(o => ({ name: o.userData.name, type: o.userData.type, p: o.position.toArray(), r: [o.rotation.x, o.rotation.y, o.rotation.z], s: o.scale.toArray() })));
-    localStorage.setItem('unitycraft-scene', data);
+    store.setItem('unitycraft-scene', data);
     log('sys', 'SampleScene saved (localStorage)');
     toast('Scene saved');
   }
   if (d.act === 'open-scene') {
-    const data = localStorage.getItem('unitycraft-scene');
+    const data = store.getItem('unitycraft-scene');
     if (!data) { log('warn', 'No saved scene found'); toast('No saved scene'); return; }
-    resetSceneFor({ target: 'cube', name: 'Untitled', ver: '6000.1.7f1' });
+    ed.objects.slice().forEach(o => { removeHelper(o); scene.remove(o); });
+    ed.objects = [];
     JSON.parse(data).forEach(d0 => {
       const o = makeObject(d0.type, { name: d0.name });
       o.position.fromArray(d0.p); o.scale.fromArray(d0.s);
       o.rotation.set(d0.r[0], d0.r[1], d0.r[2]);
     });
+    ed.selected = null; tcontrols.detach();
+    renderHierarchy(); renderInspector();
     log('sys', 'Scene loaded from save');
   }
   if (d.act === 'back-hub') { $('#editor').style.display = 'none'; $('#hub').classList.remove('hidden'); renderHub(); }
