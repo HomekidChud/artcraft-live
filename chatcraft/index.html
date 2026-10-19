@@ -303,6 +303,14 @@
   ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 40%, transparent); border-radius: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
 
+  #session-note {
+    padding: 6px 16px;
+    font-size: 12px;
+    color: var(--text-faint, #9a9a9a);
+    background: color-mix(in srgb, var(--accent, #10a37f) 12%, transparent);
+    border-bottom: 1px solid var(--border, #2a2a2a);
+  }
+
   /* ---------- Mobile ---------- */
   @media (max-width: 768px) {
     #sidebar { position: fixed; inset: 0 30% 0 0; box-shadow: var(--shadow); }
@@ -361,6 +369,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
     </header>
+    <div id="session-note" hidden>Preview: web storage is unavailable here, so chats and keys last only for this session.</div>
     <div id="thread">
       <div class="thread-inner" id="thread-inner">
         <div id="welcome">
@@ -484,15 +493,21 @@ const LS = {
 // Persistent storage where the browser allows it (e.g. GitHub Pages). Sandboxed
 // preview iframes can block web storage entirely, so we probe it once and fall
 // back to an in-memory store there (chats then last only for the session).
+// The deployed preview build ships a pure in-memory store (see preview-build.py).
 const store = (() => {
   try {
-    const s = window["loc" + "alStorage"];
     const probe = "__cc_probe__";
-    s.setItem(probe, "1"); s.removeItem(probe);
-    return s;
+    localStorage.setItem(probe, "1"); localStorage.removeItem(probe);
+    return {
+      persistent: true,
+      getItem: (k) => localStorage.getItem(k),
+      setItem: (k, v) => localStorage.setItem(k, v),
+      removeItem: (k) => localStorage.removeItem(k),
+    };
   } catch (e) {
     const mem = new Map();
     return {
+      persistent: false,
       getItem: (k) => (mem.has(k) ? mem.get(k) : null),
       setItem: (k, v) => mem.set(k, String(v)),
       removeItem: (k) => mem.delete(k),
@@ -815,7 +830,7 @@ async function streamAssistant(chat, retryFrom) {
       const reader = res.body.getReader();
       // make stop robust: cancel the body reader when aborted (covers providers where
       // the abort signal does not tear down the body stream by itself)
-      ctrl.signal.addEventListener("abort", () => { try { reader.cancel(); } catch (e) { /* already closed */ } }, { once: true });
+      ctrl.signal.addEventListener("abort", () => { reader.cancel().catch(() => { /* already closed */ }); }, { once: true });
       const dec = new TextDecoder();
       let buf = "";
       while (true) {
@@ -1067,6 +1082,12 @@ function bind() {
 
 /* ---------------- boot ---------------- */
 load();
+if (!store.persistent) {
+  $("#session-note").hidden = false;
+  const rk = $("#remember-keys");
+  rk.disabled = true;
+  rk.closest(".check").style.opacity = "0.5";
+}
 bind();
 updateModelPill();
 renderChatList();
