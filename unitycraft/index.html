@@ -1,0 +1,1278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UnityCraft — Unity Hub & Editor, in your browser</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23131313'/%3E%3Cpath fill='%23e1e1e1' d='M32 12l14 8-14 8-14-8 14-8zm14 12v16l-14 8-14-8V24l14 8 14-8z'/%3E%3C/svg%3E">
+<meta name="description" content="UnityCraft — a browser reconstruction of the Unity Hub launcher and a Unity Editor-style 3D workspace: scene view, hierarchy, inspector, play mode.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     UnityCraft — browser reconstruction of Unity Hub 3.22.3 (dark)
+     and a Unity Editor-style workspace.
+     Hub chrome evidence: UnityHubSetup-x86_64.AppImage (Unity Hub
+     3.22.3, Electron) — extracted renderer HTML/CSS + module map.
+     ============================================================ */
+  :root {
+    --hub-bg: #131313;          /* Hub loading screen bg (observed) */
+    --hub-surface: #1b1b1b;
+    --hub-surface-2: #212121;
+    --hub-border: #2b2b2b;
+    --hub-text: #e1e1e1;        /* Hub logo fill (observed) */
+    --hub-muted: #9a9a9a;
+    --hub-accent: #cddc39;      /* Unity lime accent */
+    --ed-bg: #191919;
+    --ed-panel: #1f1f1f;
+    --ed-panel-2: #232323;
+    --ed-header: #2a2a2a;
+    --ed-border: #121212;
+    --ed-border-soft: #333333;
+    --ed-text: #b4b4b4;
+    --ed-text-bright: #dcdcdc;
+    --ed-muted: #7a7a7a;
+    --ed-blue: #2f5d8a;         /* Unity selection blue */
+    --ed-blue-hover: #38659a;
+    --ed-toolbar: #3d3d3d;
+    --ed-gizmo-x: #e23d4e;
+    --ed-gizmo-y: #63a83b;
+    --ed-gizmo-z: #3a7bd0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--hub-bg);
+    color: var(--hub-text);
+    overflow: hidden;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  input, select { font: inherit; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  /* ---------- Hub loading screen (recreated from extracted CSS) ---------- */
+  #loading {
+    position: fixed; inset: 0; z-index: 100;
+    background: var(--hub-bg);
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity .6s ease, visibility .6s;
+  }
+  #loading.is-dismissed { opacity: 0; visibility: hidden; }
+  .hub-logo { width: 65px; height: 65px; transform: scale(1.4); }
+  .hub-logo .logo { fill: var(--hub-text); transform-origin: 50%; transform: scale(.8); animation: .3s cubic-bezier(.7,0,.84,0) forwards hub-logo-scale-out; }
+  .hub-logo circle { fill: none; stroke: #363636; stroke-dasharray: 80 200; stroke-dashoffset: 0; stroke-linecap: round; stroke-width: 1.5px; transform-origin: 32% 32%; will-change: transform; animation: 1.4s linear infinite hub-logo-rotate, 1.4s ease-in-out infinite hub-logo-spin; }
+  @keyframes hub-logo-rotate { 0% { transform: rotate(0); } to { transform: rotate(360deg); } }
+  @keyframes hub-logo-spin { 0% { stroke-dasharray: 1 200; stroke-dashoffset: 0; } 50% { stroke-dasharray: 100 200; stroke-dashoffset: -50px; } to { stroke-dasharray: 100 200; stroke-dashoffset: -185px; } }
+  @keyframes hub-logo-scale-out { 0% { transform: scale(.8); } to { transform: translate(-10px,-10px) scale(0); } }
+
+  /* ---------- Hub window ---------- */
+  #hub { display: flex; height: 100dvh; }
+  .hub-titlebar {
+    position: fixed; top: 0; left: 0; right: 0; height: 36px;
+    display: flex; align-items: center; gap: 10px;
+    background: var(--hub-surface); border-bottom: 1px solid var(--hub-border);
+    -webkit-app-region: drag; z-index: 10; padding: 0 12px;
+  }
+  .hub-titlebar .dot { width: 11px; height: 11px; border-radius: 50%; background: #3d3d3d; }
+  .hub-titlebar .title { color: var(--hub-muted); font-size: 12px; }
+  .hub-titlebar .winbtns { margin-left: auto; display: flex; gap: 14px; color: var(--hub-muted); -webkit-app-region: no-drag; }
+  .hub-sidebar {
+    width: 200px; flex-shrink: 0; margin-top: 36px;
+    background: var(--hub-surface); border-right: 1px solid var(--hub-border);
+    display: flex; flex-direction: column; padding: 10px 8px;
+  }
+  .hub-nav { display: flex; align-items: center; gap: 11px; padding: 9px 12px; border-radius: 6px; color: var(--hub-muted); cursor: pointer; font-weight: 500; }
+  .hub-nav:hover { background: var(--hub-surface-2); color: var(--hub-text); }
+  .hub-nav.active { background: #2c2c2c; color: #fff; }
+  .hub-nav svg { width: 17px; height: 17px; flex-shrink: 0; }
+  .hub-sidebar .spacer { flex: 1; }
+  .hub-sidebar .foot { padding: 8px 12px; color: #6d6d6d; font-size: 11px; }
+  .hub-main { flex: 1; margin-top: 36px; overflow-y: auto; padding: 26px 30px 40px; }
+  .hub-head { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+  .hub-head h2 { font-size: 19px; font-weight: 600; color: #fff; }
+  .hub-search {
+    margin-left: auto; background: var(--hub-surface-2); border: 1px solid var(--hub-border);
+    border-radius: 6px; color: var(--hub-muted); padding: 7px 12px; width: 220px; outline: none;
+  }
+  .hub-search:focus { border-color: #4a4a4a; }
+  .btn {
+    padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 12.5px;
+    background: var(--hub-surface-2); border: 1px solid var(--hub-border); color: var(--hub-text);
+  }
+  .btn:hover { background: #2a2a2a; }
+  .btn.primary { background: #fff; color: #131313; border-color: #fff; }
+  .btn.primary:hover { background: #e8e8e8; }
+  .project-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+  .project-card {
+    background: var(--hub-surface); border: 1px solid var(--hub-border); border-radius: 8px;
+    padding: 16px; cursor: pointer; transition: border-color .15s;
+  }
+  .project-card:hover { border-color: #5a5a5a; }
+  .project-card .thumb {
+    height: 110px; border-radius: 6px; margin-bottom: 12px;
+    display: grid; place-items: center; font-size: 34px; color: rgba(255,255,255,.75);
+  }
+  .project-card h3 { font-size: 14px; color: #fff; font-weight: 600; margin-bottom: 4px; }
+  .project-card .row { display: flex; align-items: center; gap: 8px; color: var(--hub-muted); font-size: 12px; }
+  .ver-chip { border: 1px solid var(--hub-border); border-radius: 99px; padding: 1px 8px; font-size: 11px; }
+  .favorite { margin-left: auto; color: #6d6d6d; cursor: pointer; font-size: 15px; }
+  .favorite.on { color: #e8b93c; }
+  .hub-section-title { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--hub-muted); margin: 26px 0 12px; font-weight: 600; }
+
+  /* ---------- New project modal ---------- */
+  #modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 50;
+    display: none; align-items: center; justify-content: center;
+  }
+  #modal-overlay.open { display: flex; }
+  .modal {
+    width: min(860px, 92vw); max-height: 86dvh; overflow-y: auto;
+    background: var(--hub-surface); border: 1px solid var(--hub-border); border-radius: 10px;
+    padding: 24px 26px;
+  }
+  .modal h2 { color: #fff; font-size: 17px; margin-bottom: 16px; font-weight: 600; }
+  .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .tpl {
+    border: 1px solid var(--hub-border); border-radius: 8px; padding: 12px; cursor: pointer;
+    background: var(--hub-surface-2);
+  }
+  .tpl:hover { border-color: #5a5a5a; }
+  .tpl.selected { border-color: var(--hub-accent); box-shadow: 0 0 0 1px var(--hub-accent); }
+  .tpl .art { height: 84px; border-radius: 5px; margin-bottom: 10px; display: grid; place-items: center; font-size: 28px; }
+  .tpl .nm { font-weight: 600; color: #e8e8e8; font-size: 13px; }
+  .tpl .ds { color: var(--hub-muted); font-size: 11.5px; margin-top: 3px; }
+  .form-row { display: flex; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
+  .field { flex: 1; min-width: 200px; }
+  .field label { display: block; color: var(--hub-muted); font-size: 12px; margin-bottom: 5px; }
+  .field input, .field select {
+    width: 100%; background: var(--hub-surface-2); border: 1px solid var(--hub-border);
+    border-radius: 6px; padding: 8px 10px; color: var(--hub-text); outline: none;
+  }
+  .modal .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+
+  /* ---------- Editor ---------- */
+  #editor { display: none; height: 100dvh; flex-direction: column; background: var(--ed-bg); }
+  .ed-menubar {
+    height: 30px; display: flex; align-items: stretch; background: #2b2b2b; flex-shrink: 0;
+    border-bottom: 1px solid var(--ed-border); user-select: none;
+  }
+  .ed-menubar .brand { display: flex; align-items: center; padding: 0 10px 0 8px; color: #eee; font-weight: 700; font-size: 12px; }
+  .ed-menu { position: relative; }
+  .ed-menu > button { padding: 0 11px; color: #c8c8c8; font-size: 12px; height: 100%; }
+  .ed-menu > button:hover, .ed-menu.open > button { background: #3a3a3a; color: #fff; }
+  .ed-dropdown {
+    position: absolute; top: 100%; left: 0; min-width: 210px; background: #2b2b2b;
+    border: 1px solid #111; border-radius: 0 0 4px 4px; z-index: 60; display: none;
+    box-shadow: 0 6px 18px rgba(0,0,0,.5); padding: 4px 0;
+  }
+  .ed-menu.open .ed-dropdown { display: block; }
+  .ed-dropdown button { display: flex; justify-content: space-between; gap: 24px; width: 100%; text-align: left; padding: 5px 12px; font-size: 12px; color: #c8c8c8; }
+  .ed-dropdown button:hover { background: var(--ed-blue); color: #fff; }
+  .ed-dropdown .sep { height: 1px; background: #1c1c1c; margin: 4px 2px; }
+  .ed-toolbar {
+    height: 36px; background: var(--ed-toolbar); display: flex; align-items: center; padding: 0 8px;
+    gap: 6px; flex-shrink: 0; border-bottom: 1px solid var(--ed-border); user-select: none;
+  }
+  .tool {
+    width: 28px; height: 28px; border-radius: 4px; display: grid; place-items: center; color: #c8c8c8;
+    font-size: 13px; font-weight: 700;
+  }
+  .tool:hover { background: #4a4a4a; color: #fff; }
+  .tool.active { background: #585858; color: #fff; box-shadow: inset 0 0 0 1px #666; }
+  .toolbar-group { display: flex; gap: 2px; padding: 0 8px; border-right: 1px solid #2f2f2f; height: 26px; align-items: center; }
+  .toolbar-group:last-child { border-right: none; }
+  .play-btn { width: 30px; height: 26px; border-radius: 4px; display: grid; place-items: center; color: #c8c8c8; }
+  .play-btn svg { width: 14px; height: 14px; }
+  .play-btn:hover { background: #4a4a4a; }
+  .play-btn.active { background: #7aad4a; color: #0e120a; }
+  .ed-toolbar .center { margin: 0 auto; display: flex; gap: 2px; }
+  .ed-toolbar .right { display: flex; align-items: center; gap: 6px; color: #9a9a9a; font-size: 11px; }
+  .ed-body { flex: 1; display: flex; min-height: 0; }
+  .ed-col-left { width: 216px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--ed-panel); border-right: 1px solid var(--ed-border); }
+  .ed-col-center { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .ed-col-right { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--ed-panel); border-left: 1px solid var(--ed-border); }
+  .ed-col-bottom { height: 230px; display: flex; flex-direction: column; background: var(--ed-panel); border-top: 1px solid var(--ed-border); }
+  .panel-tabs {
+    height: 26px; display: flex; align-items: stretch; background: var(--ed-header); flex-shrink: 0;
+    user-select: none; overflow: hidden;
+  }
+  .ptab {
+    display: flex; align-items: center; gap: 6px; padding: 0 12px; font-size: 12px; color: #a0a0a0;
+    border-right: 1px solid var(--ed-border); cursor: pointer; white-space: nowrap;
+  }
+  .ptab.active { background: var(--ed-panel); color: #e6e6e6; box-shadow: inset 0 2px 0 #888; }
+  .ptab:not(.active):hover { background: #313131; color: #d6d6d6; }
+  .ptab .x { opacity: .5; font-size: 11px; }
+  .panel-body { flex: 1; overflow-y: auto; min-height: 0; position: relative; }
+
+  /* Hierarchy */
+  #hierarchy { font-size: 12px; }
+  .hitem {
+    display: flex; align-items: center; gap: 6px; padding: 3px 8px; cursor: default; color: #c8c8c8;
+    border-left: 2px solid transparent;
+  }
+  .hitem:hover { background: #2a2a2a; }
+  .hitem.selected { background: var(--ed-blue); color: #fff; }
+  .hitem .icon { font-size: 11px; width: 14px; text-align: center; color: #8f8f8f; }
+  .hitem.selected .icon { color: #d6e4f5; }
+  .hitem .caret { width: 12px; font-size: 9px; color: #777; }
+
+  /* Scene view */
+  #scene-container { flex: 1; position: relative; min-height: 0; background: #262626; }
+  #scene-container canvas { display: block; }
+  #scene-toolbar {
+    position: absolute; top: 6px; left: 8px; display: flex; gap: 10px; align-items: center;
+    color: #9c9c9c; font-size: 11px; z-index: 5; text-shadow: 0 1px 2px rgba(0,0,0,.6);
+  }
+  #scene-toolbar label { display: flex; gap: 4px; align-items: center; cursor: pointer; }
+  #axis-gizmo {
+    position: absolute; right: 14px; bottom: 14px; width: 92px; height: 92px; z-index: 5;
+    pointer-events: none;
+  }
+  #scene-overlay {
+    position: absolute; left: 10px; bottom: 10px; color: #8f8f8f; font-size: 11px; z-index: 5;
+    text-shadow: 0 1px 2px rgba(0,0,0,.6);
+  }
+  .tint-play { position: absolute; inset: 0; background: rgba(60,90,160,.10); pointer-events: none; z-index: 4; }
+
+  /* Inspector */
+  #inspector { font-size: 12px; }
+  .insp-header {
+    padding: 8px 10px; background: #2a2a2a; color: #e0e0e0; display: flex; align-items: center; gap: 8px;
+    position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--ed-border);
+  }
+  .insp-header .checks { margin-left: auto; display: flex; gap: 10px; color: #8f8f8f; }
+  .comp {
+    border-bottom: 1px solid var(--ed-border); background: var(--ed-panel-2); margin-bottom: 1px;
+  }
+  .comp-header {
+    padding: 6px 10px; background: #2a2a2a; display: flex; align-items: center; gap: 8px;
+    cursor: pointer; color: #dcdcdc; font-weight: 600; font-size: 12px; user-select: none;
+  }
+  .comp-header .fold { font-size: 9px; color: #909090; transition: transform .12s; }
+  .comp.collapsed .comp-header .fold { transform: rotate(-90deg); }
+  .comp.collapsed .comp-body { display: none; }
+  .comp-body { padding: 8px 10px 10px; }
+  .vec3 { display: grid; grid-template-columns: 52px 1fr 1fr 1fr; gap: 3px; align-items: center; margin-bottom: 5px; }
+  .vec3 .lbl { color: var(--ed-muted); font-size: 11.5px; }
+  .vec3 .cell { display: flex; align-items: center; }
+  .vec3 .cell .ax { font-size: 10px; color: var(--ed-muted); padding: 0 3px; }
+  .vec3 input[type=number] {
+    width: 100%; background: #191919; border: 1px solid #2f2f2f; border-radius: 3px;
+    color: #c8c8c8; padding: 3px 4px; font-size: 11.5px; outline: none; -moz-appearance: textfield;
+  }
+  .vec3 input[type=number]:focus { border-color: #4a6d94; }
+  input[type=number]::-webkit-outer-spin-button, input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .kv { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .kv .k { width: 92px; color: var(--ed-muted); font-size: 11.5px; flex-shrink: 0; }
+  .kv input[type=text], .kv input[type=color], .kv input[type=number], .kv select {
+    flex: 1; background: #191919; border: 1px solid #2f2f2f; border-radius: 3px; color: #c8c8c8;
+    padding: 3px 6px; font-size: 11.5px; outline: none; min-width: 0;
+  }
+  .kv input[type=color] { height: 22px; padding: 1px 2px; }
+  .kv input[type=checkbox] { accent-color: #7aad4a; }
+
+  /* Project window */
+  .assets { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; }
+  .asset {
+    width: 86px; padding: 8px 4px; border-radius: 5px; text-align: center; cursor: pointer;
+    color: #b4b4b4; font-size: 11px;
+  }
+  .asset:hover { background: #2e2e2e; }
+  .asset .ico { font-size: 26px; margin-bottom: 4px; display: block; }
+  .console-line { padding: 4px 12px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 11.5px; border-bottom: 1px solid #242424; color: #b4b4b4; display: flex; gap: 8px; }
+  .console-line .t { color: #6f6f6f; flex-shrink: 0; }
+  .console-line.warn { color: #d8b93c; }
+  .console-line.err { color: #e06060; }
+  .console-line.sys { color: #7aa5d8; }
+
+  .ed-statusbar {
+    height: 22px; background: #1c1c1c; color: #7c7c7c; font-size: 11px; display: flex; align-items: center;
+    padding: 0 10px; gap: 18px; flex-shrink: 0; border-top: 1px solid var(--ed-border); user-select: none;
+  }
+  .ed-statusbar .space { flex: 1; }
+
+  .hidden { display: none !important; }
+  @media (max-width: 860px) {
+    .ed-col-left { width: 150px; } .ed-col-right { width: 200px; } .ed-col-bottom { height: 150px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== Unity Hub loading screen (recreated) ===== -->
+<div id="loading">
+  <svg class="hub-logo" viewBox="-12 -12 66 66" xmlns="http://www.w3.org/2000/svg" aria-label="Loading UnityCraft">
+    <svg x="0" y="0" width="100%" height="100%" viewBox="8 8 70 70" xmlns="http://www.w3.org/2000/svg">
+      <path class="logo" d="M31.5325 9.99997V17.0633L37.789 20.6708C37.8416 20.7018 37.8853 20.7461 37.9155 20.7991C37.9458 20.8521 37.9618 20.9121 37.9618 20.9732C37.9618 21.0342 37.9458 21.0942 37.9155 21.1473C37.8853 21.2003 37.8416 21.2445 37.789 21.2756L30.3525 25.5641C30.2458 25.6255 30.1249 25.6579 30.0018 25.6579C29.8787 25.6579 29.7577 25.6255 29.651 25.5641L22.2135 21.2799C22.1609 21.2487 22.1173 21.2044 22.087 21.1512C22.0567 21.0981 22.0408 21.0381 22.0408 20.977C22.0408 20.9158 22.0567 20.8558 22.087 20.8026C22.1173 20.7495 22.1609 20.7052 22.2135 20.674L28.4699 17.0676V9.99997L12.5007 19.2076L30.0006 29.2971L30.0003 29.2973L12.5005 19.2078V37.6219L18.6257 34.0908V26.8749C18.6267 26.8139 18.6435 26.7543 18.6745 26.7018C18.7054 26.6492 18.7495 26.6056 18.8024 26.5752C18.8553 26.5448 18.9152 26.5286 18.9763 26.5282C19.0373 26.5279 19.0974 26.5433 19.1507 26.5731L26.5926 30.8615C26.6991 30.9229 26.7874 31.0112 26.8488 31.1176C26.9102 31.224 26.9424 31.3447 26.9422 31.4674V40.0434C26.9419 40.1048 26.9257 40.165 26.8948 40.2182C26.8641 40.2713 26.8199 40.3155 26.7666 40.3463C26.7134 40.3771 26.653 40.3933 26.5915 40.3935C26.5301 40.3937 26.4696 40.3778 26.4162 40.3474L20.1565 36.7389L14.0323 40.27L30.0002 49.4775V49.4777L30.0003 49.4776L30.0004 49.4777V49.4775L45.9693 40.27L39.8442 36.7389L33.5845 40.3463C33.5312 40.3762 33.4711 40.3917 33.41 40.3913C33.3489 40.3908 33.289 40.3745 33.2361 40.3439C33.1833 40.3134 33.1393 40.2696 33.1085 40.2169C33.0777 40.1642 33.0612 40.1044 33.0606 40.0434V31.4674C33.0605 31.3446 33.0929 31.2238 33.1544 31.1174C33.2161 31.011 33.3046 30.9228 33.4113 30.8615L40.8478 26.5731C40.9012 26.5429 40.9615 26.5273 41.0228 26.5277C41.084 26.528 41.1443 26.5442 41.1973 26.5748C41.2504 26.6053 41.2946 26.6492 41.3255 26.702C41.3565 26.7548 41.3732 26.8148 41.3738 26.876V34.0908L47.498 37.6219V19.2091L47.5007 19.2076L31.5325 9.99997Z"/>
+    </svg>
+    <circle cx="21" cy="21" r="30"/>
+  </svg>
+</div>
+
+<!-- ===== Unity Hub window ===== -->
+<div id="hub">
+  <div class="hub-titlebar">
+    <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    <span class="title">Unity Hub 3.22.3</span>
+    <span class="winbtns"><span>—</span><span>▢</span><span>✕</span></span>
+  </div>
+  <nav class="hub-sidebar" aria-label="Hub navigation">
+    <div class="hub-nav active" data-view="projects" title="Projects">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/></svg>
+      Projects
+    </div>
+    <div class="hub-nav" data-view="installs" title="Installs">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>
+      Installs
+    </div>
+    <div class="hub-nav" data-view="learn" title="Learn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3 2 8l10 5 10-5-10-5z"/><path d="M5 10.5v5c0 1.5 3.1 3.5 7 3.5s7-2 7-3.5v-5"/></svg>
+      Learn
+    </div>
+    <div class="hub-nav" data-view="community" title="Community">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="9" r="3"/><circle cx="16.5" cy="10.5" r="2.5"/><path d="M3.5 19c.6-2.5 2.5-4 4.5-4s3.9 1.5 4.5 4M13 18.5c.4-1.6 1.6-2.7 3-2.7s2.7 1.1 3.1 2.7"/></svg>
+      Community
+    </div>
+    <div class="spacer"></div>
+    <div class="hub-nav" data-view="preferences" title="Preferences">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9l2.1 2.1m10 10 2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>
+      Preferences
+    </div>
+    <div class="foot">Unity Hub 3.22.3 · UnityCraft build</div>
+  </nav>
+  <main class="hub-main" id="hub-main"></main>
+</div>
+
+<!-- ===== New project modal ===== -->
+<div id="modal-overlay">
+  <div class="modal" role="dialog" aria-label="Create a new project">
+    <h2>Projects / New project</h2>
+    <div class="tpl-grid" id="tpl-grid"></div>
+    <div class="form-row">
+      <div class="field">
+        <label for="proj-name">Project name</label>
+        <input id="proj-name" value="MyUnityProject" />
+      </div>
+      <div class="field">
+        <label for="proj-loc">Location</label>
+        <input id="proj-loc" value="/home/user/UnityProjects" />
+      </div>
+      <div class="field" style="max-width:200px">
+        <label for="proj-ver">Editor version</label>
+        <select id="proj-ver"></select>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="tpl-cancel">Cancel</button>
+      <button class="btn primary" id="tpl-create">Create project</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Unity Editor workspace ===== -->
+<div id="editor">
+  <div class="ed-menubar" id="menubar">
+    <div class="brand">
+      <svg width="15" height="15" viewBox="-12 -12 66 66" aria-hidden="true"><path fill="#e1e1e1" d="M31.53 10v7.06l6.26 3.61c.05.03.1.08.13.13.03.05.05.11.05.17 0 .06-.02.12-.05.17-.03.06-.08.1-.13.13l-7.44 4.29c-.11.06-.23.09-.35.09s-.24-.03-.35-.09l-7.44-4.28c-.05-.03-.1-.07-.13-.12-.03-.05-.05-.11-.05-.17 0-.06.02-.12.05-.17.03-.05.07-.1.13-.12l6.26-3.61V10L12.5 19.21 30 29.3l17.5-10.09V37.62l-6.13-3.53v-7.21c0-.06.02-.12.05-.18.03-.05.07-.1.13-.13.05-.03.11-.05.17-.05.06 0 .12.02.18.05l7.44 4.29c.11.06.19.15.25.25.06.11.09.22.09.34v8.58c0 .06-.02.12-.05.18-.03.05-.07.1-.13.13-.05.03-.11.05-.17.05-.06 0-.12-.02-.18-.05l-6.26-3.61-6.12 3.53 15.97 9.21v-18.4L47.5 19.21 31.53 10z"/></svg>
+    </div>
+    <div class="ed-menu" data-menu="file"><button>File</button>
+      <div class="ed-dropdown">
+        <button data-act="new-scene">New Scene <span>Ctrl+N</span></button>
+        <button data-act="open-scene">Open Scene <span>Ctrl+O</span></button>
+        <button data-act="save-scene">Save Scene <span>Ctrl+S</span></button>
+        <div class="sep"></div>
+        <button data-act="back-hub">Back to Hub</button>
+      </div>
+    </div>
+    <div class="ed-menu" data-menu="edit"><button>Edit</button>
+      <div class="ed-dropdown">
+        <button data-act="duplicate">Duplicate <span>Ctrl+D</span></button>
+        <button data-act="delete">Delete <span>Del</span></button>
+        <div class="sep"></div>
+        <button data-act="prefs">Preferences…</button>
+      </div>
+    </div>
+    <div class="ed-menu" data-menu="gameobject"><button>GameObject</button>
+      <div class="ed-dropdown">
+        <button data-act="create" data-type="cube">3D Object ▸ Cube</button>
+        <button data-act="create" data-type="sphere">3D Object ▸ Sphere</button>
+        <button data-act="create" data-type="cylinder">3D Object ▸ Cylinder</button>
+        <button data-act="create" data-type="capsule">3D Object ▸ Capsule</button>
+        <button data-act="create" data-type="plane">3D Object ▸ Plane</button>
+        <div class="sep"></div>
+        <button data-act="create" data-type="light">Light ▸ Directional Light</button>
+        <button data-act="create" data-type="pointlight">Light ▸ Point Light</button>
+        <button data-act="create" data-type="camera">Camera</button>
+      </div>
+    </div>
+    <div class="ed-menu" data-menu="component"><button>Component</button>
+      <div class="ed-dropdown">
+        <button data-act="addcomp" data-comp="SpinScript">Scripts ▸ Spin.cs</button>
+        <button data-act="addcomp" data-comp="BobScript">Scripts ▸ Bob (float).cs</button>
+      </div>
+    </div>
+    <div class="ed-menu" data-menu="help"><button>Help</button>
+      <div class="ed-dropdown">
+        <button data-act="about">About UnityCraft</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="ed-toolbar">
+    <div class="toolbar-group">
+      <button class="tool" data-tool="hand" title="Hand Tool (Q)">✋</button>
+      <button class="tool active" data-tool="move" title="Move Tool (W)">✥</button>
+      <button class="tool" data-tool="rotate" title="Rotate Tool (E)">⟳</button>
+      <button class="tool" data-tool="scale" title="Scale Tool (R)">⤢</button>
+      <button class="tool" data-tool="rect" title="Rect Tool (T)">▭</button>
+    </div>
+    <div class="toolbar-group">
+      <button class="tool" data-act="undo" title="Undo (Ctrl+Z)">↶</button>
+      <button class="tool" data-act="redo" title="Redo (Ctrl+Y)">↷</button>
+    </div>
+    <div class="center toolbar-group" style="border:none">
+      <button class="play-btn" data-act="play" title="Play">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button class="play-btn" data-act="pause" title="Pause">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+      </button>
+      <button class="play-btn" data-act="step" title="Step">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5l8 7-8 7V5zm10 0h2v14h-2z"/></svg>
+      </button>
+    </div>
+    <div class="toolbar-group right">
+      <span>Layers ▾</span>
+      <span>Layout: 2 by 3 ▾</span>
+    </div>
+  </div>
+
+  <div class="ed-body">
+    <div class="ed-col-left">
+      <div class="panel-tabs"><div class="ptab active">Hierarchy — SampleScene</div></div>
+      <div class="panel-body" id="hierarchy"></div>
+    </div>
+
+    <div class="ed-col-center">
+      <div class="panel-tabs">
+        <div class="ptab active" data-viewtab="scene">Scene</div>
+        <div class="ptab" data-viewtab="game">Game</div>
+        <span style="flex:1"></span>
+        <div class="ptab" data-viewtab="insp" style="border:none;color:#777">▮▮▮</div>
+      </div>
+      <div id="scene-container">
+        <div id="scene-toolbar">
+          <label><input type="checkbox" id="chk-grid" checked> Grid</label>
+          <label><input type="checkbox" id="chk-gizmos" checked> Gizmos</label>
+          <label><input type="checkbox" id="chk-wire" > Wireframe</label>
+        </div>
+        <canvas id="axis-gizmo" width="184" height="184"></canvas>
+        <div id="scene-overlay"></div>
+      </div>
+    </div>
+
+    <div class="ed-col-right">
+      <div class="panel-tabs"><div class="ptab active" id="insp-tab">Inspector</div></div>
+      <div class="panel-body" id="inspector"></div>
+    </div>
+  </div>
+
+  <div class="ed-col-bottom">
+    <div class="panel-tabs">
+      <div class="ptab active" data-bottomtab="project">Project</div>
+      <div class="ptab" data-bottomtab="console">Console</div>
+      <div class="ptab" data-bottomtab="services">Services</div>
+    </div>
+    <div class="panel-body" id="bottom-body"></div>
+  </div>
+
+  <div class="ed-statusbar">
+    <span id="status-msg">Ready</span>
+    <span class="space"></span>
+    <span id="status-objcount"></span>
+    <span id="status-fps"></span>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+/* ================================================================
+   PART 1 — UNITY HUB (evidence-based reconstruction)
+   Routes & features recovered from the Hub renderer bundle:
+   projects / installs / learn / new-project / templates …
+   ================================================================ */
+const $ = s => document.querySelector(s);
+const state = {
+  hubView: 'projects',
+  favorites: new Set(['Roll-a-Ball remake']),
+  projects: [
+    { name: 'Roll-a-Ball remake', ver: '6000.1.7f1', modified: '2 hours ago', hue: 210, emoji: '🟦', target: 'cube' },
+    { name: 'FPS Playground', ver: '6000.1.7f1', modified: 'yesterday', hue: 130, emoji: '🎯', target: 'sphere' },
+    { name: 'LowPolyIsland', ver: '2022.3.50f1', modified: '4 days ago', hue: 45, emoji: '🏝️', target: 'plane' },
+  ],
+  installs: [
+    { ver: '6000.1.7f1 (LTS)', date: 'Oct 12, 2026', mods: ['Linux Build Support (IL2CPP)', 'Android Build Support'] },
+    { ver: '2022.3.50f1 (LTS)', date: 'Aug 2, 2026', mods: ['WebGL Build Support'] },
+  ],
+  learn: [
+    { t: 'Unity Essentials', d: 'Pathway · 10 hrs', emoji: '🧭' },
+    { t: 'Creative Core', d: 'Pathway · 16 hrs', emoji: '🎨' },
+    { t: 'Roll-a-Ball', d: 'Tutorial · 45 min', emoji: '⚽' },
+    { t: 'Junior Programmer', d: 'Pathway · 40 hrs', emoji: '💻' },
+  ],
+};
+
+const TEMPLATES = [
+  { id: '3d', name: 'Universal 3D', desc: 'URP · Default 3D template', emoji: '🧊', bg: 210 },
+  { id: '3d-hd', name: 'High Definition 3D', desc: 'HDRP · AAA quality', emoji: '🌄', bg: 260 },
+  { id: '2d', name: 'Universal 2D', desc: 'URP · Sprites and tiles', emoji: '🕹️', bg: 130 },
+  { id: 'mobile', name: 'Mobile 3D', desc: 'URP · Touch input ready', emoji: '📱', bg: 45 },
+];
+let selectedTemplate = '3d';
+
+function renderHub() {
+  const main = $('#hub-main');
+  document.querySelectorAll('.hub-nav').forEach(n => n.classList.toggle('active', n.dataset.view === state.hubView));
+  if (state.hubView === 'projects') {
+    main.innerHTML = `
+      <div class="hub-head">
+        <h2>Projects</h2>
+        <input class="hub-search" id="hub-search" placeholder="Search projects…" value="">
+        <button class="btn primary" id="btn-new">＋ New project</button>
+      </div>
+      <div class="project-grid" id="project-grid"></div>
+      <div class="hub-section-title">Recent projects</div>
+      <div class="project-grid" id="recent-grid"></div>`;
+    renderProjectCards('#project-grid', true);
+    renderProjectCards('#recent-grid', false);
+    $('#btn-new').onclick = openNewProject;
+    $('#hub-search').oninput = e => filterProjects(e.target.value.toLowerCase());
+  } else if (state.hubView === 'installs') {
+    main.innerHTML = `
+      <div class="hub-head">
+        <h2>Installs</h2>
+        <span style="color:var(--hub-muted);font-size:12px">Official releases</span>
+        <button class="btn" id="btn-install" style="margin-left:auto">Install Editor</button>
+      </div>
+      ${state.installs.map(i => `
+      <div style="background:var(--hub-surface);border:1px solid var(--hub-border);border-radius:8px;padding:16px 18px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <svg width="26" height="26" viewBox="-12 -12 66 66"><path fill="#7a7a7a" d="M31.53 10v7.06l6.26 3.61c.05.03.1.08.13.13.03.05.05.11.05.17 0 .06-.02.12-.05.17-.03.06-.08.1-.13.13l-7.44 4.29c-.11.06-.23.09-.35.09s-.24-.03-.35-.09l-7.44-4.28c-.05-.03-.1-.07-.13-.12-.03-.05-.05-.11-.05-.17 0-.06.02-.12.05-.17.03-.05.07-.1.13-.12l6.26-3.61V10L12.5 19.21 30 29.3l17.5-10.09V37.62l-6.13-3.53v-7.21c0-.06.02-.12.05-.18.03-.05.07-.1.13-.13.05-.03.11-.05.17-.05.06 0 .12.02.18.05l7.44 4.29c.11.06.19.15.25.25.06.11.09.22.09.34v8.58c0 .06-.02.12-.05.18-.03.05-.07.1-.13.13-.05.03-.11.05-.17.05-.06 0-.12-.02-.18-.05l-6.26-3.61-6.12 3.53 15.97 9.21v-18.4L47.5 19.21 31.53 10z"/></svg>
+          <div>
+            <div style="color:#fff;font-weight:600">${i.ver}</div>
+            <div style="color:var(--hub-muted);font-size:12px">Added ${i.date}</div>
+          </div>
+          <span class="ver-chip" style="margin-left:auto">${i.mods.length} modules</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+          ${i.mods.map(m => `<span class="ver-chip">${m}</span>`).join('')}
+        </div>
+      </div>`).join('')}`;
+    $('#btn-install').onclick = () => toast('Editor download is simulated in UnityCraft — the real 3.5 GB editor lives at unity.com/download');
+  } else if (state.hubView === 'learn') {
+    main.innerHTML = `
+      <div class="hub-head"><h2>Learn</h2></div>
+      <div class="hub-section-title">Featured pathways</div>
+      <div class="project-grid">
+        ${state.learn.map(l => `
+        <div class="project-card">
+          <div class="thumb" style="background:hsl(${l.emoji === '🧭' ? 210 : l.emoji === '🎨' ? 280 : l.emoji === '⚽' ? 45 : 140} 30% 24%)">${l.emoji}</div>
+          <h3>${l.t}</h3>
+          <div class="row"><span>${l.d}</span></div>
+        </div>`).join('')}
+      </div>`;
+  } else if (state.hubView === 'community') {
+    main.innerHTML = `
+      <div class="hub-head"><h2>Community</h2></div>
+      <div class="project-grid">
+        <div class="project-card"><div class="thumb" style="background:hsl(210 30% 24%)">💬</div><h3>Unity Discussions</h3><div class="row"><span>Ask questions, get answers</span></div></div>
+        <div class="project-card"><div class="thumb" style="background:hsl(130 30% 24%)">📚</div><h3>Documentation</h3><div class="row"><span>Manual & Scripting API</span></div></div>
+        <div class="project-card"><div class="thumb" style="background:hsl(45 30% 24%)">🎮</div><h3>Asset Store</h3><div class="row"><span>Free & paid assets</span></div></div>
+      </div>`;
+  } else if (state.hubView === 'preferences') {
+    main.innerHTML = `
+      <div class="hub-head"><h2>Preferences</h2></div>
+      <div style="background:var(--hub-surface);border:1px solid var(--hub-border);border-radius:8px;padding:18px;max-width:560px">
+        <div class="kv" style="margin-bottom:10px"><span class="k" style="color:var(--hub-muted)">Theme</span><span style="color:#fff">Dark</span></div>
+        <div class="kv" style="margin-bottom:10px"><span class="k" style="color:var(--hub-muted)">Editor install location</span><span style="color:#fff">~/Unity/Hub/Editor</span></div>
+        <div class="kv"><span class="k" style="color:var(--hub-muted)">Language</span><span style="color:#fff">English</span></div>
+      </div>`;
+  }
+}
+function projectCard(p, recent) {
+  const el = document.createElement('div');
+  el.className = 'project-card';
+  el.innerHTML = `
+    <div class="thumb" style="background:hsl(${p.hue} 28% 22%)">${p.emoji}</div>
+    <h3>${p.name}</h3>
+    <div class="row">
+      <span class="ver-chip">${p.ver}</span>
+      <span>${recent ? p.modified : 'Unity · ' + p.modified}</span>
+      <span class="favorite ${state.favorites.has(p.name) ? 'on' : ''}" title="Favorite">★</span>
+    </div>`;
+  el.querySelector('.thumb').onclick = () => openEditor(p);
+  el.onclick = e => { if (!e.target.classList.contains('favorite')) openEditor(p); };
+  el.querySelector('.favorite').onclick = e => {
+    e.stopPropagation();
+    state.favorites.has(p.name) ? state.favorites.delete(p.name) : state.favorites.add(p.name);
+    renderHub();
+  };
+  return el;
+}
+function renderProjectCards(sel, favOnly) {
+  const grid = $(sel);
+  grid.innerHTML = '';
+  state.projects.filter(p => favOnly === state.favorites.has(p.name)).forEach(p => grid.appendChild(projectCard(p, favOnly)));
+  if (!grid.children.length) grid.innerHTML = `<div style="color:var(--hub-muted);grid-column:1/-1;padding:20px 4px">${favOnly ? 'No favorite projects yet — click ★ on a project.' : 'No projects in this view.'}</div>`;
+}
+function filterProjects(q) {
+  document.querySelectorAll('#project-grid .project-card').forEach(c => {
+    c.style.display = c.querySelector('h3').textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+document.querySelectorAll('.hub-nav').forEach(n => n.onclick = () => { state.hubView = n.dataset.view; renderHub(); });
+
+function openNewProject() {
+  const ver = $('#proj-ver');
+  ver.innerHTML = state.installs.map(i => `<option>${i.ver}</option>`).join('');
+  const tg = $('#tpl-grid');
+  tg.innerHTML = TEMPLATES.map(t => `
+    <div class="tpl ${t.id === selectedTemplate ? 'selected' : ''}" data-tpl="${t.id}">
+      <div class="art" style="background:hsl(${t.bg} 30% 26%)">${t.emoji}</div>
+      <div class="nm">${t.name}</div>
+      <div class="ds">${t.desc}</div>
+    </div>`).join('');
+  tg.querySelectorAll('.tpl').forEach(el => el.onclick = () => {
+    selectedTemplate = el.dataset.tpl;
+    tg.querySelectorAll('.tpl').forEach(x => x.classList.toggle('selected', x === el));
+  });
+  $('#modal-overlay').classList.add('open');
+}
+$('#tpl-cancel').onclick = () => $('#modal-overlay').classList.remove('open');
+$('#tpl-create').onclick = () => {
+  const name = $('#proj-name').value.trim() || 'MyUnityProject';
+  $('#modal-overlay').classList.remove('open');
+  const tpl = TEMPLATES.find(t => t.id === selectedTemplate);
+  state.projects.unshift({ name, ver: '6000.1.7f1', modified: 'just now', hue: tpl.bg, emoji: tpl.emoji, target: selectedTemplate === '2d' ? 'plane' : 'cube' });
+  openEditor(state.projects[0]);
+};
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:#2b2b2b;border:1px solid #4a4a4a;color:#e1e1e1;padding:10px 18px;border-radius:8px;z-index:99;font-size:12.5px;box-shadow:0 8px 24px rgba(0,0,0,.4)';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+/* ================================================================
+   PART 2 — UNITY EDITOR (Three.js workspace)
+   ================================================================ */
+let editorReady = false;
+function openEditor(project) {
+  $('#hub').classList.add('hidden');
+  const ed = $('#editor');
+  ed.style.display = 'flex';
+  status(`Opening project "${project.name}" (Editor ${project.ver})…`);
+  if (!editorReady) { initEditor(); editorReady = true; }
+  resetSceneFor(project);
+  status(`Loaded SampleScene — ${project.name} (Editor ${project.ver})`);
+  log('sys', `Project opened: ${project.name} @ ${$('#proj-loc').value || '~/UnityProjects'}`);
+}
+
+const ed = {
+  objects: [], selected: null, idSeq: 1, tool: 'move', playing: false, paused: false,
+  viewTab: 'scene', playSnapshot: null, history: [], redoStack: [],
+};
+
+/* ---- three.js setup ---- */
+const container = $('#scene-container');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+container.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x262626);
+const sceneCamera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
+sceneCamera.position.set(5, 5.5, 6);
+sceneCamera.lookAt(0, 0.5, 0);
+const gameCamera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
+gameCamera.position.set(0, 2, -6);
+gameCamera.lookAt(0, 0.5, 0);
+const orbit = new OrbitControls(sceneCamera, renderer.domElement);
+orbit.target.set(0, 0.5, 0);
+orbit.enableDamping = true; orbit.dampingFactor = 0.12;
+orbit.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+
+const grid = new THREE.GridHelper(60, 60, 0x4a4a4a, 0x323232);
+scene.add(grid);
+const hemi = new THREE.HemisphereLight(0xffffff, 0x444455, 0.55);
+scene.add(hemi);
+
+const tcontrols = new TransformControls(sceneCamera, renderer.domElement);
+tcontrols.addEventListener('dragging-changed', e => {
+  orbit.enabled = !e.value;
+  if (e.value) pushHistory(); // snapshot pre-drag state
+});
+scene.add(tcontrols);
+
+/* axis gizmo (scene view corner) */
+const axCanvas = $('#axis-gizmo');
+const axCtx = axCanvas.getContext('2d');
+
+/* object factory */
+const GEOM = {
+  cube: () => new THREE.BoxGeometry(1, 1, 1),
+  sphere: () => new THREE.SphereGeometry(0.5, 24, 16),
+  cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1, 24),
+  capsule: () => new THREE.CapsuleGeometry(0.35, 0.6, 8, 16),
+  plane: () => new THREE.PlaneGeometry(4, 4),
+};
+function makeObject(type, opts = {}) {
+  let obj;
+  if (type === 'light') {
+    obj = new THREE.DirectionalLight(0xffffff, 1.6);
+    obj.position.set(0, 6, 0);
+    const helper = new THREE.DirectionalLightHelper(obj, 1.2, 0x7a7a7a);
+    scene.add(helper); obj.userData.helper = helper;
+  } else if (type === 'pointlight') {
+    obj = new THREE.PointLight(0xffffff, 8, 0, 2);
+    obj.position.set(0, 2.5, 0);
+    const helper = new THREE.PointLightHelper(obj, 0.35, 0x7a7a7a);
+    scene.add(helper); obj.userData.helper = helper;
+  } else if (type === 'camera') {
+    obj = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 500);
+    obj.position.set(0, 2, -6); obj.lookAt(0, 0.5, 0);
+    const helper = new THREE.CameraHelper(obj);
+    helper.userData.isCamHelper = true;
+    scene.add(helper); obj.userData.helper = helper;
+  } else {
+    const geo = GEOM[type]();
+    if (type === 'plane') { geo.rotateX(-Math.PI / 2); }
+    const mat = new THREE.MeshStandardMaterial({ color: 0xcfcfcf, roughness: 0.65, metalness: 0.05 });
+    obj = new THREE.Mesh(geo, mat);
+    if (type === 'plane') { obj.position.y = 0; } else { obj.position.y = (type === 'capsule') ? 0.65 : 0.5; }
+    const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x3a6ea5 }));
+    edges.visible = false; edges.userData.isOutline = true;
+    obj.add(edges); obj.userData.outline = edges;
+  }
+  obj.userData.id = ed.idSeq++;
+  obj.userData.type = type;
+  obj.userData.name = opts.name || defaultName(type);
+  obj.userData.components = { meshRenderer: true, collider: type !== 'plane', script: null, ...opts.components };
+  obj.userData.scriptParams = { speed: 90, amp: 0.5 };
+  scene.add(obj);
+  ed.objects.push(obj);
+  return obj;
+}
+function defaultName(type) {
+  const names = { cube: 'Cube', sphere: 'Sphere', cylinder: 'Cylinder', capsule: 'Capsule', plane: 'Plane', light: 'Directional Light', pointlight: 'Point Light', camera: 'Camera' };
+  const base = names[type];
+  const n = ed.objects.filter(o => o.userData.name.startsWith(base)).length;
+  return n ? `${base} (${n + 1})` : base;
+}
+function removeHelper(o) { if (o.userData.helper) scene.remove(o.userData.helper); }
+
+function resetSceneFor(project) {
+  ed.objects.slice().forEach(o => { removeHelper(o); scene.remove(o); });
+  ed.objects = []; ed.selected = null; ed.playing = false; ed.paused = false;
+  tcontrols.detach(); ed.history = []; ed.redoStack = [];
+  makeObject('camera', { name: 'Main Camera' });
+  makeObject('light', { name: 'Directional Light' });
+  const cube = makeObject(project.target || 'cube', { name: 'Player' });
+  cube.material.color.set(0xcfcfcf);
+  if (project.target === 'sphere') cube.position.set(0, 0.5, 0);
+  if (project.target === 'plane') cube.position.set(0, 0.01, 0);
+  const ground = makeObject('plane', { name: 'Ground' });
+  ground.scale.set(3, 1, 3);
+  ground.material.color.set(0x8a8f7a);
+  ground.userData.components.collider = false;
+  ed.selected = null;
+  renderHierarchy(); renderInspector(); renderProjectWindow();
+  log('sys', 'SampleScene loaded (2 objects + Ground)');
+}
+
+function initEditor() {
+  bindToolbar(); bindMenus(); bindKeys(); bindPanels();
+  renderProjectWindow();
+  const ro = new ResizeObserver(resize);
+  ro.observe(container);
+  resize();
+  renderer.domElement.addEventListener('pointerdown', onScenePointerDown);
+  renderer.domElement.addEventListener('pointermove', onSceneHover);
+  tcontrols.addEventListener('objectChange', () => { renderInspector(); });
+  requestAnimationFrame(loop);
+}
+
+function resize() {
+  const w = container.clientWidth, h = container.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h);
+  sceneCamera.aspect = w / h; sceneCamera.updateProjectionMatrix();
+  gameCamera.aspect = w / h; gameCamera.updateProjectionMatrix();
+}
+
+/* ---- picking ---- */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+function pick(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+  pointer.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, activeCamera());
+  const hits = raycaster.intersectObjects(ed.objects, false);
+  return hits.length ? hits[0].object : null;
+}
+function onScenePointerDown(e) {
+  if (e.button !== 0) return;
+  const hit = pick(e);
+  const down = { x: e.clientX, y: e.clientY };
+  const up = ev => {
+    renderer.domElement.removeEventListener('pointerup', up);
+    if (Math.hypot(ev.clientX - down.x, ev.clientY - down.y) < 4) select(hit);
+  };
+  renderer.domElement.addEventListener('pointerup', up);
+}
+function onSceneHover(e) {
+  const hit = pick(e);
+  renderer.domElement.style.cursor = hit ? 'pointer' : (ed.tool === 'hand' ? 'grab' : 'default');
+  ed.objects.forEach(o => { if (o.userData.outline && o !== ed.selected) o.userData.outline.visible = false; });
+  if (hit && hit.userData.outline && hit !== ed.selected) {
+    hit.userData.outline.material.color.set(0xd98a3d);
+    hit.userData.outline.visible = true;
+  }
+}
+function select(obj) {
+  if (ed.selected && ed.selected.userData.outline) ed.selected.userData.outline.visible = false;
+  ed.selected = obj;
+  if (obj) {
+    if (obj.userData.outline) { obj.userData.outline.material.color.set(0x3a6ea5); obj.userData.outline.visible = true; }
+    if (ed.tool !== 'hand' && ed.tool !== 'rect') { tcontrols.attach(obj); setGizmoMode(); }
+    else tcontrols.detach();
+    status(`Selected: ${obj.userData.name}`);
+  } else {
+    tcontrols.detach();
+  }
+  renderHierarchy(); renderInspector();
+}
+
+/* ---- hierarchy ---- */
+const ICONS = { cube: '▪', sphere: '●', cylinder: '▮', capsule: '⬮', plane: '▬', light: '☀', pointlight: '💡', camera: '🎥' };
+function renderHierarchy() {
+  const h = $('#hierarchy');
+  h.innerHTML = '';
+  ed.objects.forEach(o => {
+    const row = document.createElement('div');
+    row.className = 'hitem' + (o === ed.selected ? ' selected' : '');
+    row.innerHTML = `<span class="icon">${ICONS[o.userData.type] || '▪'}</span>${o.userData.name}`;
+    row.onclick = () => select(o);
+    row.ondblclick = () => {
+      const n = prompt('Rename object', o.userData.name);
+      if (n) { o.userData.name = n; renderHierarchy(); renderInspector(); }
+    };
+    row.oncontextmenu = e => { e.preventDefault(); select(o); };
+    h.appendChild(row);
+  });
+}
+
+/* ---- inspector ---- */
+function renderInspector() {
+  const el = $('#inspector');
+  const o = ed.selected;
+  if (!o) {
+    el.innerHTML = `<div style="padding:22px 12px;color:#777;font-size:12px">Select an object in the Scene or Hierarchy to inspect it.</div>`;
+    return;
+  }
+  const u = o.userData;
+  const p = o.position, r = { x: THREE.MathUtils.radToDeg(o.rotation.x), y: THREE.MathUtils.radToDeg(o.rotation.y), z: THREE.MathUtils.radToDeg(o.rotation.z) };
+  const s = o.scale;
+  const isMesh = u.type in GEOM;
+  const isLight = u.type === 'light' || u.type === 'pointlight';
+  const isCamera = u.type === 'camera';
+  const col = isLight ? '#' + o.color.getHexString() : isCamera ? '#cfcfcf' : '#' + o.material.color.getHexString();
+
+  el.innerHTML = `
+    <div class="insp-header">
+      <span class="icon">${ICONS[u.type] || '▪'}</span>
+      <input type="text" id="insp-name" value="${u.name}" style="background:#191919;border:1px solid #2f2f2f;border-radius:3px;color:#dcdcdc;padding:3px 6px;font-size:12px;width:140px" />
+      <div class="checks" title="Static">◉<span style="font-size:11px">Static</span></div>
+    </div>
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> Transform <span style="margin-left:auto;font-weight:400;font-size:10.5px;color:#8f8f8f">${u.type === 'camera' ? 'Camera' : ''}</span></div>
+      <div class="comp-body">
+        ${vec3('Position', 'pos', p)}${vec3('Rotation', 'rot', r)}${vec3('Scale', 'scl', s)}
+      </div>
+    </div>
+    ${isMesh ? `
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> Mesh Renderer</div>
+      <div class="comp-body">
+        <div class="kv"><span class="k">Cast Shadows</span><input type="checkbox" id="insp-shadow" ${o.castShadow !== false ? 'checked' : ''} /></div>
+        <div class="kv"><span class="k">Material</span><input type="color" id="insp-color" value="${col}" /></div>
+        <div class="kv"><span class="k">Smoothness</span><input type="number" id="insp-smooth" step="0.05" min="0" max="1" value="${o.material.roughness !== undefined ? (1 - o.material.roughness).toFixed(2) : 0.35}" /></div>
+      </div>
+    </div>
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> Box Collider</div>
+      <div class="comp-body">
+        <div class="kv"><span class="k">Enabled</span><input type="checkbox" id="insp-coll" ${u.components.collider ? 'checked' : ''} /></div>
+        <div class="kv"><span class="k">Is Trigger</span><input type="checkbox" /></div>
+      </div>
+    </div>` : ''}
+    ${isLight ? `
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> Light</div>
+      <div class="comp-body">
+        <div class="kv"><span class="k">Color</span><input type="color" id="insp-color" value="${col}" /></div>
+        <div class="kv"><span class="k">Intensity</span><input type="number" id="insp-intensity" step="0.1" min="0" max="10" value="${o.intensity.toFixed(1)}" /></div>
+      </div>
+    </div>` : ''}
+    ${isCamera ? `
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> Camera</div>
+      <div class="comp-body">
+        <div class="kv"><span class="k">Field of View</span><input type="number" id="insp-fov" step="1" min="10" max="120" value="${o.fov.toFixed(0)}" /></div>
+        <div class="kv"><span class="k">Near Clip</span><input type="number" step="0.1" value="${o.near}" /></div>
+      </div>
+    </div>` : ''}
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> ${u.components.script ? 'Script — ' + u.components.script : 'Add Component'}</div>
+      <div class="comp-body">
+        ${u.components.script ? `
+        <div class="kv"><span class="k">Script</span><input type="text" value="${u.components.script}.cs" disabled /></div>
+        ${u.components.script === 'SpinScript' ? `<div class="kv"><span class="k">Speed (deg/s)</span><input type="number" id="insp-speed" step="10" value="${u.scriptParams.speed}" /></div>` : ''}
+        ${u.components.script === 'BobScript' ? `<div class="kv"><span class="k">Amplitude</span><input type="number" id="insp-amp" step="0.1" value="${u.scriptParams.amp}" /></div>` : ''}` : `
+        <div style="color:#777;font-size:11.5px">Use Component ▸ Scripts to attach a behaviour.</div>`}
+      </div>
+    </div>`;
+
+  $('#insp-name').onchange = e => { u.name = e.target.value || u.name; renderHierarchy(); };
+  bindVec3('pos', o); bindVec3('rot', o); bindVec3('scl', o);
+  const colorInp = $('#insp-color');
+  if (colorInp) colorInp.oninput = e => { isLight ? o.color.set(e.target.value) : o.material.color.set(e.target.value); };
+  const shadow = $('#insp-shadow');
+  if (shadow) shadow.onchange = e => { o.castShadow = e.target.checked; };
+  const smooth = $('#insp-smooth');
+  if (smooth) smooth.onchange = e => { o.material.roughness = 1 - parseFloat(e.target.value || 0.35); };
+  const fov = $('#insp-fov');
+  if (fov) fov.onchange = e => { o.fov = parseFloat(e.target.value || 60); o.updateProjectionMatrix(); };
+  const inten = $('#insp-intensity');
+  if (inten) inten.onchange = e => { o.intensity = parseFloat(e.target.value || 1); };
+  const spd = $('#insp-speed');
+  if (spd) spd.onchange = e => { u.scriptParams.speed = parseFloat(e.target.value || 90); };
+  const amp = $('#insp-amp');
+  if (amp) amp.onchange = e => { u.scriptParams.amp = parseFloat(e.target.value || 0.5); };
+  const coll = $('#insp-coll');
+  if (coll) coll.onchange = e => { u.components.collider = e.target.checked; };
+}
+function vec3(label, kind, v) {
+  return `<div class="vec3"><span class="lbl">${label}</span>${['x', 'y', 'z'].map(ax =>
+    `<span class="cell"><span class="ax" style="color:${axColor(ax)}">${ax.toUpperCase()}</span><input type="number" step="0.1" data-kind="${kind}" data-ax="${ax}" value="${fmt(v[ax])}" /></span>`).join('')}</div>`;
+}
+function axColor(ax) { return ax === 'x' ? 'var(--ed-gizmo-x)' : ax === 'y' ? 'var(--ed-gizmo-y)' : 'var(--ed-gizmo-z)'; }
+function fmt(n) { return Math.round(n * 100) / 100; }
+function bindVec3(kind, o) {
+  document.querySelectorAll(`input[data-kind="${kind}"]`).forEach(inp => {
+    inp.onchange = () => {
+      const val = parseFloat(inp.value || 0);
+      const ax = inp.dataset.ax;
+      if (kind === 'pos') o.position[ax] = val;
+      if (kind === 'scl') o.scale[ax] = val || 0.01;
+      if (kind === 'rot') o.rotation[ax] = THREE.MathUtils.degToRad(val);
+    };
+  });
+}
+
+/* ---- project window & console ---- */
+function renderProjectWindow() {
+  const b = $('#bottom-body');
+  if (b.dataset.tab === 'console') return;
+  const assets = [
+    ['SampleScene.unity', '🗂️'], ['Player.cs', '📜'], ['Spin.cs', '📜'], ['Bob.cs', '📜'],
+    ['Ground.mat', '🎨'], ['Player.mat', '🎨'], ['Sprites', '🖼️'], ['Prefabs', '📦'],
+  ];
+  b.innerHTML = `<div class="assets">${assets.map(([n, i]) => `<div class="asset"><span class="ico">${i}</span>${n}</div>`).join('')}</div>`;
+  b.querySelectorAll('.asset').forEach(a => a.onclick = () => status(`Asset selected: ${a.textContent.trim()}`));
+}
+function log(kind, msg) {
+  const b = $('#bottom-body');
+  if (b.dataset.tab !== 'console') { b.dataset.pending = (b.dataset.pending || '') ; }
+  const line = document.createElement('div');
+  line.className = 'console-line ' + kind;
+  const t = new Date();
+  line.innerHTML = `<span class="t">${t.getHours().toString().padStart(2, '0')}:${t.getMinutes().toString().padStart(2, '0')}:${t.getSeconds().toString().padStart(2, '0')}</span><span>${msg}</span>`;
+  if (b.dataset.tab === 'console') b.prepend(line);
+  else (b.dataset.pending = (b.dataset.pending || '') + line.outerHTML);
+}
+function showConsole() {
+  const b = $('#bottom-body');
+  b.dataset.tab = 'console';
+  b.innerHTML = b.dataset.pending || '<div class="console-line sys"><span class="t">--:--:--</span><span>Console cleared.</span></div>';
+  b.dataset.pending = '';
+}
+function showProject() {
+  const b = $('#bottom-body');
+  b.dataset.tab = 'project';
+  b.dataset.pending = b.dataset.pending || '';
+  renderProjectWindow();
+}
+function showServices() {
+  const b = $('#bottom-body');
+  b.dataset.tab = 'services';
+  b.innerHTML = `<div style="padding:18px;color:#8f8f8f;font-size:12px">Unity Services — sign in with Unity ID to link this project. (Reconstructed UI only.)</div>`;
+}
+
+/* ---- toolbar / menus / keys ---- */
+function setGizmoMode() {
+  if (ed.tool === 'move') tcontrols.setMode('translate');
+  if (ed.tool === 'rotate') tcontrols.setMode('rotate');
+  if (ed.tool === 'scale') tcontrols.setMode('scale');
+}
+function bindToolbar() {
+  document.querySelectorAll('.tool[data-tool]').forEach(b => b.onclick = () => {
+    document.querySelectorAll('.tool[data-tool]').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    ed.tool = b.dataset.tool;
+    if (ed.selected && !['hand', 'rect'].includes(ed.tool)) { tcontrols.attach(ed.selected); setGizmoMode(); }
+    else tcontrols.detach();
+  });
+  document.querySelectorAll('[data-act]').forEach(b => b.onclick = () => handleAction(b.dataset));
+  document.querySelectorAll('.ptab[data-viewtab]').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.ptab[data-viewtab]').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    ed.viewTab = t.dataset.viewtab;
+    if (ed.viewTab === 'game') log('sys', 'Switched to Game view (Main Camera)');
+  });
+  document.querySelectorAll('.ptab[data-bottomtab]').forEach(t => t.onclick = () => {
+    document.querySelectorAll('.ptab[data-bottomtab]').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    ({ project: showProject, console: showConsole, services: showServices })[t.dataset.bottomtab]();
+  });
+  $('#chk-grid').onchange = e => grid.visible = e.target.checked;
+  $('#chk-gizmos').onchange = e => {
+    ed.objects.forEach(o => { if (o.userData.helper) o.userData.helper.visible = e.target.checked; });
+  };
+  $('#chk-wire').onchange = e => {
+    ed.objects.forEach(o => {
+      if (o.isMesh) { o.material.wireframe = e.target.checked; if (o.userData.outline) o.userData.outline.visible = !e.target.checked && o === ed.selected; }
+    });
+  };
+}
+function bindMenus() {
+  document.querySelectorAll('.ed-menu').forEach(m => {
+    m.querySelector('button').onclick = e => {
+      e.stopPropagation();
+      const open = m.classList.contains('open');
+      document.querySelectorAll('.ed-menu').forEach(x => x.classList.remove('open'));
+      if (!open) m.classList.add('open');
+    };
+  });
+  document.addEventListener('click', () => document.querySelectorAll('.ed-menu').forEach(x => x.classList.remove('open')));
+}
+function handleAction(d) {
+  if (d.act === 'create') { pushHistory(); const o = makeObject(d.type); select(o); log('sys', `Created ${o.userData.name}`); }
+  if (d.act === 'delete' && ed.selected) { deleteSelected(); }
+  if (d.act === 'duplicate' && ed.selected) { duplicateSelected(); }
+  if (d.act === 'addcomp' && ed.selected) {
+    ed.selected.userData.components.script = d.comp;
+    renderInspector();
+    log('sys', `Attached ${d.comp}.cs to ${ed.selected.userData.name}`);
+  }
+  if (d.act === 'play') togglePlay();
+  if (d.act === 'pause') togglePause();
+  if (d.act === 'step') stepPlay();
+  if (d.act === 'undo') undo();
+  if (d.act === 'redo') redo();
+  if (d.act === 'new-scene') { resetSceneFor({ target: 'cube', name: 'Untitled', ver: '6000.1.7f1' }); log('sys', 'New SampleScene created'); }
+  if (d.act === 'save-scene') {
+    const data = JSON.stringify(ed.objects.map(o => ({ name: o.userData.name, type: o.userData.type, p: o.position.toArray(), r: [o.rotation.x, o.rotation.y, o.rotation.z], s: o.scale.toArray() })));
+    localStorage.setItem('unitycraft-scene', data);
+    log('sys', 'SampleScene saved (localStorage)');
+    toast('Scene saved');
+  }
+  if (d.act === 'open-scene') {
+    const data = localStorage.getItem('unitycraft-scene');
+    if (!data) { log('warn', 'No saved scene found'); toast('No saved scene'); return; }
+    resetSceneFor({ target: 'cube', name: 'Untitled', ver: '6000.1.7f1' });
+    JSON.parse(data).forEach(d0 => {
+      const o = makeObject(d0.type, { name: d0.name });
+      o.position.fromArray(d0.p); o.scale.fromArray(d0.s);
+      o.rotation.set(d0.r[0], d0.r[1], d0.r[2]);
+    });
+    log('sys', 'Scene loaded from save');
+  }
+  if (d.act === 'back-hub') { $('#editor').style.display = 'none'; $('#hub').classList.remove('hidden'); renderHub(); }
+  if (d.act === 'about') toast('UnityCraft — a browser reconstruction. Not affiliated with Unity Technologies.');
+}
+function deleteSelected() {
+  const o = ed.selected; if (!o) return;
+  pushHistory(); // snapshot before mutation
+  removeHelper(o); scene.remove(o);
+  ed.objects = ed.objects.filter(x => x !== o);
+  ed.selected = null; tcontrols.detach();
+  renderHierarchy(); renderInspector();
+  log('warn', `Deleted ${o.userData.name}`);
+}
+function duplicateSelected() {
+  const o = ed.selected; if (!o) return;
+  pushHistory(); // snapshot before mutation
+  const c = makeObject(o.userData.type, { name: o.userData.name + ' (copy)' });
+  c.position.copy(o.position).x += 1.5;
+  c.scale.copy(o.scale); c.rotation.copy(o.rotation);
+  if (c.material && o.material) c.material.color.copy(o.material.color);
+  select(c);
+  log('sys', `Duplicated ${o.userData.name}`);
+}
+function togglePlay() {
+  if (!ed.playing) {
+    ed.playSnapshot = ed.objects.map(o => ({ o, p: o.position.clone(), r: o.rotation.clone(), s: o.scale.clone() }));
+    ed.playing = true; ed.paused = false;
+    document.querySelector('[data-act="play"]').classList.add('active');
+    status('Play mode — press Stop to return to editing');
+    log('sys', 'Entered Play Mode');
+  } else {
+    ed.playing = false; ed.paused = false;
+    document.querySelector('[data-act="play"]').classList.remove('active');
+    document.querySelector('[data-act="pause"]').classList.remove('active');
+    if (ed.playSnapshot) ed.playSnapshot.forEach(({ o, p, r, s }) => { o.position.copy(p); o.rotation.copy(r); o.scale.copy(s); });
+    ed.playSnapshot = null;
+    renderInspector();
+    log('sys', 'Exited Play Mode (scene state restored)');
+  }
+}
+function togglePause() {
+  if (!ed.playing) return;
+  ed.paused = !ed.paused;
+  document.querySelector('[data-act="pause"]').classList.toggle('active', ed.paused);
+}
+function stepPlay() {
+  if (ed.playing && ed.paused) { advancePlay(1 / 60); }
+}
+function undo() {
+  if (!ed.history.length) { toast('Nothing to undo'); return; }
+  ed.redoStack.push(snapshotScene());
+  applySnapshot(ed.history.pop());
+  log('sys', 'Undo');
+}
+function redo() {
+  if (!ed.redoStack.length) return;
+  ed.history.push(snapshotScene());
+  applySnapshot(ed.redoStack.pop());
+  log('sys', 'Redo');
+}
+function snapshotScene() {
+  return ed.objects.map(o => ({ ref: o, name: o.userData.name, type: o.userData.type, p: o.position.clone(), r: o.rotation.clone(), s: o.scale.clone() }));
+}
+function applySnapshot(snap) {
+  const keep = ed.objects.slice();
+  keep.forEach(o => { if (!snap.find(x => x.ref === o)) { removeHelper(o); scene.remove(o); } });
+  ed.objects = snap.map(x => {
+    if (!x.ref.parent) { scene.add(x.ref); }
+    x.ref.userData.name = x.name;
+    x.ref.position.copy(x.p); x.ref.rotation.copy(x.r); x.ref.scale.copy(x.s);
+    return x.ref;
+  });
+  ed.selected = null; tcontrols.detach();
+  renderHierarchy(); renderInspector();
+}
+function pushHistory() { ed.history.push(snapshotScene()); ed.redoStack.length = 0; if (ed.history.length > 50) ed.history.shift(); }
+
+function bindKeys() {
+  document.addEventListener('keydown', e => {
+    if ($('#editor').style.display === 'none') return;
+    if (e.target.matches('input, select, textarea')) return;
+    const k = e.key.toLowerCase();
+    const tools = { q: 'hand', w: 'move', e: 'rotate', r: 'scale', t: 'rect' };
+    if (tools[k]) { document.querySelector(`.tool[data-tool="${tools[k]}"]`).click(); return; }
+    if (k === 'f' && ed.selected) {
+      orbit.target.copy(ed.selected.position);
+      status(`Framed ${ed.selected.userData.name}`);
+    }
+    if (k === 'delete') deleteSelected();
+    if (e.ctrlKey && k === 'd') { e.preventDefault(); duplicateSelected(); }
+    if (e.ctrlKey && k === 's') { e.preventDefault(); handleAction({ act: 'save-scene' }); }
+    if (e.ctrlKey && k === 'z') { e.preventDefault(); undo(); }
+    if (e.ctrlKey && k === 'y') { e.preventDefault(); redo(); }
+    if (k === 'p') togglePlay(); // Unity: Ctrl+P
+  });
+}
+function bindPanels() { /* future drag-resize */ }
+
+/* ---- status & stats ---- */
+function status(msg) { $('#status-msg').textContent = msg; }
+function activeCamera() { return ed.viewTab === 'game' ? gameCamera : sceneCamera; }
+
+/* ---- render loop ---- */
+let lastT = performance.now(); let frames = 0; let fpsT = 0;
+function advancePlay(dt) {
+  ed.objects.forEach(o => {
+    const sc = o.userData.components.script;
+    if (sc === 'SpinScript') o.rotation.y += THREE.MathUtils.degToRad(o.userData.scriptParams.speed) * dt;
+    if (sc === 'BobScript') o.position.y += Math.sin(performance.now() / 300) * o.userData.scriptParams.amp * dt * 2;
+  });
+}
+function loop(now) {
+  requestAnimationFrame(loop);
+  const dt = Math.min((now - lastT) / 1000, 0.1);
+  lastT = now;
+  if (ed.playing && !ed.paused) advancePlay(dt);
+  if (ed.viewTab === 'scene') orbit.update();
+  const helpersVisible = $('#chk-gizmos').checked;
+  grid.visible = ed.viewTab === 'scene' && $('#chk-grid').checked;
+  ed.objects.forEach(o => { if (o.userData.helper) o.userData.helper.visible = helpersVisible && ed.viewTab === 'scene'; });
+  renderer.render(scene, activeCamera());
+  drawAxisGizmo();
+  frames++; fpsT += dt;
+  if (fpsT > 0.5) {
+    $('#status-fps').textContent = `${Math.round(frames / fpsT)} fps`;
+    $('#status-objcount').textContent = `${ed.objects.length} objects`;
+    frames = 0; fpsT = 0;
+  }
+}
+function drawAxisGizmo() {
+  const cam = activeCamera();
+  const m = cam.matrixWorldInverse.clone();
+  const w = axCanvas.width / 2, h = axCanvas.height / 2;
+  axCtx.clearRect(0, 0, axCanvas.width, axCanvas.height);
+  axCtx.save(); axCtx.translate(w, h);
+  const axes = [[1, 0, 0, '#e23d4e', 'X'], [0, 1, 0, '#63a83b', 'Y'], [0, 0, 1, '#3a7bd0', 'Z']];
+  const proj = v => {
+    const p = new THREE.Vector3(v[0], v[1], v[2]).applyMatrix4(m);
+    return [p.x * 62, -p.y * 62, p.z];
+  };
+  axes.sort((a, b) => proj(b)[2] - proj(a)[2]);
+  axes.forEach(a => {
+    const [x, y] = proj(a);
+    axCtx.strokeStyle = a[3]; axCtx.fillStyle = a[3]; axCtx.lineWidth = 2.5;
+    axCtx.beginPath(); axCtx.moveTo(0, 0); axCtx.lineTo(x, y); axCtx.stroke();
+    axCtx.beginPath(); axCtx.arc(x, y, 5.5, 0, Math.PI * 2); axCtx.fill();
+    axCtx.font = '600 11px Inter, sans-serif';
+    axCtx.fillText(a[4], x + 9, y + 4);
+  });
+  axCtx.restore();
+}
+
+/* ---- boot: show Hub after loading screen (mirrors Hub splash) ---- */
+window.unitycraft = { ed, scene, makeObject }; // debug/test handle
+renderHub();
+setTimeout(() => $('#loading').classList.add('is-dismissed'), 1400);
+</script>
+</body>
+</html>
