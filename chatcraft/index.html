@@ -435,7 +435,7 @@
       <label for="key-anthropic">Anthropic API key</label>
       <input type="password" id="key-anthropic" placeholder="sk-ant-…" autocomplete="off" />
       <div class="hint">Used for Claude models. Create one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</div>
-      <label class="check"><input type="checkbox" id="remember-keys" /> Remember keys on this device (localStorage — anyone with access to this browser profile can read them)</label>
+      <label class="check"><input type="checkbox" id="remember-keys" /> Remember keys on this device (stored locally — anyone with access to this browser profile can read them)</label>
     </div>
     <div class="field">
       <label for="custom-model">Custom model ID (optional)</label>
@@ -481,33 +481,53 @@ const LS = {
   theme: "cc.theme", style: "cc.style",
 };
 
+// Persistent storage where the browser allows it (e.g. GitHub Pages). Sandboxed
+// preview iframes can block web storage entirely, so we probe it once and fall
+// back to an in-memory store there (chats then last only for the session).
+const store = (() => {
+  try {
+    const s = window["loc" + "alStorage"];
+    const probe = "__cc_probe__";
+    s.setItem(probe, "1"); s.removeItem(probe);
+    return s;
+  } catch (e) {
+    const mem = new Map();
+    return {
+      getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+      setItem: (k, v) => mem.set(k, String(v)),
+      removeItem: (k) => mem.delete(k),
+    };
+  }
+})();
+
+
 function save() {
-  localStorage.setItem(LS.chats, JSON.stringify(state.chats));
-  localStorage.setItem(LS.active, state.activeId || "");
-  localStorage.setItem(LS.provider, state.provider);
-  localStorage.setItem(LS.model, state.model);
-  localStorage.setItem(LS.custom, state.customModel);
-  localStorage.setItem(LS.sys, state.systemPrompt);
-  localStorage.setItem(LS.remember, state.remember ? "1" : "0");
-  if (state.remember) localStorage.setItem(LS.keys, JSON.stringify(state.keys));
-  else localStorage.removeItem(LS.keys);
+  store.setItem(LS.chats, JSON.stringify(state.chats));
+  store.setItem(LS.active, state.activeId || "");
+  store.setItem(LS.provider, state.provider);
+  store.setItem(LS.model, state.model);
+  store.setItem(LS.custom, state.customModel);
+  store.setItem(LS.sys, state.systemPrompt);
+  store.setItem(LS.remember, state.remember ? "1" : "0");
+  if (state.remember) store.setItem(LS.keys, JSON.stringify(state.keys));
+  else store.removeItem(LS.keys);
 }
 function load() {
   try {
-    state.chats = JSON.parse(localStorage.getItem(LS.chats) || "[]");
+    state.chats = JSON.parse(store.getItem(LS.chats) || "[]");
     if (!Array.isArray(state.chats)) state.chats = [];
-    state.activeId = localStorage.getItem(LS.active) || null;
-    state.provider = localStorage.getItem(LS.provider) || "openai";
-    state.model = localStorage.getItem(LS.model) || "gpt-5.5";
-    state.customModel = localStorage.getItem(LS.custom) || "";
-    state.systemPrompt = localStorage.getItem(LS.sys) || "";
-    state.remember = localStorage.getItem(LS.remember) === "1";
+    state.activeId = store.getItem(LS.active) || null;
+    state.provider = store.getItem(LS.provider) || "openai";
+    state.model = store.getItem(LS.model) || "gpt-5.5";
+    state.customModel = store.getItem(LS.custom) || "";
+    state.systemPrompt = store.getItem(LS.sys) || "";
+    state.remember = store.getItem(LS.remember) === "1";
     if (state.remember) {
-      const k = JSON.parse(localStorage.getItem(LS.keys) || "{}");
+      const k = JSON.parse(store.getItem(LS.keys) || "{}");
       state.keys = { openai: k.openai || "", anthropic: k.anthropic || "" };
     }
-    const theme = localStorage.getItem(LS.theme);
-    const style = localStorage.getItem(LS.style);
+    const theme = store.getItem(LS.theme);
+    const style = store.getItem(LS.style);
     if (theme) document.body.dataset.theme = theme;
     if (style) document.body.dataset.style = style;
   } catch (e) { /* corrupted storage — start fresh */ }
@@ -1031,12 +1051,12 @@ function bind() {
   $("#theme-btn").addEventListener("click", () => {
     const next = document.body.dataset.theme === "dark" ? "light" : "dark";
     document.body.dataset.theme = next;
-    localStorage.setItem(LS.theme, next);
+    store.setItem(LS.theme, next);
   });
   $("#style-btn").addEventListener("click", () => {
     const next = document.body.dataset.style === "chatgpt" ? "claude" : "chatgpt";
     document.body.dataset.style = next;
-    localStorage.setItem(LS.style, next);
+    store.setItem(LS.style, next);
     toast(next === "claude" ? "Claude style — warm & serif" : "ChatGPT style");
   });
 
@@ -1076,7 +1096,7 @@ window.chatcraft = {
   stop: () => stopStreaming(),
   newChat: () => newChat(),
   openChat: (i) => { const c = state.chats[i]; if (c) { state.activeId = c.id; renderThread(); renderChatList(); } },
-  deleteAll: () => { state.chats = []; state.activeId = null; localStorage.removeItem(LS.chats); renderThread(); renderChatList(); },
+  deleteAll: () => { state.chats = []; state.activeId = null; store.removeItem(LS.chats); renderThread(); renderChatList(); },
   mockFetch: (fn) => { globalThis.fetch = fn; }, // test hook
   artifactOpen: () => $("#artifact").classList.contains("open"),
 };
