@@ -7,7 +7,7 @@ A browser reconstruction of the **Unity Hub** launcher and a **Unity Editor**-st
 
 ## Provenance
 
-This is a clean-room reconstruction — no Unity Technologies code, assets, or binaries are redistributed. The Hub logo/splash artwork and all UI code in this module are original.
+This is a clean-room reconstruction — no Unity Technologies code, assets, or binaries are redistributed. The Hub logo/splash artwork and all UI code in this module are original. **"1:1" is the design goal, not a claim**: every behavior below is labeled with how it is supported (source-assisted, binary-evidence-assisted, or documentation-based), and the real Editor's runtime behavior was never execution-verified against this reconstruction.
 
 | Area | Provenance | Notes |
 |---|---|---|
@@ -33,14 +33,15 @@ This is a clean-room reconstruction — no Unity Technologies code, assets, or b
 | Undo/redo incl. delete/create/duplicate | Design choice | Verified round-trip in browser QA |
 | Save/load scene | Design choice (Unity persists scenes to assets) | Verified round-trip incl. colors and scripts |
 | Camera helpers, light gizmos hidden in Game view | Unity Manual (documentation-based) | Verified in Game view |
-| Menu bar: File (8) / Edit (6) / Assets (3) / GameObject (12) / Component (2) / Window (4) / Help (3) with Unity shortcut labels | UnityEditor.dll strings + Unity Manual | Verified: each menu opens with the full item set |
-| Create Empty (Ctrl+Shift+N) / Create Empty Parent (Ctrl+Shift+G) | Unity Manual (Hierarchy) | Verified: object appears in Hierarchy and Scene; new object at scene pivot until first view interaction, then view pivot |
+| Menu bar: File (8) / Edit (6) / Assets (3) / GameObject (12) / Component (2) / Window (4) / Help (3) with Unity shortcut labels | UnityEditor.dll strings + Unity Manual | Implemented subset — the recovered strings show these paths exist in Unity; they do not establish Unity's complete item sets. Verified: each menu opens with the implemented item set |
+| Create Empty (Ctrl+Shift+N) | Unity Manual (Hierarchy) | Verified: object appears in Hierarchy and Scene; new object at scene pivot until first view interaction, then view pivot |
+| Create Empty Parent (Ctrl+Shift+G) | Unity Manual (Hierarchy) | Partial: creates an empty GameObject at the selected object's position, but does not actually parent objects (Hierarchy parenting is unimplemented) — real Unity parents the selection under the new object |
 | GameObject ▶ Move To View / Align With View | UnityEditor.dll strings | Implemented: moves/aligns selected object to the view pivot |
 | Full play-mode state restore: position, color, name, attached script, object set all revert on Stop | Unity Manual (Game view: "changes are reset when you exit Play mode") | Verified: mutated name/color/position/script plus a created object and a deleted object all restored; Pause frozen (two equal readings) |
-| Cast/receive shadows, camera near-clip persist through save/reload | Design choice (standard Unity properties) | Verified round-trip: castShadow off + near 0.42 restored after page reload |
+| Cast/receive shadows, camera near-clip persist through save/reload | Design choice (standard Unity properties) | Verified round-trip via both the Inspector UI and the model: castShadow off + near 0.42 restored after page reload (localhost, working localStorage). Scope note: in the deployed preview the iframe blocks localStorage, so the in-memory fallback keeps scenes only for the session — save/load across reloads is not available there |
 | New scene titled "Untitled" | Unity Manual (Creating scenes) | Implemented |
 
-Not implemented: physics/colliders (checkbox only), multi-scene, asset import, C# compilation (script components are built-in JS behaviors), parenting in the Hierarchy, Preferences. The real Editor's runtime behavior was not execution-verified (static analysis only) — parity with Unity documentation is the working standard.
+Not implemented: physics/colliders (checkbox only), multi-scene, asset import, C# compilation (script components are built-in JS behaviors), Hierarchy parenting (so Create Empty Parent is partial), Preferences. The real Editor's runtime behavior was not execution-verified (static analysis only) — parity with Unity documentation is the working standard.
 
 Unity® is a trademark of Unity Technologies — this project is not affiliated with or endorsed by them. For the real editor, download it from https://unity.com/download.
 
