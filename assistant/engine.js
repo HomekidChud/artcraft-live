@@ -104,8 +104,9 @@ export function respond(catalog, model, text, selected, previousCraft, memoryEnt
   const base = {craft, intent, confidence:intentResult.confidence, actions};
   const relevant = craft ? findRelevantMemory(memoryEntries, craft.id, text) : [];
   if (relevant.length) actions.push({command:"findRelevantMemory(memoryEntries, craft.id, text)", summary:`Found ${relevant.length} relevant note(s) stored on this device; none were uploaded.`});
-  if (intent === "greeting") return {...base, text:"Hi! Choose a Craft, then ask for a quick guide or a starter file. I’m an offline routing assistant with curated answers, not a general-purpose chatbot."};
-  if (intent === "training") return {...base, text:"Two small neural networks route 13 Crafts and six request types using reviewed examples. Replies are curated and starter files are fixed templates; chat is not saved or used for training. I cannot see or control your editor."};
+  if (intent === "greeting") return {...base, text:"Hi! I’m ArtCraft. Pick a Craft or ask me something; I can guide you or make a starter template."};
+  if (intent === "smalltalk") return {...base, text:"I don’t have feelings, but I’m here and ready to help. What are you working on?"};
+  if (intent === "training") return {...base, text:"The local router covers 13 Crafts and seven request types using reviewed examples. Optional online chat can answer more freely, but it is not training data and is not saved. I cannot see or control your editor."};
   if (intent === "troubleshoot") {
     if (craft?.id === "effectcraft") {
       return {...base, text:attachMemory("EffectCraft startup check: let the WebAssembly download finish. If the canvas stays blank, try WebGL; if that fails, try CPU mode (slower). On a self-hosted copy, effectcraft_web_bg.wasm should return HTTP 200 with application/wasm. I cannot inspect your browser console from chat.",relevant), recoveryOptions:[{label:"Try WebGL",mode:"webgl"},{label:"Try CPU · slower",mode:"cpu"}]};

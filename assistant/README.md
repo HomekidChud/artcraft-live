@@ -1,17 +1,18 @@
 # ArtCraft Chat
 
-A small, fully local assistant shared by all 13 Craft apps. It combines two neural classifiers trained from random weights with curated workflow advice and fixed starter-file templates. It offers opt-in browser-local memory and an expandable trace of actions actually run. It is not a pretrained foundation model, a generative LLM, or an autonomous editor agent.
+A hybrid assistant shared by all 13 Craft apps. Offline, it combines two small neural classifiers trained from random weights with curated workflow advice and fixed starter-file templates. Optional Online AI connects to OpenAI for broader conversation and web research, and can call a small allowlist of local skills. It still cannot control an open editor or run terminal commands.
 
 ## What works
 
 - **Chat tab:** a standalone chat at `assistant/`, plus a 44px circular launcher in each editor. The panel starts compact, can expand or minimize, and retains the conversation and pending attachments while minimized. The selector automatically follows the editor where the panel was opened. Escape from the message field also minimizes the panel.
 - **Local memory:** off by default. Turn it on with the Memory control, then explicitly ask the assistant to “remember that …” or “remember my …”. It stores only those notes and the last Craft in this browser's `localStorage`, not chat transcripts, files or model weights. “What do you remember?”, “forget [phrase]” and “forget everything” manage the saved notes. The Memory panel also shows the saved-note count and has a clear-all control. It does not sync between browsers or devices.
-- **Action trace:** each reply keeps its exact browser calls and outcomes under a compact “Show task steps” disclosure, collapsed by default. Expand it to inspect request routing, file checks, image recognition and starter generation. These are not terminal shell commands; no arbitrary command execution is available.
+- **Online AI and skills:** optional, off by default. Enter your own OpenAI API key in Online AI settings to use the Responses API, with optional provider web search and clickable citations. The model can call only local `get_craft_guidance` and `make_starter` tools; file checks remain local browser actions. This is not editor control or a general command runner.
+- **Action trace:** each reply keeps its actual browser, network and skill calls under a compact “Show task steps” disclosure, collapsed by default. Expand it to inspect request routing, file checks, image recognition, web search, API requests and starter generation. These are not terminal shell commands; no arbitrary command execution is available.
 - **All Crafts:** getting-started guidance, export guidance, loading troubleshooting, and a starter artifact for each app.
-- **Neural network:** NumPy implementation of token counts, L2-normalised inputs, a 40-unit tanh hidden layer, softmax output, cross-entropy, manual backpropagation and Adam. One network routes 13 Crafts and a second routes six supported request types. Browser inference is plain JavaScript with no external libraries.
-- **Training:** `model.json` is the actual trained checkpoint, not a placeholder. The current checkpoint uses 1,000 epochs, 420 Craft examples and 135 request examples; it records the seed, timestamp and held-out routing checks. The 52/52 Craft and 26/26 request checks are curated development smoke tests, not independent evidence of conversational intelligence or broad generalisation.
+- **Neural network:** NumPy implementation of token counts, L2-normalised inputs, a 40-unit tanh hidden layer, softmax output, cross-entropy, manual backpropagation and Adam. One network routes 13 Crafts and a second routes seven request types, including small talk. Browser inference is plain JavaScript with no external libraries.
+- **Training:** `model.json` is the actual trained checkpoint, not a placeholder. The current checkpoint uses 1,000 epochs, 511 Craft training examples and 188 request examples; it records the seed, timestamp and held-out routing checks. The 78/78 Craft and 43/43 request checks are curated development smoke tests, not independent evidence of conversational intelligence or broad generalisation.
 - **Offline use:** once this assistant URL has been opened and its service worker installed successfully, its local scripts, catalog and model are cached. Reload once while connected. The chat can then reopen offline on the same origin, provided the browser has not evicted its cache. This does not download all editor WebAssembly bundles or make the entire suite offline.
-- **Privacy:** messages and attached files stay in the open tab's memory. Reload and New chat clear them; minimizing does not. Optional local memory is disabled until enabled and saves only explicit notes and the last Craft. Saved notes are not used for automatic training or sent to a server. No chat collection, analytics, automatic uploads, self-training from users, remote model calls or API keys. Image recognition runs in your browser; images never leave your device.
+- **Privacy:** chat text and the last 12 turns stay in tab memory and clear on reload or New chat; attachments are not sent to online chat. Optional local memory is disabled until enabled and saves only explicit notes and the last Craft. The app does not collect chats or use them to train its local router. When Online AI is enabled, the current message, selected Craft and recent text are sent to OpenAI; if a local guidance/starter skill is used, its result (curated guidance text or starter metadata) is also sent in a follow-up request. File contents, attachments, local memory and editor state are not sent. `store:false` is requested, but provider data policies apply. The API key is held in page memory only and is not persisted, but any script on this public page can access it. A server-side proxy is safer; if using BYOK, use a restricted, low-limit key and revoke it if exposed. API usage may cost extra. Local image recognition stays in-browser.
 
 ## Local file attachments
 
@@ -51,9 +52,9 @@ Import support differs across the bundled browser versions. Markdown checklists 
 
 ## What “perform a task” means here
 
-The assistant can perform its supported local operations: inspect permitted attachments, classify a request, select a Craft and prepare a fixed starter download. Each response has a collapsed “Show task steps” trace of the calls it ran. It does not open or edit the current Craft document, run operating-system shell commands, install software, or execute arbitrary code. The editor folders contain upstream prebuilt WebAssembly bundles rather than source-level automation adapters. Real editor automation would require supported APIs or command adapters from those upstream apps, a reviewed allowlist of actions, previews and confirmation before changes.
+The assistant can perform its supported operations: inspect permitted attachments locally, classify a request, read curated Craft guidance, search the public web when enabled, and prepare a fixed starter download. Each response has a collapsed “Show task steps” trace of the calls it ran. It does not open or edit the current Craft document, run operating-system shell commands, install software, or execute arbitrary code. The editor folders contain upstream prebuilt WebAssembly bundles rather than source-level automation adapters. Real editor automation would require supported APIs or command adapters from those upstream apps, a reviewed allowlist of actions, previews and confirmation before changes.
 
-The assistant is not a general-purpose LLM. A server-hosted generative model would need a separate backend; embedding a provider API key in these static GitHub Pages files would expose it publicly. Opt-in local memory can personalize a few supported templates, but it does not change model weights. The reviewed catalog and routing checkpoint can be retrained; that improves request/Craft routing only, not factual knowledge or general reasoning.
+Offline, the assistant is not a general-purpose LLM: the local model improves Craft/request routing only, not factual knowledge or general reasoning. Online chat supplies broader language ability through the user's own provider account. This static GitHub Pages app cannot keep a provider key secret; the BYOK setting only holds it in the open page's memory and sends it directly to OpenAI. A protected server-side proxy is preferable for production. Opt-in local memory can personalize a few supported templates, but it does not change model weights.
 
 ## Run locally
 
@@ -63,7 +64,7 @@ From the repository root:
 python -m http.server 8000 --bind 127.0.0.1
 ```
 
-Open `http://127.0.0.1:8000/assistant/`. Use a local server rather than opening `index.html` as a `file://` URL because ES modules and service workers need an HTTP origin. A local server works with the internet disconnected after the repository and dependencies are downloaded.
+Open `http://127.0.0.1:8000/assistant/`. Use a local server rather than opening `index.html` as a `file://` URL because ES modules and service workers need an HTTP origin. Offline guidance and templates work after the repository and dependencies are downloaded; optional Online AI requires internet access and the user's OpenAI API key.
 
 ## Train from scratch
 
@@ -76,7 +77,7 @@ OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 .venv/bin/python assistant/training/tra
 npm test
 ```
 
-Training uses the local `catalog.json` (default: 1,000 full-dataset epochs; override with `--epochs N`). The current checkpoint was trained from 420 Craft and 135 request examples. A candidate must pass every held-out check for every Craft and intent label; rejected candidates never replace the working checkpoint. Acceptance of these narrow checks does not establish safety or broad task competence; review changed answers and templates separately.
+Training uses the local `catalog.json` (default: 1,000 full-dataset epochs; override with `--epochs N`). The current checkpoint was trained from 511 Craft and 188 request examples. A candidate must pass every held-out check for every Craft and intent label; rejected candidates never replace the working checkpoint. Acceptance of these narrow checks does not establish safety or broad task competence; review changed answers and templates separately.
 
 ## Always-on worker
 
@@ -113,7 +114,7 @@ Create the ignored file `assistant/training/local-approved.jsonl`, one reviewed 
 {"head":"craft","text":"I am arranging spreadsheet cells","label":"gridcraft","approved":true}
 ```
 
-Only use data you have the rights and permission to use. Remove personal information; a trained network is not a privacy guarantee. Inspect every example and label. Do not scrape or add conversations automatically. Valid intent labels are `greeting`, `help`, `create`, `export`, `troubleshoot`, and `training`; Craft labels are the lowercase folder names. These examples improve routing only, not the factual knowledge or generative ability of the assistant.
+Only use data you have the rights and permission to use. Remove personal information; a trained network is not a privacy guarantee. Inspect every example and label. Do not scrape or add conversations automatically. Valid intent labels are `greeting`, `smalltalk`, `help`, `create`, `export`, `troubleshoot`, and `training`; Craft labels are the lowercase folder names. These examples improve offline routing only, not factual knowledge or general reasoning.
 
 ## Remaining work
 

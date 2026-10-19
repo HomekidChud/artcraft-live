@@ -2,6 +2,7 @@ import {respond} from "./engine.js";
 import {readAttachment, attachmentReply, formatSize, MAX_FILES} from "./files.js";
 import {recognizeImage, formatVision, MATCH_THRESHOLD} from "./vision.js";
 import {loadMemory, setMemoryEnabled, addMemoryItem, clearMemory, forgetMemory, setLastCraft, parseMemoryCommand} from "./memory.js";
+import {runOnlineTurn,DEFAULT_MODEL} from "./online.js";
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -14,14 +15,16 @@ if (embedded) {
     if(event.key==="Escape")parent.postMessage({type:"artcraft-chat-minimize"},location.origin);
   });
 }
-let catalog, model, urls = [], pending = [], importing = false, generation = 0;
+let catalog, model, urls = [], pending = [], importing = false, sending = false, generation = 0;
 let memory = loadMemory();
 let previousCraft = memory.enabled ? memory.lastCraft : null;
+let onlineConfig = null, onlineHistory = [];
 const welcome = $("welcome");
 
 function updateControls() {
-  $("attach").disabled=!model||importing;
-  $("send").disabled=!model||importing||(!$('message').value.trim()&&!pending.length);
+  $("attach").disabled=!model||importing||sending;
+  $("send").disabled=!model||importing||sending||(!$('message').value.trim()&&!pending.length);
+  $("online-toggle").disabled=!model||sending;
 }
 function updateMemoryControls() {
   const toggle=$("memory-toggle");
@@ -34,21 +37,52 @@ function updateMemoryControls() {
     ? "This browser blocked local storage, so persistent memory is unavailable. Chat still works without it."
     : memory.enabled
       ? `On this browser only: ${memory.entries.length} explicitly saved note(s)${memory.lastCraft?" and your last Craft" : ""}. Chats and files are not stored. Use “forget all” or the button below to erase notes.`
-      : `Off. Chat and files are not stored. ${memory.entries.length?`${memory.entries.length} saved note(s) remain on this browser but are not used until memory is enabled.`:"Enable it to save only notes you explicitly ask it to remember."}`;
+    : `Off. Chat and files are not stored. ${memory.entries.length?`${memory.entries.length} saved note(s) remain on this browser but are not used until memory is enabled.`:"Enable it to save only notes you explicitly ask it to remember."}`;
 }
-function renderTrace(article, actions) {
-  if(!actions?.length)return;
+function updateOnlineControls() {
+  const connected=Boolean(onlineConfig);
+  const button=$("online-toggle");
+  button.textContent=connected?"AI online":"AI offline";
+  button.setAttribute("aria-pressed",String(connected));
+  button.disabled=!model||sending;
+  $("connection-label").textContent=connected
+    ? `Online AI · web search ${onlineConfig.webSearch?"on":"off"} · key stays in this tab`
+    : "Local chat · starter files are templates";
+  $("online-disconnect").hidden=!connected;
+  $("online-connect").textContent=connected?"Update connection":"Connect for this tab";
+  $("online-key").required=!connected;
+  $("online-consent").required=!connected;
+  $("online-model").value=onlineConfig?.model||DEFAULT_MODEL;
+  $("online-search").checked=onlineConfig?.webSearch??true;
+  $("online-key").placeholder=connected?"Connected for this tab; key not shown":"Enter for this tab only";
+}
+function createTrace(article,mode="local",open=false) {
   const details=document.createElement("details");details.className="action-trace";
-  const summary=document.createElement("summary");summary.textContent=`Show task steps · ${actions.length}`;
+  details.open=open;
+  const summary=document.createElement("summary");summary.textContent=open?"Task steps · running…":"Show task steps · 0";
   const note=document.createElement("p");note.className="trace-note";
-  note.textContent="Local browser actions only. These are not terminal shell commands and do not control the editor.";
+  note.textContent=mode==="online"
+    ? "Network and local skill calls shown. No terminal commands or editor-control calls were run."
+    : "Local browser actions only. These are not terminal shell commands and do not control the editor.";
   const list=document.createElement("ol");
-  for(const action of actions){
-    const item=document.createElement("li"),code=document.createElement("code"),result=document.createElement("span");
-    code.textContent=action.command;result.textContent=action.summary;
-    item.append(code,result);list.append(item);
-  }
   details.append(summary,note,list);article.append(details);
+  return {details,summary,list,mode};
+}
+function addTraceAction(trace,action) {
+  const item=document.createElement("li"),code=document.createElement("code"),result=document.createElement("span");
+  code.textContent=action.command;result.textContent=action.summary;
+  item.append(code,result);trace.list.append(item);
+  if(trace.details.open)trace.summary.textContent=`Task steps · ${trace.list.children.length}`;
+}
+function finishTrace(trace) {
+  trace.summary.textContent=`Show task steps · ${trace.list.children.length}`;
+  trace.details.open=false;
+}
+function renderTrace(article, actions, mode="local") {
+  if(!actions?.length)return;
+  const trace=createTrace(article,mode,false);
+  actions.forEach(action=>addTraceAction(trace,action));
+  finishTrace(trace);
 }
 function renderPending() {
   $("attachments").replaceChildren();
@@ -62,7 +96,7 @@ function renderPending() {
   updateControls();
 }
 async function addFiles(files) {
-  if(!model||importing)return;
+  if(!model||importing||sending)return;
   const current=++generation;importing=true;updateControls();
   $("attachment-status").textContent="Reading files locally…";
   const notices=[];
@@ -105,6 +139,36 @@ function append(speaker, text) {
   const body = document.createElement("div"); body.className = "body"; body.textContent = text;
   article.append(label,body); $("messages").append(article);
   return article;
+}
+function renderOnlineCitations(article,result) {
+  const body=article.querySelector(".body");
+  const text=result.text||"";
+  const citations=(result.citations||[]).filter(item=>Number.isInteger(item.start)&&Number.isInteger(item.end)&&item.start>=0&&item.end>item.start&&item.end<=text.length)
+    .sort((a,b)=>a.start-b.start);
+  body.replaceChildren();
+  let cursor=0;
+  for(const citation of citations){
+    if(citation.start<cursor)continue;
+    body.append(document.createTextNode(text.slice(cursor,citation.start)));
+    const link=document.createElement("a");link.href=citation.url;link.target="_blank";link.rel="noopener";link.textContent=text.slice(citation.start,citation.end)||citation.title;
+    body.append(link);cursor=citation.end;
+  }
+  body.append(document.createTextNode(text.slice(cursor)));
+  const sources=(result.sources||[]).slice(0,5);
+  if(sources.length){
+    const list=document.createElement("div");list.className="source-list";list.setAttribute("aria-label","Web sources");
+    const label=document.createElement("span");label.textContent="Sources ";list.append(label);
+    sources.forEach((source,index)=>{
+      const link=document.createElement("a");link.href=source.url;link.target="_blank";link.rel="noopener";link.textContent=`[${index+1}] ${source.title}`;list.append(link);
+    });
+    article.append(list);
+  }
+}
+function appendArtifact(article,artifact) {
+  if(!artifact)return;
+  const link=document.createElement("a");link.className="download";link.href=URL.createObjectURL(artifact.blob);urls.push(link.href);
+  link.download=artifact.filename;link.textContent=`Download ${artifact.filename}`;
+  const note=document.createElement("p");note.className="note";note.textContent=artifact.note;article.append(link,note);
 }
 function syncCraft() {
   const craft = catalog.crafts.find(c=>c.id===$("craft").value);
@@ -163,7 +227,7 @@ function handleMemoryCommand(text) {
 }
 async function submit(text) {
   text = text.trim().slice(0,2000);
-  if ((!text&&!pending.length) || !model || importing) return;
+  if ((!text&&!pending.length) || !model || importing || sending) return;
   welcome.remove();
   const files=pending;pending=[];
   const user=append("You",text||"Check these attached files.");
@@ -207,6 +271,40 @@ async function submit(text) {
   }
   const namesCraft = text && catalog.crafts.some(craft => text.toLowerCase().includes(craft.id));
   const craftChoice = (images.length && recognizedCraft && $("craft").value === "auto" && !namesCraft) ? recognizedCraft : $("craft").value;
+  if(text&&onlineConfig){
+    sending=true;updateControls();
+    const article=append("ArtCraft · Online AI","Connecting…");
+    const body=article.querySelector(".body");
+    const trace=createTrace(article,"online",true),traceActions=[];
+    const scroll=()=>embedded?$("messages").scrollTop=$("messages").scrollHeight:article.scrollIntoView({block:"nearest"});
+    const recordAction=action=>{traceActions.push(action);addTraceAction(trace,action);scroll();};
+    try{
+      const result=await runOnlineTurn({apiKey:onlineConfig.apiKey,model:onlineConfig.model,webSearch:onlineConfig.webSearch,
+        history:onlineHistory,text,catalog,selectedCraft:$("craft").value,onAction:recordAction,
+        onStatus:status=>{body.textContent=status;scroll();}});
+      onlineHistory.push({role:"user",content:text},{role:"assistant",content:result.text});
+      onlineHistory=onlineHistory.slice(-24);
+      body.textContent=result.text;
+      article.querySelector(".speaker").textContent=result.webSearched?"ArtCraft · Web answer":"ArtCraft · Online AI";
+      renderOnlineCitations(article,result);
+      appendArtifact(article,result.artifacts?.[0]);
+      finishTrace(trace);
+    }catch(error){
+      body.textContent=`Online AI could not reply. ${error?.message||"Check the connection and try again."}`;
+      recordAction(traceActions.length
+        ? {command:"request outcome",summary:"The request failed or was blocked. Check the connection, model and quota; the API key is not recorded."}
+        : {command:"validate online settings",summary:"Rejected locally before any provider request was made."});
+      finishTrace(trace);
+    }finally{
+      sending=false;updateControls();
+      $("message").value="";
+      $("attachment-status").textContent=files.length?"Files were checked locally; their contents were not sent to online chat.":"";
+      renderPending();
+      scroll();
+      $("message").focus({preventScroll:true});
+    }
+    return;
+  }
   const result = text ? respond(catalog,model,text,craftChoice,previousCraft,memory.enabled?memory.entries:[]) : null;
   if(!result||(files.length&&!result.intent)){
     $("message").value="";$("attachment-status").textContent="Files checked locally. They were not imported into the editor.";
@@ -233,13 +331,7 @@ async function submit(text) {
     }
     article.append(links);
   }
-  if (result.artifact) {
-    const a = document.createElement("a"); a.className = "download";
-    a.href = URL.createObjectURL(result.artifact.blob); urls.push(a.href);
-    a.download = result.artifact.filename; a.textContent = `Download ${result.artifact.filename}`;
-    const note = document.createElement("p"); note.className = "note"; note.textContent = result.artifact.note;
-    article.append(a,note);
-  }
+  appendArtifact(article,result.artifact);
   if (result.docs && result.craft) {
     const a = document.createElement("a");
     a.href = `https://github.com/HomekidChud/artcraft-live/blob/main/${result.craft.id}/README.md`;
@@ -277,14 +369,44 @@ $("memory-clear").addEventListener("click",()=>{
   const ok=clearMemory(memory);previousCraft=null;updateMemoryControls();
   $("attachment-status").textContent=ok?`Cleared ${count} saved note(s) and the remembered last Craft from this browser.`:"Could not clear browser storage.";
 });
+$("online-toggle").addEventListener("click",()=>{
+  updateOnlineControls();
+  $("online-dialog").showModal();
+  $("online-model").focus();
+});
+$("online-close").addEventListener("click",()=>$("online-dialog").close());
+$("online-dialog").addEventListener("close",()=>{
+  $("online-key").value="";
+  if(!onlineConfig)$("online-consent").checked=false;
+});
+$("online-form").addEventListener("submit",event=>{
+  event.preventDefault();
+  const apiKey=$("online-key").value.trim()||onlineConfig?.apiKey||"";
+  const modelName=$("online-model").value.trim()||DEFAULT_MODEL;
+  if(!apiKey||(!onlineConfig&&!$("online-consent").checked))return;
+  onlineConfig={apiKey,model:modelName,webSearch:$("online-search").checked};
+  onlineHistory=[];
+  $("online-key").value="";
+  updateOnlineControls();
+  $("online-dialog").close();
+  $("reset").click();
+  $("attachment-status").textContent=`Online AI connected for this tab. ${onlineConfig.webSearch?"Web search is allowed; citations will be shown.":"Web search is off."}`;
+});
+$("online-disconnect").addEventListener("click",()=>{
+  onlineConfig=null;onlineHistory=[];updateOnlineControls();
+  $("online-dialog").close();
+  $("reset").click();
+  $("attachment-status").textContent="Disconnected. The API key was cleared from this page's memory.";
+});
 $("craft").addEventListener("change",()=>{previousCraft=null;syncCraft();});
 $("reset").addEventListener("click",()=>{
   $("messages").querySelectorAll("audio").forEach(audio=>audio.pause());
-  urls.forEach(URL.revokeObjectURL);urls=[];previousCraft=memory.enabled?memory.lastCraft:null;
+  urls.forEach(URL.revokeObjectURL);urls=[];previousCraft=memory.enabled?memory.lastCraft:null;onlineHistory=[];
   generation++;pending=[];importing=false;$("file-input").value="";$("attachment-status").textContent="";renderPending();
   $("messages").replaceChildren(welcome);$("message").value="";updateControls();$("message").focus();
 });
 updateMemoryControls();
+updateOnlineControls();
 try {
   const responses = await Promise.all([fetch("./catalog.json"),fetch("./model.json")]);
   if (responses.some(r=>!r.ok)) throw new Error("Missing model or catalog.");
@@ -297,7 +419,7 @@ try {
   syncCraft();
   $("status").textContent="Ready";
   $("status").classList.add("ready");
-  $("message").disabled=false;updateControls();
+  $("message").disabled=false;updateControls();updateOnlineControls();
   $("metrics").textContent=`Trained from scratch: ${model.epochs} epochs per network. Craft routing: ${model.metrics.craft.correct}/${model.metrics.craft.total}; request routing: ${model.metrics.intent.correct}/${model.metrics.intent.total}. These are small curated smoke tests, not proof of general chat ability. Checkpoint: ${model.trained_at}.`;
 }catch(error){
   model=null;$("message").disabled=true;updateControls();

@@ -12,7 +12,7 @@ test("real accepted checkpoint contains two independently initialised MLPs",()=>
   assert.equal(model.accepted,true);
   assert.equal(model.epochs,1000);
   assert.equal(model.networks.craft.labels.length,13);
-  assert.equal(model.networks.intent.labels.length,6);
+  assert.equal(model.networks.intent.labels.length,7);
   for(const net of Object.values(model.networks)){
     assert.equal(net.w1.length,net.vocab.length);
     assert.equal(net.w1[0].length,40);
@@ -61,9 +61,17 @@ test("auto routing remembers the craft and explicit craft names override history
 test("no selected or identifiable craft asks instead of making up a project",()=>{
   assert.match(respond(catalog,model,"make a starter file","auto").text,/Choose a Craft/);
 });
-test("training and greeting explain the actual capability boundary",()=>{
-  assert.match(respond(catalog,model,"hi","auto").text,/not a general-purpose chatbot/);
-  assert.match(respond(catalog,model,"how was the model trained","auto").text,/cannot see or control/);
+test("greetings and small talk receive friendly, honest replies",()=>{
+  const greeting=respond(catalog,model,"hi","auto");
+  assert.equal(greeting.intent,"greeting");
+  assert.match(greeting.text,/I’m ArtCraft/);
+  const smalltalk=respond(catalog,model,"how are you","auto");
+  assert.equal(smalltalk.intent,"smalltalk");
+  assert.match(smalltalk.text,/don’t have feelings/);
+  assert.doesNotMatch(smalltalk.text,/Choose a Craft|not confident/);
+  const training=respond(catalog,model,"how was the model trained","auto");
+  assert.equal(training.intent,"training");
+  assert.match(training.text,/cannot see or control/);
 });
 test("EffectCraft startup troubleshooting offers official renderer fallbacks",()=>{
   const result=respond(catalog,model,"EffectCraft is stuck on a blank loading screen","auto");

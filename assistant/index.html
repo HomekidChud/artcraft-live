@@ -22,8 +22,9 @@
     </section>
     <section class="context-bar" aria-label="Craft selection">
       <label for="craft">Craft</label>
-      <select id="craft"><option value="auto">Choose automatically</option></select>
+      <select id="craft"><option value="auto">Auto</option></select>
       <button id="memory-toggle" class="memory-toggle" type="button" aria-pressed="false">Memory off</button>
+      <button id="online-toggle" class="online-toggle" type="button" aria-pressed="false" aria-haspopup="dialog">AI offline</button>
       <a id="open-craft" class="editor-link" hidden target="_blank" rel="noopener">Open editor <span aria-hidden="true">↗</span></a>
     </section>
     <div class="status" id="status" role="status">Getting things ready…</div>
@@ -32,7 +33,7 @@
         <div class="welcome-mark" aria-hidden="true"><span></span><span></span><span></span></div>
         <p class="welcome-kicker">A GOOD PLACE TO START</p>
         <h2>Bring an idea. We’ll find the next step.</h2>
-        <p class="welcome-copy">Ask for a quick guide or make a starter you can download.</p>
+        <p class="welcome-copy">Local guides and starter files. Connect Online AI for broader chat and web research.</p>
         <div class="suggestions" aria-label="Suggested prompts">
           <button type="button" data-prompt="Help me get started with VectorCraft"><span class="prompt-label">GET GUIDANCE</span>Help me get started with VectorCraft ↗</button>
           <button type="button" data-prompt="Make a starter budget spreadsheet in GridCraft"><span class="prompt-label">MAKE A STARTER</span>Create a GridCraft budget ↗</button>
@@ -53,19 +54,36 @@
         <span>Files stay on this device · up to 3</span>
       </div>
       <div class="footline">
-        <span>Local chat · starter files are templates</span>
+        <span id="connection-label">Local chat · starter files are templates</span>
         <details class="about-details"><summary>Details</summary><div class="details-panel">
           <p id="metrics">Model evaluation is loading.</p>
           <p id="offline-status">Offline cache is not installed yet.</p>
           <p id="memory-info">Memory is off. Chat and files are not stored. Enable it to save only notes you explicitly ask it to remember.</p>
           <button id="memory-clear" class="quiet-button" type="button" hidden>Clear saved memory</button>
-          <p>Messages and attachments last in this tab until reload or New chat. Optional memory saves only explicit notes and your last Craft on this browser; it is not chat training or cloud sync. Files are not uploaded or automatically imported. Image recognition runs on-device; its first model download is about 155 MB. Text previews are limited to 1 MB, images to 25 megapixels; PDFs and native project files show metadata only.</p>
-          <p>“Show task steps” lists local browser actions, not terminal commands. This assistant cannot edit an open project or control the editor. Its classifiers route to curated help and fixed starter templates; they are not a general-purpose language model.</p>
+          <p>Chats and attachments stay in this tab until reload or New chat. Optional memory saves only explicit notes and your last Craft locally; it is not chat training or cloud sync. Files are not uploaded or imported automatically. Image recognition runs on-device; its first model download is about 155 MB. Text previews are limited to 1 MB, images to 25 megapixels; PDFs and native project files show metadata only.</p>
+          <p>The offline router uses reviewed examples for 13 Crafts and seven request types. Online AI is optional: messages, the selected Craft and up to 12 recent turns go to OpenAI. If a local Craft/starter skill is used, its result (which can include curated guidance text or starter metadata) is included in a follow-up request. Attachments, local memory and editor contents stay local. If enabled, web search can retrieve current information and show clickable citations. Provider data rules and separate API charges may apply.</p>
+          <p>API keys are held only in this tab and are not written to storage or the repository, but page scripts can access them; a server-side proxy is safer. “Show task steps” lists actual browser or network actions, not terminal commands. ArtCraft cannot edit an open project or control the editor.</p>
           <a href="README.md" target="_blank" rel="noopener">Setup, training and limitations ↗</a>
         </div></details>
       </div>
     </div>
   </main>
 </div>
+<dialog id="online-dialog" aria-labelledby="online-title">
+  <div class="online-dialog-head"><div><p class="eyebrow">OPTIONAL CONNECTION</p><h2 id="online-title">Online AI</h2></div><button id="online-close" class="quiet-button" type="button" aria-label="Close online AI settings">Close</button></div>
+  <form id="online-form">
+    <label for="online-model">OpenAI model</label>
+    <input id="online-model" name="model" value="gpt-4.1-mini" maxlength="100" autocomplete="off" spellcheck="false">
+    <label for="online-key">Your OpenAI API key</label>
+    <input id="online-key" name="key" type="password" required maxlength="300" autocomplete="off" spellcheck="false" placeholder="Enter for this tab only">
+    <label class="online-check"><input id="online-search" type="checkbox" checked> Allow web search and citations</label>
+    <label class="online-check"><input id="online-consent" type="checkbox" required> I understand this page can access the key and my messages will be sent to OpenAI when I use Online AI</label>
+    <p class="online-warning">This public static page cannot keep an API key secret from its own scripts. The key is held in memory only and is not saved to browser storage or the repository, but a server-side proxy is safer. Use a restricted, low-limit key you can revoke. API use may cost extra.</p>
+    <p class="online-data">When connected, your message, selected Craft and up to 12 recent turns go to OpenAI. If a local Craft/starter skill is used, its result (curated guidance text or starter metadata) is included in a follow-up request. Local memory, attachments and editor contents are not sent. Web search is optional; search activity and sources come from OpenAI. Provider data policies apply.</p>
+    <div class="online-skills"><strong>Available skills</strong><span>Web research · Craft guidance · Starter downloads · Local file checks</span></div>
+    <div class="online-actions"><button id="online-connect" class="online-connect" type="submit">Connect for this tab</button><button id="online-disconnect" class="quiet-button" type="button" hidden>Disconnect</button></div>
+    <p class="online-help"><a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">OpenAI API keys ↗</a> · <a href="https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety" target="_blank" rel="noopener">Key safety ↗</a></p>
+  </form>
+</dialog>
 </body>
 </html>

@@ -11,11 +11,20 @@
       "examples": [
         "draw a logo with pen curves on a vector artboard",
         "edit bezier paths in an svg illustration",
-        "create an icon from scalable vector shapes"
+        "create an icon from scalable vector shapes",
+        "adjust nodes on a vector logo path",
+        "make a scalable svg icon with bezier curves",
+        "trace a shape into editable vector paths",
+        "prepare a clean brand mark using vector shapes",
+        "draw an icon with anchor points and handles",
+        "create an illustration from scalable paths",
+        "edit the outlines in my vector artwork"
       ],
       "checks": [
         "draw clean bezier curves for an icon",
-        "make an SVG brand mark from simple shapes"
+        "make an SVG brand mark from simple shapes",
+        "edit the anchor handles on my SVG icon",
+        "turn this logo into editable vector paths"
       ]
     },
     {
@@ -29,11 +38,20 @@
       "examples": [
         "retouch a portrait with layers and masks",
         "remove blemishes from a raster photo",
-        "adjust color and contrast in an image editor"
+        "adjust color and contrast in an image editor",
+        "mask the background before retouching a portrait",
+        "clean up skin on separate non destructive layers",
+        "crop a photo and fix contrast without flattening",
+        "remove a dust spot from a raster photograph",
+        "work on a photo copy with layer masks",
+        "blend a retouch on a separate image layer",
+        "prepare a natural looking photo edit"
       ],
       "checks": [
         "retouch this portrait without changing the original",
-        "mask part of a raster photo layer"
+        "mask part of a raster photo layer",
+        "keep my original photo and mask its background",
+        "retouch this raster image with non destructive layers"
       ]
     },
     {
@@ -47,11 +65,20 @@
       "examples": [
         "trim footage on a video timeline and add subtitles",
         "cut a movie into short clips",
-        "edit captions and sound for a video"
+        "edit captions and sound for a video",
+        "add subtitles and align them to speech on a timeline",
+        "trim a long clip into a short vertical video",
+        "arrange video footage and add a title card",
+        "sync captions and dialogue across movie clips",
+        "split a video into scenes and adjust the cuts",
+        "place clips in order and review the sequence",
+        "add an SRT caption track to a movie"
       ],
       "checks": [
         "shorten a video and time its captions",
-        "arrange my footage in a movie timeline"
+        "arrange my footage in a movie timeline",
+        "time an SRT caption track for a short clip",
+        "cut and rearrange my video footage"
       ]
     },
     {
@@ -65,11 +92,20 @@
       "examples": [
         "develop raw photographs and correct exposure",
         "adjust white balance in camera raw images",
-        "grade a batch of photographs non destructively"
+        "grade a batch of photographs non destructively",
+        "correct exposure in a raw camera photo",
+        "recover bright highlights and dark shadows",
+        "fix the white balance on several raw images",
+        "make a non destructive colour grade for photographs",
+        "develop a camera raw file before exporting",
+        "adjust the tone curve in a raw photo workflow",
+        "batch correct exposure and temperature"
       ],
       "checks": [
         "adjust exposure on raw camera photographs",
-        "recover highlights and shadows in a raw image"
+        "recover highlights and shadows in a raw image",
+        "balance white and exposure in a camera raw file",
+        "recover bright sky detail from my raw photo"
       ]
     },
     {
@@ -83,11 +119,20 @@
       "examples": [
         "combine pdf pages and add annotations",
         "redact sensitive text from a pdf",
-        "reorder and review pdf pages"
+        "reorder and review pdf pages",
+        "reorder pages in a document and add comments",
+        "combine two pdf documents into one copy",
+        "review a pdf and mark passages with annotations",
+        "check whether a confidential PDF is truly redacted",
+        "rotate pages and save a revised PDF",
+        "add notes to a PDF proof before sharing",
+        "inspect links and selectable text in an exported PDF"
       ],
       "checks": [
         "merge several PDF pages and annotate them",
-        "securely redact a confidential PDF copy"
+        "securely redact a confidential PDF copy",
+        "combine two PDF files and mark a page with notes",
+        "verify that sensitive text is removed from a redacted PDF"
       ]
     },
     {
@@ -101,11 +146,20 @@
       "examples": [
         "lay out a magazine spread with print bleed",
         "design a brochure with typography and margins",
-        "prepare publication pages for professional printing"
+        "prepare publication pages for professional printing",
+        "set up a magazine page with columns and a baseline grid",
+        "prepare a brochure layout with print bleed",
+        "style a publication with reusable typography rules",
+        "check for overset text in a print layout",
+        "place images in a magazine spread and set margins",
+        "design a book page using a consistent grid",
+        "prepare a flyer layout for a print shop"
       ],
       "checks": [
         "set bleed and margins for a print publication",
-        "make a magazine page layout with type"
+        "make a magazine page layout with type",
+        "set page margins and bleed for a brochure",
+        "arrange text and images in a magazine spread"
       ]
     },
     {
@@ -119,11 +173,20 @@
       "examples": [
         "animate a title with keyframes and glow effects",
         "composite layers for a motion graphics sequence",
-        "create a lottie animation with moving text"
+        "create a lottie animation with moving text",
+        "animate a shape with keyframes in a composition",
+        "set the frame rate and duration for motion graphics",
+        "make a title sequence with layered effects",
+        "preview a lottie animation before exporting",
+        "composite animated layers with a glow effect",
+        "build a short motion graphic with moving text",
+        "adjust timing on keyframes in an animated title"
       ],
       "checks": [
         "keyframe a text layer in an animated composition",
-        "add visual effects to a motion graphics title"
+        "add visual effects to a motion graphics title",
+        "add keyframes to a title in a motion composition",
+        "animate layered text and preview the final frame"
       ]
     },
     {
@@ -137,11 +200,20 @@
       "examples": [
         "build formulas in a spreadsheet budget",
         "calculate a sum across table cells",
-        "organize expenses in an xlsx workbook"
+        "organize expenses in an xlsx workbook",
+        "organise expenses with formulas in a workbook",
+        "calculate an average and total in spreadsheet cells",
+        "make a CSV table of monthly costs",
+        "check spreadsheet totals against the source numbers",
+        "format a budget sheet with column headings",
+        "import a CSV and inspect its rows and columns",
+        "create formulas for revenue and expenses"
       ],
       "checks": [
         "sum values in a workbook table",
-        "build a budget with spreadsheet formulas"
+        "build a budget with spreadsheet formulas",
+        "calculate totals for a monthly spreadsheet budget",
+        "organise CSV expenses into a workbook table"
       ]
     },
     {
@@ -155,11 +227,20 @@
       "examples": [
         "write and format a report in a word processor",
         "create headings and paragraphs in a docx",
-        "draft a business letter with styles"
+        "draft a business letter with styles",
+        "format a document with headings and page breaks",
+        "draft a letter using paragraph and heading styles",
+        "prepare a report in an editable word document",
+        "fix spacing and sections in a docx file",
+        "add a table of contents using heading levels",
+        "review page layout in a business document",
+        "write a report with consistent paragraph styles"
       ],
       "checks": [
         "format a report with heading styles and paragraphs",
-        "draft a letter in a document editor"
+        "draft a letter in a document editor",
+        "format my DOCX report with heading levels",
+        "draft a business letter with proper paragraph spacing"
       ]
     },
     {
@@ -173,11 +254,20 @@
       "examples": [
         "create powerpoint slides with speaker notes",
         "outline a pitch deck for a presentation",
-        "build a slideshow with one key point per slide"
+        "build a slideshow with one key point per slide",
+        "outline a short slide deck with speaker notes",
+        "make a pitch presentation with one idea per slide",
+        "plan slides for a project update meeting",
+        "prepare a readable slideshow with consistent layouts",
+        "organise a presentation around a clear story",
+        "add presenter notes to a set of slides",
+        "create a five part outline for a talk"
       ],
       "checks": [
         "prepare a short presentation with speaker notes",
-        "make a powerpoint pitch deck"
+        "make a powerpoint pitch deck",
+        "plan a pitch slideshow with concise speaker notes",
+        "outline presentation slides for a project update"
       ]
     },
     {
@@ -191,11 +281,20 @@
       "examples": [
         "draw a scaled plan with dimensions in dxf",
         "create rectangles and circles in cad",
-        "draft a technical drawing with exact units"
+        "draft a technical drawing with exact units",
+        "draft a floor plan to exact drawing units",
+        "dimension a rectangle and circle in a DXF drawing",
+        "set CAD scale and units before drafting",
+        "organise a technical drawing with separate layers",
+        "draw a measured part outline for fabrication review",
+        "check the dimensions on an exported DXF",
+        "create simple geometry for a scaled plan"
       ],
       "checks": [
         "add dimensions to a DXF drawing",
-        "make a CAD rectangle with measured sides"
+        "make a CAD rectangle with measured sides",
+        "set exact units and dimensions in a CAD plan",
+        "add measurements to a scaled DXF outline"
       ]
     },
     {
@@ -209,11 +308,20 @@
       "examples": [
         "record tracks and balance a daw mix",
         "edit audio and apply eq before exporting wav",
-        "mix music with safe headroom"
+        "mix music with safe headroom",
+        "record vocals on separate tracks in a daw",
+        "balance a music mix and avoid clipping",
+        "edit a wav recording and apply gentle eq",
+        "set sample rate and output format for a mix",
+        "leave headroom when exporting recorded audio",
+        "organise multiple tracks for a recording session",
+        "listen for clipping before bouncing a song"
       ],
       "checks": [
         "record and mix multiple audio tracks",
-        "apply EQ and export an audio mix"
+        "apply EQ and export an audio mix",
+        "balance recorded tracks and export a WAV mix",
+        "set safe levels before recording vocals"
       ]
     },
     {
@@ -227,11 +335,20 @@
       "examples": [
         "design a mobile app wireframe with components",
         "prototype responsive screens and links",
-        "create interface frames with consistent spacing"
+        "create interface frames with consistent spacing",
+        "make reusable buttons and components for a mobile screen",
+        "link prototype frames for a responsive app flow",
+        "set consistent spacing and type in a UI design",
+        "create a wireframe for a phone app dashboard",
+        "check interface contrast on small screens",
+        "prototype navigation between interface frames",
+        "design a reusable component library for a website"
       ],
       "checks": [
         "create a clickable mobile interface prototype",
-        "make reusable UI components for a screen design"
+        "make reusable UI components for a screen design",
+        "link mobile interface frames into a prototype flow",
+        "make reusable components for a responsive UI"
       ]
     }
   ],
@@ -243,7 +360,6 @@
         "hi there",
         "hey assistant",
         "good morning",
-        "hello how are you",
         "nice to meet you",
         "hi can we chat",
         "greetings",
@@ -252,13 +368,21 @@
         "hi ArtCraft",
         "hello there",
         "hey folks",
-        "good afternoon"
+        "good afternoon",
+        "hey there",
+        "hello can you help me",
+        "hi assistant are you there",
+        "good evening",
+        "hello ArtCraft helper",
+        "hey how is it going"
       ],
       "checks": [
         "hi",
         "good evening",
         "hello there assistant",
-        "good afternoon"
+        "good afternoon",
+        "hey ArtCraft",
+        "hello can we get started"
       ]
     },
     {
@@ -279,13 +403,21 @@
         "what should I do first in this editor",
         "where can I find the main controls",
         "walk me through the basics",
-        "explain the workspace panels"
+        "explain the workspace panels",
+        "I am new here, show me around",
+        "where do I find the tools for this app",
+        "can you explain the workspace to me",
+        "what is the first step in this editor",
+        "show me the basic workflow for this Craft",
+        "how do I get started in this workspace"
       ],
       "checks": [
         "show me how to start",
         "explain this app to me",
         "give me a quick tour of the tools",
-        "what should I do first in this editor"
+        "what should I do first in this editor",
+        "I am new to this editor, where should I begin",
+        "show me around the workspace"
       ]
     },
     {
@@ -325,13 +457,21 @@
         "build a starter for a vector icon",
         "give me a basic layout I can customize",
         "make a sample I can download",
-        "create a small example file for this project"
+        "create a small example file for this project",
+        "build a small sample I can edit",
+        "make a downloadable template for this Craft",
+        "create a starter document from my brief",
+        "prepare a simple example file",
+        "generate a basic layout I can customize",
+        "make a sample asset to download"
       ],
       "checks": [
         "create something I can download",
         "generate an example file for me",
         "make a downloadable starter for a small poster",
-        "create an editable checklist file"
+        "create an editable checklist file",
+        "prepare an editable example template",
+        "make a small file I can download"
       ]
     },
     {
@@ -360,13 +500,21 @@
         "where is the download option",
         "keep an editable version and a final copy",
         "help me choose an output format",
-        "save a copy with a different extension"
+        "save a copy with a different extension",
+        "where does my exported file go",
+        "save a delivery copy for sharing",
+        "which format keeps this project editable",
+        "download a copy of my work",
+        "what file type should I send to a printer",
+        "preserve the layers in my export"
       ],
       "checks": [
         "how can I save this",
         "which export format is best",
         "how can I render a movie to MP4",
-        "which file type should I use for delivery"
+        "which file type should I use for delivery",
+        "what format should I save to keep layers",
+        "where can I download my finished work"
       ]
     },
     {
@@ -391,7 +539,13 @@
         "the app opens but shows an empty black canvas",
         "the loading spinner never goes away",
         "EffectCraft fails while opening",
-        "EffectCraft cannot get past loading"
+        "EffectCraft cannot get past loading",
+        "the page loads but the editor never appears",
+        "I get an error before the project opens",
+        "the app hangs on a loading spinner",
+        "the editor is showing a black screen",
+        "my browser tab becomes unresponsive in this app",
+        "the WebAssembly asset did not load"
       ],
       "checks": [
         "it freezes when I open it",
@@ -399,7 +553,9 @@
         "the web app is stuck loading on a blank screen",
         "the webassembly file failed and the page will not start",
         "EffectCraft is stuck on a blank loading screen",
-        "EffectCraft fails to start in the browser"
+        "EffectCraft fails to start in the browser",
+        "the editor opens to a blank canvas and stays there",
+        "the app freezes while loading its main screen"
       ]
     },
     {
@@ -430,13 +586,51 @@
         "can you improve routing with reviewed examples",
         "is this assistant learning from our chat",
         "do you train a language model",
-        "how is the classifier evaluated"
+        "how is the classifier evaluated",
+        "what can you actually remember between sessions",
+        "does chatting update your model weights",
+        "where is the neural network checkpoint stored",
+        "are the training phrases written by people",
+        "is this assistant powered by a foundation model",
+        "do you upload conversation transcripts"
       ],
       "checks": [
         "do you use my conversations for learning",
         "are you a general language model",
         "does this model learn from our messages",
-        "can you increase training with reviewed examples"
+        "can you increase training with reviewed examples",
+        "does a conversation change your network weights",
+        "are my messages used as training examples"
+      ]
+    },
+    {
+      "id": "smalltalk",
+      "examples": [
+        "how are you",
+        "how are you doing",
+        "what is up",
+        "how is your day going",
+        "how is it going",
+        "are you there",
+        "thanks for helping",
+        "thank you",
+        "that was helpful",
+        "appreciate it",
+        "nice talking to you",
+        "can we just chat",
+        "tell me something fun",
+        "do you ever get tired",
+        "hope you are doing well",
+        "good to see you again",
+        "cool thanks",
+        "what do you do for fun"
+      ],
+      "checks": [
+        "how are you",
+        "what is up today",
+        "thanks for the help",
+        "can we chat about something",
+        "nice talking with you"
       ]
     }
   ]
