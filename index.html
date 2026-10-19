@@ -89,7 +89,7 @@
   <header>
     <div class="kicker">ArtCraft Live</div>
     <h1>The Crafting Apps,<br>running in your browser</h1>
-    <p class="lede">All 13 open-source ArtCraft applications — vector art, photo editing, video, PDF, spreadsheets and more — compiled to WebAssembly and hosted as live web apps. No installs, no accounts.</p>
+    <p class="lede">All 14 open-source ArtCraft applications — vector art, photo editing, video, PDF, spreadsheets, Unity-style 3D and more — hosted as live web apps. No installs, no accounts.</p>
   </header>
 
   <nav aria-label="Workspace" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:24px">
@@ -124,6 +124,7 @@ const APPS = [
   { name: "CADCraft", path: "cadcraft/", tag: "CAD & drafting", desc: "Computer-aided design and drafting — an AutoCAD-style app.", ver: "v0.8.0", src: "storytold/cadcraft", hue: 190 },
   { name: "SoundCraft", path: "soundcraft/", tag: "Audio & DAW", desc: "Clean-room Avid Pro Tools reimplementation for audio production.", ver: "v0.8.0", src: "storytold/soundcraft", hue: 100 },
   { name: "FigCraft", path: "figcraft/", tag: "Interface design", desc: "Interface design and prototyping — collaborative design workflows.", ver: "v0.7.0", src: "storytold/figcraft", hue: 300 },
+  { name: "UnityCraft", path: "unitycraft/", tag: "3D editor & hub", desc: "Browser reconstruction of the Unity Hub and a Unity Editor-style 3D workspace — scene view, hierarchy, inspector, play mode.", ver: "v0.1.0", src: "HomekidChud/artcraft-live", hue: 80 },
 ];
 const grid = document.getElementById("grid");
 grid.innerHTML = APPS.map(a => `
