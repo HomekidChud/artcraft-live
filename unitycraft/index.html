@@ -8,7 +8,7 @@
 <meta name="description" content="UnityCraft — a browser reconstruction of the Unity Hub launcher and a Unity Editor-style 3D workspace: scene view, hierarchy, inspector, play mode.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   /* ============================================================
      UnityCraft — browser reconstruction of Unity Hub 3.22.3 (dark)
@@ -27,15 +27,15 @@
     --ed-bg: #191919;
     --ed-panel: #1f1f1f;
     --ed-panel-2: #232323;
-    --ed-header: #2a2a2a;
+    --ed-header: #353535;        /* window tab bg (Unity Foundations dark) */
     --ed-border: #121212;
     --ed-border-soft: #333333;
     --ed-text: #b4b4b4;
     --ed-text-bright: #dcdcdc;
     --ed-muted: #7a7a7a;
-    --ed-blue: #2f5d8a;         /* Unity selection blue */
-    --ed-blue-hover: #38659a;
-    --ed-toolbar: #3d3d3d;
+    --ed-blue: #2c5d87;          /* Unity highlight-background dark */
+    --ed-blue-hover: #4d4d4d;    /* Unity highlight-background-hover dark */
+    --ed-toolbar: #191919;      /* app toolbar background dark */
     --ed-gizmo-x: #e23d4e;
     --ed-gizmo-y: #63a83b;
     --ed-gizmo-z: #3a7bd0;
@@ -161,21 +161,22 @@
   /* ---------- Editor ---------- */
   #editor { display: none; height: 100dvh; flex-direction: column; background: var(--ed-bg); }
   .ed-menubar {
-    height: 30px; display: flex; align-items: stretch; background: #2b2b2b; flex-shrink: 0;
+    height: 30px; display: flex; align-items: stretch; background: #1a1a1a; flex-shrink: 0;
     border-bottom: 1px solid var(--ed-border); user-select: none;
   }
   .ed-menubar .brand { display: flex; align-items: center; padding: 0 10px 0 8px; color: #eee; font-weight: 700; font-size: 12px; }
   .ed-menu { position: relative; }
   .ed-menu > button { padding: 0 11px; color: #c8c8c8; font-size: 12px; height: 100%; }
-  .ed-menu > button:hover, .ed-menu.open > button { background: #3a3a3a; color: #fff; }
+  .ed-menu > button:hover, .ed-menu.open > button { background: #383838; color: #fff; }
   .ed-dropdown {
-    position: absolute; top: 100%; left: 0; min-width: 210px; background: #2b2b2b;
+    position: absolute; top: 100%; left: 0; min-width: 240px; background: #1f1f1f;
     border: 1px solid #111; border-radius: 0 0 4px 4px; z-index: 60; display: none;
     box-shadow: 0 6px 18px rgba(0,0,0,.5); padding: 4px 0;
   }
   .ed-menu.open .ed-dropdown { display: block; }
   .ed-dropdown button { display: flex; justify-content: space-between; gap: 24px; width: 100%; text-align: left; padding: 5px 12px; font-size: 12px; color: #c8c8c8; }
   .ed-dropdown button:hover { background: var(--ed-blue); color: #fff; }
+  .ed-dropdown .submenu-hint { color: #777; font-size: 11px; }
   .ed-dropdown .sep { height: 1px; background: #1c1c1c; margin: 4px 2px; }
   .ed-toolbar {
     height: 36px; background: var(--ed-toolbar); display: flex; align-items: center; padding: 0 8px;
@@ -185,8 +186,8 @@
     width: 28px; height: 28px; border-radius: 4px; display: grid; place-items: center; color: #c8c8c8;
     font-size: 13px; font-weight: 700;
   }
-  .tool:hover { background: #4a4a4a; color: #fff; }
-  .tool.active { background: #585858; color: #fff; box-shadow: inset 0 0 0 1px #666; }
+  .tool:hover { background: #464646; color: #fff; }
+  .tool.active { background: #505050; color: #fff; box-shadow: inset 0 0 0 1px #666; }
   .toolbar-group { display: flex; gap: 2px; padding: 0 8px; border-right: 1px solid #2f2f2f; height: 26px; align-items: center; }
   .toolbar-group:last-child { border-right: none; }
   .play-btn { width: 30px; height: 26px; border-radius: 4px; display: grid; place-items: center; color: #c8c8c8; }
@@ -246,7 +247,7 @@
   /* Inspector */
   #inspector { font-size: 12px; }
   .insp-header {
-    padding: 8px 10px; background: #2a2a2a; color: #e0e0e0; display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: #3e3e3e; color: #e0e0e0; display: flex; align-items: center; gap: 8px;
     position: sticky; top: 0; z-index: 2; border-bottom: 1px solid var(--ed-border);
   }
   .insp-header .checks { margin-left: auto; display: flex; gap: 10px; color: #8f8f8f; }
@@ -254,7 +255,7 @@
     border-bottom: 1px solid var(--ed-border); background: var(--ed-panel-2); margin-bottom: 1px;
   }
   .comp-header {
-    padding: 6px 10px; background: #2a2a2a; display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; background: #3e3e3e; display: flex; align-items: center; gap: 8px;
     cursor: pointer; color: #dcdcdc; font-weight: 600; font-size: 12px; user-select: none;
   }
   .comp-header .fold { font-size: 9px; color: #909090; transition: transform .12s; }
@@ -288,7 +289,7 @@
   }
   .asset:hover { background: #2e2e2e; }
   .asset .ico { font-size: 26px; margin-bottom: 4px; display: block; }
-  .console-line { padding: 4px 12px; font-family: 'JetBrains Mono', Consolas, monospace; font-size: 11.5px; border-bottom: 1px solid #242424; color: #b4b4b4; display: flex; gap: 8px; }
+  .console-line { padding: 4px 12px; font-family: 'Roboto Mono', Consolas, monospace; font-size: 11.5px; border-bottom: 1px solid #242424; color: #b4b4b4; display: flex; gap: 8px; }
   .console-line .t { color: #6f6f6f; flex-shrink: 0; }
   .console-line.warn { color: #d8b93c; }
   .console-line.err { color: #e06060; }
@@ -385,8 +386,9 @@
 <!-- ===== Unity Editor workspace ===== -->
 <div id="editor">
   <div class="ed-menubar" id="menubar">
-    <div class="brand">
+    <div class="brand" title="UnityCraft">
       <svg width="15" height="15" viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="#e1e1e1" stroke-width="5" stroke-linejoin="round"><polygon points="32,6 54,18 32,30 10,18"/><polygon points="10,18 32,30 32,58 10,46"/><polygon points="54,18 32,30 32,58 54,46"/></g></svg>
+      <span style="font-weight:600">UnityCraft</span>
     </div>
     <div class="ed-menu" data-menu="file"><button>File</button>
       <div class="ed-dropdown">
@@ -394,23 +396,44 @@
         <button data-act="open-scene">Open Scene <span>Ctrl+O</span></button>
         <button data-act="save-scene">Save Scene <span>Ctrl+S</span></button>
         <div class="sep"></div>
-        <button data-act="back-hub">Back to Hub</button>
+        <button data-act="save-project">Save Project</button>
+        <button data-act="build-profiles">Build Profiles…</button>
+        <button data-act="project-settings">Project Settings…</button>
+        <div class="sep"></div>
+        <button data-act="prefs">Preferences… <span>Ctrl+,</span></button>
+        <button data-act="back-hub">Back to Unity Hub</button>
       </div>
     </div>
     <div class="ed-menu" data-menu="edit"><button>Edit</button>
       <div class="ed-dropdown">
+        <button data-act="undo">Undo <span>Ctrl+Z</span></button>
+        <button data-act="redo">Redo <span>Ctrl+Y</span></button>
+        <div class="sep"></div>
+        <button data-act="copy">Copy <span>Ctrl+C</span></button>
+        <button data-act="paste">Paste <span>Ctrl+V</span></button>
         <button data-act="duplicate">Duplicate <span>Ctrl+D</span></button>
         <button data-act="delete">Delete <span>Del</span></button>
-        <div class="sep"></div>
-        <button data-act="prefs" title="Not implemented in UnityCraft">Preferences… (n/a)</button>
+      </div>
+    </div>
+    <div class="ed-menu" data-menu="assets"><button>Assets</button>
+      <div class="ed-dropdown">
+        <button data-act="create-scene-asset">Create ▸ Scene</button>
+        <button data-act="create-material">Create ▸ Material</button>
+        <button data-act="show-in-explorer">Show in Explorer</button>
       </div>
     </div>
     <div class="ed-menu" data-menu="gameobject"><button>GameObject</button>
       <div class="ed-dropdown">
+        <button data-act="create-empty">Create Empty <span>Ctrl+Shift+N</span></button>
+        <button data-act="create-empty-parent">Create Empty Parent <span>Ctrl+Shift+G</span></button>
+        <div class="sep"></div>
+        <button data-act="move-to-view">Move To View <span>Ctrl+Alt+F</span></button>
+        <button data-act="align-with-view">Align With View <span>Ctrl+Shift+F</span></button>
+        <div class="sep"></div>
         <button data-act="create" data-type="cube">3D Object ▸ Cube</button>
         <button data-act="create" data-type="sphere">3D Object ▸ Sphere</button>
-        <button data-act="create" data-type="cylinder">3D Object ▸ Cylinder</button>
         <button data-act="create" data-type="capsule">3D Object ▸ Capsule</button>
+        <button data-act="create" data-type="cylinder">3D Object ▸ Cylinder</button>
         <button data-act="create" data-type="plane">3D Object ▸ Plane</button>
         <div class="sep"></div>
         <button data-act="create" data-type="light">Light ▸ Directional Light</button>
@@ -424,9 +447,20 @@
         <button data-act="addcomp" data-comp="BobScript">Scripts ▸ Bob (float).cs</button>
       </div>
     </div>
+    <div class="ed-menu" data-menu="window"><button>Window</button>
+      <div class="ed-dropdown">
+        <button data-act="win-project">General ▸ Project <span>Ctrl+5</span></button>
+        <button data-act="win-console">General ▸ Console <span>Ctrl+Shift+C</span></button>
+        <button data-act="win-services">General ▸ Services</button>
+        <div class="sep"></div>
+        <button data-act="save-layout">Layouts ▸ Save Layout…</button>
+      </div>
+    </div>
     <div class="ed-menu" data-menu="help"><button>Help</button>
       <div class="ed-dropdown">
         <button data-act="about">About UnityCraft</button>
+        <button data-act="unity-manual">Unity Manual</button>
+        <button data-act="scripting-api">Scripting Reference</button>
       </div>
     </div>
   </div>
@@ -462,7 +496,7 @@
 
   <div class="ed-body">
     <div class="ed-col-left">
-      <div class="panel-tabs"><div class="ptab active">Hierarchy — SampleScene</div></div>
+      <div class="panel-tabs"><div class="ptab active" id="hier-tab">Hierarchy — SampleScene</div></div>
       <div class="panel-body" id="hierarchy"></div>
     </div>
 
@@ -530,13 +564,13 @@ const state = {
   hubView: 'projects',
   favorites: new Set(['Roll-a-Ball remake']),
   projects: [
-    { name: 'Roll-a-Ball remake', ver: '6000.1.7f1', modified: '2 hours ago', hue: 210, emoji: '🟦', target: 'cube' },
-    { name: 'FPS Playground', ver: '6000.1.7f1', modified: 'yesterday', hue: 130, emoji: '🎯', target: 'sphere' },
-    { name: 'LowPolyIsland', ver: '2022.3.50f1', modified: '4 days ago', hue: 45, emoji: '🏝️', target: 'plane' },
+    { name: 'Roll-a-Ball remake', ver: '6000.0.64f1', modified: '2 hours ago', hue: 210, emoji: '🟦', target: 'cube' },
+    { name: 'FPS Playground', ver: '6000.0.64f1', modified: 'yesterday', hue: 130, emoji: '🎯', target: 'sphere' },
+    { name: 'LowPolyIsland', ver: '6000.3.10f1', modified: '4 days ago', hue: 45, emoji: '🏝️', target: 'plane' },
   ],
   installs: [
-    { ver: '6000.1.7f1 (LTS)', date: 'Oct 12, 2026', mods: ['Linux Build Support (IL2CPP)', 'Android Build Support'] },
-    { ver: '2022.3.50f1 (LTS)', date: 'Aug 2, 2026', mods: ['WebGL Build Support'] },
+    { ver: '6000.0.64f1 (LTS)', date: 'Oct 12, 2026', mods: ['Linux Build Support (IL2CPP)', 'Android Build Support'] },
+    { ver: '6000.3.10f1 (LTS)', date: 'Aug 2, 2026', mods: ['WebGL Build Support'] },
   ],
   learn: [
     { t: 'Unity Essentials', d: 'Pathway · 10 hrs', emoji: '🧭' },
@@ -677,7 +711,7 @@ $('#tpl-create').onclick = () => {
   const name = $('#proj-name').value.trim() || 'MyUnityProject';
   $('#modal-overlay').classList.remove('open');
   const tpl = TEMPLATES.find(t => t.id === selectedTemplate);
-  const ver = $('#proj-ver').value || '6000.1.7f1';
+  const ver = $('#proj-ver').value || '6000.0.64f1';
   state.projects.unshift({ name, ver, modified: 'just now', hue: tpl.bg, emoji: tpl.emoji, target: selectedTemplate === '2d' ? 'plane' : 'cube' });
   openEditor(state.projects[0]);
 };
@@ -701,6 +735,8 @@ function openEditor(project) {
   status(`Opening project "${project.name}" (Editor ${project.ver})…`);
   if (!editorReady) { initEditor(); editorReady = true; }
   resetSceneFor(project);
+  ed.sceneName = 'SampleScene';
+  $('#hier-tab').textContent = 'Hierarchy — SampleScene';
   status(`Loaded SampleScene — ${project.name} (Editor ${project.ver})`);
   log('sys', `Project opened: ${project.name} @ ${$('#proj-loc').value || '~/UnityProjects'}`);
 }
@@ -714,7 +750,8 @@ const store = (() => {
 
 const ed = {
   objects: [], selected: null, idSeq: 1, tool: 'move', playing: false, paused: false,
-  viewTab: 'scene', playSnapshot: null, history: [], redoStack: [],
+  viewTab: 'scene', playSnapshot: null, history: [], redoStack: [], sceneName: 'SampleScene',
+  clipboard: null,
 };
 
 /* ---- three.js setup ---- */
@@ -760,7 +797,17 @@ const GEOM = {
   cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1, 24),
   capsule: () => new THREE.CapsuleGeometry(0.35, 0.6, 8, 16),
   plane: () => new THREE.PlaneGeometry(4, 4),
+  empty: () => null,
 };
+function scenePivotSpawn() {
+  // Unity: new 3D objects instantiate at the Scene pivot (in front of the Scene view camera)
+  const dir = new THREE.Vector3();
+  sceneCamera.getWorldDirection(dir);
+  const p = sceneCamera.position.clone().add(dir.multiplyScalar(Math.max(6, orbit.target.distanceTo(sceneCamera.position))));
+  p.y = 0;
+  return p;
+}
+
 function makeObject(type, opts = {}) {
   let obj;
   if (type === 'light') {
@@ -781,13 +828,17 @@ function makeObject(type, opts = {}) {
     const helper = new THREE.CameraHelper(obj);
     helper.userData.isCamHelper = true;
     scene.add(helper); obj.userData.helper = helper;
+  } else if (type === 'empty') {
+    obj = new THREE.Object3D();
   } else {
     const geo = GEOM[type]();
     if (type === 'plane') { geo.rotateX(-Math.PI / 2); }
     const mat = new THREE.MeshStandardMaterial({ color: 0xcfcfcf, roughness: 0.65, metalness: 0.05 });
     obj = new THREE.Mesh(geo, mat);
     obj.castShadow = true; obj.receiveShadow = true;
-    if (type === 'plane') { obj.position.y = 0; } else { obj.position.y = (type === 'capsule') ? 0.65 : 0.5; }
+    const spawn = opts.atPivot ? scenePivotSpawn() : null;
+    if (type === 'plane') { obj.position.y = 0; if (spawn) obj.position.set(spawn.x, 0, spawn.z); }
+    else { obj.position.y = (type === 'capsule') ? 0.65 : 0.5; if (spawn) obj.position.set(spawn.x, obj.position.y, spawn.z); }
     const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geo, 30), new THREE.LineBasicMaterial({ color: 0x3a6ea5 }));
     edges.visible = false; edges.userData.isOutline = true;
     obj.add(edges); obj.userData.outline = edges;
@@ -795,14 +846,14 @@ function makeObject(type, opts = {}) {
   obj.userData.id = ed.idSeq++;
   obj.userData.type = type;
   obj.userData.name = opts.name || defaultName(type);
-  obj.userData.components = { meshRenderer: true, collider: type !== 'plane', script: null, ...opts.components };
+  obj.userData.components = { meshRenderer: type !== 'empty', collider: type !== 'plane' && type !== 'empty', script: null, ...opts.components };
   obj.userData.scriptParams = { speed: 90, amp: 0.5 };
   scene.add(obj);
   ed.objects.push(obj);
   return obj;
 }
 function defaultName(type) {
-  const names = { cube: 'Cube', sphere: 'Sphere', cylinder: 'Cylinder', capsule: 'Capsule', plane: 'Plane', light: 'Directional Light', pointlight: 'Point Light', camera: 'Camera' };
+  const names = { cube: 'Cube', sphere: 'Sphere', cylinder: 'Cylinder', capsule: 'Capsule', plane: 'Plane', empty: 'GameObject', light: 'Directional Light', pointlight: 'Point Light', camera: 'Camera' };
   const base = names[type];
   const n = ed.objects.filter(o => o.userData.name.startsWith(base)).length;
   return n ? `${base} (${n + 1})` : base;
@@ -893,7 +944,7 @@ function select(obj) {
 }
 
 /* ---- hierarchy ---- */
-const ICONS = { cube: '▪', sphere: '●', cylinder: '▮', capsule: '⬮', plane: '▬', light: '☀', pointlight: '💡', camera: '🎥' };
+const ICONS = { cube: '▪', sphere: '●', cylinder: '▮', capsule: '⬮', plane: '▬', empty: '▫', light: '☀', pointlight: '💡', camera: '🎥' };
 function renderHierarchy() {
   const h = $('#hierarchy');
   h.innerHTML = '';
@@ -922,10 +973,10 @@ function renderInspector() {
   const u = o.userData;
   const p = o.position, r = { x: THREE.MathUtils.radToDeg(o.rotation.x), y: THREE.MathUtils.radToDeg(o.rotation.y), z: THREE.MathUtils.radToDeg(o.rotation.z) };
   const s = o.scale;
-  const isMesh = u.type in GEOM;
+  const isMesh = (u.type in GEOM) && u.type !== 'empty';
   const isLight = u.type === 'light' || u.type === 'pointlight';
   const isCamera = u.type === 'camera';
-  const col = isLight ? '#' + o.color.getHexString() : isCamera ? '#cfcfcf' : '#' + o.material.color.getHexString();
+  const col = isLight ? '#' + o.color.getHexString() : (isCamera || !o.material) ? '#cfcfcf' : '#' + o.material.color.getHexString();
 
   el.innerHTML = `
     <div class="insp-header">
@@ -1106,8 +1157,64 @@ function bindMenus() {
   });
   document.addEventListener('click', () => document.querySelectorAll('.ed-menu').forEach(x => x.classList.remove('open')));
 }
+/* full-state serialization shared by save/load and play-mode snapshots */
+function serializeObject(o) {
+  const u = o.userData;
+  const d = { name: u.name, type: u.type, p: o.position.toArray(), r: [o.rotation.x, o.rotation.y, o.rotation.z], s: o.scale.toArray(), comps: { ...u.components }, params: { ...u.scriptParams } };
+  if (u.type === 'light' || u.type === 'pointlight') { d.color = '#' + o.color.getHexString(); d.intensity = o.intensity; }
+  if (u.type === 'camera') { d.fov = o.fov; d.near = o.near; }
+  if (o.material) d.mat = { color: '#' + o.material.color.getHexString(), roughness: o.material.roughness };
+  if (o.isMesh || o.isObject3D) { d.castShadow = o.castShadow === true; d.receiveShadow = o.receiveShadow === true; }
+  return d;
+}
+function restoreObject(o, d) {
+  o.position.fromArray(d.p); o.scale.fromArray(d.s);
+  o.rotation.set(d.r[0], d.r[1], d.r[2]);
+  o.userData.name = d.name;
+  if (d.comps) Object.assign(o.userData.components, d.comps);
+  if (d.params) Object.assign(o.userData.scriptParams, d.params);
+  if (d.mat && o.material) { o.material.color.set(d.mat.color); o.material.roughness = d.mat.roughness; }
+  if (d.color) o.color.set(d.color);
+  if (d.intensity !== undefined) o.intensity = d.intensity;
+  if (d.fov !== undefined) { o.fov = d.fov; o.near = d.near; o.updateProjectionMatrix(); }
+  if (d.castShadow !== undefined) { o.castShadow = d.castShadow; o.receiveShadow = d.receiveShadow; }
+}
+function serializeScene() { return JSON.stringify(ed.objects.map(serializeObject)); }
+function loadSceneFromSpec(spec) {
+  ed.objects.slice().forEach(o => { removeHelper(o); scene.remove(o); });
+  ed.objects = [];
+  spec.forEach(d0 => { const o = makeObject(d0.type, { name: d0.name }); restoreObject(o, d0); });
+  ed.selected = null; tcontrols.detach();
+  renderHierarchy(); renderInspector();
+}
+
 function handleAction(d) {
-  if (d.act === 'create') { pushHistory(); const o = makeObject(d.type); select(o); log('sys', `Created ${o.userData.name}`); }
+  if (d.act === 'create') { pushHistory(); const o = makeObject(d.type, { atPivot: true }); select(o); log('sys', `Created ${o.userData.name}`); }
+  if (d.act === 'create-empty') { pushHistory(); const o = makeObject('empty'); select(o); log('sys', `Created ${o.userData.name} (empty)`); }
+  if (d.act === 'create-empty-parent') { pushHistory(); const o = makeObject('empty', { name: 'GameObject' }); if (ed.selected) o.position.copy(ed.selected.position); select(o); log('sys', 'Created empty parent GameObject'); }
+  if (d.act === 'move-to-view' && ed.selected) { ed.selected.position.copy(orbit.target); renderInspector(); log('sys', `Moved ${ed.selected.userData.name} to view`); }
+  if (d.act === 'align-with-view' && ed.selected) { ed.selected.rotation.copy(sceneCamera.rotation); renderInspector(); log('sys', `Aligned ${ed.selected.userData.name} with view`); }
+  if (d.act === 'copy' && ed.selected) { ed.clipboard = serializeObject(ed.selected); status(`Copied ${ed.selected.userData.name}`); }
+  if (d.act === 'paste' && ed.clipboard) {
+    pushHistory();
+    const spec = { ...ed.clipboard, name: ed.clipboard.name };
+    const o = makeObject(spec.type, { name: spec.name });
+    restoreObject(o, spec);
+    o.position.x += 1.5;
+    select(o); log('sys', `Pasted ${o.userData.name}`);
+  }
+  if (d.act === 'save-project') { toast('Project-wide settings save is not implemented in UnityCraft'); }
+  if (d.act === 'build-profiles') { toast('Build Profiles is not implemented in UnityCraft'); }
+  if (d.act === 'project-settings') { toast('Project Settings is not implemented in UnityCraft'); }
+  if (d.act === 'create-scene-asset') { handleAction({ act: 'new-scene' }); }
+  if (d.act === 'create-material') { toast('Material creation is not implemented in UnityCraft'); }
+  if (d.act === 'show-in-explorer') { status('Project path: ~/UnityProjects (simulated)'); log('sys', 'Assets folder would open in the OS file manager'); }
+  if (d.act === 'win-project') { switchBottomTab('project'); }
+  if (d.act === 'win-console') { switchBottomTab('console'); }
+  if (d.act === 'win-services') { switchBottomTab('services'); }
+  if (d.act === 'save-layout') { toast('Layout saving is not implemented in UnityCraft'); }
+  if (d.act === 'unity-manual') { window.open('https://docs.unity3d.com/Manual/unity-editor.html', '_blank'); }
+  if (d.act === 'scripting-api') { window.open('https://docs.unity3d.com/ScriptReference/index.html', '_blank'); }
   if (d.act === 'delete' && ed.selected) { deleteSelected(); }
   if (d.act === 'duplicate' && ed.selected) { duplicateSelected(); }
   if (d.act === 'addcomp' && ed.selected) {
@@ -1120,44 +1227,33 @@ function handleAction(d) {
   if (d.act === 'step') stepPlay();
   if (d.act === 'undo') undo();
   if (d.act === 'redo') redo();
-  if (d.act === 'new-scene') { resetSceneFor({ target: 'cube', name: 'Untitled', ver: '6000.1.7f1' }); log('sys', 'New SampleScene created'); }
+  if (d.act === 'new-scene') { newScene(); }
   if (d.act === 'save-scene') {
-    const data = JSON.stringify(ed.objects.map(o => {
-      const u = o.userData;
-      const d = { name: u.name, type: u.type, p: o.position.toArray(), r: [o.rotation.x, o.rotation.y, o.rotation.z], s: o.scale.toArray(), comps: { ...u.components }, params: { ...u.scriptParams } };
-      if (u.type === 'light' || u.type === 'pointlight') { d.color = '#' + o.color.getHexString(); d.intensity = o.intensity; }
-      if (u.type === 'camera') { d.fov = o.fov; }
-      if (o.material) d.mat = { color: '#' + o.material.color.getHexString(), roughness: o.material.roughness };
-      return d;
-    }));
-    store.setItem('unitycraft-scene', data);
-    log('sys', 'SampleScene saved (localStorage)');
+    store.setItem('unitycraft-scene', serializeScene());
+    log('sys', `${ed.sceneName} saved`);
     toast('Scene saved');
   }
   if (d.act === 'open-scene') {
     const data = store.getItem('unitycraft-scene');
     if (!data) { log('warn', 'No saved scene found'); toast('No saved scene'); return; }
-    ed.objects.slice().forEach(o => { removeHelper(o); scene.remove(o); });
-    ed.objects = [];
-    JSON.parse(data).forEach(d0 => {
-      const o = makeObject(d0.type, { name: d0.name });
-      o.position.fromArray(d0.p); o.scale.fromArray(d0.s);
-      o.rotation.set(d0.r[0], d0.r[1], d0.r[2]);
-      if (d0.comps) Object.assign(o.userData.components, d0.comps);
-      if (d0.params) Object.assign(o.userData.scriptParams, d0.params);
-      if (d0.mat && o.material) { o.material.color.set(d0.mat.color); o.material.roughness = d0.mat.roughness; }
-      if (d0.color) o.color.set(d0.color);
-      if (d0.intensity !== undefined) o.intensity = d0.intensity;
-      if (d0.fov !== undefined) { o.fov = d0.fov; o.updateProjectionMatrix(); }
-    });
-    ed.selected = null; tcontrols.detach();
-    renderHierarchy(); renderInspector();
-    log('sys', 'Scene loaded from save');
+    loadSceneFromSpec(JSON.parse(data));
+    log('sys', `${ed.sceneName} loaded from save`);
   }
   if (d.act === 'back-hub') { $('#editor').style.display = 'none'; $('#hub').classList.remove('hidden'); renderHub(); }
   if (d.act === 'prefs') { toast('Preferences are not implemented in UnityCraft'); return; }
   if (d.act === 'about') toast('UnityCraft — a browser reconstruction. Not affiliated with Unity Technologies.');
 }
+function switchBottomTab(tab) {
+  const btn = document.querySelector(`.ptab[data-bottomtab="${tab}"]`);
+  if (btn) btn.click();
+}
+function newScene() {
+  resetSceneFor({ target: 'cube', name: 'Untitled', ver: '6000.0.64f1' });
+  ed.sceneName = 'Untitled';
+  $('#hier-tab').textContent = 'Hierarchy — Untitled';
+  log('sys', 'New Scene created (Untitled)');
+}
+
 function deleteSelected() {
   const o = ed.selected; if (!o) return;
   pushHistory(); // snapshot before mutation
@@ -1179,7 +1275,7 @@ function duplicateSelected() {
 }
 function togglePlay() {
   if (!ed.playing) {
-    ed.playSnapshot = ed.objects.map(o => ({ o, p: o.position.clone(), r: o.rotation.clone(), s: o.scale.clone() }));
+    ed.playSnapshot = ed.objects.map(o => ({ o, spec: serializeObject(o) })); // full state, incl. object set
     ed.playing = true; ed.paused = false;
     $('#editor').classList.add('playing');
     document.querySelector('[data-act="play"]').classList.add('active');
@@ -1190,7 +1286,16 @@ function togglePlay() {
     $('#editor').classList.remove('playing');
     document.querySelector('[data-act="play"]').classList.remove('active');
     document.querySelector('[data-act="pause"]').classList.remove('active');
-    if (ed.playSnapshot) ed.playSnapshot.forEach(({ o, p, r, s }) => { o.position.copy(p); o.rotation.copy(r); o.scale.copy(s); });
+    if (ed.playSnapshot) {
+      // Unity: changes made in Play mode are reset on exit — restore the full pre-play state
+      const snapSet = new Set(ed.playSnapshot.map(x => x.o));
+      ed.objects.filter(o => !snapSet.has(o)).forEach(o => { removeHelper(o); scene.remove(o); }); // remove objects created during play
+      ed.playSnapshot.forEach(({ o, spec }) => {
+        if (!o.parent) { scene.add(o); if (o.userData.helper && !o.userData.helper.parent) scene.add(o.userData.helper); }
+        restoreObject(o, spec);
+      }); // restore deleted + state
+      ed.objects = ed.playSnapshot.map(x => x.o);
+    }
     ed.playSnapshot = null;
     renderInspector();
     log('sys', 'Exited Play Mode (scene state restored)');
@@ -1247,9 +1352,13 @@ function bindKeys() {
     if (k === 'delete') deleteSelected();
     if (e.ctrlKey && k === 'd') { e.preventDefault(); duplicateSelected(); }
     if (e.ctrlKey && k === 's') { e.preventDefault(); handleAction({ act: 'save-scene' }); }
+    if (e.ctrlKey && k === 'n' && e.shiftKey) { e.preventDefault(); handleAction({ act: 'create-empty' }); return; }
+    if (e.ctrlKey && k === 'g' && e.shiftKey) { e.preventDefault(); handleAction({ act: 'create-empty-parent' }); return; }
+    if (e.ctrlKey && k === 'c') { if (ed.selected) { e.preventDefault(); handleAction({ act: 'copy' }); } }
+    if (e.ctrlKey && k === 'v') { if (ed.clipboard) { e.preventDefault(); handleAction({ act: 'paste' }); } }
     if (e.ctrlKey && k === 'z') { e.preventDefault(); undo(); }
     if (e.ctrlKey && k === 'y') { e.preventDefault(); redo(); }
-    if (k === 'p') togglePlay(); // Unity: Ctrl+P
+    if (k === 'p' && !e.ctrlKey) togglePlay(); // Unity: Ctrl+P toggles Play
   });
 }
 function bindPanels() { /* future drag-resize */ }
