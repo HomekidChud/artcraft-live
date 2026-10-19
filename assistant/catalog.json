@@ -18,13 +18,25 @@
         "prepare a clean brand mark using vector shapes",
         "draw an icon with anchor points and handles",
         "create an illustration from scalable paths",
-        "edit the outlines in my vector artwork"
+        "edit the outlines in my vector artwork",
+        "smooth out the curves on my logo path",
+        "convert a sketch into clean vector outlines",
+        "design a flat icon with geometric shapes",
+        "tweak the bezier handles on this curve",
+        "build a monogram from basic vector shapes",
+        "refine anchor points on an svg badge",
+        "draw a minimal line art illustration",
+        "make my icon sharper at small sizes",
+        "combine shapes into a single vector path",
+        "outline text into editable vector shapes"
       ],
       "checks": [
         "draw clean bezier curves for an icon",
         "make an SVG brand mark from simple shapes",
         "edit the anchor handles on my SVG icon",
-        "turn this logo into editable vector paths"
+        "turn this logo into editable vector paths",
+        "smooth the bezier curve on my vector logo",
+        "turn my sketch into scalable vector shapes"
       ]
     },
     {
@@ -45,13 +57,25 @@
         "remove a dust spot from a raster photograph",
         "work on a photo copy with layer masks",
         "blend a retouch on a separate image layer",
-        "prepare a natural looking photo edit"
+        "prepare a natural looking photo edit",
+        "dodge and burn a portrait on separate layers",
+        "fix red eye in a family photo",
+        "select hair with a refined mask edge",
+        "remove a distracting object from my photo",
+        "color correct a scanned picture",
+        "soften skin texture without losing detail",
+        "composite two images with layer masks",
+        "brighten underexposed areas of a jpeg",
+        "sharpen a blurry snapshot carefully",
+        "resize an image for social media"
       ],
       "checks": [
         "retouch this portrait without changing the original",
         "mask part of a raster photo layer",
         "keep my original photo and mask its background",
-        "retouch this raster image with non destructive layers"
+        "retouch this raster image with non destructive layers",
+        "erase a power line from my landscape photo",
+        "brighten a dark portrait on a new layer"
       ]
     },
     {
@@ -72,13 +96,25 @@
         "sync captions and dialogue across movie clips",
         "split a video into scenes and adjust the cuts",
         "place clips in order and review the sequence",
-        "add an SRT caption track to a movie"
+        "add an SRT caption track to a movie",
+        "stitch clips together for a highlight reel",
+        "cut out a boring section of my vlog",
+        "add background music under dialogue",
+        "sync audio recorded separately with video",
+        "make a short trailer from longer footage",
+        "blur a face in a moving shot",
+        "adjust the pacing of my travel video",
+        "export a vertical cut for phones",
+        "fade between two scenes smoothly",
+        "caption an interview clip"
       ],
       "checks": [
         "shorten a video and time its captions",
         "arrange my footage in a movie timeline",
         "time an SRT caption track for a short clip",
-        "cut and rearrange my video footage"
+        "cut and rearrange my video footage",
+        "trim my vlog and add background music",
+        "sync separate audio with my video footage"
       ]
     },
     {
@@ -99,13 +135,25 @@
         "make a non destructive colour grade for photographs",
         "develop a camera raw file before exporting",
         "adjust the tone curve in a raw photo workflow",
-        "batch correct exposure and temperature"
+        "batch correct exposure and temperature",
+        "lift shadows in a backlit portrait",
+        "fix orange skin tones from indoor lighting",
+        "apply the same grade across a photo set",
+        "reduce noise in a high iso raw file",
+        "straighten a crooked horizon non destructively",
+        "bring back detail in a blown out sky",
+        "warm up a cold looking landscape",
+        "compare my edit against the original raw",
+        "sharpen for print after raw conversion",
+        "correct lens distortion on architecture shots"
       ],
       "checks": [
         "adjust exposure on raw camera photographs",
         "recover highlights and shadows in a raw image",
         "balance white and exposure in a camera raw file",
-        "recover bright sky detail from my raw photo"
+        "recover bright sky detail from my raw photo",
+        "fix orange indoor white balance in raw",
+        "apply one grade to a whole photo batch"
       ]
     },
     {
@@ -126,13 +174,25 @@
         "check whether a confidential PDF is truly redacted",
         "rotate pages and save a revised PDF",
         "add notes to a PDF proof before sharing",
-        "inspect links and selectable text in an exported PDF"
+        "inspect links and selectable text in an exported PDF",
+        "sign a form and flatten the pdf",
+        "extract three pages into a separate pdf",
+        "black out account numbers properly",
+        "highlight key clauses in a contract",
+        "fill in a scanned application form",
+        "check a pdf for broken links",
+        "split a large pdf into chapters",
+        "add page numbers to a report pdf",
+        "compare two versions of a document",
+        "ocr a scanned receipt pdf"
       ],
       "checks": [
         "merge several PDF pages and annotate them",
         "securely redact a confidential PDF copy",
         "combine two PDF files and mark a page with notes",
-        "verify that sensitive text is removed from a redacted PDF"
+        "verify that sensitive text is removed from a redacted PDF",
+        "highlight passages and sign the contract pdf",
+        "verify sensitive text was removed in my redacted pdf"
       ]
     },
     {
@@ -153,13 +213,25 @@
         "check for overset text in a print layout",
         "place images in a magazine spread and set margins",
         "design a book page using a consistent grid",
-        "prepare a flyer layout for a print shop"
+        "prepare a flyer layout for a print shop",
+        "build a tri fold brochure with a grid",
+        "set up master pages for a catalog",
+        "choose type sizes for a poster hierarchy",
+        "flow text across linked frames",
+        "align photos to a baseline grid",
+        "prepare a business card with bleed",
+        "package a layout with fonts for the printer",
+        "fix widows and orphans in my article",
+        "design a newsletter template with columns",
+        "check image resolution before printing"
       ],
       "checks": [
         "set bleed and margins for a print publication",
         "make a magazine page layout with type",
         "set page margins and bleed for a brochure",
-        "arrange text and images in a magazine spread"
+        "arrange text and images in a magazine spread",
+        "set up master pages for my magazine",
+        "prepare a business card layout with bleed"
       ]
     },
     {
@@ -180,13 +252,25 @@
         "preview a lottie animation before exporting",
         "composite animated layers with a glow effect",
         "build a short motion graphic with moving text",
-        "adjust timing on keyframes in an animated title"
+        "adjust timing on keyframes in an animated title",
+        "ease keyframes for smoother motion",
+        "loop a logo animation seamlessly",
+        "add a camera wiggle to a title",
+        "time text to music beats",
+        "build an animated lower third",
+        "preview my composition at half resolution",
+        "stagger keyframes across multiple layers",
+        "make a bouncing shape with squash and stretch",
+        "export a transparent lottie for a website",
+        "nest one composition inside another"
       ],
       "checks": [
         "keyframe a text layer in an animated composition",
         "add visual effects to a motion graphics title",
         "add keyframes to a title in a motion composition",
-        "animate layered text and preview the final frame"
+        "animate layered text and preview the final frame",
+        "loop a seamless logo animation with keyframes",
+        "stagger keyframes across title layers"
       ]
     },
     {
@@ -207,13 +291,25 @@
         "check spreadsheet totals against the source numbers",
         "format a budget sheet with column headings",
         "import a CSV and inspect its rows and columns",
-        "create formulas for revenue and expenses"
+        "create formulas for revenue and expenses",
+        "split expenses into category columns",
+        "use a formula to flag overspending",
+        "chart monthly spending from a table",
+        "sort a roster by last name",
+        "filter rows above a threshold",
+        "freeze the header row while scrolling",
+        "calculate percentage change between months",
+        "clean up inconsistent csv imports",
+        "track inventory counts in a workbook",
+        "sum hours across a timesheet"
       ],
       "checks": [
         "sum values in a workbook table",
         "build a budget with spreadsheet formulas",
         "calculate totals for a monthly spreadsheet budget",
-        "organise CSV expenses into a workbook table"
+        "organise CSV expenses into a workbook table",
+        "chart monthly spending from my budget table",
+        "calculate percentage change in a sales sheet"
       ]
     },
     {
@@ -234,13 +330,25 @@
         "fix spacing and sections in a docx file",
         "add a table of contents using heading levels",
         "review page layout in a business document",
-        "write a report with consistent paragraph styles"
+        "write a report with consistent paragraph styles",
+        "write a cover letter with a formal tone",
+        "turn notes into a structured essay",
+        "add footnotes and a bibliography",
+        "fix inconsistent heading numbering",
+        "draft meeting minutes with action items",
+        "format a resume with clear sections",
+        "track changes while editing a draft",
+        "insert a page break before each chapter",
+        "write a newsletter article draft",
+        "proofread a report for spacing issues"
       ],
       "checks": [
         "format a report with heading styles and paragraphs",
         "draft a letter in a document editor",
         "format my DOCX report with heading levels",
-        "draft a business letter with proper paragraph spacing"
+        "draft a business letter with proper paragraph spacing",
+        "turn my notes into a structured essay",
+        "format a resume with clear heading sections"
       ]
     },
     {
@@ -261,13 +369,25 @@
         "prepare a readable slideshow with consistent layouts",
         "organise a presentation around a clear story",
         "add presenter notes to a set of slides",
-        "create a five part outline for a talk"
+        "create a five part outline for a talk",
+        "turn a report into ten slides",
+        "make a title slide with a strong headline",
+        "add charts to a quarterly review deck",
+        "rehearse timings with presenter view",
+        "simplify a busy slide into three points",
+        "design a consistent template for my talk",
+        "export handouts with speaker notes",
+        "plan a workshop agenda as slides",
+        "convert bullet walls into visuals",
+        "make a closing slide with next steps"
       ],
       "checks": [
         "prepare a short presentation with speaker notes",
         "make a powerpoint pitch deck",
         "plan a pitch slideshow with concise speaker notes",
-        "outline presentation slides for a project update"
+        "outline presentation slides for a project update",
+        "turn my report into a ten slide deck",
+        "simplify a busy slide into key points"
       ]
     },
     {
@@ -288,13 +408,25 @@
         "organise a technical drawing with separate layers",
         "draw a measured part outline for fabrication review",
         "check the dimensions on an exported DXF",
-        "create simple geometry for a scaled plan"
+        "create simple geometry for a scaled plan",
+        "draft a bracket with mounting holes",
+        "offset parallel lines for a wall outline",
+        "mirror a part across a centerline",
+        "annotate a bolt circle diameter",
+        "lay out a room plan at one to fifty",
+        "trim crossing lines on a detail drawing",
+        "hatch a section view of a part",
+        "check clearances on an assembly sketch",
+        "draw an isometric view of a bracket",
+        "set dimension precision to two decimals"
       ],
       "checks": [
         "add dimensions to a DXF drawing",
         "make a CAD rectangle with measured sides",
         "set exact units and dimensions in a CAD plan",
-        "add measurements to a scaled DXF outline"
+        "add measurements to a scaled DXF outline",
+        "draft a mounting bracket with hole dimensions",
+        "hatch the section view of my dxf part"
       ]
     },
     {
@@ -315,13 +447,25 @@
         "set sample rate and output format for a mix",
         "leave headroom when exporting recorded audio",
         "organise multiple tracks for a recording session",
-        "listen for clipping before bouncing a song"
+        "listen for clipping before bouncing a song",
+        "record a podcast with two microphones",
+        "reduce hiss on a voice recording",
+        "pan instruments across the stereo field",
+        "comp the best takes of a vocal",
+        "add reverb to a snare drum",
+        "normalize a quiet interview recording",
+        "automate volume on a chorus",
+        "bounce stems for a mixing engineer",
+        "tune vocals with subtle pitch correction",
+        "edit out ums from a podcast episode"
       ],
       "checks": [
         "record and mix multiple audio tracks",
         "apply EQ and export an audio mix",
         "balance recorded tracks and export a WAV mix",
-        "set safe levels before recording vocals"
+        "set safe levels before recording vocals",
+        "reduce hiss and normalize my podcast audio",
+        "pan tracks and add reverb in my mix"
       ]
     },
     {
@@ -342,13 +486,25 @@
         "create a wireframe for a phone app dashboard",
         "check interface contrast on small screens",
         "prototype navigation between interface frames",
-        "design a reusable component library for a website"
+        "design a reusable component library for a website",
+        "build a design system with color tokens",
+        "make an auto layout card component",
+        "prototype a checkout flow for mobile",
+        "test my layout at tablet width",
+        "create hover states for a button",
+        "hand off specs to a developer",
+        "wireframe a settings screen quickly",
+        "organize screens into user flows",
+        "swap icons across all instances",
+        "review contrast for accessibility"
       ],
       "checks": [
         "create a clickable mobile interface prototype",
         "make reusable UI components for a screen design",
         "link mobile interface frames into a prototype flow",
-        "make reusable components for a responsive UI"
+        "make reusable components for a responsive UI",
+        "prototype a mobile checkout flow",
+        "prototype reusable components for an app interface"
       ]
     }
   ],
@@ -374,7 +530,15 @@
         "hi assistant are you there",
         "good evening",
         "hello ArtCraft helper",
-        "hey how is it going"
+        "hey how is it going",
+        "yo",
+        "hiya",
+        "hello hello",
+        "morning",
+        "evening friend",
+        "hey artcraft",
+        "good day",
+        "hi hope your day is good"
       ],
       "checks": [
         "hi",
@@ -382,7 +546,9 @@
         "hello there assistant",
         "good afternoon",
         "hey ArtCraft",
-        "hello can we get started"
+        "hello can we get started",
+        "hiya",
+        "morning artcraft"
       ]
     },
     {
@@ -409,7 +575,16 @@
         "can you explain the workspace to me",
         "what is the first step in this editor",
         "show me the basic workflow for this Craft",
-        "how do I get started in this workspace"
+        "how do I get started in this workspace",
+        "how do i use the pen tool",
+        "what features does this have",
+        "guide me through my first project",
+        "what tools are available here",
+        "how does the workspace work",
+        "can you teach me this app",
+        "what are the main panels",
+        "help me understand this craft",
+        "is there a tutorial for beginners"
       ],
       "checks": [
         "show me how to start",
@@ -417,7 +592,9 @@
         "give me a quick tour of the tools",
         "what should I do first in this editor",
         "I am new to this editor, where should I begin",
-        "show me around the workspace"
+        "show me around the workspace",
+        "what tools does this editor have",
+        "guide me through my first project"
       ]
     },
     {
@@ -463,7 +640,15 @@
         "create a starter document from my brief",
         "prepare a simple example file",
         "generate a basic layout I can customize",
-        "make a sample asset to download"
+        "make a sample asset to download",
+        "whip up a quick starter",
+        "i need a template file",
+        "can you generate a sample",
+        "start me off with a basic file",
+        "give me something to start from",
+        "make a blank starter i can tweak",
+        "produce a starter outline for me",
+        "spin up an example project file"
       ],
       "checks": [
         "create something I can download",
@@ -471,7 +656,9 @@
         "make a downloadable starter for a small poster",
         "create an editable checklist file",
         "prepare an editable example template",
-        "make a small file I can download"
+        "make a small file I can download",
+        "give me a template to start from",
+        "generate a basic starter i can tweak"
       ]
     },
     {
@@ -506,7 +693,15 @@
         "which format keeps this project editable",
         "download a copy of my work",
         "what file type should I send to a printer",
-        "preserve the layers in my export"
+        "preserve the layers in my export",
+        "how do i get my file out of the app",
+        "render the final version",
+        "what format works best for sharing",
+        "turn my project into a downloadable file",
+        "export for print quality",
+        "how should i deliver this to a client",
+        "produce a shareable copy",
+        "keep my work editable after saving"
       ],
       "checks": [
         "how can I save this",
@@ -514,7 +709,9 @@
         "how can I render a movie to MP4",
         "which file type should I use for delivery",
         "what format should I save to keep layers",
-        "where can I download my finished work"
+        "where can I download my finished work",
+        "how do i render the final version",
+        "what format should i send to a client"
       ]
     },
     {
@@ -545,7 +742,17 @@
         "the app hangs on a loading spinner",
         "the editor is showing a black screen",
         "my browser tab becomes unresponsive in this app",
-        "the WebAssembly asset did not load"
+        "the WebAssembly asset did not load",
+        "the screen stays white",
+        "my project will not load at all",
+        "the app is unbelievably slow today",
+        "i keep getting a blank canvas",
+        "the import button does nothing",
+        "it crashed twice in a row",
+        "the editor window froze completely",
+        "nothing happens when i open the app",
+        "the page never finishes loading",
+        "i see errors in the console"
       ],
       "checks": [
         "it freezes when I open it",
@@ -555,7 +762,9 @@
         "EffectCraft is stuck on a blank loading screen",
         "EffectCraft fails to start in the browser",
         "the editor opens to a blank canvas and stays there",
-        "the app freezes while loading its main screen"
+        "the app freezes while loading its main screen",
+        "the app crashed and will not reopen",
+        "my screen stays white after loading"
       ]
     },
     {
@@ -592,7 +801,17 @@
         "where is the neural network checkpoint stored",
         "are the training phrases written by people",
         "is this assistant powered by a foundation model",
-        "do you upload conversation transcripts"
+        "do you upload conversation transcripts",
+        "what model powers the offline chat",
+        "do my messages stay on my device",
+        "can the assistant learn new tricks",
+        "where do the training examples come from",
+        "is there a neural network in this app",
+        "how accurate is the routing model",
+        "what data was the classifier trained on",
+        "does the assistant improve over time",
+        "can i see the training pipeline",
+        "is the model open source"
       ],
       "checks": [
         "do you use my conversations for learning",
@@ -600,7 +819,9 @@
         "does this model learn from our messages",
         "can you increase training with reviewed examples",
         "does a conversation change your network weights",
-        "are my messages used as training examples"
+        "are my messages used as training examples",
+        "where do your training examples come from",
+        "does the local model improve over time"
       ]
     },
     {
@@ -623,14 +844,27 @@
         "hope you are doing well",
         "good to see you again",
         "cool thanks",
-        "what do you do for fun"
+        "what do you do for fun",
+        "you are pretty helpful",
+        "that is awesome",
+        "lol nice",
+        "i am bored, entertain me",
+        "what is your favourite craft",
+        "do you like art",
+        "we make a good team",
+        "sorry to bother you",
+        "thanks for the help",
+        "thanks a lot",
+        "many thanks"
       ],
       "checks": [
         "how are you",
         "what is up today",
         "thanks for the help",
         "can we chat about something",
-        "nice talking with you"
+        "nice talking with you",
+        "what is your favourite craft",
+        "lol that is funny"
       ]
     }
   ]
