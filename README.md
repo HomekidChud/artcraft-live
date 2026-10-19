@@ -21,6 +21,7 @@ Hosted on GitHub Pages, one path per app:
 | FigCraft | Interface design and prototyping | [/figcraft/](https://homekidchud.github.io/artcraft-live/figcraft/) |
 | UnityCraft | Unity Hub + Editor-style 3D workspace reconstruction | [/unitycraft/](https://homekidchud.github.io/artcraft-live/unitycraft/) |
 | RobloxCraft | Roblox player reconstruction (launcher + playable world) | [/robloxcraft/](https://homekidchud.github.io/artcraft-live/robloxcraft/) |
+| ChatCraft | ChatGPT- and Claude-style AI chat, bring your own API key (BYOK) | [/chatcraft/](https://homekidchud.github.io/artcraft-live/chatcraft/) |
 
 Each app folder at the repository root comes from the official `*-web-<version>.zip` static bundle from that app's GitHub release. The generated application assets are preserved; the HTML entrypoints include the shared chat overlay described below. **DeckCraft is pinned to v0.7.0** because the v0.8.0 web bundle stalled on its loading screen in the test browser (2026-10-18), while v0.7.0 reached the editor. All apps use relative URLs, so they work at these subpaths. (Note: [AniCraft](https://github.com/storytold/AniCraft) has no release yet, and support projects like `artcraft`, `craft-libs` and `craft-fonts` are libraries rather than apps, so they are not hosted here.)
 
@@ -32,14 +33,15 @@ Open [`assistant/`](assistant/) or use **Chat with ArtCraft** in any editor. Off
 
 The original generated application bundles are preserved. HTML entrypoints load the isolated chat overlay; EffectCraft's entrypoint adds nonintrusive WebGL2/CPU recovery controls. The EffectCraft service-worker version is bumped only to refresh the changed entry page; application JavaScript, WebAssembly and upstream licenses are unchanged.
 
-## Reconstructions: UnityCraft and RobloxCraft
+## Reconstructions: UnityCraft, RobloxCraft and ChatCraft
 
-Unlike the mirrored Craft apps above, **UnityCraft** and **RobloxCraft** were built directly in this repository — browser reconstructions of the official Unity and Roblox desktop clients, produced by static analysis of the officially downloaded installers (never executed). No proprietary code, assets, fonts, or trademarks from either client are bundled; all artwork is original and independently implemented.
+Unlike the mirrored Craft apps above, **UnityCraft**, **RobloxCraft** and **ChatCraft** were built directly in this repository. UnityCraft and RobloxCraft are browser reconstructions of the official Unity and Roblox desktop clients, produced by static analysis of the officially downloaded installers (never executed); ChatCraft's interface patterns are rebuilt from publicly documented chatgpt.com and claude.ai behavior. No proprietary code, assets, fonts, or trademarks from any of them are bundled; all artwork is original and independently implemented.
 
 - **UnityCraft** ([README](unitycraft/README.md)) — a Unity Hub-style project launcher plus a Unity Editor-style 3D workspace: scene view, hierarchy, inspector, play mode, and console. Built from analysis of the Unity Hub AppImage and the Unity Editor's assembly metadata.
 - **RobloxCraft** ([README](robloxcraft/README.md)) — a Roblox player reconstruction: discovery launcher, topbar, chat with recovered official UI strings, People leaderboard, health bar, Esc menu, and two playable stand-in worlds with a blocky R6-style avatar. Built from the official Roblox Windows Player packages (MD5-verified against the official manifest).
+- **ChatCraft** ([README](chatcraft/README.md)) — a ChatGPT- and Claude-style AI chat interface built from publicly documented interface behavior (no proprietary code), with real streaming inference via your own OpenAI or Anthropic API key (BYOK). As part of the same research task, dalica.pkarma.com was read in full; it is an open-source Rust photo organizer rather than an AI chat app, so it is not reconstructed here.
 
-Both are labeled, self-contained static apps — they do not run real Unity projects or real Roblox experiences. Each app's README carries the full provenance and behavior ledger.
+All three are labeled, self-contained static apps — they do not run real Unity projects or real Roblox experiences, and ChatCraft needs your own API key for real AI responses. Each app's README carries the full provenance and behavior ledger.
 
 ## Credits
 
