@@ -340,7 +340,7 @@
         </div>
       </button>
     </div>
-    <p class="lx-footnote">RobloxCraft is a clean-room reconstruction for study. No Roblox Corporation code, assets, or trademarks are redistributed — all artwork here is original. Not affiliated with or endorsed by Roblox Corporation.</p>
+    <p class="lx-footnote">RobloxCraft is a clean-room reconstruction for study. Player counts, ratings and other players are simulated demo data. No Roblox Corporation code, assets, or trademarks are redistributed — all artwork here is original. Not affiliated with or endorsed by Roblox Corporation.</p>
   </main>
 </div>
 
@@ -629,6 +629,7 @@ function addPart(w, h, d, x, y, z, color, opts = {}) {
   if (opts.hazard) m.userData.hazard = true;
   scene.add(m);
   if (!opts.noCollide) world.colliders.push({ w, h, d, x, y, z });
+  m.userData.level = true; // removable on world rebuild (ground is preserved)
   if (opts.hazard) world.hazards.push(m);
   if (opts.spin) world.spinners.push(m);
   return m;
@@ -853,7 +854,7 @@ function stepGameplay(dt) {
       const dx = Math.abs(h.position.x - state.pos.x), dz = Math.abs(h.position.z - state.pos.z);
       const dy = Math.abs(h.position.y - state.pos.y);
       if (dx < hx + 0.9 && dz < hz + 0.9 && dy < hy + 3.2) {
-        state.health = Math.max(0, state.health - 25);
+        state.health = Math.max(0, state.health - 20);
         state.invincibleUntil = now + 900;
         sfxHurt(); flashDamage(); updateHealth();
         addChat('sys', 'Ouch! Watch out for the red bricks.');
@@ -937,14 +938,18 @@ function addChat(kind, text) {
   const log = $('#chat-log');
   const div = document.createElement('div');
   div.className = 'msg ' + kind;
-  if (kind === 'you') div.innerHTML = `<span class="who">[You]</span> ${escapeHtml(text)}`;
-  else div.textContent = text;
+  if (kind === 'you') {
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = '[You]';
+    div.appendChild(who);
+    div.appendChild(document.createTextNode(' ' + text));
+  } else {
+    div.textContent = text; // user-influenced text is never parsed as HTML
+  }
   log.appendChild(div);
   while (log.children.length > 40) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
-}
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, (ch) => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' }[ch]));
 }
 function focusChat() { $('#chat-input').focus(); }
 function handleChatCommand(cmd) {
@@ -1051,14 +1056,11 @@ function enterExperience() {
 }
 
 function rebuildWorld() {
-  // remove all world objects and rebuild
+  // remove level objects and rebuild (ground, spawn pad, lights and player are preserved)
   for (const c of [...world.coins, ...world.hazards, ...world.spinners]) scene.remove(c);
   world.colliders.length = 0; world.coins.length = 0; world.hazards.length = 0; world.spinners.length = 0;
-  // remove parts (everything except ground, spawn, lights, player)
   for (const child of [...scene.children]) {
-    if (child.isMesh && child !== playerRig && child.geometry?.type === 'BoxGeometry') {
-      scene.remove(child);
-    }
+    if (child.isMesh && child.userData.level) scene.remove(child);
   }
   world.colliders.push(world.groundCollider); // keep the baseplate solid
   buildLevel();
@@ -1094,22 +1096,24 @@ function buildLevel() {
 /* ---------------- Game loop ---------------- */
 const FIXED = 1 / 60;
 let lastPhys = performance.now();
+let physAcc = 0;
 
-/* Physics is wall-clock driven with catch-up steps, so gameplay speed is
-   correct even when timers or rendering are throttled (software rendering,
-   background tabs). Rendering runs on rAF and adapts its quality. */
+/* Physics is wall-clock driven with a persistent accumulator, so gameplay
+   speed is correct even when timers or rendering are throttled (software
+   rendering, background tabs). Fractional time is never discarded. */
 setInterval(() => {
   const now = performance.now();
-  if (!started || !state.playing) { lastPhys = now; return; }
-  let elapsed = Math.min((now - lastPhys) / 1000, 1.0);
+  if (!started || !state.playing) { lastPhys = now; physAcc = 0; return; }
+  physAcc += Math.min((now - lastPhys) / 1000, 1.0);
   lastPhys = now;
-  if (escOpen()) return;
+  if (escOpen()) { physAcc = 0; return; }
   let guard = 0;
-  while (elapsed >= FIXED && guard++ < 70) {
+  while (physAcc >= FIXED && guard++ < 70) {
     stepPhysics(FIXED);
     stepGameplay(FIXED);
-    elapsed -= FIXED;
+    physAcc -= FIXED;
   }
+  if (guard >= 70) physAcc = 0; // drop unpayable backlog (tab sleep)
 }, 1000 / 60);
 
 let frameTimes = [];
@@ -1154,6 +1158,14 @@ window.robloxcraft = {
   respawn: () => resetPlayer(),
   pressKey: (code, down = true) => { state.keys[code] = down; },
   teleport: (x, y, z) => { state.pos.set(x, y, z); state.vel.set(0, 0, 0); },
+  get cfg() { return { camYaw: +CFG.camYaw.toFixed(3), camDist: +CFG.camDist.toFixed(2), sensitivity: CFG.sensitivity }; },
+  get sceneInfo() {
+    return {
+      meshCount: scene.children.filter((c) => c.isMesh).length,
+      groundVisible: scene.children.some((c) => c.isMesh && c.geometry?.parameters?.width === CFG.baseplate),
+      volume: masterGain ? masterGain.gain.value : null,
+    };
+  },
 };
 </script>
 </body>
