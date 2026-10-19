@@ -32,6 +32,10 @@ Open [`assistant/`](assistant/) or use **Chat with ArtCraft** in any editor. Off
 
 The original generated application bundles are preserved. HTML entrypoints load the isolated chat overlay; EffectCraft's entrypoint adds nonintrusive WebGL2/CPU recovery controls. The EffectCraft service-worker version is bumped only to refresh the changed entry page; application JavaScript, WebAssembly and upstream licenses are unchanged.
 
+### Development environment
+
+The repo includes a one-click [devcontainer](.devcontainer/devcontainer.json) for GitHub Codespaces and VS Code Dev Containers: Node 22, Python 3.12 and the assistant training dependencies are preinstalled, port 8000 is forwarded for `npm run serve`, and assistant tasks (serve, test, retrain) are predefined in `.vscode/tasks.json`. [.github/copilot-instructions.md](.github/copilot-instructions.md) documents the repository rules an AI agent must follow (never touch generated editor bundles, keep `catalog.json`/`model.json` in sync, preserve the assistant DOM contract).
+
 ## Reconstructions: UnityCraft and RobloxCraft
 
 Unlike the mirrored Craft apps above, **UnityCraft** and **RobloxCraft** were built directly in this repository — browser reconstructions of the official Unity and Roblox desktop clients, produced by static analysis of the officially downloaded installers (never executed). No proprietary code, assets, fonts, or trademarks from either client are bundled; all artwork is original and independently implemented.

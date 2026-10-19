@@ -353,6 +353,11 @@ $("message").addEventListener("keydown",event=>{
   if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){event.preventDefault();submit($("message").value);}
 });
 $("message").addEventListener("input",updateControls);
+welcome.addEventListener("click",event=>{
+  const button=event.target.closest("[data-prompt]");
+  if(!button||!model||sending||importing)return;
+  submit(button.dataset.prompt);
+});
 $("attach").addEventListener("click",()=>$("file-input").click());
 $("file-input").addEventListener("change",()=>addFiles([...$("file-input").files]));
 $("memory-toggle").addEventListener("click",()=>{

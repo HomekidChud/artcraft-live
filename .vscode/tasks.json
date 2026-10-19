@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Serve ArtCraft Live",
+      "type": "shell",
+      "command": "python3 -m http.server 8000 --bind 127.0.0.1",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Test assistant (JS + Python)",
+      "type": "shell",
+      "command": "npm test && python3 -m unittest discover -s assistant/tests -p 'test_*.py'",
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": true }
+    },
+    {
+      "label": "Retrain assistant model",
+      "type": "shell",
+      "command": "OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 python3 assistant/training/train.py",
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": true }
+    }
+  ]
+}
