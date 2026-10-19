@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ChatCraft — ChatGPT & Claude in your browser</title>
+<meta name="description" content="A ChatGPT- and Claude-style AI chat in your browser. Bring your own OpenAI or Anthropic API key." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310a37f'/%3E%3Cpath d='M16 7c-5 0-9 3.6-9 8 0 2.5 1.3 4.7 3.4 6.2-.3 1-1 2.2-2.2 3.3 1.8-.4 3.4-1.2 4.6-2 .9.2 1.9.3 3.2.3 5 0 9-3.6 9-8s-4-7.8-9-7.8z' fill='white'/%3E%3C/svg%3E" />
+<style>
+  /* ---------- Design tokens: two styles x two themes ---------- */
+  :root {
+    --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-chat: var(--font-ui);
+    --radius: 14px;
+  }
+  body[data-style="chatgpt"][data-theme="dark"] {
+    --bg: #212121; --sidebar: #171717; --sidebar-hover: #2a2a2a; --surface: #303030;
+    --surface-2: #2f2f2f; --border: #ffffff1f; --text: #ececec; --muted: #9b9b9b;
+    --accent: #ffffff; --accent-text: #0d0d0d; --user-bubble: #303030;
+    --code-bg: #0d0d0d; --code-head: #1f1f1f; --btn: #303030; --btn-hover: #3d3d3d;
+    --shadow: 0 10px 30px rgba(0,0,0,.5);
+  }
+  body[data-style="chatgpt"][data-theme="light"] {
+    --bg: #ffffff; --sidebar: #f9f9f9; --sidebar-hover: #ececec; --surface: #f4f4f4;
+    --surface-2: #ffffff; --border: #0000001f; --text: #0d0d0d; --muted: #5d5d5d;
+    --accent: #0d0d0d; --accent-text: #ffffff; --user-bubble: #f4f4f4;
+    --code-bg: #f6f8fa; --code-head: #ececec; --btn: #f4f4f4; --btn-hover: #e8e8e8;
+    --shadow: 0 10px 30px rgba(0,0,0,.12);
+  }
+  body[data-style="claude"][data-theme="light"] {
+    --bg: #f5f4ee; --sidebar: #f0eee7; --sidebar-hover: #e6e2d6; --surface: #ece9df;
+    --surface-2: #faf9f5; --border: #00000014; --text: #1f1e1d; --muted: #6e6b64;
+    --accent: #d97757; --accent-text: #ffffff; --user-bubble: #ece9df;
+    --code-bg: #1f1e1d; --code-head: #141311; --btn: #ffffff; --btn-hover: #f0eee7;
+    --shadow: 0 10px 30px rgba(31,30,29,.15);
+    --font-chat: Georgia, "Times New Roman", serif;
+  }
+  body[data-style="claude"][data-theme="dark"] {
+    --bg: #1f1e1d; --sidebar: #191817; --sidebar-hover: #262422; --surface: #262422;
+    --surface-2: #2a2826; --border: #ffffff17; --text: #f0eee7; --muted: #a3a099;
+    --accent: #d97757; --accent-text: #1f1e1d; --user-bubble: #2a2826;
+    --code-bg: #141311; --code-head: #0f0e0d; --btn: #2a2826; --btn-hover: #35322f;
+    --shadow: 0 10px 30px rgba(0,0,0,.5);
+    --font-chat: Georgia, "Times New Roman", serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { height: 100%; }
+  body {
+    height: 100%; overflow: hidden; font-family: var(--font-ui);
+    font-size: 15px; color: var(--text); background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { cursor: pointer; background: none; border: none; font: inherit; color: inherit; }
+  input, textarea { font: inherit; color: inherit; }
+  ::selection { background: color-mix(in srgb, var(--accent) 30%, transparent); }
+
+  #app { display: flex; height: 100%; }
+
+  /* ---------- Sidebar ---------- */
+  #sidebar {
+    width: 260px; flex: none; background: var(--sidebar); display: flex; flex-direction: column;
+    border-right: 1px solid var(--border); transition: margin-left .22s ease; z-index: 20;
+  }
+  #sidebar.collapsed { margin-left: -260px; }
+  .sb-top { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 8px; }
+  .sb-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; padding: 4px 6px; }
+  .sb-logo .mark { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent); color: var(--accent-text); font-size: 14px; font-weight: 800; }
+  .icon-btn {
+    width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+    color: var(--muted); flex: none;
+  }
+  .icon-btn:hover { background: var(--sidebar-hover); color: var(--text); }
+  .icon-btn svg { width: 17px; height: 17px; }
+  #new-chat {
+    margin: 8px 12px; padding: 9px 14px; border-radius: 22px; background: var(--btn);
+    display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600;
+    border: 1px solid var(--border); text-align: left;
+  }
+  #new-chat:hover { background: var(--btn-hover); }
+  #search-wrap { margin: 4px 12px 10px; position: relative; }
+  #search {
+    width: 100%; padding: 8px 12px 8px 32px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); font-size: 13px; outline: none;
+  }
+  #search:focus { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+  #search-wrap svg { position: absolute; left: 9px; top: 9px; width: 14px; height: 14px; color: var(--muted); }
+  .sb-label { padding: 10px 16px 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+  #chat-list { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+  .chat-item {
+    display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 10px;
+    font-size: 13.5px; cursor: pointer; color: var(--text); position: relative;
+  }
+  .chat-item:hover { background: var(--sidebar-hover); }
+  .chat-item.active { background: var(--sidebar-hover); font-weight: 600; }
+  .chat-item .t { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .chat-item .acts { display: none; gap: 2px; }
+  .chat-item:hover .acts { display: flex; }
+  .chat-item .acts button { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--muted); }
+  .chat-item .acts button:hover { background: var(--btn); color: var(--text); }
+  .chat-item .acts svg { width: 13px; height: 13px; }
+  .sb-foot { border-top: 1px solid var(--border); padding: 8px; display: flex; gap: 4px; }
+  .sb-foot button {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 6px; border-radius: 10px; font-size: 12.5px; color: var(--muted);
+  }
+  .sb-foot button:hover { background: var(--sidebar-hover); color: var(--text); }
+  .sb-foot svg { width: 15px; height: 15px; }
+
+  /* ---------- Main ---------- */
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+  #topbar {
+    height: 52px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 14px;
+    border-bottom: 1px solid var(--border); z-index: 10;
+  }
+  #topbar .menu-btn { display: none; }
+  #topbar .title { font-size: 14px; font-weight: 600; color: var(--muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #thread { flex: 1; overflow-y: auto; scroll-behavior: smooth; }
+  .thread-inner { max-width: 768px; margin: 0 auto; padding: 24px 20px 12px; }
+
+  /* welcome */
+  #welcome { padding-top: max(8vh, 24px); text-align: center; }
+  #welcome .big-mark {
+    width: 52px; height: 52px; border-radius: 16px; margin: 0 auto 20px; display: grid; place-items: center;
+    background: var(--accent); color: var(--accent-text); font-size: 24px; font-weight: 800;
+  }
+  #welcome h1 { font-size: 26px; font-weight: 700; margin-bottom: 26px; letter-spacing: -.01em; }
+  #welcome .chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 620px; margin: 0 auto; }
+  #welcome .chip {
+    padding: 10px 16px; border-radius: 20px; border: 1px solid var(--border); background: var(--surface);
+    font-size: 13.5px; color: var(--muted);
+  }
+  #welcome .chip:hover { color: var(--text); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+
+  /* messages */
+  .msg { display: flex; gap: 14px; padding: 14px 0; position: relative; }
+  .msg .avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex: none; display: grid; place-items: center;
+    font-size: 12px; font-weight: 700; margin-top: 2px;
+  }
+  .msg.user .avatar { background: var(--accent); color: var(--accent-text); }
+  .msg.assistant .avatar { background: var(--surface); border: 1px solid var(--border); }
+  .msg .body { flex: 1; min-width: 0; padding-top: 4px; }
+  .msg.user .body .bubble {
+    background: var(--user-bubble); border-radius: 18px; padding: 10px 16px;
+    white-space: pre-wrap; word-wrap: break-word; font-size: 15px; display: inline-block; max-width: 100%;
+  }
+  .msg .body .content { font-family: var(--font-chat); line-height: 1.65; font-size: 15.5px; word-wrap: break-word; }
+  .content p { margin: 0 0 12px; }
+  .content p:last-child { margin-bottom: 0; }
+  .content h1, .content h2, .content h3 { margin: 18px 0 10px; line-height: 1.3; }
+  .content h1 { font-size: 1.45em; } .content h2 { font-size: 1.25em; } .content h3 { font-size: 1.1em; }
+  .content ul, .content ol { margin: 0 0 12px 22px; }
+  .content li { margin: 4px 0; }
+  .content a { color: color-mix(in srgb, var(--accent) 75%, var(--text)); }
+  .content code.ic {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+    padding: 1px 5px; font-size: .88em; font-family: ui-monospace, "Cascadia Code", Menlo, monospace;
+  }
+  .content .err { color: #e5484d; }
+  .msg .acts { display: flex; gap: 2px; margin-top: 6px; opacity: 0; transition: opacity .15s; }
+  .msg:hover .acts, .msg .acts.show { opacity: 1; }
+  .msg .acts button {
+    width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--muted);
+  }
+  .msg .acts button:hover { background: var(--surface); color: var(--text); }
+  .msg .acts svg { width: 14px; height: 14px; }
+  .cursor-blink { display: inline-block; width: 8px; height: 16px; background: var(--text); vertical-align: text-bottom; animation: blink 1s steps(1) infinite; border-radius: 2px; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* code blocks */
+  .codeblock { margin: 12px 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); background: var(--code-bg); }
+  .codeblock .cb-head {
+    display: flex; align-items: center; justify-content: space-between; padding: 6px 8px 6px 14px;
+    background: var(--code-head); color: var(--muted); font-size: 12px; font-family: var(--font-ui);
+  }
+  .codeblock .cb-head .lang { text-transform: lowercase; letter-spacing: .03em; }
+  .codeblock .cb-head .cb-btns { display: flex; gap: 4px; }
+  .codeblock .cb-head button {
+    display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 7px; font-size: 12px; color: var(--muted);
+  }
+  .codeblock .cb-head button:hover { background: #ffffff14; color: #fff; }
+  .codeblock pre { padding: 14px; overflow-x: auto; }
+  .codeblock code {
+    font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; font-size: 13px; line-height: 1.55;
+    color: #e6e6e6; white-space: pre;
+  }
+
+  /* edit box for user messages */
+  .editbox { width: 100%; }
+  .editbox textarea {
+    width: 100%; min-height: 64px; border-radius: 12px; padding: 10px 14px; resize: vertical;
+    background: var(--surface); border: 1px solid var(--border); outline: none; font-size: 15px;
+  }
+  .editbox .eb-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+  .eb-btn { padding: 7px 14px; border-radius: 18px; font-size: 13px; font-weight: 600; }
+  .eb-btn.primary { background: var(--accent); color: var(--accent-text); }
+  .eb-btn.ghost { color: var(--muted); }
+  .eb-btn.ghost:hover { color: var(--text); }
+
+  /* ---------- Composer ---------- */
+  #composerwrap { flex: none; padding: 8px 20px 14px; background: linear-gradient(transparent, var(--bg) 30%); }
+  #composer {
+    max-width: 768px; margin: 0 auto; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 24px; padding: 12px 14px 8px; box-shadow: var(--shadow);
+  }
+  #composer:focus-within { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+  #input {
+    width: 100%; border: none; outline: none; background: none; resize: none; max-height: 200px;
+    font-size: 15.5px; line-height: 1.5; padding: 2px 4px; font-family: var(--font-ui);
+  }
+  #input::placeholder { color: var(--muted); }
+  .composer-bar { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  .pill {
+    display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 16px;
+    font-size: 13px; color: var(--muted); font-weight: 600;
+  }
+  .pill:hover { background: var(--btn-hover); color: var(--text); }
+  .pill svg { width: 14px; height: 14px; }
+  .spacer { flex: 1; }
+  #send {
+    width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: var(--accent-text);
+    display: grid; place-items: center; transition: transform .1s;
+  }
+  #send:disabled { opacity: .35; cursor: default; }
+  #send:not(:disabled):hover { transform: scale(1.06); }
+  #send svg { width: 16px; height: 16px; }
+  #send.stop { background: var(--text); color: var(--bg); }
+  .disclaimer { text-align: center; font-size: 11.5px; color: var(--muted); padding: 8px 0 0; max-width: 768px; margin: 0 auto; }
+
+  /* dropdown menus */
+  .menu {
+    position: absolute; bottom: 60px; left: 0; min-width: 240px; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 14px; padding: 6px; box-shadow: var(--shadow); z-index: 50;
+    display: none;
+  }
+  .menu.open { display: block; }
+  .menu .mi {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
+    padding: 9px 12px; border-radius: 9px; font-size: 13.5px; text-align: left;
+  }
+  .menu .mi:hover { background: var(--sidebar-hover); }
+  .menu .mi .sub { color: var(--muted); font-size: 12px; }
+  .menu .mi.on .name::after { content: "✓"; margin-left: 8px; color: var(--accent); }
+  .menu .mhead { padding: 8px 12px 4px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+  /* ---------- Artifact panel (Claude-style) ---------- */
+  #artifact {
+    width: 0; flex: none; background: var(--surface-2); border-left: 1px solid var(--border);
+    display: flex; flex-direction: column; transition: width .22s ease; overflow: hidden;
+  }
+  #artifact.open { width: 46%; min-width: 320px; }
+  #artifact .ar-top {
+    height: 52px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  #artifact .ar-title { flex: 1; font-size: 13.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #artifact .ar-body { flex: 1; position: relative; }
+  #artifact iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: none; background: #fff; }
+  #artifact .ar-code {
+    position: absolute; inset: 0; overflow: auto; padding: 16px; display: none;
+    font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; white-space: pre-wrap; background: var(--code-bg); color: #e6e6e6;
+  }
+  #artifact.show-code .ar-code { display: block; }
+  #artifact.show-code iframe { display: none; }
+
+  /* ---------- Settings modal ---------- */
+  #modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; place-items: center; z-index: 100; padding: 20px;
+  }
+  #modal-backdrop.open { display: grid; }
+  #settings {
+    width: 520px; max-width: 100%; max-height: 86vh; overflow-y: auto; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 18px; padding: 22px; box-shadow: var(--shadow);
+  }
+  #settings h2 { font-size: 18px; margin-bottom: 4px; }
+  #settings .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  .field input[type="text"], .field input[type="password"] {
+    width: 100%; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); outline: none; font-size: 13.5px;
+  }
+  .field input:focus { border-color: color-mix(in srgb, var(--accent) 60%, var(--border)); }
+  .field .hint { font-size: 12px; color: var(--muted); margin-top: 5px; line-height: 1.45; }
+  .field .hint a { color: var(--accent); }
+  .check { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; color: var(--muted); margin-top: 6px; cursor: pointer; }
+  .check input { margin-top: 2px; accent-color: var(--accent); }
+  #settings .modal-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+  .modal-btn { padding: 9px 18px; border-radius: 20px; font-size: 13.5px; font-weight: 600; }
+  .modal-btn.primary { background: var(--accent); color: var(--accent-text); }
+  .modal-btn.ghost { color: var(--muted); }
+
+  /* toast */
+  #toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+    background: var(--text); color: var(--bg); padding: 9px 18px; border-radius: 12px; font-size: 13px;
+    transition: transform .25s ease; z-index: 200; box-shadow: var(--shadow);
+  }
+  #toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* scrollbars */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 40%, transparent); border-radius: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+
+  #session-note {
+    padding: 6px 16px;
+    font-size: 12px;
+    color: var(--text-faint, #9a9a9a);
+    background: color-mix(in srgb, var(--accent, #10a37f) 12%, transparent);
+    border-bottom: 1px solid var(--border, #2a2a2a);
+  }
+
+  /* ---------- Mobile ---------- */
+  @media (max-width: 768px) {
+    #sidebar { position: fixed; inset: 0 30% 0 0; box-shadow: var(--shadow); }
+    #sidebar.collapsed { margin-left: -100vw; }
+    #topbar .menu-btn { display: grid; }
+    .thread-inner { padding: 16px 14px 8px; }
+    #composerwrap { padding: 6px 12px 10px; }
+    #artifact.open { position: fixed; inset: 0; width: 100%; min-width: 0; z-index: 60; }
+    .msg { gap: 10px; }
+  }
+</style>
+</head>
+<body data-style="chatgpt" data-theme="dark">
+<div id="app">
+
+  <aside id="sidebar">
+    <div class="sb-top">
+      <div class="sb-logo"><span class="mark">C</span> ChatCraft</div>
+      <button class="icon-btn" id="collapse-btn" title="Close sidebar" aria-label="Close sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+    </div>
+    <button id="new-chat">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+      New chat
+    </button>
+    <div id="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="search" type="text" placeholder="Search chats" />
+    </div>
+    <div class="sb-label" id="chats-label">Chats</div>
+    <div id="chat-list"></div>
+    <div class="sb-foot">
+      <button id="theme-btn" title="Toggle theme">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        Theme
+      </button>
+      <button id="style-btn" title="Switch ChatGPT / Claude style">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 3 19h18L12 3z"/></svg>
+        Style
+      </button>
+      <button id="settings-btn" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </div>
+  </aside>
+
+  <main id="main">
+    <header id="topbar">
+      <button class="icon-btn menu-btn" id="menu-btn" aria-label="Open sidebar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <div class="title" id="topbar-title">New chat</div>
+      <button class="icon-btn" id="top-settings" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </header>
+    <div id="session-note" hidden>Preview: web storage is unavailable here, so chats and keys last only for this session.</div>
+    <div id="thread">
+      <div class="thread-inner" id="thread-inner">
+        <div id="welcome">
+          <div class="big-mark">C</div>
+          <h1>What can I help you with?</h1>
+          <div class="chips">
+            <button class="chip">Explain quantum computing in simple terms</button>
+            <button class="chip">Write a Python script to rename files by date</button>
+            <button class="chip">Draft a friendly follow-up email</button>
+            <button class="chip">Debug this idea: a weather-based playlist</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="composerwrap">
+      <div id="composer">
+        <textarea id="input" rows="1" placeholder="Message ChatCraft…"></textarea>
+        <div class="composer-bar">
+          <button class="pill" id="model-pill">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V6a5 5 0 0 1 10 0v2"/></svg>
+            <span id="model-pill-label">GPT-5.5</span>
+          </button>
+          <div class="spacer"></div>
+          <button id="send" disabled aria-label="Send message">
+            <svg id="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m22 2-7 20-4-9-9-4z"/></svg>
+          </button>
+        </div>
+        <div class="menu" id="model-menu">
+          <div class="mhead">OpenAI</div>
+          <button class="mi" data-provider="openai" data-model="gpt-5.5"><span class="name">GPT-5.5</span><span class="sub">flagship</span></button>
+          <button class="mi" data-provider="openai" data-model="gpt-5.5-pro"><span class="name">GPT-5.5 Pro</span><span class="sub">deep reasoning</span></button>
+          <button class="mi" data-provider="openai" data-model="gpt-5.4-mini"><span class="name">GPT-5.4 mini</span><span class="sub">fast</span></button>
+          <div class="mhead">Anthropic</div>
+          <button class="mi" data-provider="anthropic" data-model="claude-sonnet-5-5"><span class="name">Claude Sonnet 5.5</span><span class="sub">latest</span></button>
+          <button class="mi" data-provider="anthropic" data-model="claude-opus-5-5"><span class="name">Claude Opus 5.5</span><span class="sub">most capable</span></button>
+          <button class="mi" data-provider="anthropic" data-model="claude-haiku-5-5"><span class="name">Claude Haiku 5.5</span><span class="sub">fastest</span></button>
+          <div class="mhead">Custom</div>
+          <button class="mi" id="custom-model-btn"><span class="name">Use a custom model ID…</span></button>
+        </div>
+      </div>
+      <div class="disclaimer">ChatCraft can make mistakes. Check important info. Your API key stays in this browser and is sent only to the provider you choose.</div>
+    </div>
+  </main>
+
+  <aside id="artifact" aria-label="Artifact preview">
+    <div class="ar-top">
+      <button class="icon-btn" id="ar-code-btn" title="Toggle code view">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m8 6-6 6 6 6M16 6l6 6-6 6"/></svg>
+      </button>
+      <div class="ar-title" id="ar-title">Preview</div>
+      <button class="icon-btn" id="ar-close" title="Close" aria-label="Close preview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="ar-body">
+      <iframe id="ar-frame" sandbox="allow-scripts" title="Artifact preview"></iframe>
+      <div class="ar-code" id="ar-code"></div>
+    </div>
+  </aside>
+</div>
+
+<div id="modal-backdrop">
+  <div id="settings">
+    <h2>Settings</h2>
+    <div class="sub">Bring your own key — it is kept in this browser and sent only to the provider when you send a message.</div>
+    <div class="field">
+      <label for="key-openai">OpenAI API key</label>
+      <input type="password" id="key-openai" placeholder="sk-…" autocomplete="off" />
+      <div class="hint">Used for GPT models. Create one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a>.</div>
+    </div>
+    <div class="field">
+      <label for="key-anthropic">Anthropic API key</label>
+      <input type="password" id="key-anthropic" placeholder="sk-ant-…" autocomplete="off" />
+      <div class="hint">Used for Claude models. Create one at <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a>.</div>
+      <label class="check"><input type="checkbox" id="remember-keys" /> Remember keys on this device (stored locally — anyone with access to this browser profile can read them)</label>
+    </div>
+    <div class="field">
+      <label for="custom-model">Custom model ID (optional)</label>
+      <input type="text" id="custom-model" placeholder="e.g. gpt-5.5-2026-04-23" />
+      <div class="hint">Overrides the model picker. Uses the provider of the last picked preset.</div>
+    </div>
+    <div class="field">
+      <label for="sysprompt">System prompt</label>
+      <input type="text" id="sysprompt" placeholder="You are a helpful assistant." />
+    </div>
+    <div class="modal-row">
+      <button class="modal-btn ghost" id="settings-cancel">Cancel</button>
+      <button class="modal-btn primary" id="settings-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">Copied</div>
+
+<script>
+"use strict";
+/* ================= ChatCraft — a ChatGPT/Claude-style BYOK chat ================= */
+
+const $ = (s) => document.querySelector(s);
+const uid = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+
+/* ---------------- state & persistence ---------------- */
+const state = {
+  chats: [],            // {id, title, messages:[{role, content}], updated}
+  activeId: null,
+  provider: "openai",
+  model: "gpt-5.5",
+  customModel: "",
+  systemPrompt: "",
+  keys: { openai: "", anthropic: "" },   // page memory only unless "remember"
+  remember: false,
+  streaming: null,      // AbortController while generating
+};
+
+const LS = {
+  chats: "cc.chats", active: "cc.active", provider: "cc.provider", model: "cc.model",
+  custom: "cc.custom", sys: "cc.sys", remember: "cc.remember", keys: "cc.keys",
+  theme: "cc.theme", style: "cc.style",
+};
+
+// Persistent storage where the browser allows it (e.g. GitHub Pages). Sandboxed
+// preview iframes can block web storage entirely, so we probe it once and fall
+// back to an in-memory store there (chats then last only for the session).
+// The deployed preview build ships a pure in-memory store (see preview-build.py).
+const store = (() => {
+  try {
+    const probe = "__cc_probe__";
+    localStorage.setItem(probe, "1"); localStorage.removeItem(probe);
+    return {
+      persistent: true,
+      getItem: (k) => localStorage.getItem(k),
+      setItem: (k, v) => localStorage.setItem(k, v),
+      removeItem: (k) => localStorage.removeItem(k),
+    };
+  } catch (e) {
+    const mem = new Map();
+    return {
+      persistent: false,
+      getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+      setItem: (k, v) => mem.set(k, String(v)),
+      removeItem: (k) => mem.delete(k),
+    };
+  }
+})();
+
+
+function save() {
+  store.setItem(LS.chats, JSON.stringify(state.chats));
+  store.setItem(LS.active, state.activeId || "");
+  store.setItem(LS.provider, state.provider);
+  store.setItem(LS.model, state.model);
+  store.setItem(LS.custom, state.customModel);
+  store.setItem(LS.sys, state.systemPrompt);
+  store.setItem(LS.remember, state.remember ? "1" : "0");
+  if (state.remember) store.setItem(LS.keys, JSON.stringify(state.keys));
+  else store.removeItem(LS.keys);
+}
+function load() {
+  try {
+    state.chats = JSON.parse(store.getItem(LS.chats) || "[]");
+    if (!Array.isArray(state.chats)) state.chats = [];
+    state.activeId = store.getItem(LS.active) || null;
+    state.provider = store.getItem(LS.provider) || "openai";
+    state.model = store.getItem(LS.model) || "gpt-5.5";
+    state.customModel = store.getItem(LS.custom) || "";
+    state.systemPrompt = store.getItem(LS.sys) || "";
+    state.remember = store.getItem(LS.remember) === "1";
+    if (state.remember) {
+      const k = JSON.parse(store.getItem(LS.keys) || "{}");
+      state.keys = { openai: k.openai || "", anthropic: k.anthropic || "" };
+    }
+    const theme = store.getItem(LS.theme);
+    const style = store.getItem(LS.style);
+    if (theme) document.body.dataset.theme = theme;
+    if (style) document.body.dataset.style = style;
+  } catch (e) { /* corrupted storage — start fresh */ }
+}
+
+/* ---------------- markdown (safe: escape first) ---------------- */
+function escapeHtml(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function safeUrl(u) {
+  const t = u.trim();
+  return /^(https?:\/\/|mailto:)/i.test(t) ? t : "#";
+}
+function renderMarkdown(src) {
+  const blocks = [];
+  // fenced code blocks (tolerate an unclosed fence while streaming)
+  let text = String(src).replace(/```([\w+-]*)\n?([\s\S]*?)(?:```|$)/g, (m, lang, code) => {
+    blocks.push({ lang: (lang || "").toLowerCase(), code: code.replace(/\n$/, "") });
+    return "\u0000B" + (blocks.length - 1) + "\u0000";
+  });
+  text = escapeHtml(text);
+  // inline code
+  text = text.replace(/`([^`\n]+)`/g, (m, c) => `<code class="ic">${c}</code>`);
+  // bold / italic
+  text = text.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  text = text.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s.,!?)\u0000]|$)/g, "$1<em>$2</em>");
+  // headings
+  text = text.replace(/^### (.*)$/gm, "<h3>$1</h3>");
+  text = text.replace(/^## (.*)$/gm, "<h2>$1</h2>");
+  text = text.replace(/^# (.*)$/gm, "<h1>$1</h1>");
+  // links [text](url)
+  text = text.replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (m, t, u) => `<a href="${escapeHtml(safeUrl(u))}" target="_blank" rel="noopener">${t}</a>`);
+  // lists and paragraphs, line by line
+  const lines = text.split("\n");
+  const out = [];
+  let list = null; // "ul" | "ol"
+  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  const openList = (kind) => { if (list !== kind) { closeList(); out.push(`<${kind}>`); list = kind; } };
+  let para = [];
+  const flushPara = () => { if (para.length) { out.push("<p>" + para.join("<br>") + "</p>"); para = []; } };
+  for (let ln of lines) {
+    const t = ln.trim();
+    if (!t) { flushPara(); closeList(); continue; }
+    let m;
+    if (/^<h[123]>/.test(t)) { flushPara(); closeList(); out.push(t); continue; }
+    if ((m = t.match(/^[-*]\s+(.+)$/))) { flushPara(); openList("ul"); out.push(`<li>${m[1]}</li>`); continue; }
+    if ((m = t.match(/^\d+[.)]\s+(.+)$/))) { flushPara(); openList("ol"); out.push(`<li>${m[1]}</li>`); continue; }
+    if (t.startsWith("<p>") || t.startsWith("</")) { flushPara(); closeList(); out.push(t); continue; }
+    closeList(); para.push(t);
+  }
+  flushPara(); closeList();
+  text = out.join("\n");
+  // reinsert code blocks
+  text = text.replace(/\u0000B(\d+)\u0000/g, (m, i) => codeBlockHtml(blocks[+i]));
+  return text;
+}
+function codeBlockHtml(b) {
+  const i = blocksCounter++;
+  const previewable = ["html", "svg", "xml"].includes(b.lang) || /^<!DOCTYPE html|^<svg/i.test(b.code.trim());
+  return `<div class="codeblock" data-block="${i}"><div class="cb-head"><span class="lang">${escapeHtml(b.lang || "code")}</span>` +
+    `<span class="cb-btns">` +
+    (previewable ? `<button class="cb-preview" data-code="${encodeURIComponent(b.code)}">Preview</button>` : "") +
+    `<button class="cb-copy" data-code="${encodeURIComponent(b.code)}">Copy</button>` +
+    `</span></div><pre><code>${escapeHtml(b.code)}</code></pre></div>`;
+}
+let blocksCounter = 0;
+
+/* ---------------- chat storage ---------------- */
+function activeChat() { return state.chats.find(c => c.id === state.activeId) || null; }
+function newChat() {
+  state.activeId = null;
+  renderThread();
+  renderChatList();
+  $("#topbar-title").textContent = "New chat";
+  $("#input").focus();
+}
+function ensureChat() {
+  let c = activeChat();
+  if (!c) {
+    c = { id: uid(), title: "New chat", messages: [], updated: Date.now() };
+    state.chats.unshift(c);
+    state.activeId = c.id;
+  }
+  return c;
+}
+
+/* ---------------- rendering ---------------- */
+const ICONS = {
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6 9 17l-5-5"/></svg>',
+  redo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+};
+function msgHtml(m, idx) {
+  if (m.role === "user") {
+    return `<div class="msg user" data-idx="${idx}"><div class="avatar">You</div><div class="body">` +
+      (m.editing
+        ? `<div class="editbox"><textarea>${escapeHtml(m.editing)}</textarea><div class="eb-row"><button class="eb-btn ghost" data-act="cancel-edit">Cancel</button><button class="eb-btn primary" data-act="save-edit">Send</button></div></div>`
+        : `<div class="bubble">${escapeHtml(m.content)}</div><div class="acts"><button data-act="copy" title="Copy">${ICONS.copy}</button><button data-act="edit" title="Edit message">${ICONS.edit}</button></div>`) +
+      `</div></div>`;
+  }
+  const content = m.error
+    ? `<div class="content"><p class="err">${escapeHtml(m.content)}</p></div>`
+    : `<div class="content">${renderMarkdown(m.content)}${m.streaming ? '<span class="cursor-blink"></span>' : ""}</div>`;
+  return `<div class="msg assistant" data-idx="${idx}"><div class="avatar">C</div><div class="body">${content}` +
+    (m.streaming ? "" : `<div class="acts"><button data-act="copy" title="Copy">${ICONS.copy}</button><button data-act="regen" title="Regenerate">${ICONS.redo}</button></div>`) +
+    `</div></div>`;
+}
+function renderThread() {
+  const c = activeChat();
+  const inner = $("#thread-inner");
+  if (!c || c.messages.length === 0) {
+    inner.innerHTML = document.getElementById("welcome-placeholder")?.innerHTML || $("#welcome") ? welcomeHtml() : "";
+    renderWelcome();
+    return;
+  }
+  blocksCounter = 0;
+  inner.innerHTML = c.messages.map((m, i) => msgHtml(m, i)).join("");
+  scrollBottom();
+}
+function welcomeHtml() {
+  return `<div id="welcome"><div class="big-mark">C</div><h1>What can I help you with?</h1><div class="chips">` +
+    `<button class="chip">Explain quantum computing in simple terms</button>` +
+    `<button class="chip">Write a Python script to rename files by date</button>` +
+    `<button class="chip">Draft a friendly follow-up email</button>` +
+    `<button class="chip">Debug this idea: a weather-based playlist</button>` +
+    `</div></div>`;
+}
+function renderWelcome() {
+  // chips are clickable prompts
+  document.querySelectorAll("#welcome .chip").forEach(ch => {
+    ch.addEventListener("click", () => { $("#input").value = ch.textContent; updateSend(); send(); });
+  });
+}
+function scrollBottom() {
+  const t = $("#thread");
+  if (t.scrollHeight - t.scrollTop - t.clientHeight < 160) t.scrollTop = t.scrollHeight;
+}
+function renderChatList() {
+  const q = ($("#search").value || "").toLowerCase();
+  const list = $("#chat-list");
+  const chats = state.chats.filter(c => c.title.toLowerCase().includes(q));
+  if (!chats.length) { list.innerHTML = `<div style="padding:14px 16px;font-size:13px;color:var(--muted)">${state.chats.length ? "No matching chats." : "No chats yet."}</div>`; return; }
+  list.innerHTML = chats.map(c => `
+    <div class="chat-item ${c.id === state.activeId ? "active" : ""}" data-id="${c.id}">
+      <span class="t">${escapeHtml(c.title)}</span>
+      <span class="acts">
+        <button data-act="rename" title="Rename"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+        <button data-act="del" title="Delete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+      </span>
+    </div>`).join("");
+}
+function updateModelPill() {
+  const label = state.customModel || state.model;
+  const pretty = label.replace(/-/g, " ").replace(/\b\w/g, ch => ch.toUpperCase());
+  $("#model-pill-label").textContent = pretty;
+  document.querySelectorAll("#model-menu .mi[data-model]").forEach(mi => {
+    mi.classList.toggle("on", !state.customModel && mi.dataset.provider === state.provider && mi.dataset.model === state.model);
+  });
+}
+
+/* ---------------- providers ---------------- */
+const PROVIDERS = {
+  openai: {
+    name: "OpenAI",
+    endpoint: "https://api.openai.com/v1/chat/completions",
+    headers: (key) => ({ "Authorization": "Bearer " + key, "Content-Type": "application/json" }),
+    body: (messages, model) => JSON.stringify({
+      model,
+      messages,
+      stream: true,
+    }),
+    // SSE: data: {"choices":[{"delta":{"content":"..."}}]} ... data: [DONE]
+    parseSse: (obj, acc) => {
+      const d = obj?.choices?.[0]?.delta?.content;
+      if (typeof d === "string") acc += d;
+      return acc;
+    },
+    done: (line) => line === "[DONE]",
+  },
+  anthropic: {
+    name: "Anthropic",
+    endpoint: "https://api.anthropic.com/v1/messages",
+    headers: (key) => ({
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true",
+      "Content-Type": "application/json",
+    }),
+    body: (messages, model) => JSON.stringify({
+      model,
+      system: state.systemPrompt || undefined,
+      max_tokens: 8192,
+      messages: messages.filter(m => m.role !== "system"),
+      stream: true,
+    }),
+    // SSE events: content_block_delta {delta:{text}} ... message_stop
+    parseSse: (obj, acc) => {
+      if (obj?.type === "content_block_delta" && typeof obj?.delta?.text === "string") acc += obj.delta.text;
+      return acc;
+    },
+    done: (line, obj) => obj?.type === "message_stop",
+  },
+};
+
+function providerFor() { return PROVIDERS[state.provider]; }
+
+function buildMessages(chat) {
+  const msgs = [];
+  if (state.provider === "openai" && state.systemPrompt) msgs.push({ role: "system", content: state.systemPrompt });
+  for (const m of chat.messages) {
+    if (m.role === "user" || m.role === "assistant") {
+      if (m.error) continue;
+      msgs.push({ role: m.role, content: m.content });
+    }
+  }
+  return msgs;
+}
+
+/* ---------------- streaming ---------------- */
+async function send(text) {
+  if (state.streaming) { stopStreaming(); return; }
+  const input = $("#input");
+  const content = (text !== undefined ? text : input.value).trim();
+  if (!content) return;
+  const prov = providerFor();
+  if (!state.keys[state.provider]) {
+    openSettings(true);
+    toast("Add your " + prov.name + " API key in Settings to start chatting.");
+    if (text === undefined) input.value = content;
+    return;
+  }
+  const chat = ensureChat();
+  chat.messages.push({ role: "user", content });
+  if (chat.title === "New chat") chat.title = content.slice(0, 48) + (content.length > 48 ? "…" : "");
+  input.value = ""; autoGrow(); updateSend();
+  chat.updated = Date.now();
+  state.chats.sort((a, b) => b.updated - a.updated);
+  renderThread(); renderChatList();
+  $("#topbar-title").textContent = chat.title;
+  await streamAssistant(chat);
+}
+
+async function streamAssistant(chat, retryFrom) {
+  const prov = providerFor();
+  const model = state.customModel || state.model;
+  const msgs = buildMessages(chat);
+  const asst = { role: "assistant", content: "", streaming: true };
+  if (retryFrom !== undefined) chat.messages = chat.messages.slice(0, retryFrom);
+  chat.messages.push(asst);
+  renderThread();
+
+  const ctrl = new AbortController();
+  state.streaming = ctrl;
+  updateSend();
+
+  let acc = "";
+  let renderTimer = null;
+  const paint = () => {
+    asst.content = acc;
+    const node = $(`#thread-inner .msg[data-idx="${chat.messages.indexOf(asst)}"] .content`);
+    if (node) { node.innerHTML = renderMarkdown(acc) + '<span class="cursor-blink"></span>'; scrollBottom(); }
+  };
+  const paintThrottled = () => { if (!renderTimer) renderTimer = setTimeout(() => { renderTimer = null; paint(); }, 60); };
+
+  try {
+    const res = await fetch(prov.endpoint, {
+      method: "POST",
+      headers: prov.headers(state.keys[state.provider]),
+      body: prov.body(msgs, model),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      let detail = "";
+      try { const j = await res.json(); detail = j?.error?.message || j?.error?.type || JSON.stringify(j).slice(0, 200); } catch (e) { /* ignore */ }
+      throw new Error(httpErrorMessage(res.status, prov.name, detail));
+    }
+    const ctype = res.headers.get("content-type") || "";
+    if (!res.body || (!ctype.includes("event-stream") && !ctype.includes("stream"))) {
+      // non-streaming fallback (some providers ignore stream:true)
+      const j = await res.json();
+      const t = j?.choices?.[0]?.message?.content || j?.content?.[0]?.text || "";
+      acc = t; paint();
+    } else {
+      const reader = res.body.getReader();
+      // make stop robust: cancel the body reader when aborted (covers providers where
+      // the abort signal does not tear down the body stream by itself)
+      ctrl.signal.addEventListener("abort", () => { reader.cancel().catch(() => { /* already closed */ }); }, { once: true });
+      const dec = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const parts = buf.split("\n");
+        buf = parts.pop();
+        for (let line of parts) {
+          line = line.trim();
+          if (!line.startsWith("data:")) continue;
+          const data = line.slice(5).trim();
+          if (prov.done(data)) continue;
+          let obj = null;
+          try { obj = JSON.parse(data); } catch (e) { continue; }
+          if (obj?.error) throw new Error(obj.error.message || "Provider error");
+          acc = prov.parseSse(obj, acc);
+          paintThrottled();
+        }
+      }
+    }
+    asst.content = acc;
+    asst.streaming = false;
+    if (ctrl.signal.aborted && acc.trim()) asst.content = acc + "\n\n*(stopped)*";
+    if (!acc.trim()) asst.content = "(The model returned an empty response.)";
+  } catch (err) {
+    asst.streaming = false;
+    if (err.name === "AbortError") {
+      asst.content = acc + "\n\n*(stopped)*";
+    } else {
+      asst.error = true;
+      asst.content = "⚠ " + (err.message || "Request failed.");
+    }
+  } finally {
+    if (renderTimer) clearTimeout(renderTimer);
+    state.streaming = null;
+    updateSend();
+    chat.updated = Date.now();
+    renderThread();
+    renderChatList();
+    save();
+  }
+}
+function httpErrorMessage(status, name, detail) {
+  const base = `HTTP ${status} from ${name}. `;
+  if (status === 401 || status === 403) return base + "Your API key looks invalid or lacks access. Check it in Settings. " + (detail || "");
+  if (status === 429) return base + "Rate limit or quota exceeded — check your plan/billing. " + (detail || "");
+  if (status === 404) return base + "That model ID was not found. Try another model in the picker. " + (detail || "");
+  return base + (detail || "Request failed.");
+}
+function stopStreaming() {
+  if (state.streaming) state.streaming.abort();
+}
+function regenerate(idx) {
+  const chat = activeChat();
+  if (!chat || state.streaming) return;
+  // drop this assistant message and everything after, then re-stream
+  const prevUser = chat.messages.slice(0, idx).map((m, i) => ({ m, i })).filter(x => x.m.role === "user").pop();
+  if (!prevUser) return;
+  chat.messages = chat.messages.slice(0, prevUser.i + 1);
+  streamAssistant(chat);
+}
+
+/* ---------------- composer ---------------- */
+function autoGrow() {
+  const t = $("#input");
+  t.style.height = "auto";
+  t.style.height = Math.min(t.scrollHeight, 200) + "px";
+}
+function updateSend() {
+  const btn = $("#send");
+  if (state.streaming) {
+    btn.disabled = false; btn.classList.add("stop");
+    $("#send-icon").innerHTML = '<rect x="6" y="6" width="12" height="12" rx="2"/>';
+  } else {
+    btn.disabled = !$("#input").value.trim();
+    btn.classList.remove("stop");
+    $("#send-icon").innerHTML = '<path d="m22 2-7 20-4-9-9-4z"/>';
+  }
+}
+
+/* ---------------- artifact preview ---------------- */
+function openArtifact(code, title) {
+  $("#artifact").classList.add("open");
+  $("#ar-title").textContent = title || "Preview";
+  $("#ar-frame").srcdoc = code;
+  $("#ar-code").textContent = code;
+  $("#artifact").classList.remove("show-code");
+}
+
+/* ---------------- settings ---------------- */
+function openSettings(focusKey) {
+  $("#key-openai").value = state.keys.openai;
+  $("#key-anthropic").value = state.keys.anthropic;
+  $("#remember-keys").checked = state.remember;
+  $("#custom-model").value = state.customModel;
+  $("#sysprompt").value = state.systemPrompt;
+  $("#modal-backdrop").classList.add("open");
+  if (focusKey) $("#key-" + state.provider).focus();
+}
+function closeSettings() { $("#modal-backdrop").classList.remove("open"); }
+
+/* ---------------- toast ---------------- */
+let toastTimer = null;
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 2200);
+}
+
+/* ---------------- clipboard ---------------- */
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast("Copied"); }
+  catch (e) {
+    const ta = document.createElement("textarea");
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); toast("Copied"); } catch (e2) { toast("Copy failed"); }
+    ta.remove();
+  }
+}
+
+/* ---------------- events ---------------- */
+function bind() {
+  $("#new-chat").addEventListener("click", newChat);
+  $("#collapse-btn").addEventListener("click", () => $("#sidebar").classList.add("collapsed"));
+  $("#menu-btn").addEventListener("click", () => $("#sidebar").classList.remove("collapsed"));
+  $("#search").addEventListener("input", renderChatList);
+
+  $("#chat-list").addEventListener("click", (e) => {
+    const item = e.target.closest(".chat-item");
+    if (!item) return;
+    const id = item.dataset.id;
+    const act = e.target.closest("button")?.dataset.act;
+    if (act === "del") {
+      state.chats = state.chats.filter(c => c.id !== id);
+      if (state.activeId === id) { state.activeId = null; renderThread(); }
+      renderChatList(); save(); return;
+    }
+    if (act === "rename") {
+      const c = state.chats.find(x => x.id === id);
+      const t = prompt("Rename chat", c.title);
+      if (t && t.trim()) { c.title = t.trim().slice(0, 80); renderChatList(); if (c.id === state.activeId) $("#topbar-title").textContent = c.title; save(); }
+      return;
+    }
+    state.activeId = id;
+    const c = activeChat();
+    $("#topbar-title").textContent = c.title;
+    renderThread(); renderChatList(); save();
+    if (window.innerWidth <= 768) $("#sidebar").classList.add("collapsed");
+  });
+
+  // message actions (delegated)
+  $("#thread-inner").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    const msgEl = e.target.closest(".msg");
+    const idx = msgEl ? +msgEl.dataset.idx : -1;
+    const chat = activeChat();
+    if (!chat) return;
+    if (btn.classList.contains("cb-copy")) { copyText(decodeURIComponent(btn.dataset.code)); return; }
+    if (btn.classList.contains("cb-preview")) { openArtifact(decodeURIComponent(btn.dataset.code), "Artifact preview"); return; }
+    const act = btn.dataset.act;
+    if (act === "copy") { copyText(chat.messages[idx].content); return; }
+    if (act === "regen") { regenerate(idx); return; }
+    if (act === "edit") {
+      chat.messages[idx].editing = chat.messages[idx].content;
+      renderThread(); return;
+    }
+    if (act === "cancel-edit") { delete chat.messages[idx].editing; renderThread(); return; }
+    if (act === "save-edit") {
+      const ta = msgEl.querySelector("textarea");
+      const val = (ta.value || "").trim();
+      delete chat.messages[idx].editing;
+      if (val) {
+        chat.messages = chat.messages.slice(0, idx); // drop this message and everything after
+        send(val);
+      } else renderThread();
+    }
+  });
+
+  // composer
+  const input = $("#input");
+  input.addEventListener("input", () => { autoGrow(); updateSend(); });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+  });
+  $("#send").addEventListener("click", () => send());
+  document.querySelectorAll("#welcome .chip").forEach(ch => {
+    ch.addEventListener("click", () => send(ch.textContent));
+  });
+
+  // model menu
+  $("#model-pill").addEventListener("click", (e) => {
+    e.stopPropagation();
+    $("#model-menu").classList.toggle("open");
+  });
+  document.addEventListener("click", () => $("#model-menu").classList.remove("open"));
+  document.querySelectorAll("#model-menu .mi[data-model]").forEach(mi => {
+    mi.addEventListener("click", () => {
+      state.provider = mi.dataset.provider;
+      state.model = mi.dataset.model;
+      state.customModel = "";
+      $("#custom-model").value = "";
+      updateModelPill(); save();
+    });
+  });
+  $("#custom-model-btn").addEventListener("click", () => {
+    $("#model-menu").classList.remove("open");
+    openSettings();
+    setTimeout(() => $("#custom-model").focus(), 50);
+  });
+
+  // settings
+  $("#settings-btn").addEventListener("click", () => openSettings());
+  $("#top-settings").addEventListener("click", () => openSettings());
+  $("#settings-cancel").addEventListener("click", closeSettings);
+  $("#modal-backdrop").addEventListener("click", (e) => { if (e.target === e.currentTarget) closeSettings(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#modal-backdrop").classList.contains("open")) closeSettings(); });
+  $("#settings-save").addEventListener("click", () => {
+    state.keys.openai = $("#key-openai").value.trim();
+    state.keys.anthropic = $("#key-anthropic").value.trim();
+    state.remember = $("#remember-keys").checked;
+    state.customModel = $("#custom-model").value.trim();
+    state.systemPrompt = $("#sysprompt").value.trim();
+    if (state.customModel) state.provider = state.provider; // custom uses current provider
+    updateModelPill(); save(); closeSettings();
+    toast("Settings saved");
+  });
+
+  // theme & style
+  $("#theme-btn").addEventListener("click", () => {
+    const next = document.body.dataset.theme === "dark" ? "light" : "dark";
+    document.body.dataset.theme = next;
+    store.setItem(LS.theme, next);
+  });
+  $("#style-btn").addEventListener("click", () => {
+    const next = document.body.dataset.style === "chatgpt" ? "claude" : "chatgpt";
+    document.body.dataset.style = next;
+    store.setItem(LS.style, next);
+    toast(next === "claude" ? "Claude style — warm & serif" : "ChatGPT style");
+  });
+
+  // artifact
+  $("#ar-close").addEventListener("click", () => $("#artifact").classList.remove("open"));
+  $("#ar-code-btn").addEventListener("click", () => $("#artifact").classList.toggle("show-code"));
+}
+
+/* ---------------- boot ---------------- */
+load();
+if (!store.persistent) {
+  $("#session-note").hidden = false;
+  const rk = $("#remember-keys");
+  rk.disabled = true;
+  rk.closest(".check").style.opacity = "0.5";
+}
+bind();
+updateModelPill();
+renderChatList();
+renderThread();
+if (window.innerWidth <= 768) $("#sidebar").classList.add("collapsed");
+if (state.chats.length && state.activeId && activeChat()) {
+  $("#topbar-title").textContent = activeChat().title;
+}
+// QA handle (primitives only)
+window.chatcraft = {
+  get state() {
+    return {
+      chatCount: state.chats.length,
+      activeTitle: activeChat()?.title || null,
+      messageCount: activeChat()?.messages.length || 0,
+      provider: state.provider,
+      model: state.customModel || state.model,
+      streaming: !!state.streaming,
+      theme: document.body.dataset.theme,
+      style: document.body.dataset.style,
+    };
+  },
+  get messages() { return (activeChat()?.messages || []).map(m => ({ role: m.role, content: m.content, error: !!m.error, streaming: !!m.streaming })); },
+  setKeys: (openai, anthropic) => { state.keys.openai = openai || ""; state.keys.anthropic = anthropic || ""; },
+  setProvider: (p, model) => { if (PROVIDERS[p]) { state.provider = p; if (model) state.model = model; updateModelPill(); } },
+  send: (text) => send(text),
+  stop: () => stopStreaming(),
+  newChat: () => newChat(),
+  openChat: (i) => { const c = state.chats[i]; if (c) { state.activeId = c.id; renderThread(); renderChatList(); } },
+  deleteAll: () => { state.chats = []; state.activeId = null; store.removeItem(LS.chats); renderThread(); renderChatList(); },
+  mockFetch: (fn) => { globalThis.fetch = fn; }, // test hook
+  artifactOpen: () => $("#artifact").classList.contains("open"),
+};
+</script>
+</body>
+</html>
