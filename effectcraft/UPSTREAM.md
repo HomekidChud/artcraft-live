@@ -20,8 +20,8 @@ The repository's `index.html` adds recovery links that appear only after a long 
 Because a web build can run on browsers or machines with no usable GPU, the entry page now selects the renderer automatically before the application starts:
 
 1. If the visitor set `?webgl` or `?cpu` explicitly, that choice is never overridden.
-2. Otherwise the page probes for a WebGPU adapter (4-second timeout) and, if none, for a working WebGL2 context. When the browser has neither, the page rewrites its own URL to `?cpu` via `history.replaceState` before the app initializes, so the CPU path starts instead of the upstream "no renderer available" message.
-3. If startup still fails, the page retries automatically once with `?webgl` and then once with `?cpu` (guarded by `sessionStorage` so a genuine failure cannot loop), and only then shows the manual recovery controls with the technical details.
+2. Otherwise the page probes for a WebGPU adapter (4-second timeout that resolves to null, so no promise is ever left unhandled) and, if none, for a working WebGL2 context. When the browser has neither, the page adds the `cpu` flag to its own URL via `history.replaceState` — preserving every other parameter and the fragment — before the app initializes, so the CPU path starts instead of the upstream "no renderer available" message.
+3. If startup still fails, the page retries automatically once with `?webgl` and then once with `?cpu` (a renderer flag the page added itself still counts as automatic, so the chain can step from WebGL2 on to CPU; the state is kept in `sessionStorage`, cleared on successful startup, so a genuine failure cannot loop) and only then shows the manual recovery controls with the technical details.
 
 The application JavaScript and WebAssembly are untouched; the module import is only awaited after the probe so the renderer flags are read after any URL rewrite.
 

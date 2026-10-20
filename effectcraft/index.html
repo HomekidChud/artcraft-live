@@ -64,7 +64,7 @@
         if (!recovery.isConnected) return;
         recovery.hidden = false;
         status.className = "err";
-        status.textContent = "EffectCraft could not start. It already retried other renderers; the links below force one.";
+        status.textContent = "EffectCraft could not start. It retries other renderers automatically; the links below force one.";
         if (document.getElementById("startup-error-details")) return;
         const details = document.createElement("details"); details.id = "startup-error-details";
         const summary = document.createElement("summary"); summary.textContent = "Technical error details";
@@ -78,15 +78,25 @@
       window.effectcraftRendererProbe = (async () => {
         const chosen = new URLSearchParams(location.search);
         if (chosen.has("webgl") || chosen.has("cpu")) return;
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("adapter timeout")), 4000));
         let webgpu = false;
-        try { webgpu = !!navigator.gpu && !!(await Promise.race([navigator.gpu.requestAdapter(), timeout])); }
-        catch { webgpu = false; }
+        if (navigator.gpu) {
+          // Resolve (never reject) after the timeout, and only create it when an
+          // adapter request is actually raced, so no promise is left unhandled.
+          let timer;
+          const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(null), 4000); });
+          try {
+            webgpu = !!(await Promise.race([navigator.gpu.requestAdapter(), timeout]));
+          } catch { webgpu = false; }
+          clearTimeout(timer);
+        }
         if (!webgpu) {
           let webgl2 = false;
           try { webgl2 = !!document.createElement("canvas").getContext("webgl2"); } catch { webgl2 = false; }
           if (!webgl2) {
-            history.replaceState(null, "", `${location.pathname}?cpu`);
+            // Keep every other parameter and the fragment; only set the CPU flag.
+            const url = new URL(location.href);
+            url.searchParams.set("cpu", "");
+            history.replaceState(null, "", url.href);
             return "cpu";
           }
         }
@@ -163,26 +173,29 @@
         await ec.start("effectcraft_canvas");
         window.effectcraftRecovery.ready();
         window.effectcraftLoad.readyMs = performance.now() - t0;
+        // Startup succeeded: forget any automatic renderer retry state.
+        try { sessionStorage.removeItem("effectcraftRendererRetry"); } catch { /* ignore */ }
       } catch (e) {
         window.effectcraftRecovery.fail(e);
         window.effectcraftLoad.error = String(e);
-        // Automatic renderer retry: unless the visitor chose a renderer, retry
-        // once with WebGL2 and then once with the CPU path before giving up and
-        // showing the manual recovery links.
+        // Automatic renderer retry: unless the visitor chose a renderer
+        // explicitly, retry once with WebGL2 and then once with the CPU path
+        // before giving up and showing the manual recovery links. A renderer
+        // flag this page added itself counts as automatic, so the chain can
+        // still step from WebGL2 on to CPU.
         try {
           const chosen = new URLSearchParams(location.search);
+          const explicit = chosen.has("webgl") || chosen.has("cpu");
           const tried = sessionStorage.getItem("effectcraftRendererRetry") || "";
-          if (!chosen.has("webgl") && !chosen.has("cpu")) {
-            if (!tried.includes("webgl")) {
-              sessionStorage.setItem("effectcraftRendererRetry", tried + "webgl");
-              const url = new URL(location.href); url.searchParams.set("webgl", ""); location.replace(url.href);
-              return;
-            }
-            if (!tried.includes("cpu")) {
-              sessionStorage.setItem("effectcraftRendererRetry", tried + ",cpu");
-              const url = new URL(location.href); url.searchParams.set("cpu", ""); location.replace(url.href);
-              return;
-            }
+          const next = !tried.includes("webgl") && !chosen.has("webgl") ? "webgl"
+            : !tried.includes("cpu") && !chosen.has("cpu") ? "cpu" : null;
+          if ((!explicit || tried) && next) {
+            sessionStorage.setItem("effectcraftRendererRetry", (tried ? tried + "," : "") + next);
+            const url = new URL(location.href);
+            url.searchParams.delete("webgl"); url.searchParams.delete("cpu");
+            url.searchParams.set(next, "");
+            location.replace(url.href);
+            return;
           }
         } catch { /* storage unavailable: keep the manual recovery links */ }
         throw e;

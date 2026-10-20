@@ -510,24 +510,24 @@
     {
       "id": "launcher",
       "name": "ArtCraft Launcher",
-      "topic": "launcher suite hub apps install discover start",
-      "guide": "The launcher is the home screen for the ArtCraft Crafting Apps. Browse or search the app list, open a craft, and pin favourites for quick access.",
+      "topic": "launcher suite hub apps releases versions downloads status",
+      "guide": "The launcher is the official home screen for the Crafting Apps: browse the whole suite in a grid or table, search, and check each app's current version, release status and download links.",
       "export": "The launcher itself does not export files; open a craft from its app list to create or export documents.",
       "starter": "md",
       "example": "Make a starter list of crafting apps to try",
       "examples": [
         "list the crafting apps in the launcher",
-        "open the spreadsheet craft from the launcher",
-        "search the launcher for a photo editor",
-        "pin a favourite craft in the launcher",
-        "find the video editing app in the launcher hub"
+        "check which crafting apps have new releases",
+        "search the launcher for the photo editor",
+        "find the video editing app in the launcher hub",
+        "see the release status of the spreadsheet craft"
       ],
       "checks": [
         "open the crafting apps launcher",
         "find an app in the artcraft launcher",
         "browse the launcher app hub",
-        "search the launcher for the spreadsheet app",
-        "pin my favourite craft in the launcher"
+        "check which crafting apps have new releases",
+        "see the release status of the spreadsheet craft"
       ]
     }
   ],

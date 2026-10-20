@@ -6,7 +6,7 @@ Hosted on GitHub Pages, one path per app:
 
 | App | What it is | Live URL |
 |---|---|---|
-| ArtCraft Launcher | Home screen for the Crafting Apps | [/launcher/](https://homekidchud.github.io/artcraft-live/launcher/) |
+| ArtCraft Launcher | Crafting Apps hub (versions, status, downloads) | [/launcher/](https://homekidchud.github.io/artcraft-live/launcher/) |
 | VectorCraft | Vector illustration (Illustrator alternative) | [/vectorcraft/](https://homekidchud.github.io/artcraft-live/vectorcraft/) |
 | PhotoCraft | Photo editor (Photoshop alternative) | [/photocraft/](https://homekidchud.github.io/artcraft-live/photocraft/) |
 | FilmCraft | Nonlinear video editor | [/filmcraft/](https://homekidchud.github.io/artcraft-live/filmcraft/) |
