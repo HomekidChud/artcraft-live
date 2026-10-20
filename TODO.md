@@ -103,14 +103,15 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
 ### Milestones completed in this upgrade
 
 - (commit 1) Baseline: this ledger created; no app changes yet.
-
-### Planned milestones (move each to "completed" as it lands)
-
-- Avatar editor (launcher tab: skin/shirt/pants colors + face choice,
-  persisted in `robloxcraft-avatar`), gear shop (spend coins on Speed Coil /
-  Gravity Coil / Fusion Coil in the Esc-menu shop tab), inventory + equip
-  (topbar backpack, keys 1-3), coin + purchase persistence
-  (`robloxcraft-save`).
+- (commit 4) RobloxCraft pass 1: avatar editor (launcher Avatar tab:
+  15 skin/shirt/pants swatches + 4 faces with live preview, persisted in
+  `robloxcraft-avatar`, applied to the R6 rig + face texture), gear shop
+  (Esc menu Shop section: Speed Coil 10 / Gravity Coil 15 / Fusion Coil 25
+  coins — `GEAR`, `buyGear`), wallet persistence (`robloxcraft-save`;
+  coins survive sessions and world rebuilds), backpack panel (topbar
+  inventory button + number keys 1-9 equip, `updateBackpackUI`), gear
+  effects in physics (x1.6 walk / x1.35 jump), equipped coil shown in
+  hand (`updateGearVisual`).
 - Obby checkpoints (glowing pads, respawn at last checkpoint, best stage
   persisted), Neon City Showcase world playable (night city, neon towers,
   moving platforms), chat commands (`/help`, `/respawn`, `/reset`, `/stage`,
@@ -126,8 +127,8 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
 
 1. Mobile touch controls (virtual joystick + jump button) — currently desktop
    keyboard only at usable fidelity.
-2. Baseplate world: add a simple objective (coin counter → gate that opens).
-3. Settings: persist volume/sensitivity (currently reset per session).
+2. Settings: persist volume/sensitivity (currently reset per session).
+3. Backpack: unequip-all button + gear descriptions in the panel tooltip.
 
 ## Verification log (append per push)
 
@@ -148,3 +149,9 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
   test` 64 pass. QA harness note: headless rAF throttling on background
   pages can fake physics failures — always bringToFront / close stale
   contexts (the QA script launches its own browser, unaffected).
+- 2026-10-20 commit 4 (robloxcraft pass 1): `node qa/reconstructions-qa.mjs`
+  41/41 PASS (avatar editor + persistence, wallet seed/load, shop buy,
+  key-equip, live speed 25.6 with coil, backpack). `npm test` 64 pass.
+  Measurement note: displacement-based speed checks are noisy (page timer
+  jitter) — the QA handle exposes `state.speed` (live velocity) for exact
+  checks.

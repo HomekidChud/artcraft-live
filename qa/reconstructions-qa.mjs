@@ -232,6 +232,47 @@ try {
   await page.waitForTimeout(500);
   const respawned = await page.evaluate(() => window.robloxcraft.state.pos.y > 0);
   check("robloxcraft: falling off the world respawns", respawned);
+  // Avatar editor (launcher view)
+  await page.evaluate(() => { document.getElementById("tb-more").click(); }); // open menu
+  await page.evaluate(() => { document.getElementById("esc-leave").click(); });
+  await page.evaluate(() => { document.getElementById("lc-leave").click(); });
+  await page.waitForTimeout(300);
+  await page.locator('[data-lxnav="avatar"]').click();
+  check("robloxcraft: avatar view opens",
+    await page.evaluate(() => document.getElementById("lx-avatar").classList.contains("active")));
+  check("robloxcraft: avatar swatches + faces render",
+    (await page.locator("#sw-skin .swatch").count()) === 15 && (await page.locator(".face-btn").count()) === 4);
+  await page.locator("#sw-shirt .swatch").nth(8).click();
+  await page.locator(".face-btn").nth(1).click();
+  const avatarSaved = await page.evaluate(() => JSON.parse(localStorage.getItem("robloxcraft-avatar")));
+  check("robloxcraft: avatar picks persist", avatarSaved.shirt === "#37a34a" && avatarSaved.face === "cool", JSON.stringify(avatarSaved));
+  // Wallet + shop + equip (seed coins, reload, re-enter)
+  await page.evaluate(() => { localStorage.setItem("robloxcraft-save", JSON.stringify({ coins: 100, owned: [], equipped: null })); });
+  await page.reload({ waitUntil: "load", timeout: 45000 });
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => { document.querySelector(".lx-card[data-exp='baseplate']").click(); });
+  await page.waitForTimeout(3500);
+  check("robloxcraft: wallet coins load from save", (await page.evaluate(() => window.robloxcraft.state.coins)) === 100);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  check("robloxcraft: shop renders 3 gears", (await page.locator("#shop-rows .shop-row").count()) === 3);
+  await page.locator("#shop-rows .shop-row").nth(0).locator(".sbtn").click();
+  await page.waitForTimeout(200);
+  const gearAfter = await page.evaluate(() => window.robloxcraft.gear);
+  check("robloxcraft: buy speed coil", gearAfter.coins === 90 && gearAfter.owned.includes("speed"), JSON.stringify(gearAfter));
+  await page.keyboard.press("Escape"); // close menu
+  await page.waitForTimeout(200);
+  await page.keyboard.press("Digit1");
+  await page.waitForTimeout(200);
+  check("robloxcraft: equip via number key", (await page.evaluate(() => window.robloxcraft.gear.equipped)) === "speed");
+  await page.evaluate(() => { window.robloxcraft.pressKey("KeyW", true); });
+  await page.waitForTimeout(300);
+  const liveSpeed = await page.evaluate(() => window.robloxcraft.state.speed);
+  await page.evaluate(() => { window.robloxcraft.pressKey("KeyW", false); });
+  check("robloxcraft: speed coil boosts walk speed", liveSpeed === 25.6, String(liveSpeed));
+  await page.evaluate(() => { document.getElementById("tb-inventory").click(); });
+  await page.waitForTimeout(200);
+  check("robloxcraft: backpack lists owned gear", (await page.locator("#bp-rows .bp-row").count()) === 1);
   await zeroErrors("robloxcraft");
 } catch (e) { check("robloxcraft: suite ran", false, String(e).slice(0, 160)); }
 

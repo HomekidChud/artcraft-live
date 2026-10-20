@@ -264,6 +264,72 @@
 
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }
 
+  /* ---------- Avatar editor ---------- */
+  .lx-view { display: none; }
+  .lx-view.active { display: block; }
+  .av-layout { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+  .av-preview {
+    width: 220px; flex: none; border-radius: 14px; border: 1px solid var(--rbx-border);
+    background: linear-gradient(160deg, #23283a, #16181d); padding: 22px; text-align: center;
+  }
+  .av-figure { margin: 0 auto 14px; width: 108px; }
+  .av-figure .avc { margin: 0 auto; }
+  .av-figure .head { width: 52px; height: 52px; border-radius: 6px; position: relative; overflow: hidden; }
+  .av-figure .head canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .av-figure .torso { width: 72px; height: 60px; border-radius: 6px; margin-top: 6px; }
+  .av-figure .arms { display: flex; justify-content: space-between; margin-top: 6px; }
+  .av-figure .arm { width: 30px; height: 56px; border-radius: 6px; }
+  .av-figure .legs { display: flex; gap: 8px; justify-content: center; margin-top: 6px; }
+  .av-figure .leg { width: 30px; height: 54px; border-radius: 6px; }
+  .av-preview .av-name { font-weight: 800; font-size: 15px; }
+  .av-preview .av-sub { color: var(--rbx-muted); font-size: 12px; margin-top: 2px; }
+  .av-controls { flex: 1; min-width: 280px; }
+  .av-group { margin-bottom: 20px; }
+  .av-group h4 { font-size: 13px; font-weight: 800; margin-bottom: 8px; color: var(--rbx-muted); text-transform: uppercase; letter-spacing: .05em; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch { width: 30px; height: 30px; border-radius: 8px; border: 2px solid rgba(255,255,255,.14); cursor: pointer; transition: transform .12s; }
+  .swatch:hover { transform: scale(1.12); }
+  .swatch.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--rbx-green); }
+  .faces { display: flex; flex-wrap: wrap; gap: 8px; }
+  .face-btn { width: 52px; height: 52px; border-radius: 8px; border: 2px solid rgba(255,255,255,.14); cursor: pointer; background: none; padding: 0; overflow: hidden; }
+  .face-btn:hover { transform: scale(1.08); }
+  .face-btn.selected { border-color: #fff; box-shadow: 0 0 0 2px var(--rbx-green); }
+  .face-btn canvas { width: 100%; height: 100%; display: block; }
+
+  /* ---------- Backpack (inventory) ---------- */
+  #backpack {
+    position: absolute; top: 52px; right: 8px; width: 240px; z-index: 11;
+    background: rgba(25, 27, 29, 0.92); border-radius: 10px; overflow: hidden;
+    transition: opacity .18s, transform .18s;
+  }
+  #backpack.hidden { opacity: 0; transform: translateY(-6px); pointer-events: none; }
+  #backpack .bd-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 13px; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,.07); }
+  .bp-row {
+    display: flex; align-items: center; gap: 9px; padding: 8px 12px; font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,.04); cursor: pointer;
+  }
+  .bp-row:hover { background: rgba(255,255,255,.05); }
+  .bp-row:last-child { border-bottom: none; }
+  .bp-dot { width: 22px; height: 22px; border-radius: 50%; flex: none; }
+  .bp-name { font-weight: 600; }
+  .bp-key { margin-left: auto; color: var(--rbx-muted); font-size: 11px; }
+  .bp-row.equipped .bp-name { color: var(--rbx-green); }
+  .bp-empty { padding: 14px 12px; color: var(--rbx-muted); font-size: 12px; }
+
+  /* ---------- Shop rows (Esc menu) ---------- */
+  .shop-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+  .shop-row .bp-dot { width: 18px; height: 18px; }
+  .shop-row .s-name { font-weight: 700; }
+  .shop-row .s-desc { color: var(--rbx-muted); font-size: 11px; }
+  .sbtn {
+    margin-left: auto; border-radius: 7px; font-weight: 800; font-size: 12px; padding: 5px 12px;
+    background: var(--rbx-green); color: #fff; flex: none;
+  }
+  .sbtn:hover { background: var(--rbx-green-dark); }
+  .sbtn.ghost { background: rgba(255,255,255,.1); color: var(--rbx-text); }
+  .sbtn.ghost:hover { background: rgba(255,255,255,.18); }
+  .sbtn:disabled { opacity: .4; cursor: default; }
+
   @media (max-width: 640px) {
     .lx-hero { flex-direction: column; }
     .lx-hero-side { min-height: 120px; }
@@ -281,13 +347,14 @@
   <header class="lx-header">
     <div class="lx-logo"><span class="lx-logo-mark" aria-hidden="true"></span>RobloxCraft</div>
     <nav class="lx-nav" aria-label="Main">
-      <button type="button">Discover</button>
-      <button type="button">Avatar</button>
-      <button type="button">Friends</button>
+      <button type="button" data-lxnav="discover" class="active">Discover</button>
+      <button type="button" data-lxnav="avatar">Avatar</button>
+      <button type="button" data-lxnav="friends">Friends</button>
     </nav>
     <div class="lx-user" title="Guest">G</div>
   </header>
   <main class="lx-main">
+    <div id="lx-discover" class="lx-view active">
     <div class="lx-hero">
       <div class="lx-hero-card">
         <h1>Welcome to RobloxCraft</h1>
@@ -341,6 +408,34 @@
       </button>
     </div>
     <p class="lx-footnote">RobloxCraft is a clean-room reconstruction for study. Player counts, ratings and other players are simulated demo data. No Roblox Corporation code, assets, or trademarks are redistributed — all artwork here is original. Not affiliated with or endorsed by Roblox Corporation.</p>
+    </div>
+
+    <div id="lx-avatar" class="lx-view">
+      <h2 class="lx-section-title">Avatar Editor</h2>
+      <div class="av-layout">
+        <div class="av-preview">
+          <div class="av-figure">
+            <div class="avc head" id="av-head"><canvas id="av-face" width="64" height="64"></canvas></div>
+            <div class="avc torso" id="av-torso"></div>
+            <div class="arms"><div class="arm avc" id="av-arm-l"></div><div class="arm avc" id="av-arm-r"></div></div>
+            <div class="legs"><div class="leg avc" id="av-leg-l"></div><div class="leg avc" id="av-leg-r"></div></div>
+          </div>
+          <div class="av-name">Guest</div>
+          <div class="av-sub">Saved automatically · applies in every experience</div>
+        </div>
+        <div class="av-controls">
+          <div class="av-group"><h4>Skin</h4><div class="swatches" id="sw-skin"></div></div>
+          <div class="av-group"><h4>Shirt</h4><div class="swatches" id="sw-shirt"></div></div>
+          <div class="av-group"><h4>Pants</h4><div class="swatches" id="sw-pants"></div></div>
+          <div class="av-group"><h4>Face</h4><div class="faces" id="face-choices"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="lx-friends" class="lx-view">
+      <h2 class="lx-section-title">Friends</h2>
+      <p style="color:var(--rbx-muted);font-size:14px;">Your friends list is empty. (Simulated players appear in experiences.)</p>
+    </div>
   </main>
 </div>
 
@@ -394,6 +489,11 @@
     </div>
   </div>
 
+  <div id="backpack" aria-label="Backpack">
+    <div class="bd-head">Backpack <span class="count" id="bp-count">0</span></div>
+    <div id="bp-rows"></div>
+  </div>
+
   <div id="board" aria-label="People">
     <div class="bd-head">People <span class="count" id="board-count">5</span></div>
     <div id="board-rows"></div>
@@ -417,6 +517,11 @@
       <button class="esc-btn" id="esc-screenshot" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Screenshot
       </button>
+      <div class="esc-sep"></div>
+      <div class="esc-set">
+        <label>Shop — Gear <span id="wallet-label">0 coins</span></label>
+        <div id="shop-rows"></div>
+      </div>
       <div class="esc-sep"></div>
       <div class="esc-set">
         <label>Volume <span id="vol-label">60%</span></label>
@@ -456,6 +561,21 @@ import * as THREE from 'three';
 
 const $ = (s) => document.querySelector(s);
 
+/* ---------------- Avatar (persisted) ---------------- */
+const AVATAR = { skin: '#f5cd30', shirt: '#2a5fd4', pants: '#37a34a', face: 'smile' };
+function loadAvatar() { try { Object.assign(AVATAR, JSON.parse(localStorage.getItem('robloxcraft-avatar')) || {}); } catch (e) {} }
+function saveAvatar() { try { localStorage.setItem('robloxcraft-avatar', JSON.stringify(AVATAR)); } catch (e) {} }
+
+/* ---------------- Wallet + gear (persisted) ---------------- */
+const WALLET = { coins: 0, owned: [], equipped: null };
+function loadWallet() { try { Object.assign(WALLET, JSON.parse(localStorage.getItem('robloxcraft-save')) || {}); } catch (e) {} }
+function saveWallet() { try { localStorage.setItem('robloxcraft-save', JSON.stringify(WALLET)); } catch (e) {} }
+const GEAR = [
+  { id: 'speed', name: 'Speed Coil', price: 10, color: '#335fff', desc: '×1.6 walk speed' },
+  { id: 'gravity', name: 'Gravity Coil', price: 15, color: '#00b06f', desc: '×1.35 jump power' },
+  { id: 'fusion', name: 'Fusion Coil', price: 25, color: '#f5c518', desc: 'speed + jump' },
+];
+
 /* ---------------- Audio (procedural, Web Audio) ---------------- */
 let audioCtx = null, masterGain = null, volume = 0.6;
 function initAudio() {
@@ -486,6 +606,91 @@ const sfxLeave = () => sfx(440, 0.25, 'triangle', 0.2, -220);
 /* ---------------- Launcher ---------------- */
 const launcher = $('#launcher'), loading = $('#loading'), experience = $('#experience');
 let currentExp = 'baseplate';
+
+/* launcher nav: switch views */
+document.querySelectorAll('[data-lxnav]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-lxnav]').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.lx-view').forEach((v) => v.classList.remove('active'));
+    $('#lx-' + btn.dataset.lxnav).classList.add('active');
+    sfxClick();
+  });
+});
+
+/* ---------------- Avatar editor UI ---------------- */
+const SWATCHES = ['#f5cd30', '#e8b98a', '#c98850', '#8a5a2b', '#f2f2f2', '#d05656', '#e07b39', '#f5c518', '#37a34a', '#2a5fd4', '#7b5cff', '#335fff', '#23b5a3', '#8a8f96', '#313234'];
+const FACES = ['smile', 'cool', 'happy', 'wink'];
+function renderAvatarEditor() {
+  for (const part of ['skin', 'shirt', 'pants']) {
+    const wrap = $('#sw-' + part);
+    wrap.innerHTML = '';
+    for (const col of SWATCHES) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'swatch' + (AVATAR[part] === col ? ' selected' : '');
+      b.style.background = col;
+      b.title = col;
+      b.addEventListener('click', () => { AVATAR[part] = col; saveAvatar(); renderAvatarEditor(); });
+      wrap.appendChild(b);
+    }
+  }
+  const fw = $('#face-choices');
+  fw.innerHTML = '';
+  for (const f of FACES) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'face-btn' + (AVATAR.face === f ? ' selected' : '');
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    drawFacePreview(cv, f);
+    b.appendChild(cv);
+    b.title = f;
+    b.addEventListener('click', () => { AVATAR.face = f; saveAvatar(); renderAvatarEditor(); });
+    fw.appendChild(b);
+  }
+  // preview figure
+  const head = $('#av-head'), torso = $('#av-torso'), armL = $('#av-arm-l'), armR = $('#av-arm-r'), legL = $('#av-leg-l'), legR = $('#av-leg-r');
+  head.style.background = AVATAR.skin; torso.style.background = AVATAR.shirt;
+  armL.style.background = armR.style.background = AVATAR.skin;
+  legL.style.background = legR.style.background = AVATAR.pants;
+  const fc = $('#av-face');
+  drawFacePreview(fc, AVATAR.face);
+}
+function drawFacePreview(canvas, face) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = AVATAR.skin; ctx.fillRect(0, 0, w, h);
+  const ink = '#3c3c3c';
+  ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineWidth = Math.max(2, w / 16); ctx.lineCap = 'round';
+  const ex = w * 0.33, ex2 = w * 0.67, ey = h * 0.4, er = w * 0.06;
+  const eye = (x, wink) => {
+    ctx.beginPath(); ctx.arc(x, ey, er, 0, Math.PI * 2); ctx.fill();
+    if (wink) { ctx.beginPath(); ctx.moveTo(x + w * 0.11, ey); ctx.lineTo(x + w * 0.22, ey); ctx.stroke(); }
+  };
+  if (face === 'cool') {
+    ctx.fillStyle = '#222';
+    ctx.fillRect(w * 0.14, ey - er * 1.4, w * 0.3, er * 2.6);
+    ctx.fillRect(w * 0.56, ey - er * 1.4, w * 0.3, er * 2.6);
+    ctx.fillRect(w * 0.44, ey - er * 0.3, w * 0.12, er * 0.7);
+    ctx.beginPath(); ctx.moveTo(w * 0.3, h * 0.68); ctx.lineTo(w * 0.7, h * 0.68); ctx.stroke();
+  } else if (face === 'happy') {
+    eye(ex); eye(ex2);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(w / 2, h * 0.6, w * 0.18, h * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.ellipse(w / 2, h * 0.65, w * 0.11, h * 0.07, 0, 0, Math.PI * 2); ctx.fill();
+  } else if (face === 'wink') {
+    eye(ex); eye(ex2, true);
+    ctx.beginPath(); ctx.arc(w / 2, h * 0.52, w * 0.16, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  } else {
+    eye(ex); eye(ex2);
+    ctx.beginPath(); ctx.arc(w / 2, h * 0.52, w * 0.16, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  }
+}
+loadAvatar();
+renderAvatarEditor();
 
 document.querySelectorAll('.lx-card[data-exp]').forEach((card) => {
   card.addEventListener('click', () => {
@@ -567,12 +772,32 @@ function makeStudTexture(base = '#9d9ea1', stud = '#8e8f92', size = 256, cells =
 function makeFaceTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 128;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#f5cd30'; ctx.fillRect(0, 0, 128, 128); // head yellow
-  ctx.fillStyle = '#3c3c3c';
-  ctx.beginPath(); ctx.arc(42, 52, 8, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(86, 52, 8, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = '#3c3c3c'; ctx.lineWidth = 7; ctx.lineCap = 'round';
-  ctx.beginPath(); ctx.arc(64, 68, 20, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  ctx.fillStyle = AVATAR.skin; ctx.fillRect(0, 0, 128, 128);
+  const ink = '#3c3c3c';
+  ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineWidth = 7; ctx.lineCap = 'round';
+  const eyes = (wink) => {
+    ctx.beginPath(); ctx.arc(42, 52, 8, 0, Math.PI * 2); ctx.fill();
+    if (wink) { ctx.beginPath(); ctx.moveTo(78, 52); ctx.lineTo(94, 52); ctx.stroke(); }
+    else { ctx.beginPath(); ctx.arc(86, 52, 8, 0, Math.PI * 2); ctx.fill(); }
+  };
+  if (AVATAR.face === 'cool') {
+    ctx.fillStyle = '#222';
+    ctx.fillRect(24, 44, 34, 14); ctx.fillRect(70, 44, 34, 14);
+    ctx.fillRect(56, 48, 16, 5);
+    ctx.beginPath(); ctx.moveTo(40, 86); ctx.lineTo(88, 86); ctx.stroke();
+  } else if (AVATAR.face === 'happy') {
+    eyes();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.ellipse(64, 78, 22, 15, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.ellipse(64, 84, 14, 8, 0, 0, Math.PI * 2); ctx.fill();
+  } else if (AVATAR.face === 'wink') {
+    eyes(true);
+    ctx.beginPath(); ctx.arc(64, 68, 20, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  } else { // smile (default)
+    eyes();
+    ctx.beginPath(); ctx.arc(64, 68, 20, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  }
   return new THREE.CanvasTexture(c);
 }
 
@@ -594,7 +819,7 @@ function buildR6() {
   // Classic blocky character proportions (public R6 spec): 2x2x1 torso,
   // 1x1x1 head, 1x2x1 limbs. Colors: classic starter colors.
   const g = new THREE.Group();
-  const skin = 0xf5cd30, shirt = 0x2a5fd4, pants = 0x37a34a;
+  const skin = new THREE.Color(AVATAR.skin).getHex(), shirt = new THREE.Color(AVATAR.shirt).getHex(), pants = new THREE.Color(AVATAR.pants).getHex();
   const box = (w, h, d, m, x, y, z) => {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
     mesh.position.set(x, y, z); return mesh;
@@ -750,6 +975,8 @@ function bindInput() {
     if (e.code === 'Space') { if (state.onGround) state.jumpBuffer = 15; e.preventDefault(); }
     if (e.code === 'Escape') toggleEscMenu();
     if (e.code === 'Slash' && !escOpen()) { e.preventDefault(); focusChat(); }
+    const digit = /^Digit([1-9])$/.exec(e.code);
+    if (digit && WALLET.owned[+digit[1] - 1]) equipGear(WALLET.owned[+digit[1] - 1]);
   };
   const ku = (e) => { state.keys[e.code] = false; };
   addEventListener('keydown', kd); addEventListener('keyup', ku);
@@ -804,14 +1031,15 @@ function stepPhysics(dt) {
   const len = Math.hypot(mx, mz);
   if (len > 0) { mx /= len; mz /= len; state.yaw = Math.atan2(mx, mz); }
 
-  const speed = CFG.walkSpeed;
+  const eq = WALLET.equipped;
+  const speed = CFG.walkSpeed * ((eq === 'speed' || eq === 'fusion') ? 1.6 : 1);
   state.vel.x = mx * speed;
   state.vel.z = mz * speed;
 
   // buffered jump: a short Space tap between frames (throttled rendering) still jumps.
   // Expiry counts physics steps, not wall time, so it survives any frame gap.
   if ((k['Space'] || state.jumpBuffer > 0) && state.onGround) {
-    state.vel.y = CFG.jumpPower;
+    state.vel.y = CFG.jumpPower * ((eq === 'gravity' || eq === 'fusion') ? 1.35 : 1);
     state.onGround = false;
     state.jumpBuffer = 0;
     state.jumpCount++;
@@ -852,7 +1080,9 @@ function stepGameplay(dt) {
     if (c.position.distanceTo(new THREE.Vector3(state.pos.x, state.pos.y, state.pos.z)) < 3.4) {
       scene.remove(c); world.coins.splice(i, 1);
       state.coins++; sfxCoin();
+      WALLET.coins = state.coins; saveWallet();
       updateBoard();
+      updateBackpackUI();
       addChat('sys', `You collected a coin! (${state.coins})`);
     }
   }
@@ -876,6 +1106,85 @@ function stepGameplay(dt) {
   for (const s of world.spinners) { s.rotation.y += s.userData.spin * dt; }
 }
 
+/* ---------------- Gear: shop, backpack, equip ---------------- */
+let gearMesh = null;
+function gearById(id) { return GEAR.find((g) => g.id === id); }
+function buyGear(id) {
+  const g = gearById(id);
+  if (!g || WALLET.owned.includes(id) || state.coins < g.price) return false;
+  state.coins -= g.price;
+  WALLET.coins = state.coins;
+  WALLET.owned.push(id);
+  saveWallet();
+  addChat('sys', `Purchased ${g.name}! Equip it from the backpack (or press ${WALLET.owned.length}).`);
+  sfxCoin();
+  updateBoard(); updateBackpackUI(); renderShop();
+  return true;
+}
+function equipGear(id) {
+  if (id !== null && !WALLET.owned.includes(id)) return;
+  WALLET.equipped = WALLET.equipped === id ? null : id;
+  saveWallet();
+  const g = gearById(WALLET.equipped);
+  addChat('sys', g ? `Equipped ${g.name}.` : 'Unequipped gear.');
+  updateGearVisual(); updateBackpackUI(); renderShop();
+}
+function updateGearVisual() {
+  if (gearMesh && gearMesh.parent) gearMesh.parent.remove(gearMesh);
+  gearMesh = null;
+  const g = gearById(WALLET.equipped);
+  if (!g || !playerRig) return;
+  gearMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.2, 0.2, 0.85, 12),
+    new THREE.MeshStandardMaterial({ color: g.color, emissive: g.color, emissiveIntensity: 0.35, roughness: 0.4 })
+  );
+  gearMesh.position.set(0, -1.1, 0.4);
+  playerParts.armR.add(gearMesh);
+}
+function updateBackpackUI() {
+  const rows = $('#bp-rows');
+  if (!rows) return;
+  $('#bp-count').textContent = WALLET.owned.length;
+  if (!WALLET.owned.length) {
+    rows.innerHTML = '<div class="bp-empty">Backpack empty — buy gear from the menu Shop (Esc).</div>';
+    return;
+  }
+  rows.innerHTML = '';
+  WALLET.owned.forEach((id, i) => {
+    const g = gearById(id);
+    const row = document.createElement('div');
+    row.className = 'bp-row' + (WALLET.equipped === id ? ' equipped' : '');
+    row.innerHTML = `<span class="bp-dot" style="background:${g.color}"></span><span class="bp-name">${g.name}</span><span class="bp-key">${i + 1}</span>`;
+    row.addEventListener('click', () => { equipGear(id); sfxClick(); });
+    rows.appendChild(row);
+  });
+}
+function renderShop() {
+  const rows = $('#shop-rows');
+  if (!rows) return;
+  $('#wallet-label').textContent = state.coins + ' coins';
+  rows.innerHTML = '';
+  for (const g of GEAR) {
+    const owned = WALLET.owned.includes(g.id);
+    const row = document.createElement('div');
+    row.className = 'shop-row';
+    const btn = document.createElement('button');
+    btn.className = 'sbtn';
+    if (owned) {
+      btn.textContent = WALLET.equipped === g.id ? 'Equipped' : 'Equip';
+      btn.classList.add('ghost');
+      if (WALLET.equipped === g.id) btn.disabled = true;
+      btn.addEventListener('click', () => equipGear(g.id));
+    } else {
+      btn.textContent = g.price + ' coins';
+      btn.disabled = state.coins < g.price;
+      btn.addEventListener('click', () => buyGear(g.id));
+    }
+    row.innerHTML = `<span class="bp-dot" style="background:${g.color}"></span><span><span class="s-name">${g.name}</span> <span class="s-desc">— ${g.desc}</span></span>`;
+    row.appendChild(btn);
+    rows.appendChild(row);
+  }
+}
 function stepVisuals(dt) {
   playerRig.position.copy(state.pos);
   playerRig.rotation.y = state.yaw;
@@ -995,15 +1304,12 @@ function toggleEscMenu(force) {
   const m = $('#escmenu');
   const on = force !== undefined ? force : !m.classList.contains('on');
   m.classList.toggle('on', on);
-  if (on) $('#leaveconfirm').classList.remove('on');
+  if (on) { $('#leaveconfirm').classList.remove('on'); renderShop(); }
 }
 function bindHud() {
   $('#tb-chat').addEventListener('click', () => { $('#chat').classList.toggle('hidden'); sfxClick(); });
   $('#tb-board').addEventListener('click', () => { $('#board').classList.toggle('hidden'); sfxClick(); });
-  $('#tb-inventory').addEventListener('click', () => {
-    sfxClick();
-    addChat('sys', 'Inventory is empty. Collect tools in a real experience to fill your backpack.');
-  });
+  $('#tb-inventory').addEventListener('click', () => { $('#backpack').classList.toggle('hidden'); sfxClick(); });
   $('#tb-more').addEventListener('click', () => { toggleEscMenu(true); sfxClick(); });
   $('#esc-resume').addEventListener('click', () => { toggleEscMenu(false); sfxClick(); });
   $('#esc-respawn').addEventListener('click', () => {
@@ -1047,6 +1353,7 @@ function leaveExperience() {
   window.scrollTo(0, 0);
 }
 
+loadWallet();
 function enterExperience() {
   if (!started) {
     buildWorld();
@@ -1059,10 +1366,13 @@ function enterExperience() {
     // fresh world per session
     rebuildWorld();
   }
+  state.coins = WALLET.coins; // wallet persists across sessions
   state.playing = true;
   experience.classList.add('on');
   // narrow screens: keep the leaderboard hidden by default (Roblox mobile behavior)
   if (matchMedia('(max-width: 640px)').matches) $('#board').classList.add('hidden');
+  updateBackpackUI();
+  updateGearVisual();
   renderer.setSize(innerWidth, innerHeight);
   addChat('sys', 'Entered the experience. Have fun!');
 }
@@ -1076,7 +1386,6 @@ function rebuildWorld() {
   }
   world.colliders.push(world.groundCollider); // keep the baseplate solid
   buildLevel();
-  state.coins = 0;
   resetPlayer();
   updateBoard();
 }
@@ -1159,6 +1468,10 @@ loop();
 
 /* QA handle (primitives only via getters) */
 window.robloxcraft = {
+  get gear() { return { coins: WALLET.coins, owned: [...WALLET.owned], equipped: WALLET.equipped }; },
+  buyGear,
+  equipGear,
+  get avatar() { return { ...AVATAR }; },
   get state() {
     return {
       pos: { x: +state.pos.x.toFixed(2), y: +state.pos.y.toFixed(2), z: +state.pos.z.toFixed(2) },
@@ -1166,6 +1479,7 @@ window.robloxcraft = {
       playing: state.playing, exp: currentExp,
       jumpCount: state.jumpCount, maxY: +state.maxY.toFixed(2),
       coinsLeft: world.coins.length,
+      speed: +Math.hypot(state.vel.x, state.vel.z).toFixed(2),
     };
   },
   respawn: () => resetPlayer(),

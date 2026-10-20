@@ -2,9 +2,9 @@
 
 A browser reconstruction of the **Roblox** experience — a discovery launcher and a playable in-experience 3D world with the Roblox player UI (topbar, chat, leaderboard, health bar, Roblox Menu). Independently implemented — the downloaded client's code, assets, and fonts are not bundled in this repository; all artwork is original.
 
-- **Launcher** — dark discovery page with experience cards, simulated player counts and ratings, and a Play flow.
-- **Experience** — Three.js baseplate world with a classic blocky R6-style avatar: WASD movement, jumping, third-person orbit camera, coin collection, hazard bricks with damage, respawn on falling off the edge.
-- **Player UI** — topbar with Chat/Leaderboard/Inventory/Menu buttons, chat window with the official welcome text and `/`-key focus, People leaderboard, health bar, Esc menu with Resume/Respawn Character/Screenshot/Volume/Sensitivity, and the leave-confirmation dialog.
+- **Launcher** — dark discovery page with experience cards, simulated player counts and ratings, a Play flow, and an **Avatar editor** (skin/shirt/pants colors + face, saved to the browser and applied to your character in every experience).
+- **Experience** — Three.js baseplate world with a classic blocky R6-style avatar: WASD movement, jumping, third-person orbit camera, coin collection, hazard bricks with damage, respawn on falling off the edge, and a **gear shop** (Speed/Gravity/Fusion Coils bought with collected coins) with a **backpack** (topbar button or number keys to equip) and coil effects on walk speed / jump power.
+- **Player UI** — topbar with Chat/Leaderboard/Inventory/Menu buttons, chat window with the official welcome text and `/`-key focus, People leaderboard, health bar, Esc menu with Resume/Respawn Character/Screenshot/Shop/Volume/Sensitivity, and the leave-confirmation dialog. Coins and purchases persist between sessions.
 
 ## Provenance
 
@@ -39,8 +39,10 @@ Deep binary decompilation (Ghidra-class) was not available in the analysis envir
 | Coin collection with sound + chat notification + leaderboard update | Reconstruction decision (stand-in gameplay) | Verified |
 | Mobile: leaderboard hidden by default, compact chat | Documentation-based (Roblox mobile defaults) | Verified at 375 px (responsive layout only — touch movement controls are not implemented) |
 | Fixed-step physics with capped wall-clock catch-up | Reconstruction decision | Verified under throttled software rendering; very low frame rates can still affect input timing |
+| Avatar editor: 15 color swatches per part + 4 faces, live preview, persisted | Documentation-based (Roblox avatar editor) | Verified: picks persist in localStorage and apply to the R6 rig (colors + face texture) in the experience |
+| Gear shop + backpack + equip (Speed/Gravity/Fusion Coil) | Documentation-based (Roblox gear/backpack) | Verified: buy with coins (wallet persists across sessions and world rebuilds), equip via number keys or backpack click; Speed Coil raises walk speed 16 → 25.6 studs/s (live velocity readout), Gravity Coil raises jump apex ≈ 6.4 → 11.6 studs; equipped coil rendered in hand |
 
-Not implemented: Luau scripting, multiplayer, accounts, avatar customization, emotes (chat replies that they are unavailable), voice chat, tools/backpack items, friends, real experiences (the two playable worlds are original stand-ins), touch controls. The other players on the leaderboard are simulated demo data. This is a local single-player reconstruction — "1:1" is the design goal, not a claim; the client's runtime behavior was not execution-verified.
+Not implemented: Luau scripting, multiplayer, accounts, emotes (chat replies that they are unavailable), voice chat, friends, real experiences (the two playable worlds are original stand-ins), touch controls. The other players on the leaderboard are simulated demo data. This is a local single-player reconstruction — "1:1" is the design goal, not a claim; the client's runtime behavior was not execution-verified.
 
 Roblox® is a trademark of Roblox Corporation — this project is not affiliated with or endorsed by them. For the real platform, visit https://www.roblox.com.
 
