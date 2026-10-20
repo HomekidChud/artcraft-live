@@ -266,7 +266,30 @@ QA'd + pushed.
   phase used to flake it); the pause check snapshots steps after the
   pause engages (a jammed main thread can run a physics catch-up
   burst before the click handler).
-- [ ] M5: shared inspector core
+- [x] M5 (this commit): shared inspector core — new
+  inspector/inspector.js (self-contained classic script, shadow-DOM
+  panel, no deps). Elements tab: lazily expandable DOM tree (starts
+  html/head/body expanded), hover highlight + pick mode (click to
+  select, auto-switches to Elements), box-model highlight overlay
+  (margin/border/padding/content), breadcrumbs, live updates
+  (MutationObserver), editable inline style declarations, matched
+  stylesheet rules (cross-origin sheets labeled, never faked),
+  searchable computed props, box model, editable attributes + text
+  nodes. Console tab: captured log/warn/error/rejection history +
+  command eval (safe text rendering). Network tab: only actually
+  observed fetch/XHR, honestly labeled (a page cannot read the
+  browser network stack). Ctrl+Shift+I best-effort (some browsers
+  reserve it) + floating button fallback; Escape closes ONLY the
+  inspector (stopPropagation so the game menu does not open); typing
+  in the panel is key-isolated (events cut at the host boundary);
+  focus restored on close; ArtCraftInspector.onOpen lets apps clear
+  held keys (robloxcraft does). RobloxCraft loads it via script
+  tag. GAME FIX: moving-platform carry now tests within-bounds against
+  the platform's start-of-step position — a long frame gap used to
+  move the platform > the carry tolerance in one step and drop the
+  player. QA +8 checks (84 total), runner hardened (atomic
+  mover teleport, live-wait for speed reading).
+- [ ] M6: all-app integration
 - [ ] M4: services explorer — in-experience panel with WORKING local
   services: Workspace (scene objects), Players (local player),
   Lighting (live controls), Simulation (pause/step the fixed-step

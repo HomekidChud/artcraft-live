@@ -375,7 +375,8 @@ try {
   await page.waitForTimeout(200);
   check("robloxcraft: equip via number key", (await page.evaluate(() => window.robloxcraft.gear.equipped)) === "speed");
   await page.evaluate(() => { window.robloxcraft.pressKey("KeyW", true); });
-  await page.waitForTimeout(300);
+  // slow frames can delay stepping: wait until the speed reading is live
+  await page.waitForFunction(() => window.robloxcraft.state.speed > 20, null, { timeout: 4000 });
   const liveSpeed = await page.evaluate(() => window.robloxcraft.state.speed);
   await page.evaluate(() => { window.robloxcraft.pressKey("KeyW", false); });
   check("robloxcraft: speed coil boosts walk speed", liveSpeed === 25.6, String(liveSpeed));
@@ -519,6 +520,63 @@ try {
   await page.waitForTimeout(200);
   check("robloxcraft: Escape closes services panel",
     await page.evaluate(() => document.getElementById("svcs").classList.contains("hidden")));
+  // Shared inspector (Ctrl+Shift+I / floating button)
+  check("robloxcraft: inspector API present", await page.evaluate(() => typeof window.ArtCraftInspector) === "object");
+  await page.evaluate(() => { window.ArtCraftInspector.open(); });
+  await page.waitForTimeout(300);
+  check("robloxcraft: inspector opens",
+    await page.evaluate(() => window.ArtCraftInspector.isOpen()));
+  const insTree = await page.evaluate(() => {
+    const host = document.getElementById("acpi-host");
+    return { rows: host.shadowRoot.querySelectorAll(".trow").length };
+  });
+  check("robloxcraft: inspector DOM tree renders", insTree.rows > 5, JSON.stringify(insTree));
+  // console eval
+  await page.evaluate(() => { [...document.getElementById("acpi-host").shadowRoot.querySelectorAll(".tab")].find((b) => b.textContent === "Console").click(); });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { const inp = document.getElementById("acpi-host").shadowRoot.querySelector(".cin input"); inp.focus(); });
+  await page.keyboard.type("6 * 7");
+  await page.keyboard.press("Enter");
+  await page.waitForTimeout(300);
+  const insEval = await page.evaluate(() =>
+    [...document.getElementById("acpi-host").shadowRoot.querySelectorAll(".msg")].map((m) => m.textContent).slice(-2));
+  check("robloxcraft: inspector console evaluates commands", insEval.some((t) => t.includes("42")), JSON.stringify(insEval));
+  // typing in the inspector console must not move the character
+  await page.evaluate(() => { const inp = document.getElementById("acpi-host").shadowRoot.querySelector(".cin input"); inp.focus(); });
+  await page.keyboard.type("W");
+  await page.waitForTimeout(400);
+  const insArm = await page.evaluate(() => window.robloxcraft.state.armRX);
+  check("robloxcraft: inspector input is key-isolated", Math.abs(insArm) < 0.1, "armRX " + insArm);
+  // pick mode: click the 3D canvas
+  await page.evaluate(() => { window.ArtCraftInspector.open(); });
+  await page.evaluate(() => { document.getElementById("acpi-host").shadowRoot.querySelector('[title="Pick element from page"]').click(); });
+  await page.waitForTimeout(200);
+  await page.mouse.click(700, 450);
+  await page.waitForTimeout(300);
+  const insPick = await page.evaluate(() => {
+    const host = document.getElementById("acpi-host");
+    const sel = host.shadowRoot.querySelector(".trow.sel");
+    return sel ? sel.textContent : null;
+  });
+  check("robloxcraft: inspector pick selects page element", !!insPick && insPick.includes("canvas"), String(insPick).slice(0, 60));
+  // Escape closes only the inspector (game menu must stay closed)
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  const insEsc = await page.evaluate(() => ({
+    inspector: window.ArtCraftInspector.isOpen(),
+    gameMenu: document.getElementById("escmenu").classList.contains("on"),
+  }));
+  check("robloxcraft: inspector Escape closes without opening game menu",
+    insEsc.inspector === false && insEsc.gameMenu === false, JSON.stringify(insEsc));
+  // Ctrl+Shift+I toggles
+  await page.keyboard.press("Control+Shift+I");
+  await page.waitForTimeout(250);
+  const insT1 = await page.evaluate(() => window.ArtCraftInspector.isOpen());
+  await page.keyboard.press("Control+Shift+I");
+  await page.waitForTimeout(250);
+  const insT2 = await page.evaluate(() => window.ArtCraftInspector.isOpen());
+  check("robloxcraft: Ctrl+Shift+I toggles inspector", insT1 === true && insT2 === false, insT1 + " -> " + insT2);
+  await page.evaluate(() => { window.ArtCraftInspector.close(); });
   // corrective: moving platform carries a standing player (showcase)
   await page.evaluate(() => { document.getElementById("tb-more").click(); });
   await page.evaluate(() => { document.getElementById("esc-leave").click(); });
@@ -529,13 +587,18 @@ try {
   // stand on the x-mover (retry — the platform keeps moving between sample and teleport)
   let onPlatform = false;
   for (let i = 0; i < 4 && !onPlatform; i++) {
-    const mp = await page.evaluate(() => window.robloxcraft.movers[0]);
-    await page.evaluate((mp) => { window.robloxcraft.teleport(mp.x, mp.y + 3.5, mp.z); }, mp);
+    // sample the mover AND teleport in the same evaluate: a round-trip
+    // between sampling and teleporting targets a stale platform position
+    // (slow frames move it several units) and drops the player mid-air
+    await page.evaluate(() => {
+      const m = window.robloxcraft.movers[0];
+      window.robloxcraft.teleport(m.x, m.y + 3.5, m.z);
+    });
     await page.waitForTimeout(400);
     const chk = await page.evaluate(() => {
       const m = window.robloxcraft.movers[0];
       const p = window.robloxcraft.state.pos;
-      return { on: Math.abs(p.y - (m.y + 3)) < 0.6 && Math.abs(p.x - m.x) < 5 && Math.abs(p.z - m.z) < 5, y: p.y };
+      return { on: Math.abs(p.y - (m.y + 3.5)) < 0.3 && Math.abs(p.x - m.x) < 4.5 && Math.abs(p.z - m.z) < 5, y: p.y };
     });
     onPlatform = chk.on;
   }

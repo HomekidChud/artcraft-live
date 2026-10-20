@@ -616,6 +616,7 @@
   </div>
 </div>
 
+<script src="../inspector/inspector.js" defer></script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -1655,13 +1656,21 @@ function stepGameplay(dt) {
     mv.position[m.axis] = m.base + Math.sin(performance.now() / 1000 * m.speed + m.phase) * m.range;
     const delta = mv.position[m.axis] - prev;
     mv.userData.collider[m.axis] = mv.position[m.axis];
-    // carry the player when standing on this platform
+    // carry the player when standing on this platform. within-bounds is
+    // tested against the platform's position at the START of the step
+    // (prev): a long frame gap can move the platform many units in one
+    // step, and testing against the new position would drop the player.
     if (state.onGround) {
       const c = mv.userData.collider;
-      const withinX = state.pos.x > c.x - c.w / 2 - 0.5 && state.pos.x < c.x + c.w / 2 + 0.5;
-      const withinZ = state.pos.z > c.z - c.d / 2 - 0.5 && state.pos.z < c.z + c.d / 2 + 0.5;
+      const center = m.axis === 'x' ? prev : c.z;
+      const within = m.axis === 'x'
+        ? state.pos.x > center - c.w / 2 - 0.5 && state.pos.x < center + c.w / 2 + 0.5
+        : state.pos.z > center - c.d / 2 - 0.5 && state.pos.z < center + c.d / 2 + 0.5;
+      const cross = m.axis === 'x'
+        ? state.pos.z > c.z - c.d / 2 - 0.5 && state.pos.z < c.z + c.d / 2 + 0.5
+        : state.pos.x > c.x - c.w / 2 - 0.5 && state.pos.x < c.x + c.w / 2 + 0.5;
       const onTop = Math.abs(state.pos.y - 3 - (c.y + c.h / 2)) < 0.4;
-      if (withinX && withinZ && onTop) state.pos[m.axis] += delta;
+      if (within && cross && onTop) state.pos[m.axis] += delta;
     }
   }
   // checkpoints
@@ -2237,6 +2246,11 @@ function svcInit() {
   }));
 }
 svcInit();
+
+// shared inspector: clear held movement keys while it is open
+if (window.ArtCraftInspector) {
+  ArtCraftInspector.onOpen(() => { for (const k of Object.keys(state.keys)) state.keys[k] = false; });
+}
 
 /* ---------------- Game loop ---------------- */
 const FIXED = 1 / 60;
