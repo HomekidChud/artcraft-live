@@ -33,5 +33,12 @@ On 19 October 2026, the live GitHub Pages copy returned the WebAssembly asset wi
 
 Sources: [upstream README](https://github.com/storytold/effectcraft/blob/v0.11.1/README.md), [web hosting guide](https://github.com/storytold/effectcraft/blob/v0.11.1/packaging/web/README.md), [v0.11.1 release](https://github.com/storytold/effectcraft/releases/tag/v0.11.1).
 
-On 20 October 2026, after deploying the automatic fallback, the live page was re-verified: the default load started the app with WebGPU in about 3.5 seconds (`wasmMs` 3231, `readyMs` 3456), the no-GPU probe path (simulated with WebGPU and WebGL2 unavailable) returned `cpu-forced` and rewrote the page URL to `?cpu`, and a forced `?cpu` load started the app in about 2.9 seconds. This confirms the fallback logic in that test browser; it does not establish compatibility with every device or GPU.
+On 20 October 2026, after deploying the capability probe, the live page was re-verified with capability overrides injected before any page script ran:
+
+- No WebGPU and no WebGL2: the page skipped the ~63 MB download and showed the explanation with a reload link (no application load attempted).
+- No WebGPU with WebGL2: the app started normally on the GL backend in about 2.9 seconds; the probe did not interfere.
+- Full GPU: the app started normally in about 0.5 seconds (cached).
+- Explicit `?cpu` with no GPU: the choice was respected (no override); the application attempted to start, failed with the wgpu surface error, and the recovery UI showed the error with a reload link.
+
+Also verified that day: `?cpu` with a GPU present starts on the `BrowserWebGpu` backend — the documented `?webgl`/`?cpu` flags are not implemented in v0.11.1. These checks confirm the entry-page behavior in that test browser; they do not establish compatibility with every device or GPU.
 
