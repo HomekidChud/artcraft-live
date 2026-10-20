@@ -259,6 +259,7 @@ try {
     fallbackOk.sceneRow && fallbackOk.prefabRow, JSON.stringify(fallbackOk));
   await blockedCtx.close();
 } catch (e) { check("unitycraft: fallback suite ran", false, String(e).slice(0, 160)); }
+await page.bringToFront(); // main page back in front (rAF unthrottled for physics checks)
 
 /* ---------------- RobloxCraft ---------------- */
 try {
@@ -299,11 +300,19 @@ try {
   check("robloxcraft: avatar view opens",
     await page.evaluate(() => document.getElementById("lx-avatar").classList.contains("active")));
   check("robloxcraft: avatar swatches + faces render",
-    (await page.locator("#sw-skin .swatch").count()) === 15 && (await page.locator(".face-btn").count()) === 4);
+    (await page.locator("#sw-skin .swatch").count()) === 15 && (await page.locator(".face-btn").count()) === 6);
+  const limbRowsOk = await page.evaluate(() =>
+    ["armL", "armR", "legL", "legR"].every((p) => document.querySelectorAll(`#sw-${p} .swatch`).length === 15));
+  check("robloxcraft: per-limb color rows render", limbRowsOk);
+  check("robloxcraft: hat choices render", (await page.locator("#hat-choices .hat-btn").count()) === 5);
+  check("robloxcraft: 3D preview canvas present", await page.locator("#av-3d").isVisible());
   await page.locator("#sw-shirt .swatch").nth(8).click();
+  await page.locator("#sw-armR .swatch").nth(5).click();
   await page.locator(".face-btn").nth(1).click();
+  await page.locator("#hat-choices .hat-btn").nth(1).click();
   const avatarSaved = await page.evaluate(() => JSON.parse(localStorage.getItem("robloxcraft-avatar")));
-  check("robloxcraft: avatar picks persist", avatarSaved.shirt === "#37a34a" && avatarSaved.face === "cool", JSON.stringify(avatarSaved));
+  check("robloxcraft: avatar picks persist", avatarSaved.shirt === "#37a34a" && avatarSaved.face === "cool"
+    && avatarSaved.limbs && avatarSaved.limbs.armR === "#d05656" && avatarSaved.hat === "tophat", JSON.stringify(avatarSaved));
   // Wallet + shop + equip (seed coins, reload, re-enter)
   await page.evaluate(() => { localStorage.setItem("robloxcraft-save", JSON.stringify({ coins: 100, owned: [], equipped: null })); });
   await page.reload({ waitUntil: "load", timeout: 45000 });

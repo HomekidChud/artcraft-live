@@ -269,7 +269,7 @@
   .lx-view.active { display: block; }
   .av-layout { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
   .av-preview {
-    width: 220px; flex: none; border-radius: 14px; border: 1px solid var(--rbx-border);
+    width: 424px; max-width: 100%; flex: none; border-radius: 14px; border: 1px solid var(--rbx-border);
     background: linear-gradient(160deg, #23283a, #16181d); padding: 22px; text-align: center;
   }
   .av-figure { margin: 0 auto 14px; width: 108px; }
@@ -282,6 +282,12 @@
   .av-figure .legs { display: flex; gap: 8px; justify-content: center; margin-top: 6px; }
   .av-figure .leg { width: 30px; height: 54px; border-radius: 6px; }
   .av-preview .av-name { font-weight: 800; font-size: 15px; }
+  .av-preview #av-3d { display: block; border-radius: 14px; max-width: 100%; background: radial-gradient(120% 90% at 50% 0%, #26313f 0%, #131721 75%); cursor: grab; touch-action: none; }
+  .av-preview #av-3d:active { cursor: grabbing; }
+  .hats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hat-btn { border: 2px solid var(--rbx-border); background: var(--rbx-surface); border-radius: 12px; padding: 7px 12px; font-weight: 700; font-size: 12px; color: var(--rbx-text); cursor: pointer; }
+  .hat-btn:hover { border-color: var(--rbx-accent); }
+  .hat-btn.selected { border-color: var(--rbx-accent); box-shadow: 0 0 0 1px var(--rbx-accent); color: var(--rbx-accent); }
   .av-preview .av-sub { color: var(--rbx-muted); font-size: 12px; margin-top: 2px; }
   .av-controls { flex: 1; min-width: 280px; }
   .av-group { margin-bottom: 20px; }
@@ -414,20 +420,19 @@
       <h2 class="lx-section-title">Avatar Editor</h2>
       <div class="av-layout">
         <div class="av-preview">
-          <div class="av-figure">
-            <div class="avc head" id="av-head"><canvas id="av-face" width="64" height="64"></canvas></div>
-            <div class="avc torso" id="av-torso"></div>
-            <div class="arms"><div class="arm avc" id="av-arm-l"></div><div class="arm avc" id="av-arm-r"></div></div>
-            <div class="legs"><div class="leg avc" id="av-leg-l"></div><div class="leg avc" id="av-leg-r"></div></div>
-          </div>
+          <canvas id="av-3d" width="380" height="430" aria-label="3D avatar preview — drag to rotate"></canvas>
           <div class="av-name">Guest</div>
           <div class="av-sub">Saved automatically · applies in every experience</div>
         </div>
         <div class="av-controls">
           <div class="av-group"><h4>Skin</h4><div class="swatches" id="sw-skin"></div></div>
           <div class="av-group"><h4>Shirt</h4><div class="swatches" id="sw-shirt"></div></div>
-          <div class="av-group"><h4>Pants</h4><div class="swatches" id="sw-pants"></div></div>
+          <div class="av-group"><h4>Left Arm</h4><div class="swatches" id="sw-armL"></div></div>
+          <div class="av-group"><h4>Right Arm</h4><div class="swatches" id="sw-armR"></div></div>
+          <div class="av-group"><h4>Left Leg</h4><div class="swatches" id="sw-legL"></div></div>
+          <div class="av-group"><h4>Right Leg</h4><div class="swatches" id="sw-legR"></div></div>
           <div class="av-group"><h4>Face</h4><div class="faces" id="face-choices"></div></div>
+          <div class="av-group"><h4>Hat</h4><div class="hats" id="hat-choices"></div></div>
         </div>
       </div>
     </div>
@@ -625,18 +630,70 @@ document.querySelectorAll('[data-lxnav]').forEach((btn) => {
 
 /* ---------------- Avatar editor UI ---------------- */
 const SWATCHES = ['#f5cd30', '#e8b98a', '#c98850', '#8a5a2b', '#f2f2f2', '#d05656', '#e07b39', '#f5c518', '#37a34a', '#2a5fd4', '#7b5cff', '#335fff', '#23b5a3', '#8a8f96', '#313234'];
-const FACES = ['smile', 'cool', 'happy', 'wink'];
+const FACES = ['smile', 'cool', 'happy', 'wink', 'skeptical', 'mad'];
+const HATS = [
+  { id: null, name: 'None' },
+  { id: 'tophat', name: 'Top Hat' },
+  { id: 'cap', name: 'Cap' },
+  { id: 'halo', name: 'Halo' },
+  { id: 'headphones', name: 'Headphones' },
+];
+function buildHat(id) {
+  if (!id) return null;
+  const g = new THREE.Group();
+  const std = (c, extra = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.5, ...extra });
+  if (id === 'tophat') {
+    const dark = std('#1b1b1e');
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.72, 24), dark));
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.88, 0.88, 0.09, 28), dark);
+    brim.position.y = -0.36; g.add(brim);
+    const band = new THREE.Mesh(new THREE.CylinderGeometry(0.57, 0.57, 0.14, 24), std('#c0392b'));
+    band.position.y = -0.18; g.add(band);
+    g.position.y = 0.62; // sits on head top (head local +y)
+  } else if (id === 'cap') {
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), std('#2a5fd4'));
+    g.add(dome);
+    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.09, 0.5), std('#23b5a3'));
+    brim.position.set(0, 0.04, 0.72); g.add(brim);
+    g.position.y = 0.56;
+  } else if (id === 'halo') {
+    const h = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.07, 10, 32),
+      new THREE.MeshStandardMaterial({ color: 0xf5c518, emissive: 0x8a6d00, emissiveIntensity: 0.8, roughness: 0.3 }));
+    h.rotation.x = Math.PI / 2;
+    g.add(h);
+    g.position.y = 1.05;
+  } else if (id === 'headphones') {
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.64, 0.06, 8, 24, Math.PI), std('#313234'));
+    g.add(band);
+    const cup = (x) => {
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.26, 0.16, 18), std('#313234'));
+      c.rotation.z = Math.PI / 2; c.position.x = x; g.add(c);
+    };
+    cup(-0.66); cup(0.66);
+    g.position.y = 0.1;
+  }
+  return g;
+}
+function setLimb(part, col) { AVATAR.limbs = AVATAR.limbs || {}; AVATAR.limbs[part] = col; }
 function renderAvatarEditor() {
-  for (const part of ['skin', 'shirt', 'pants']) {
+  const rows = [
+    ['skin', (c) => { AVATAR.skin = c; }, () => AVATAR.skin],
+    ['shirt', (c) => { AVATAR.shirt = c; }, () => AVATAR.shirt],
+    ['armL', (c) => setLimb('armL', c), () => limbColor('armL')],
+    ['armR', (c) => setLimb('armR', c), () => limbColor('armR')],
+    ['legL', (c) => setLimb('legL', c), () => limbColor('legL')],
+    ['legR', (c) => setLimb('legR', c), () => limbColor('legR')],
+  ];
+  for (const [part, setter, getter] of rows) {
     const wrap = $('#sw-' + part);
     wrap.innerHTML = '';
     for (const col of SWATCHES) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'swatch' + (AVATAR[part] === col ? ' selected' : '');
+      b.className = 'swatch' + (getter() === col ? ' selected' : '');
       b.style.background = col;
       b.title = col;
-      b.addEventListener('click', () => { AVATAR[part] = col; saveAvatar(); renderAvatarEditor(); });
+      b.addEventListener('click', () => { setter(col); saveAvatar(); renderAvatarEditor(); });
       wrap.appendChild(b);
     }
   }
@@ -654,13 +711,68 @@ function renderAvatarEditor() {
     b.addEventListener('click', () => { AVATAR.face = f; saveAvatar(); renderAvatarEditor(); });
     fw.appendChild(b);
   }
-  // preview figure
-  const head = $('#av-head'), torso = $('#av-torso'), armL = $('#av-arm-l'), armR = $('#av-arm-r'), legL = $('#av-leg-l'), legR = $('#av-leg-r');
-  head.style.background = AVATAR.skin; torso.style.background = AVATAR.shirt;
-  armL.style.background = armR.style.background = AVATAR.skin;
-  legL.style.background = legR.style.background = AVATAR.pants;
-  const fc = $('#av-face');
-  drawFacePreview(fc, AVATAR.face);
+  const hw = $('#hat-choices');
+  hw.innerHTML = '';
+  for (const h of HATS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'hat-btn' + ((AVATAR.hat || null) === h.id ? ' selected' : '');
+    b.textContent = h.name;
+    b.addEventListener('click', () => { AVATAR.hat = h.id; saveAvatar(); renderAvatarEditor(); });
+    hw.appendChild(b);
+  }
+  refreshAvatarPreview();
+}
+/* 3D live preview — its own renderer, scene and rig instance; only
+   renders frames while the avatar view is active, and rebuilds the
+   rig on every avatar change. */
+const avPreview = { renderer: null, scene: null, camera: null, rig: null, rotY: 0.4, rotX: 0.08, dragging: false, lastX: 0, lastY: 0 };
+function initAvatarPreview() {
+  if (avPreview.renderer) return;
+  const canvas = $('#av-3d');
+  avPreview.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  avPreview.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  avPreview.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  avPreview.scene = new THREE.Scene();
+  avPreview.camera = new THREE.PerspectiveCamera(34, canvas.width / canvas.height, 0.1, 60);
+  avPreview.camera.position.set(0, 1.9, 9.2);
+  avPreview.camera.lookAt(0, 1.55, 0);
+  avPreview.scene.add(new THREE.HemisphereLight(0xffffff, 0x334466, 1.05));
+  const key = new THREE.DirectionalLight(0xffffff, 1.6);
+  key.position.set(4, 7, 6);
+  avPreview.scene.add(key);
+  const rim = new THREE.DirectionalLight(0x88bbff, 0.5);
+  rim.position.set(-5, 3, -6);
+  avPreview.scene.add(rim);
+  refreshAvatarPreview();
+  canvas.addEventListener('pointerdown', (e) => {
+    avPreview.dragging = true; avPreview.lastX = e.clientX; avPreview.lastY = e.clientY;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (!avPreview.dragging) return;
+    avPreview.rotY += (e.clientX - avPreview.lastX) * 0.011;
+    avPreview.rotX = Math.max(-0.5, Math.min(0.6, avPreview.rotX + (e.clientY - avPreview.lastY) * 0.006));
+    avPreview.lastX = e.clientX; avPreview.lastY = e.clientY;
+  });
+  const up = () => { avPreview.dragging = false; };
+  canvas.addEventListener('pointerup', up);
+  canvas.addEventListener('pointercancel', up);
+  (function loop() {
+    requestAnimationFrame(loop);
+    const view = $('#lx-avatar');
+    if (!view || !view.classList.contains('active') || !avPreview.rig) return;
+    if (!avPreview.dragging) avPreview.rotY += 0.007;
+    avPreview.rig.root.rotation.y = avPreview.rotY;
+    avPreview.rig.root.rotation.x = avPreview.rotX;
+    avPreview.renderer.render(avPreview.scene, avPreview.camera);
+  })();
+}
+function refreshAvatarPreview() {
+  if (!avPreview.renderer) { initAvatarPreview(); return; }
+  if (avPreview.rig) avPreview.rig.dispose();
+  avPreview.rig = createRig(AVATAR);
+  avPreview.scene.add(avPreview.rig.root);
 }
 function drawFacePreview(canvas, face) {
   const ctx = canvas.getContext('2d');
@@ -689,6 +801,20 @@ function drawFacePreview(canvas, face) {
   } else if (face === 'wink') {
     eye(ex); eye(ex2, true);
     ctx.beginPath(); ctx.arc(w / 2, h * 0.52, w * 0.16, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  } else if (face === 'skeptical') {
+    eye(ex); eye(ex2);
+    ctx.lineWidth = Math.max(2, w / 22);
+    ctx.beginPath(); ctx.moveTo(ex - er * 1.4, ey - er * 2.6); ctx.lineTo(ex + er * 1.1, ey - er * 3.1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ex2 - er * 1.1, ey - er * 2.2); ctx.lineTo(ex2 + er * 1.4, ey - er * 1.7); ctx.stroke();
+    ctx.lineWidth = Math.max(2, w / 16);
+    ctx.beginPath(); ctx.moveTo(w * 0.38, h * 0.66); ctx.lineTo(w * 0.64, h * 0.63); ctx.stroke();
+  } else if (face === 'mad') {
+    eye(ex); eye(ex2);
+    ctx.lineWidth = Math.max(2, w / 22);
+    ctx.beginPath(); ctx.moveTo(ex - er * 1.4, ey - er * 1.6); ctx.lineTo(ex + er * 1.1, ey - er * 0.6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(ex2 + er * 1.4, ey - er * 1.6); ctx.lineTo(ex2 - er * 1.1, ey - er * 0.6); ctx.stroke();
+    ctx.lineWidth = Math.max(2, w / 16);
+    ctx.beginPath(); ctx.arc(w / 2, h * 0.78, w * 0.14, 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
   } else {
     eye(ex); eye(ex2);
     ctx.beginPath(); ctx.arc(w / 2, h * 0.52, w * 0.16, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
@@ -696,6 +822,13 @@ function drawFacePreview(canvas, face) {
 }
 loadAvatar();
 renderAvatarEditor();
+// lazily spin up the 3D preview once the avatar view is first shown
+document.querySelectorAll('[data-lxnav]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.lxnav === 'avatar') initAvatarPreview();
+  });
+});
+if ($('#lx-avatar').classList.contains('active')) initAvatarPreview();
 
 /* friends panel (simulated demo data, labeled as such) */
 const FRIENDS = [
@@ -917,6 +1050,10 @@ function createRig(avatar = AVATAR) {
   legR.geometry.translate(0, -1 + 0.1, 0); legR.position.set(0.5, -1.1, 0);
   torso.position.y = 0;
   g.add(head, torso, armL, armR, legL, legR);
+  if (avatar.hat) {
+    const hat = buildHat(avatar.hat);
+    if (hat) { hat.name = 'Hat'; head.add(hat); }
+  }
   const nametag = makeNametag('You');
   nametag.position.y = 3.1;
   g.add(nametag);

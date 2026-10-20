@@ -203,11 +203,18 @@ QA'd + pushed.
   speed-driven phase (`state.walkPhase`, `_swingAmp` blend), idle
   breathing bob + walk bob + head counter-sway. QA: 59/59 still green,
   armRX damps -0.66 (walk) → 0 (idle), front-view screenshot verified.
-- [ ] M2: avatar editor upgrade — 3D rotating preview (own renderer,
-  own rig instance, disposed when hidden), per-limb color pickers,
-  hat accessories (meshes: top hat, cap, halo, headphones), 6 faces in
-  the UI, save migration (old skin/shirt/pants/face saves keep
-  working).
+- [x] M2 (this commit): avatar editor upgrade — live 3D rotating
+  preview (own WebGLRenderer + scene, own rig instance via createRig,
+  drag to rotate, only renders while avatar view active, old rig
+  disposed on every change), per-limb color rows (armL/armR/legL/legR
+  via AVATAR.limbs), hats (Top Hat / Cap / Halo / Headphones meshes,
+  attached to head, saved as AVATAR.hat), 6 faces (added skeptical +
+  mad to texture + 2D preview), old saves migrate automatically
+  (missing limbs/hat fall back to skin/pants/null). QA: 62 checks
+  (added 3D canvas, limb rows, hat row, limb+hat persistence); fixed
+  QA runner focus bug (blocked-storage section left bp in front and
+  throttled main-page rAF -> physics false failures; bringToFront
+  restored).
 - [ ] M3: marketplace — launcher tab, item catalog (hats, faces, gear,
   color packs) with one wallet/ownership model (stable IDs), equip
   from marketplace + avatar editor, insufficient-funds and repeat-
