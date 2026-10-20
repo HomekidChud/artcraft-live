@@ -286,6 +286,26 @@
   .av-preview #av-3d:active { cursor: grabbing; }
   .hats { display: flex; flex-wrap: wrap; gap: 8px; }
   .mk-wallet { color: var(--rbx-accent); font-weight: 800; margin-bottom: 14px; }
+  #svcs { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(4,6,10,.5); z-index: 60; }
+  #svcs.hidden { display: none; }
+  .svcs-panel { width: min(560px, 94vw); max-height: 82vh; display: flex; flex-direction: column; background: var(--rbx-surface); border: 1px solid var(--rbx-border); border-radius: 16px; }
+  .svcs-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px 8px; font-weight: 800; }
+  .svcs-x { background: none; border: none; color: var(--rbx-muted); font-size: 16px; cursor: pointer; }
+  .svcs-tabs { display: flex; gap: 4px; padding: 0 12px; border-bottom: 1px solid var(--rbx-border); flex-wrap: wrap; }
+  .svcs-tabs button { background: none; border: none; border-bottom: 2px solid transparent; color: var(--rbx-muted); padding: 8px 10px; cursor: pointer; font-weight: 700; font-size: 12px; }
+  .svcs-tabs button.active { color: var(--rbx-text); border-bottom-color: var(--rbx-accent); }
+  .svcs-body { padding: 14px 16px; overflow-y: auto; font-size: 13px; }
+  .svcs-note { padding: 8px 16px 12px; color: var(--rbx-muted); font-size: 11px; }
+  .svc-row { display: flex; justify-content: space-between; gap: 8px; padding: 5px 8px; border-radius: 8px; cursor: pointer; }
+  .svc-row:hover, .svc-row.selected { background: rgba(255,255,255,.06); }
+  .svc-row .svc-dim { color: var(--rbx-muted); font-size: 11px; }
+  .svc-kv { display: flex; justify-content: space-between; padding: 3px 0; }
+  .svc-kv span:last-child { color: var(--rbx-muted); }
+  .svc-ctl { margin: 10px 0; }
+  .svc-ctl label { display: flex; justify-content: space-between; margin-bottom: 4px; }
+  .svc-btnrow { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+  .svc-btn { border: 1px solid var(--rbx-border); background: var(--rbx-surface2, #1b1f2b); border-radius: 10px; padding: 8px 12px; color: var(--rbx-text); font-weight: 700; cursor: pointer; }
+  .svc-btn.primary { background: var(--rbx-accent); color: #06231a; border: none; }
   .mk-sub { color: var(--rbx-muted); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 18px 0 8px; }
   .mk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
   .mk-card { border: 1px solid var(--rbx-border); border-radius: 14px; padding: 12px; background: var(--rbx-surface); display: flex; flex-direction: column; gap: 8px; }
@@ -543,6 +563,9 @@
       <button class="esc-btn" id="esc-respawn" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/></svg>Respawn Character
       </button>
+      <button class="esc-btn" id="esc-svcs" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Services
+      </button>
       <button class="esc-btn" id="esc-screenshot" type="button">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Screenshot
       </button>
@@ -560,6 +583,25 @@
       </div>
     </div>
     <div class="esc-foot"><button class="btn-leave" id="esc-leave" type="button">Leave</button></div>
+  </div>
+</div>
+
+<!-- ============ SERVICES EXPLORER ============ -->
+<div id="svcs" role="dialog" aria-label="Services explorer" class="hidden">
+  <div class="svcs-panel">
+    <div class="svcs-head">
+      <span>Services</span>
+      <button class="svcs-x" id="svcs-close" type="button" aria-label="Close services">✕</button>
+    </div>
+    <div class="svcs-tabs">
+      <button data-svctab="workspace" class="active" type="button">Workspace</button>
+      <button data-svctab="players" type="button">Players</button>
+      <button data-svctab="lighting" type="button">Lighting</button>
+      <button data-svctab="simulation" type="button">Simulation</button>
+      <button data-svctab="persistence" type="button">Persistence</button>
+    </div>
+    <div class="svcs-body" id="svcs-body"></div>
+    <div class="svcs-note">Local browser services — this is a reconstruction, nothing leaves your machine.</div>
   </div>
 </div>
 
@@ -602,6 +644,8 @@ function saveAvatar() { try { localStorage.setItem('robloxcraft-avatar', JSON.st
 
 /* ---------------- Wallet + gear (persisted) ---------------- */
 const WALLET = { coins: 0, owned: [], equipped: null };
+let worldLights = null; // { hemi, sun } — set by buildWorld, used by the Lighting service
+const svcState = { paused: false, selected: null, selBox: null }; // services explorer state
 function loadWallet() { try { Object.assign(WALLET, JSON.parse(localStorage.getItem('robloxcraft-save')) || {}); } catch (e) {} }
 function saveWallet() { try { localStorage.setItem('robloxcraft-save', JSON.stringify(WALLET)); } catch (e) {} }
 const GEAR = [
@@ -1404,13 +1448,15 @@ function buildWorld() {
   camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.3, 1200);
   clock = new THREE.Clock();
 
-  scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x8a8f96, 0.85));
+  const hemi = new THREE.HemisphereLight(0xcfe8ff, 0x8a8f96, 0.85);
+  scene.add(hemi);
   const sun = new THREE.DirectionalLight(0xfff3d6, 1.35);
   sun.position.set(90, 140, 60);
   sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024);
   const sc = sun.shadow.camera; sc.left = -140; sc.right = 140; sc.top = 140; sc.bottom = -140; sc.far = 500;
   scene.add(sun);
+  worldLights = { hemi, sun };
 
   // Baseplate
   const B = CFG.baseplate;
@@ -1469,7 +1515,7 @@ function bindInput() {
     }
     state.keys[e.code] = true;
     if (e.code === 'Space') { if (state.onGround) state.jumpBuffer = 15; e.preventDefault(); }
-    if (e.code === 'Escape') toggleEscMenu();
+    if (e.code === 'Escape') { if (SVCS.open) svcSetOpen(false); else toggleEscMenu(); }
     if (e.code === 'Slash' && !escOpen()) { e.preventDefault(); focusChat(); }
     const digit = /^Digit([1-9])$/.exec(e.code);
     const gearList = gearOwnedIds();
@@ -2047,6 +2093,151 @@ function buildLevel() {
   }
 }
 
+/* ---------------- Services explorer ---------------- */
+const SVCS = {
+  open: false, tab: 'workspace',
+};
+function svcClearSelection() {
+  if (svcState.selBox) { scene.remove(svcState.selBox); svcState.selBox.geometry.dispose(); svcState.selBox = null; }
+  svcState.selected = null;
+}
+function svcSelect(obj) {
+  svcClearSelection();
+  if (!obj) return;
+  svcState.selected = obj;
+  svcState.selBox = new THREE.BoxHelper(obj, 0x00e5a0);
+  scene.add(svcState.selBox);
+}
+function svcRender() {
+  const body = $('#svcs-body');
+  if (!body) return;
+  if (SVCS.tab === 'workspace') {
+    const meshes = [];
+    scene.traverse((o) => { if (o.isMesh && o.name !== 'Hat' && !o.userData.noList) meshes.push(o); });
+    const byType = {};
+    for (const m of meshes) {
+      const t = m.userData.coin ? 'coin' : m.userData.checkpoint ? 'checkpoint' : m.userData.mover ? 'mover' : m.userData.hazard ? 'hazard' : (m.name || 'Part');
+      byType[t] = (byType[t] || 0) + 1;
+    }
+    body.innerHTML = `<div class="svc-kv"><span>Scene objects</span><span>${meshes.length}</span></div>` +
+      Object.entries(byType).map(([t, n]) => `<div class="svc-kv"><span>${t}</span><span>${n}</span></div>`).join('') +
+      `<div class="svc-btnrow"><button class="svc-btn" id="svc-sel-player">Select player character</button></div>`;
+    $('#svc-sel-player').addEventListener('click', () => { svcSelect(playerRig); svcRender(); });
+    if (svcState.selected) {
+      const o = svcState.selected;
+      const p = o.position;
+      body.innerHTML += `<div class="svc-kv"><span>Selected</span><span>${o.name || o.type || 'Mesh'}</span></div>
+        <div class="svc-kv"><span>Position</span><span>${p.x.toFixed(1)}, ${p.y.toFixed(1)}, ${p.z.toFixed(1)}</span></div>
+        <div class="svc-btnrow"><button class="svc-btn" id="svc-desel">Deselect</button></div>`;
+      $('#svc-desel').addEventListener('click', () => { svcClearSelection(); svcRender(); });
+    }
+  } else if (SVCS.tab === 'players') {
+    const you = people.find((p) => p.you);
+    body.innerHTML = `
+      <div class="svc-kv"><span>Local player</span><span>${you ? you.name : 'You'}</span></div>
+      <div class="svc-kv"><span>Position</span><span>${state.pos.x.toFixed(1)}, ${state.pos.y.toFixed(1)}, ${state.pos.z.toFixed(1)}</span></div>
+      <div class="svc-kv"><span>Health</span><span>${state.health}</span></div>
+      <div class="svc-kv"><span>Coins (this run)</span><span>${state.coins}</span></div>
+      <div class="svc-kv"><span>Equipped gear</span><span>${WALLET.equipped || 'none'}</span></div>
+      <div class="svc-kv"><span>Hat</span><span>${AVATAR.hat || 'none'}</span></div>
+      <div class="svc-kv"><span>Face</span><span>${AVATAR.face}</span></div>
+      <div class="svc-kv"><span>Simulated players in world</span><span>${people.length - 1}</span></div>`;
+  } else if (SVCS.tab === 'lighting') {
+    body.innerHTML = `
+      <div class="svc-ctl"><label>Ambient intensity <span id="svc-amb-v">${(worldLights.hemi.intensity).toFixed(2)}</span></label>
+        <input id="svc-amb" type="range" min="0" max="2" step="0.05" value="${worldLights.hemi.intensity}" style="width:100%"></div>
+      <div class="svc-ctl"><label>Sun intensity <span id="svc-sun-v">${(worldLights.sun.intensity).toFixed(2)}</span></label>
+        <input id="svc-sun" type="range" min="0" max="3" step="0.05" value="${worldLights.sun.intensity}" style="width:100%"></div>
+      <div class="svc-ctl"><label>Sun direction <span id="svc-dir-v">90°</span></label>
+        <input id="svc-dir" type="range" min="0" max="360" step="5" value="90" style="width:100%"></div>
+      <div class="svc-ctl"><label>Fog near <span id="svc-fn-v">${scene.fog.near}</span></label>
+        <input id="svc-fn" type="range" min="20" max="400" step="10" value="${scene.fog.near}" style="width:100%"></div>
+      <div class="svc-ctl"><label>Fog far <span id="svc-ff-v">${scene.fog.far}</span></label>
+        <input id="svc-ff" type="range" min="100" max="1200" step="20" value="${scene.fog.far}" style="width:100%"></div>
+      <div class="svc-btnrow">
+        <button class="svc-btn" data-sky="day">Day</button>
+        <button class="svc-btn" data-sky="sunset">Sunset</button>
+        <button class="svc-btn" data-sky="night">Night</button>
+        <button class="svc-btn" data-sky="default">World default</button>
+      </div>`;
+    const bind = (id, fn) => { const el = $(id); el.addEventListener('input', () => fn(parseFloat(el.value))); };
+    bind('#svc-amb', (v) => { worldLights.hemi.intensity = v; $('#svc-amb-v').textContent = v.toFixed(2); });
+    bind('#svc-sun', (v) => { worldLights.sun.intensity = v; $('#svc-sun-v').textContent = v.toFixed(2); });
+    bind('#svc-dir', (v) => { worldLights.sun.position.set(Math.cos(v * Math.PI / 180) * 140, 120, Math.sin(v * Math.PI / 180) * 140); $('#svc-dir-v').textContent = v + '°'; });
+    bind('#svc-fn', (v) => { scene.fog.near = v; $('#svc-fn-v').textContent = v; });
+    bind('#svc-ff', (v) => { scene.fog.far = v; $('#svc-ff-v').textContent = v; });
+    body.querySelectorAll('[data-sky]').forEach((b) => b.addEventListener('click', () => {
+      const preset = b.dataset.sky;
+      if (preset === 'day') { scene.background = new THREE.Color(0x9fd0f5); scene.fog.color = new THREE.Color(0x9fd0f5); worldLights.hemi.intensity = 0.85; worldLights.sun.intensity = 1.35; }
+      if (preset === 'sunset') { scene.background = new THREE.Color(0xf5a96b); scene.fog.color = new THREE.Color(0xf5a96b); worldLights.hemi.intensity = 0.6; worldLights.sun.intensity = 1.6; worldLights.sun.color = new THREE.Color(0xffb37a); }
+      if (preset === 'night') { scene.background = new THREE.Color(0x0a0e1a); scene.fog.color = new THREE.Color(0x0a0e1a); worldLights.hemi.intensity = 0.25; worldLights.sun.intensity = 0.4; }
+      if (preset === 'default') { applySky(); worldLights.hemi.intensity = 0.85; worldLights.sun.intensity = 1.35; worldLights.sun.color = new THREE.Color(0xfff3d6); }
+      svcRender();
+    }));
+  } else if (SVCS.tab === 'simulation') {
+    body.innerHTML = `
+      <div class="svc-kv"><span>Fixed step</span><span>1/60 s</span></div>
+      <div class="svc-kv"><span>Steps taken</span><span>${state.steps}</span></div>
+      <div class="svc-kv"><span>Status</span><span id="svc-sim-status">${svcState.paused ? 'PAUSED' : 'running'}</span></div>
+      <div class="svc-btnrow">
+        <button class="svc-btn primary" id="svc-sim-toggle">${svcState.paused ? 'Resume' : 'Pause'}</button>
+        <button class="svc-btn" id="svc-sim-step" ${svcState.paused ? '' : 'disabled'}>Step once</button>
+      </div>`;
+    $('#svc-sim-toggle').addEventListener('click', () => { svcState.paused = !svcState.paused; svcRender(); });
+    $('#svc-sim-step').addEventListener('click', () => { if (svcState.paused) { stepPhysics(FIXED); stepGameplay(FIXED); } svcRender(); });
+  } else if (SVCS.tab === 'persistence') {
+    const keys = ['robloxcraft-avatar', 'robloxcraft-save'];
+    body.innerHTML = keys.map((k) => {
+      const v = localStorage.getItem(k);
+      return `<div class="svc-kv"><span>${k}</span><span>${v ? (v.length + ' bytes' + (k.includes('save') ? ' (wallet)' : ' (avatar)')) : 'empty'}</span></div>`;
+    }).join('') + `
+      <div class="svc-btnrow">
+        <button class="svc-btn" id="svc-export">Export saves (JSON)</button>
+        <button class="svc-btn" id="svc-clear-avatar">Reset avatar</button>
+        <button class="svc-btn" id="svc-clear-wallet">Reset wallet</button>
+      </div>
+      <div class="svc-note" style="padding:0;">Saved to this browser's localStorage only — no accounts, no cloud.</div>`;
+    $('#svc-export').addEventListener('click', () => {
+      const data = JSON.stringify({ avatar: JSON.parse(localStorage.getItem('robloxcraft-avatar') || '{}'), wallet: JSON.parse(localStorage.getItem('robloxcraft-save') || '{}') }, null, 2);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      a.download = 'robloxcraft-saves.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+    $('#svc-clear-avatar').addEventListener('click', () => {
+      Object.assign(AVATAR, { skin: '#f5cd30', shirt: '#2a5fd4', pants: '#37a34a', face: 'smile', hat: null, limbs: undefined });
+      saveAvatar(); rebuildPlayerRig(); svcRender(); renderAvatarEditor();
+    });
+    $('#svc-clear-wallet').addEventListener('click', () => {
+      WALLET.coins = 0; WALLET.owned = []; WALLET.equipped = null; saveWallet(); svcRender(); renderMarket();
+    });
+  }
+}
+function svcSetOpen(open) {
+  SVCS.open = open;
+  $('#svcs').classList.toggle('hidden', !open);
+  if (open) {
+    // don't leave movement keys held while inspecting services
+    for (const k of Object.keys(state.keys)) state.keys[k] = false;
+    svcRender();
+  } else {
+    svcClearSelection();
+  }
+}
+function svcInit() {
+  $('#esc-svcs').addEventListener('click', () => { toggleEscMenu(false); svcSetOpen(true); sfxClick(); });
+  $('#svcs-close').addEventListener('click', () => svcSetOpen(false));
+  document.querySelectorAll('[data-svctab]').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('[data-svctab]').forEach((x) => x.classList.remove('active'));
+    b.classList.add('active');
+    SVCS.tab = b.dataset.svctab;
+    svcRender();
+    sfxClick();
+  }));
+}
+svcInit();
+
 /* ---------------- Game loop ---------------- */
 const FIXED = 1 / 60;
 let lastPhys = performance.now();
@@ -2060,7 +2251,7 @@ setInterval(() => {
   if (!started || !state.playing) { lastPhys = now; physAcc = 0; return; }
   physAcc += Math.min((now - lastPhys) / 1000, 1.0);
   lastPhys = now;
-  if (escOpen()) { physAcc = 0; return; }
+  if (escOpen() || svcState.paused) { physAcc = 0; return; }
   let guard = 0;
   while (physAcc >= FIXED && guard++ < 70) {
     stepPhysics(FIXED);
@@ -2121,6 +2312,16 @@ window.robloxcraft = {
     };
   },
   respawn: () => resetPlayer(),
+  services: {
+    open: (v) => { svcSetOpen(v !== false); },
+    get paused() { return svcState.paused; },
+    set paused(v) { svcState.paused = v; },
+    step: () => { stepPhysics(FIXED); stepGameplay(FIXED); },
+    tab: (t) => { const b = document.querySelector('[data-svctab="' + t + '"]'); if (b) b.click(); },
+    select: () => svcState.selected,
+    lights: () => worldLights ? { hemi: worldLights.hemi.intensity, sun: worldLights.sun.intensity } : null,
+    fog: () => scene && scene.fog ? { near: scene.fog.near, far: scene.fog.far } : null,
+  },
   get movers() { return world.movers.map((m) => ({ x: +m.position.x.toFixed(1), y: +m.position.y.toFixed(1), z: +m.position.z.toFixed(1) })); },
   rigColors() {
     return {

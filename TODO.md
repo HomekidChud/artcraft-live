@@ -246,7 +246,27 @@ QA'd + pushed.
   entering an experience. QA +4 checks (catalog render, launcher
   purchase debit+own+equip, insufficient funds + no repeat debit,
   reload persistence), 68 total; disabled buy button contrast fixed.
-- [ ] M4: services explorer
+- [x] M4 (this commit): services explorer — Esc menu > Services
+  opens a tabbed panel with WORKING local services (labeled "local
+  browser services — nothing leaves your machine"): Workspace
+  (scene object counts by type, select player/deselect with live
+  BoxHelper highlight + position readout), Players (local player
+  card: position/health/coins/gear/hat/face + simulated players),
+  Lighting (live sliders: ambient, sun intensity, sun direction,
+  fog near/far + Day/Sunset/Night/World-default presets), Simulation
+  (Pause/Resume integrated into the fixed-step loop, Step-once,
+  steps counter, status), Persistence (localStorage keys with sizes,
+  export saves as JSON download, reset avatar/wallet). Opens from
+  the Esc menu; Escape closes; movement keys cleared on open.
+  worldLights refs stored by buildWorld. QA +8 checks (open, workspace
+  list, player selection, lighting slider + night preset, pause
+  freeze, step-once, esc close), 76 total. QA runner hardening: the
+  platform-carry check is now oscillation-phase independent (tracks
+  player-to-mover distance instead of raw x spread — random teleport
+  phase used to flake it); the pause check snapshots steps after the
+  pause engages (a jammed main thread can run a physics catch-up
+  burst before the click handler).
+- [ ] M5: shared inspector core
 - [ ] M4: services explorer — in-experience panel with WORKING local
   services: Workspace (scene objects), Players (local player),
   Lighting (live controls), Simulation (pause/step the fixed-step

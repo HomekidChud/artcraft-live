@@ -471,6 +471,54 @@ try {
   check("robloxcraft: per-limb colors + hat apply to gameplay rig",
     newRig.cols.armR === "#d05656" && newRig.cols.legL === "#7b5cff" && newRig.cols.armL === "#f5cd30" && newRig.hat === true,
     JSON.stringify(newRig));
+  // Services explorer: open via Esc menu, exercise every tab
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("esc-svcs").click(); });
+  await page.waitForTimeout(300);
+  check("robloxcraft: services panel opens from Esc menu",
+    await page.evaluate(() => !document.getElementById("svcs").classList.contains("hidden")));
+  const svcWs = await page.evaluate(() => document.getElementById("svcs-body").textContent);
+  check("robloxcraft: services Workspace lists scene objects", /Scene objects/.test(svcWs) && /\d/.test(svcWs));
+  await page.evaluate(() => { document.getElementById("svc-sel-player").click(); });
+  await page.waitForTimeout(200);
+  check("robloxcraft: services Workspace selects the player rig",
+    (await page.evaluate(() => window.robloxcraft.services.select())) !== null);
+  await page.evaluate(() => { window.robloxcraft.services.tab("lighting"); });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { const el = document.getElementById("svc-amb"); el.value = 1.5; el.dispatchEvent(new Event("input")); });
+  await page.waitForTimeout(200);
+  const svcLights = await page.evaluate(() => window.robloxcraft.services.lights());
+  check("robloxcraft: services Lighting slider drives the scene light", svcLights.hemi === 1.5, JSON.stringify(svcLights));
+  await page.evaluate(() => { document.querySelector('[data-sky="night"]').click(); });
+  await page.waitForTimeout(200);
+  const svcNight = await page.evaluate(() => window.robloxcraft.services.lights());
+  check("robloxcraft: services Lighting night preset applies", svcNight.hemi === 0.25 && svcNight.sun === 0.4, JSON.stringify(svcNight));
+  await page.evaluate(() => { document.querySelector('[data-sky="default"]').click(); });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { window.robloxcraft.services.tab("simulation"); });
+  await page.waitForTimeout(200);
+  const s1 = await page.evaluate(() => window.robloxcraft.state.steps);
+  await page.waitForTimeout(500);
+  const s2 = await page.evaluate(() => window.robloxcraft.state.steps);
+  await page.evaluate(() => { document.getElementById("svc-sim-toggle").click(); });
+  // a jammed main thread can run a queued physics catch-up burst BEFORE the
+  // click handler, so snapshot the step count only after the pause engages
+  await page.waitForFunction(() => window.robloxcraft.services.paused === true, null, { timeout: 4000 });
+  const s2b = await page.evaluate(() => window.robloxcraft.state.steps);
+  await page.waitForTimeout(600);
+  const s3 = await page.evaluate(() => window.robloxcraft.state.steps);
+  check("robloxcraft: services Simulation pause freezes stepping", s2 > s1 && s3 === s2b, `running ${s1}->${s2}, paused ${s2b}->${s3}`);
+  await page.evaluate(() => { document.getElementById("svc-sim-step").click(); });
+  await page.waitForFunction((v) => window.robloxcraft.state.steps > v, s2b, { timeout: 4000 });
+  const s4 = await page.evaluate(() => window.robloxcraft.state.steps);
+  check("robloxcraft: services Simulation step-once advances one step", s4 === s2b + 1, `${s2b} -> ${s4}`);
+  await page.evaluate(() => { document.getElementById("svc-sim-toggle").click(); });
+  await page.waitForFunction(() => window.robloxcraft.services.paused === false, null, { timeout: 4000 });
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(200);
+  check("robloxcraft: Escape closes services panel",
+    await page.evaluate(() => document.getElementById("svcs").classList.contains("hidden")));
   // corrective: moving platform carries a standing player (showcase)
   await page.evaluate(() => { document.getElementById("tb-more").click(); });
   await page.evaluate(() => { document.getElementById("esc-leave").click(); });
@@ -492,13 +540,21 @@ try {
     onPlatform = chk.on;
   }
   check("robloxcraft: player stands on the moving platform", onPlatform);
+  // carry check is oscillation-phase independent: the mover's own travel
+  // must exceed the threshold AND the player must track it the whole time
+  // (teleporting at a slow swing extreme used to flake the raw spread test)
   const carried = await page.evaluate(() => new Promise(res => {
-    const xs = [];
-    const iv = setInterval(() => xs.push(window.robloxcraft.state.pos.x), 150);
-    setTimeout(() => { clearInterval(iv); res(xs); }, 2200);
+    const pairs = [];
+    const iv = setInterval(() => {
+      const m = window.robloxcraft.movers[0];
+      pairs.push([window.robloxcraft.state.pos.x, m ? m.x : 0]);
+    }, 150);
+    setTimeout(() => { clearInterval(iv); res(pairs); }, 2600);
   }));
-  const carrySpread = Math.max(...carried) - Math.min(...carried);
-  check("robloxcraft: moving platform carries the player", carrySpread > 4, "x spread " + carrySpread.toFixed(1) + " over 2.2s");
+  const mSpread = Math.max(...carried.map((c) => c[1])) - Math.min(...carried.map((c) => c[1]));
+  const tracked = carried.every(([px, mx]) => Math.abs(px - mx) < 3);
+  check("robloxcraft: moving platform carries the player", mSpread > 4 && tracked,
+    "mover spread " + mSpread.toFixed(1) + ", tracking " + tracked + " over 2.6s");
   // corrective: emote animates arms (armRX changes over time during /e wave)
   await page.locator("#chat-input").fill("/e wave");
   await page.locator("#chat-input").press("Enter");
