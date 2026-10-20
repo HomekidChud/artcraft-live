@@ -1,0 +1,1445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PlaneCraft — project management, in your browser</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<meta name="description" content="PlaneCraft — a browser reconstruction of Plane: work items, cycles, modules, views, pages and analytics for project management.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     PlaneCraft — browser reconstruction of the Plane project
+     management app (documentation-based; original artwork and code).
+     Plane layout evidence: docs.plane.so + makeplane/plane README
+     (open source, AGPL-3.0). No Plane code or assets redistributed.
+     ============================================================ */
+  :root {
+    --rail-bg: #0c0d10;
+    --sidebar-bg: #101114;
+    --sidebar-hover: #1a1c20;
+    --sidebar-active: #20232a;
+    --sidebar-border: #1e2126;
+    --sidebar-text: #b6bac4;
+    --sidebar-muted: #6f737e;
+    --bg: #f6f7f8;
+    --surface: #ffffff;
+    --surface-2: #fbfbfc;
+    --border: #e2e5e9;
+    --border-strong: #d3d7dd;
+    --text: #17181c;
+    --text-muted: #5c6069;
+    --text-faint: #9aa0aa;
+    --accent: #4453e6;
+    --accent-hover: #3743c4;
+    --accent-soft: #eef0fd;
+    --backlog: #8b8f98;
+    --todo: #6e7f96;
+    --inprogress: #d9a514;
+    --done: #3f9142;
+    --cancelled: #d6564d;
+    --urgent: #d6564d;
+    --high: #e8833a;
+    --medium: #d9a514;
+    --low: #8b8f98;
+    --none-p: #a6abb5;
+    --radius: 8px;
+    --shadow-sm: 0 1px 2px rgba(23, 24, 28, 0.06);
+    --shadow-md: 0 4px 14px rgba(23, 24, 28, 0.09);
+    --shadow-lg: 0 18px 50px rgba(23, 24, 28, 0.18);
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+    overflow: hidden;
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  input, textarea, select { font: inherit; color: inherit; }
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-thumb { background: rgba(120, 125, 135, 0.35); border-radius: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+  a, button, input, textarea, select, [draggable] { transition: background 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
+
+  /* ---------- icon rail ---------- */
+  #rail {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 52px;
+    background: var(--rail-bg); display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0 12px; gap: 4px; z-index: 60;
+  }
+  #rail .logo { width: 30px; height: 30px; margin-bottom: 10px; flex: none; }
+  .rail-btn {
+    width: 36px; height: 36px; border-radius: 8px; display: grid; place-items: center;
+    color: #7d818c; position: relative;
+  }
+  .rail-btn:hover { background: #1a1c21; color: #d7dae1; }
+  .rail-btn.active { background: #23252c; color: #fff; }
+  .rail-btn svg { width: 18px; height: 18px; }
+  .rail-btn .rail-tip {
+    position: absolute; left: 46px; top: 50%; transform: translateY(-50%); background: #23252c;
+    color: #e8eaee; font-size: 12px; font-weight: 500; padding: 4px 9px; border-radius: 6px;
+    white-space: nowrap; opacity: 0; pointer-events: none; box-shadow: var(--shadow-md); z-index: 5;
+  }
+  .rail-btn:hover .rail-tip { opacity: 1; }
+  #rail .spacer { flex: 1; }
+  #rail .avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 600; color: #fff; background: #4453e6; cursor: pointer; }
+
+  /* ---------- sidebar ---------- */
+  #sidebar {
+    position: fixed; left: 52px; top: 0; bottom: 0; width: 232px;
+    background: var(--sidebar-bg); border-right: 1px solid var(--sidebar-border);
+    display: flex; flex-direction: column; z-index: 50;
+  }
+  .side-head { padding: 12px 10px 8px; }
+  .ws-switch {
+    display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 8px;
+    border-radius: var(--radius); color: #e8eaee;
+  }
+  .ws-switch:hover { background: var(--sidebar-hover); }
+  .ws-switch .ws-mark { width: 24px; height: 24px; border-radius: 6px; background: linear-gradient(135deg, #4453e6, #7b8cf7); display: grid; place-items: center; color: #fff; flex: none; }
+  .ws-switch .ws-mark svg { width: 13px; height: 13px; }
+  .ws-switch .ws-name { font-weight: 600; font-size: 13px; flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ws-switch .chev { color: var(--sidebar-muted); }
+  .side-search { position: relative; margin: 4px 10px 10px; }
+  .side-search input {
+    width: 100%; background: #191b20; border: 1px solid #26282e; border-radius: var(--radius);
+    color: #d7dae1; padding: 6px 28px 6px 30px; font-size: 12.5px;
+  }
+  .side-search input::placeholder { color: #5d616b; }
+  .side-search input:focus { border-color: #3a3d46; outline: none; background: #1d1f25; }
+  .side-search .s-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: #5d616b; width: 14px; height: 14px; }
+  .side-search .s-key { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: #5d616b; border: 1px solid #2c2f36; border-radius: 4px; padding: 0 5px; }
+  .side-scroll { flex: 1; overflow-y: auto; padding: 2px 6px 10px; }
+  .side-section { margin-top: 12px; }
+  .side-label {
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--sidebar-muted); padding: 4px 10px 4px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .side-label button { color: var(--sidebar-muted); display: grid; place-items: center; border-radius: 4px; padding: 2px; }
+  .side-label button:hover { color: #e8eaee; background: var(--sidebar-hover); }
+  .side-item {
+    display: flex; align-items: center; gap: 9px; width: 100%; padding: 6px 9px; border-radius: var(--radius);
+    color: var(--sidebar-text); text-align: left; font-weight: 500; font-size: 12.5px;
+  }
+  .side-item:hover { background: var(--sidebar-hover); color: #e8eaee; }
+  .side-item.active { background: var(--sidebar-active); color: #fff; }
+  .side-item svg { width: 15px; height: 15px; flex: none; opacity: 0.85; }
+  .side-item .count { margin-left: auto; font-size: 10.5px; color: var(--sidebar-muted); background: #1c1e23; border-radius: 8px; padding: 1px 7px; }
+  .side-item .dot { width: 16px; height: 16px; border-radius: 4.5px; flex: none; display: grid; place-items: center; font-size: 8.5px; font-weight: 700; color: #fff; }
+  .side-item .sname { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .side-foot { border-top: 1px solid var(--sidebar-border); padding: 8px 6px; }
+
+  /* ---------- main ---------- */
+  #main { position: absolute; left: 284px; top: 0; right: 0; bottom: 0; overflow-y: auto; }
+  .page { padding: 26px 32px 60px; max-width: 1240px; margin: 0 auto; }
+
+  /* home */
+  .home-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 22px; }
+  .home-head h1 { font-size: 21px; font-weight: 700; letter-spacing: -0.01em; }
+  .home-head .sub { color: var(--text-muted); font-size: 12.5px; margin-top: 3px; }
+  .proj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 14px; }
+  .proj-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px;
+    cursor: pointer; box-shadow: var(--shadow-sm);
+  }
+  .proj-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+  .proj-card .p-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .proj-card .p-ico { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 13px; flex: none; }
+  .proj-card h3 { font-size: 14px; font-weight: 600; }
+  .proj-card .p-key { font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); }
+  .proj-card .p-desc { color: var(--text-muted); font-size: 12.5px; margin-bottom: 14px; min-height: 34px; }
+  .proj-card .p-meta { display: flex; align-items: center; justify-content: space-between; }
+  .proj-card .p-avatars { display: flex; }
+  .proj-card .p-avatars .avatar { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--surface); margin-left: -6px; display: grid; place-items: center; font-size: 9px; font-weight: 600; color: #fff; }
+  .proj-card .p-avatars .avatar:first-child { margin-left: 0; }
+  .pbar { height: 4px; border-radius: 3px; background: #eceef1; overflow: hidden; margin-top: 12px; }
+  .pbar i { display: block; height: 100%; background: linear-gradient(90deg, #4453e6, #7b8cf7); border-radius: 3px; }
+
+  /* project header + tabs */
+  .proj-head { display: flex; align-items: center; gap: 12px; padding: 18px 0 0; }
+  .proj-head .p-ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-weight: 700; }
+  .proj-head h2 { font-size: 17px; font-weight: 700; }
+  .proj-head .p-key { font-family: var(--mono); font-size: 11px; color: var(--text-faint); }
+  .proj-head .head-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-top: 14px; }
+  .tab {
+    padding: 8px 12px 9px; color: var(--text-muted); font-weight: 500; font-size: 13px;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px; padding: 6px 13px; border-radius: var(--radius);
+    font-weight: 600; font-size: 12.5px; border: 1px solid transparent;
+  }
+  .btn svg { width: 14px; height: 14px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-ghost { border-color: var(--border-strong); color: var(--text); background: var(--surface); }
+  .btn-ghost:hover { background: var(--surface-2); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  /* toolbar */
+  .toolbar { display: flex; align-items: center; gap: 8px; padding: 14px 0 10px; flex-wrap: wrap; }
+  .toolbar .t-search { position: relative; flex: 1; min-width: 170px; max-width: 300px; }
+  .toolbar .t-search input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius);
+    padding: 6px 10px 6px 30px; font-size: 12.5px;
+  }
+  .toolbar .t-search input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .toolbar .t-search svg { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); width: 13px; height: 13px; color: var(--text-faint); }
+  .fbtn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: var(--radius);
+    border: 1px solid var(--border-strong); background: var(--surface); font-size: 12.5px; font-weight: 500; color: var(--text-muted);
+  }
+  .fbtn:hover { background: var(--surface-2); color: var(--text); }
+  .fbtn.has { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .fbtn svg { width: 12px; height: 12px; }
+  .seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+  .seg button { padding: 6px 12px; color: var(--text-muted); font-weight: 500; font-size: 12.5px; display: inline-flex; gap: 6px; align-items: center; }
+  .seg button svg { width: 13px; height: 13px; }
+  .seg button.active { background: #17181c; color: #fff; }
+
+  /* filter dropdown */
+  .fdrop {
+    position: absolute; top: calc(100% + 6px); left: 0; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: var(--shadow-lg); min-width: 215px; z-index: 40; padding: 6px;
+  }
+  .fdrop .f-title { font-size: 11px; font-weight: 600; color: var(--text-faint); padding: 6px 9px 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .fdrop .f-opt { display: flex; align-items: center; gap: 9px; width: 100%; padding: 6px 9px; border-radius: 6px; font-size: 12.5px; text-align: left; }
+  .fdrop .f-opt:hover { background: var(--surface-2); }
+  .fdrop .f-opt .chk { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--border-strong); flex: none; display: grid; place-items: center; color: #fff; }
+  .fdrop .f-opt.on .chk { background: var(--accent); border-color: var(--accent); }
+  .fdrop .f-opt .chk svg { width: 9px; height: 9px; opacity: 0; }
+  .fdrop .f-opt.on .chk svg { opacity: 1; }
+
+  /* list view */
+  .list-view { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
+  .lv-group { border-bottom: 1px solid var(--border); }
+  .lv-group:last-child { border-bottom: none; }
+  .lv-group-head { display: flex; align-items: center; gap: 8px; padding: 9px 14px; background: var(--surface-2); font-weight: 600; font-size: 12.5px; }
+  .lv-group-head .gcount { color: var(--text-faint); font-weight: 500; }
+  .lv-row {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-top: 1px solid var(--border);
+    cursor: pointer; background: var(--surface);
+  }
+  .lv-row:hover { background: #f7f8fb; }
+  .lv-row .id { font-family: var(--mono); font-size: 11px; color: var(--text-faint); width: 58px; flex: none; }
+  .lv-row .ttl { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lv-row .labels { display: flex; gap: 4px; flex: none; }
+  .lv-row .assignee { width: 22px; height: 22px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 9px; font-weight: 600; color: #fff; }
+  .lv-row .assignee.none { background: #eceef2; color: var(--text-faint); }
+  .chiplabel { font-size: 10.5px; font-weight: 600; border-radius: 5px; padding: 1.5px 7px; }
+
+  /* state + priority chips */
+  .state-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; border-radius: 5px; padding: 2.5px 8px; flex: none; }
+  .state-chip i { width: 7px; height: 7px; border-radius: 50%; }
+  .pri { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; flex: none; border-radius: 4px; }
+  .pri svg { width: 11px; height: 11px; }
+  .pri.urgent { background: #fdecea; color: var(--urgent); }
+  .pri.high { background: #fdf0e5; color: var(--high); }
+  .pri.medium { background: #fbf3d9; color: var(--medium); }
+  .pri.low { background: #eef0f3; color: var(--low); }
+  .pri.none-p { background: #eef0f3; color: var(--none-p); }
+
+  /* board view */
+  .board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; padding: 6px 2px 16px; }
+  .bcol { background: #eef0f2; border-radius: 12px; width: 262px; flex: none; max-height: calc(100vh - 290px); display: flex; flex-direction: column; }
+  .bcol-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px 6px; font-weight: 600; font-size: 12.5px; }
+  .bcol-head .gcount { color: var(--text-faint); font-weight: 500; }
+  .bcol-body { padding: 4px 8px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 7px; min-height: 44px; }
+  .bcol.dragover { background: #e4e7ee; box-shadow: inset 0 0 0 2px var(--accent); }
+  .bcard {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 9px; padding: 10px 11px;
+    cursor: pointer; box-shadow: var(--shadow-sm);
+  }
+  .bcard:hover { border-color: var(--border-strong); }
+  .bcard.dragging { opacity: 0.45; }
+  .bcard .b-id { font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); }
+  .bcard .b-ttl { font-weight: 500; font-size: 12.5px; margin: 3px 0 8px; }
+  .bcard .b-foot { display: flex; align-items: center; gap: 7px; }
+  .bcard .b-foot .assignee { margin-left: auto; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 8.5px; font-weight: 600; color: #fff; }
+  .bcard .b-foot .assignee.none { background: #eceef2; color: var(--text-faint); }
+  .bcard .chiplabel { font-size: 10px; }
+
+  /* calendar view */
+  .cal-head { display: flex; align-items: center; gap: 10px; margin: 6px 0 12px; }
+  .cal-head h3 { font-size: 15px; font-weight: 700; }
+  .cal-head .cal-nav { display: flex; gap: 4px; margin-left: auto; }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm); }
+  .cal-dow { padding: 8px 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); background: var(--surface-2); border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.04em; }
+  .cal-cell { min-height: 96px; border-top: 1px solid var(--border); border-left: 1px solid var(--border); padding: 6px 7px; }
+  .cal-cell:nth-child(7n+8) { border-left: none; }
+  .cal-cell.out { background: #fafafb; }
+  .cal-cell .dnum { font-size: 11px; font-weight: 600; color: var(--text-faint); margin-bottom: 4px; }
+  .cal-cell.today .dnum { color: #fff; background: var(--accent); border-radius: 50%; width: 19px; height: 19px; display: grid; place-items: center; }
+  .cal-ev {
+    display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; padding: 2.5px 7px;
+    border-radius: 5px; margin-bottom: 3px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cal-ev:hover { filter: brightness(0.95); }
+  .cal-ev i { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+
+  /* cycles / modules */
+  .cycle-row {
+    display: flex; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 15px 18px; margin-bottom: 10px; box-shadow: var(--shadow-sm); cursor: pointer;
+  }
+  .cycle-row:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+  .cycle-row .c-info { flex: 1; min-width: 0; }
+  .cycle-row .c-name { font-weight: 600; font-size: 13.5px; display: flex; gap: 9px; align-items: center; }
+  .cycle-row .c-dates { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+  .cycle-row .c-stats { display: flex; gap: 22px; align-items: center; }
+  .cycle-row .c-stat { text-align: center; }
+  .cycle-row .c-stat b { font-size: 15px; display: block; }
+  .cycle-row .c-stat span { font-size: 10.5px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+  .cprog { width: 150px; }
+  .cprog .pbar { margin-top: 0; }
+  .cprog .pct { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-bottom: 4px; display: block; }
+  .badge { font-size: 10.5px; font-weight: 700; border-radius: 5px; padding: 2px 8px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .badge.current { background: #e8f6e9; color: #2c7a30; }
+  .badge.upcoming { background: #eef0fd; color: var(--accent); }
+  .badge.completed { background: #eceef2; color: var(--text-muted); }
+  .mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+  .mod-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 15px 16px; box-shadow: var(--shadow-sm); cursor: pointer; }
+  .mod-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+  .mod-card h4 { font-size: 13.5px; font-weight: 600; margin-bottom: 3px; }
+  .mod-card .m-desc { color: var(--text-muted); font-size: 12px; min-height: 34px; margin: 6px 0 12px; }
+  .mod-card .m-meta { display: flex; justify-content: space-between; align-items: center; color: var(--text-muted); font-size: 11.5px; }
+  .empty {
+    padding: 44px 20px; text-align: center; color: var(--text-muted); background: var(--surface);
+    border: 1px dashed var(--border-strong); border-radius: 12px; margin-top: 10px;
+  }
+  .empty svg { width: 30px; height: 30px; color: var(--text-faint); margin: 0 auto 10px; }
+  .empty b { display: block; color: var(--text); margin-bottom: 3px; font-size: 13.5px; }
+
+  /* views list */
+  .view-row {
+    display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 13px 16px; margin-bottom: 9px; cursor: pointer; box-shadow: var(--shadow-sm);
+  }
+  .view-row:hover { border-color: var(--border-strong); }
+  .view-row svg { width: 16px; height: 16px; color: var(--accent); flex: none; }
+  .view-row .v-name { font-weight: 600; font-size: 13px; }
+  .view-row .v-desc { color: var(--text-muted); font-size: 12px; }
+  .view-row .v-apply { margin-left: auto; }
+
+  /* pages */
+  .page-row {
+    display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 13px 16px; margin-bottom: 9px; cursor: pointer; box-shadow: var(--shadow-sm);
+  }
+  .page-row:hover { border-color: var(--border-strong); }
+  .page-row svg { width: 17px; height: 17px; color: var(--text-faint); flex: none; }
+  .page-row .pg-name { font-weight: 600; font-size: 13px; }
+  .page-row .pg-meta { color: var(--text-faint); font-size: 11.5px; margin-left: auto; }
+  .page-editor { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow-sm); }
+  .page-editor .pe-head { padding: 14px 20px 0; display: flex; align-items: center; gap: 10px; }
+  .page-editor .pe-title { border: none; font-size: 21px; font-weight: 700; width: 100%; padding: 4px 0; letter-spacing: -0.01em; }
+  .page-editor .pe-title:focus { outline: none; }
+  .page-editor .pe-body { padding: 10px 20px 22px; }
+  .page-editor .pe-content { width: 100%; min-height: 300px; border: none; resize: vertical; font-size: 13.5px; line-height: 1.7; color: var(--text); font-family: var(--font); }
+  .page-editor .pe-content:focus { outline: none; }
+  .pe-toolbar { display: flex; gap: 6px; padding: 10px 20px 0; align-items: center; }
+  .pe-toolbar .hint { margin-left: auto; font-size: 11px; color: var(--text-faint); }
+
+  /* analytics */
+  .an-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+  .an-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 17px 18px; box-shadow: var(--shadow-sm); }
+  .an-card h4 { font-size: 12.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 13px; }
+  .an-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .an-row .a-label { width: 108px; flex: none; font-size: 12px; font-weight: 500; display: flex; gap: 7px; align-items: center; }
+  .an-row .a-label i { width: 8px; height: 8px; border-radius: 50%; }
+  .an-row .a-bar { flex: 1; height: 18px; background: #eef0f2; border-radius: 5px; overflow: hidden; }
+  .an-row .a-bar i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, #4453e6, #7b8cf7); }
+  .an-row .a-num { width: 30px; text-align: right; font-weight: 600; font-size: 12px; color: var(--text-muted); }
+  .an-big { display: flex; gap: 12px; }
+  .an-stat { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 15px 17px; box-shadow: var(--shadow-sm); }
+  .an-stat b { font-size: 24px; font-weight: 700; display: block; letter-spacing: -0.02em; }
+  .an-stat span { color: var(--text-muted); font-size: 12px; }
+
+  /* drawer (work item detail) */
+  #drawer-veil { position: fixed; inset: 0; background: rgba(15, 16, 20, 0.28); z-index: 70; opacity: 0; pointer-events: none; }
+  #drawer-veil.open { opacity: 1; pointer-events: auto; }
+  #drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 92vw); background: var(--surface);
+    border-left: 1px solid var(--border); box-shadow: var(--shadow-lg); z-index: 71; transform: translateX(102%);
+    display: flex; flex-direction: column;
+  }
+  #drawer.open { transform: translateX(0); }
+  .dr-head { display: flex; align-items: center; gap: 8px; padding: 13px 16px; border-bottom: 1px solid var(--border); flex: none; }
+  .dr-head .id { font-family: var(--mono); font-size: 11.5px; color: var(--text-faint); }
+  .dr-head .dr-x { margin-left: auto; width: 28px; height: 28px; border-radius: 7px; display: grid; place-items: center; color: var(--text-muted); }
+  .dr-head .dr-x:hover { background: var(--surface-2); color: var(--text); }
+  .dr-body { flex: 1; overflow-y: auto; padding: 16px 18px 26px; }
+  .dr-title { width: 100%; border: none; font-size: 16.5px; font-weight: 600; padding: 2px 0 6px; letter-spacing: -0.01em; }
+  .dr-title:focus { outline: none; }
+  .dr-desc-label { font-size: 11px; font-weight: 600; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; margin: 12px 0 6px; }
+  .dr-desc { width: 100%; min-height: 88px; border: 1px solid transparent; border-radius: var(--radius); padding: 8px 10px; font-size: 12.5px; line-height: 1.6; resize: vertical; background: var(--surface-2); }
+  .dr-desc:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--surface); }
+  .dr-props { margin-top: 16px; display: grid; grid-template-columns: 118px 1fr; row-gap: 3px; }
+  .dr-props .dp-label { font-size: 12px; color: var(--text-muted); padding: 6px 8px 6px 0; font-weight: 500; }
+  .dr-props select, .dr-props .labels-cell {
+    background: var(--surface-2); border: 1px solid transparent; border-radius: var(--radius); padding: 5.5px 8px; font-size: 12.5px; width: 100%;
+  }
+  .dr-props select:hover, .dr-props select:focus { border-color: var(--border-strong); outline: none; background: var(--surface); }
+  .dr-props .labels-cell { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; cursor: pointer; }
+  .dr-props .labels-cell:hover { border-color: var(--border-strong); }
+  .dr-sec { margin-top: 18px; }
+  .dr-sec .dr-sec-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+  .dr-sec .dr-sec-head b { font-size: 12.5px; }
+  .subitem { display: flex; align-items: center; gap: 9px; padding: 5px 2px; font-size: 12.5px; }
+  .subitem .cb { width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--border-strong); display: grid; place-items: center; flex: none; }
+  .subitem.done .cb { background: var(--done); border-color: var(--done); }
+  .subitem.done .cb svg { width: 9px; height: 9px; opacity: 1; }
+  .subitem .cb svg { opacity: 0; width: 9px; height: 9px; color: #fff; }
+  .subitem.done span { text-decoration: line-through; color: var(--text-faint); }
+  .subitem .del { margin-left: auto; color: var(--text-faint); width: 22px; height: 22px; border-radius: 5px; display: grid; place-items: center; }
+  .subitem .del:hover { color: var(--cancelled); background: #fdecea; }
+  .comment { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--border); }
+  .comment .avatar { width: 24px; height: 24px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 9.5px; font-weight: 600; color: #fff; }
+  .view-row .assignee, .comment .assignee, .c-new .assignee { width: 24px; height: 24px; border-radius: 50%; flex: none; display: grid; place-items: center; font-size: 9.5px; font-weight: 600; color: #fff; }
+  .comment .c-body b { font-size: 12px; }
+  .comment .c-body .c-at { color: var(--text-faint); font-size: 10.5px; margin-left: 7px; }
+  .comment .c-body p { font-size: 12.5px; color: var(--text); margin-top: 1px; }
+  .c-new { display: flex; gap: 10px; margin-top: 10px; }
+  .c-new input {
+    flex: 1; border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 7px 11px; font-size: 12.5px; background: var(--surface);
+  }
+  .c-new input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+  /* modal */
+  #modal-veil { position: fixed; inset: 0; background: rgba(15, 16, 20, 0.42); z-index: 80; display: none; align-items: flex-start; justify-content: center; padding-top: 9vh; }
+  #modal-veil.open { display: flex; }
+  .modal { background: var(--surface); border-radius: 14px; box-shadow: var(--shadow-lg); width: min(580px, 92vw); overflow: hidden; }
+  .modal .m-head { display: flex; align-items: center; gap: 10px; padding: 15px 18px 0; }
+  .modal .m-head h3 { font-size: 14.5px; font-weight: 700; }
+  .modal .m-body { padding: 12px 18px 18px; }
+  .modal .m-title-in { width: 100%; border: none; font-size: 15px; font-weight: 600; padding: 8px 0; }
+  .modal .m-title-in:focus { outline: none; }
+  .modal textarea {
+    width: 100%; min-height: 74px; border: 1px solid var(--border-strong); border-radius: var(--radius);
+    padding: 9px 11px; font-size: 12.5px; resize: vertical; background: var(--surface);
+  }
+  .modal textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .modal .m-props { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; margin-top: 12px; }
+  .modal .m-props label { font-size: 11px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px; }
+  .modal .m-props select { width: 100%; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 8px; font-size: 12.5px; }
+  .modal .m-foot { display: flex; justify-content: flex-end; gap: 9px; padding: 4px 18px 16px; }
+
+  /* toast */
+  #toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translate(-50%, 90px); background: #17181c; color: #fff;
+    padding: 9px 17px; border-radius: 9px; font-size: 12.5px; font-weight: 500; box-shadow: var(--shadow-lg);
+    z-index: 95; opacity: 0;
+  }
+  #toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+  .banner {
+    display: flex; gap: 10px; align-items: flex-start; background: #fdf6e7; border: 1px solid #ecd9a8;
+    color: #6b5a2a; border-radius: 10px; padding: 10px 14px; font-size: 12.5px; margin-bottom: 16px;
+  }
+  .banner svg { width: 15px; height: 15px; flex: none; margin-top: 1px; }
+
+  @media (max-width: 860px) {
+    #sidebar { display: none; }
+    #main { left: 52px; }
+    .page { padding: 18px 14px 50px; }
+    .proj-head .head-actions .btn-ghost { display: none; }
+    .tabs { overflow-x: auto; flex-wrap: nowrap; }
+    .tab { flex: none; white-space: nowrap; }
+    .lv-row .labels, .lv-row .cyc { display: none; }
+    .lv-row .id { width: 48px; }
+    .bcol { width: 240px; }
+    .toolbar .t-search { max-width: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav id="rail" aria-label="Primary">
+  <svg class="logo" viewBox="0 0 32 32" aria-label="PlaneCraft" role="img"><rect width="32" height="32" rx="8" fill="#4453e6"/><g transform="translate(16 16.7) rotate(-38) scale(1.1) translate(-12 -12)"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" fill="#2c37a8" opacity="0.5"/></g><g transform="translate(16 16) rotate(-38) scale(1.1) translate(-12 -12)"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" fill="#fff"/></g></svg>
+  <button class="rail-btn" data-nav="home" aria-label="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg><span class="rail-tip">Home</span></button>
+  <button class="rail-btn" data-nav="work-items" aria-label="All work items"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="m3 6 1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2"/></svg><span class="rail-tip">Work items</span></button>
+  <button class="rail-btn" data-nav="inbox" aria-label="Inbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5z"/></svg><span class="rail-tip">Inbox</span></button>
+  <button class="rail-btn" data-nav="analytics" aria-label="Analytics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9M13 17V5M8 17v-3"/></svg><span class="rail-tip">Analytics</span></button>
+  <div class="spacer"></div>
+  <button class="rail-btn" data-nav="settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.08a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="rail-tip">Settings</span></button>
+  <div class="avatar" title="Alex Rivera">AR</div>
+</nav>
+
+<aside id="sidebar" aria-label="Workspace">
+  <div class="side-head">
+    <button class="ws-switch">
+      <span class="ws-mark"><svg viewBox="0 0 32 32" fill="none"><g transform="translate(16 16) rotate(-38) scale(1.1) translate(-12 -12)"><path d="M2.01 21 23 12 2.01 3 2 10l15 2-15 2z" fill="#fff"/></g></svg></span>
+      <span class="ws-name">Aurora Studio</span>
+      <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+  </div>
+  <div class="side-search">
+    <svg class="s-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="global-search" type="search" placeholder="Search" aria-label="Search">
+    <span class="s-key">/</span>
+  </div>
+  <div class="side-scroll">
+    <div class="side-section">
+      <button class="side-item" data-nav="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>Home</button>
+      <button class="side-item" data-nav="work-items"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><path d="m3 6 1 1 2-2M3 12l1 1 2-2M3 18l1 1 2-2"/></svg>My work items<span class="count" id="side-my-count"></span></button>
+      <button class="side-item" data-nav="inbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5z"/></svg>Inbox</button>
+    </div>
+    <div class="side-section">
+      <div class="side-label"><span>Projects</span><button id="side-add-proj" aria-label="New project"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button></div>
+      <div id="side-projects"></div>
+    </div>
+    <div class="side-section">
+      <div class="side-label"><span>Views</span></div>
+      <div id="side-views"></div>
+    </div>
+  </div>
+  <div class="side-foot">
+    <button class="side-item" data-nav="invite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>Invite members</button>
+    <button class="side-item" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3M4.9 4.9l2.1 2.1m10 10 2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>Settings</button>
+  </div>
+</aside>
+
+<main id="main"><div class="page" id="page"></div></main>
+
+<div id="drawer-veil"></div>
+<section id="drawer" aria-label="Work item detail">
+  <div class="dr-head">
+    <span class="id" id="dr-id"></span>
+    <button class="dr-x" id="dr-close" aria-label="Close panel"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+  </div>
+  <div class="dr-body" id="dr-body"></div>
+</section>
+
+<div id="modal-veil">
+  <div class="modal" role="dialog" aria-modal="true" id="modal"></div>
+</div>
+
+<div id="toast" role="status"></div>
+<script src="../assistant/widget.js" data-craft="planecraft" defer></script>
+
+<script>
+"use strict";
+/* =====================================================================
+   PlaneCraft — data model, persistence and UI.
+   Reconstruction of Plane's documented feature set (work items, cycles,
+   modules, views, pages, analytics) with original code and artwork.
+   ===================================================================== */
+
+const STATES = [
+  { id: "backlog", name: "Backlog", color: "#8b8f98" },
+  { id: "todo", name: "Todo", color: "#6e7f96" },
+  { id: "in_progress", name: "In Progress", color: "#d9a514" },
+  { id: "done", name: "Done", color: "#3f9142" },
+  { id: "cancelled", name: "Cancelled", color: "#d6564d" },
+];
+const PRIORITIES = [
+  { id: "urgent", name: "Urgent", color: "#d6564d" },
+  { id: "high", name: "High", color: "#e8833a" },
+  { id: "medium", name: "Medium", color: "#d9a514" },
+  { id: "low", name: "Low", color: "#8b8f98" },
+  { id: "none", name: "None", color: "#a6abb5" },
+];
+const MEMBERS = [
+  { id: "ar", name: "Alex Rivera", initials: "AR", color: "#4453e6" },
+  { id: "jm", name: "Jules Martin", initials: "JM", color: "#0e8a6d" },
+  { id: "kt", name: "Kira Tanaka", initials: "KT", color: "#b0562f" },
+  { id: "sd", name: "Sam Doyle", initials: "SD", color: "#7a49a8" },
+  { id: "np", name: "Noor Patel", initials: "NP", color: "#2d7bb0" },
+];
+const ME = "ar";
+const LBL = {
+  bug: { name: "Bug", bg: "#fdecea", fg: "#b3402f" },
+  feature: { name: "Feature", bg: "#eef0fd", fg: "#3a47b8" },
+  improvement: { name: "Improvement", bg: "#e8f6e9", fg: "#2c7a30" },
+  design: { name: "Design", bg: "#f7ecfb", fg: "#8b3fa0" },
+  docs: { name: "Docs", bg: "#fbf3d9", fg: "#8a6a10" },
+  infra: { name: "Infra", bg: "#e6eef4", fg: "#33607d" },
+};
+
+function seedData() {
+  const iso = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
+  return {
+    v: 1,
+    seq: 30,
+    projects: [
+      {
+        id: "p1", key: "AUR", name: "Aurora Web App", color: "#4453e6",
+        desc: "Customer-facing marketing site and web app rebuild.",
+        members: ["ar", "jm", "kt", "sd"],
+        cycles: [
+          { id: "c1", name: "Cycle 24", start: iso(-6), end: iso(8), state: "current" },
+          { id: "c2", name: "Cycle 25", start: iso(9), end: iso(23), state: "upcoming" },
+          { id: "c0", name: "Cycle 23", start: iso(-34), end: iso(-20), state: "completed" },
+        ],
+        modules: [
+          { id: "m1", name: "Onboarding flow", desc: "Signup, first-run tour and empty states." },
+          { id: "m2", name: "Billing", desc: "Plans, invoices and payment retries." },
+          { id: "m3", name: "Design system", desc: "Tokens, components and docs site." },
+        ],
+        pages: [
+          { id: "pg1", title: "Cycle 24 planning notes", updated: iso(-1), content: "Cycle 24 goals\n\n- Ship the new onboarding flow\n- Cut checkout drop-off by 15%\n- Design review every Tuesday\n\nRisks: billing migration lands mid-cycle; QA window is tight." },
+          { id: "pg2", title: "Weekly standup — log", updated: iso(-3), content: "Mon: billing migration branch green. Tue: design review moved to Thu. Wed: onboarding tour copy drafted. Thu: bug bash, 6 findings triaged." },
+          { id: "pg3", title: "Release checklist", updated: iso(-8), content: "Before tagging a release:\n\n1. All cycle items Done or rolled over\n2. Smoke test on staging\n3. Changelog drafted\n4. Announce in #releases" },
+        ],
+        views: [
+          { id: "v1", name: "My open items", desc: "Assigned to me, not Done", filters: { assignee: ["ar"], state: ["backlog", "todo", "in_progress"] } },
+          { id: "v2", name: "This cycle", desc: "Everything in Cycle 24", filters: { cycle: ["c1"] } },
+          { id: "v3", name: "Bugs first", desc: "Open items labelled Bug", filters: { label: ["bug"], state: ["backlog", "todo", "in_progress"] } },
+        ],
+      },
+      {
+        id: "p2", key: "MOB", name: "Mobile Companion", color: "#0e8a6d",
+        desc: "iOS and Android companion app for field teams.",
+        members: ["kt", "np", "sd"],
+        cycles: [
+          { id: "c3", name: "Sprint 9", start: iso(-3), end: iso(11), state: "current" },
+        ],
+        modules: [{ id: "m4", name: "Offline sync", desc: "Queue and reconcile edits without signal." }],
+        pages: [{ id: "pg4", title: "Offline sync spec", updated: iso(-5), content: "Requirements\n\n- Edits queue locally while offline\n- Conflict resolution: last-write-wins with audit trail\n- Background sync on reconnect" }],
+        views: [{ id: "v4", name: "Sync bugs", desc: "Offline sync bug list", filters: { label: ["bug"], state: ["backlog", "todo", "in_progress"] } }],
+      },
+      {
+        id: "p3", key: "DSN", name: "Design System", color: "#b0562f",
+        desc: "Shared component library and tokens for all products.",
+        members: ["sd", "ar"],
+        cycles: [],
+        modules: [],
+        pages: [{ id: "pg5", title: "Token naming rules", updated: iso(-12), content: "Color tokens use role names (--color-surface), never palette names.\n\nSpacing is a 4px scale. Radius steps: 6, 8, 12, 16." }],
+        views: [],
+      },
+    ],
+    issues: [
+      { id: "i1", p: "p1", seq: 1, title: "Rebuild pricing page with new components", desc: "Use the refreshed PricingTable from the design system. Keep the annual/monthly toggle.", state: "in_progress", pri: "high", as: "jm", labels: ["feature", "design"], cycle: "c1", module: "m3", est: 5, due: iso(2), subs: [{ t: "Component audit", done: true }, { t: "Copy pass", done: false }], comments: [{ by: "sd", at: iso(-2), text: "Latest comps are in Figma — the toggle moved next to the cards." }], created: iso(-10) },
+      { id: "i2", p: "p1", seq: 2, title: "Checkout drops card details on retry", desc: "When a payment fails and the user retries, the form clears and the error banner disappears.", state: "todo", pri: "urgent", as: "ar", labels: ["bug"], cycle: "c1", module: "m2", est: 3, due: iso(1), subs: [{ t: "Reproduce on staging", done: true }], comments: [], created: iso(-7) },
+      { id: "i3", p: "p1", seq: 3, title: "Onboarding: first-run tour", desc: "Four-step spotlight tour for new workspaces, skippable and remembered.", state: "in_progress", pri: "high", as: "kt", labels: ["feature"], cycle: "c1", module: "m1", est: 8, due: iso(5), subs: [{ t: "Draft copy", done: true }, { t: "Spotlight component", done: true }, { t: "Analytics events", done: false }], comments: [{ by: "ar", at: iso(-1), text: "Ship behind a flag; we enable per workspace." }], created: iso(-9) },
+      { id: "i4", p: "p1", seq: 4, title: "Empty states for all list views", desc: "Every list and board needs a friendly empty state with one next action.", state: "todo", pri: "medium", as: "sd", labels: ["design", "improvement"], cycle: "c1", module: "m1", est: 3, due: iso(9), subs: [], comments: [], created: iso(-6) },
+      { id: "i5", p: "p1", seq: 5, title: "Payment retry backoff is too aggressive", desc: "Retry schedule hammers the provider; move to exponential backoff.", state: "backlog", pri: "medium", as: "jm", labels: ["bug", "infra"], cycle: "c1", module: "m2", est: 2, due: null, subs: [], comments: [], created: iso(-5) },
+      { id: "i6", p: "p1", seq: 6, title: "Design tokens: dark mode audit", desc: "Contrast-check every token pair against the dark surfaces.", state: "todo", pri: "low", as: "sd", labels: ["design"], cycle: "c1", module: "m3", est: 5, due: iso(12), subs: [], comments: [], created: iso(-4) },
+      { id: "i7", p: "p1", seq: 7, title: "Invoice PDF layout breaks on long names", desc: "Company names over 60 chars overflow the billing box.", state: "done", pri: "medium", as: "jm", labels: ["bug"], cycle: "c0", module: "m2", est: 2, due: iso(-3), subs: [], comments: [{ by: "jm", at: iso(-3), text: "Shipped in Cycle 23 — truncation with tooltip." }], created: iso(-28) },
+      { id: "i8", p: "p1", seq: 8, title: "Cycle planning template page", desc: "A starter page teams can copy each cycle: goals, risks, demo items.", state: "backlog", pri: "low", as: "ar", labels: ["docs", "improvement"], cycle: null, module: null, est: 1, due: null, subs: [], comments: [], created: iso(-2) },
+      { id: "i9", p: "p1", seq: 9, title: "Search returns archived projects", desc: "Global search should exclude archived projects unless asked.", state: "done", pri: "low", as: "kt", labels: ["bug"], cycle: "c0", module: null, est: 1, due: iso(-22), subs: [], comments: [], created: iso(-30) },
+      { id: "i10", p: "p1", seq: 10, title: "Component docs: live playground", desc: "Embed live component demos in the docs site pages.", state: "todo", pri: "medium", as: "sd", labels: ["feature", "docs"], cycle: "c2", module: "m3", est: 5, due: iso(16), subs: [], comments: [], created: iso(-1) },
+      { id: "i11", p: "p2", seq: 1, title: "Offline queue loses edits after app restart", desc: "Queued edits vanish if the app is killed before sync completes.", state: "in_progress", pri: "urgent", as: "np", labels: ["bug"], cycle: "c3", module: "m4", est: 8, due: iso(3), subs: [{ t: "Persist queue to disk", done: true }, { t: "Replay on boot", done: false }], comments: [], created: iso(-6) },
+      { id: "i12", p: "p2", seq: 2, title: "Field photo upload compresses twice", desc: "Photos are compressed on capture and again on upload — quality suffers.", state: "todo", pri: "medium", as: "kt", labels: ["bug"], cycle: "c3", module: null, est: 3, due: iso(6), subs: [], comments: [], created: iso(-4) },
+      { id: "i13", p: "p2", seq: 3, title: "Offline sync spec review", desc: "Walk the team through the conflict-resolution rules before build.", state: "done", pri: "high", as: "kt", labels: ["docs"], cycle: "c3", module: "m4", est: 1, due: iso(-2), subs: [], comments: [{ by: "np", at: iso(-2), text: "Signed off — building against v2 of the spec." }], created: iso(-9) },
+      { id: "i14", p: "p2", seq: 4, title: "Home dashboard widgets for field teams", desc: "Today's jobs, sync status and unread alerts in one glance.", state: "backlog", pri: "medium", as: "np", labels: ["feature"], cycle: null, module: null, est: 8, due: null, subs: [], comments: [], created: iso(-1) },
+      { id: "i15", p: "p3", seq: 1, title: "Publish token naming rules", desc: "Finalise and publish the naming conventions page.", state: "done", pri: "medium", as: "sd", labels: ["docs"], cycle: null, module: null, est: 1, due: iso(-11), subs: [], comments: [], created: iso(-14) },
+      { id: "i16", p: "p3", seq: 2, title: "Deprecate legacy spacing scale", desc: "Remove the 6px/10px steps from the old scale; codemod consumers.", state: "todo", pri: "low", as: "ar", labels: ["improvement"], cycle: null, module: null, est: 3, due: iso(14), subs: [], comments: [], created: iso(-3) },
+    ],
+  };
+}
+
+/* ---------- persistence (localStorage with in-memory fallback) ---------- */
+const store = (() => {
+  let mem = null, ok = true;
+  try { localStorage.setItem("__pc_t", "1"); localStorage.removeItem("__pc_t"); } catch { ok = false; }
+  return {
+    load() {
+      if (!ok) return mem;
+      try { const raw = localStorage.getItem("planecraft-data-v1"); return raw ? JSON.parse(raw) : null; }
+      catch { return null; }
+    },
+    save(d) { mem = d; if (ok) { try { localStorage.setItem("planecraft-data-v1", JSON.stringify(d)); } catch {} } },
+    reset() { if (ok) { try { localStorage.removeItem("planecraft-data-v1"); } catch {} } mem = null; },
+  };
+})();
+
+let db = store.load();
+if (!db || !db.projects) db = seedData();
+
+/* ---------- app state ---------- */
+const app = {
+  view: "home",          // home | project | my-items | inbox | analytics | settings | invite
+  projectId: null,
+  tab: "items",          // items | cycles | modules | views | pages | analytics
+  layout: "list",        // list | board | calendar
+  calMonth: null,        // {y, m} — null = current month
+  filters: freshFilters(),
+  openPageId: null,
+  selectedIssue: null,
+  openProjectId: null,    // project context for the new-item modal
+};
+const save = () => store.save(db);
+const $ = (s, el) => (el || document).querySelector(s);
+const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&#38;", "<": "&#60;", ">": "&#62;", '"': "&#34;", "'": "&#39;" }[c]));
+const proj = (id) => db.projects.find(p => p.id === id);
+const member = (id) => MEMBERS.find(m => m.id === id);
+const stateOf = (id) => STATES.find(s => s.id === id) || STATES[0];
+const priOf = (id) => PRIORITIES.find(p => p.id === id) || PRIORITIES[4];
+const issueId = (i) => `${proj(i.p).key}-${i.seq}`;
+const projectIssues = (pid) => db.issues.filter(i => i.p === pid);
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2400);
+}
+
+/* ---------- svg helpers ---------- */
+const svgCheck = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 13 4 4L19 7"/></svg>';
+const svgPri = {
+  urgent: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2 1.5 21h21z"/><rect x="11" y="16" width="2" height="2" rx="0.5"/><rect x="11" y="9" width="2" height="5" rx="0.5"/></svg>',
+  high: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
+  medium: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M6 5h12"/></svg>',
+  low: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
+  none: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"/></svg>',
+};
+const svgPlus = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+
+function stateChip(st) {
+  const s = stateOf(st);
+  return `<span class="state-chip" style="background:${s.color}1d;color:${s.color}"><i style="background:${s.color}"></i>${s.name}</span>`;
+}
+function priChip(p) { return `<span class="pri ${p === "none" ? "none-p" : p}" title="${priOf(p).name}">${svgPri[p]}</span>`; }
+function avatarEl(id, extra) {
+  const m = member(id);
+  if (!m) return `<span class="assignee none ${extra || ""}" title="Unassigned"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg></span>`;
+  return `<span class="assignee ${extra || ""}" title="${esc(m.name)}" style="background:${m.color}">${m.initials}</span>`;
+}
+
+/* ---------- routing / rendering ---------- */
+function freshFilters() { return { state: [], pri: [], assignee: [], label: [], cycle: [], module: [], search: "" }; }
+
+function nav(view, opts = {}) {
+  Object.assign(app, { view, projectId: opts.projectId ?? null, tab: opts.tab || "items", openPageId: null });
+  if (opts.resetFilters !== false) app.filters = freshFilters();
+  if (view === "project" && opts.projectId) { app.openProjectId = opts.projectId; }
+  app.calMonth = null;
+  render();
+  $("#main").scrollTop = 0;
+}
+
+function render() {
+  renderSidebar();
+  const p = $("#page");
+  if (app.view === "home") renderHome(p);
+  else if (app.view === "project") renderProject(p);
+  else if (app.view === "my-items") renderMyItems(p);
+  else if (app.view === "analytics") renderAnalytics(p, null);
+  else if (app.view === "inbox") renderInbox(p);
+  else if (app.view === "settings" || app.view === "invite") renderSettings(p, app.view);
+  closeDrawer(true);
+}
+
+function renderSidebar() {
+  $$("#sidebar .side-item").forEach(b => b.classList.toggle("active",
+    (app.view === "home" && b.dataset.nav === "home") ||
+    (app.view === "my-items" && b.dataset.nav === "work-items") ||
+    (app.view === "inbox" && b.dataset.nav === "inbox") ||
+    (app.view === "analytics" && b.dataset.nav === "analytics") ||
+    (app.view === "settings" && b.dataset.nav === "settings")));
+  const mine = db.issues.filter(i => i.as === ME && !["done", "cancelled"].includes(i.state)).length;
+  $("#side-my-count").textContent = mine;
+  $("#side-projects").innerHTML = db.projects.map(pr => `
+    <button class="side-item ${app.view === "project" && app.projectId === pr.id ? "active" : ""}" data-proj="${pr.id}">
+      <span class="dot" style="background:${pr.color}">${pr.key[0]}</span>
+      <span class="sname">${esc(pr.name)}</span>
+    </button>`).join("");
+  $("#side-views").innerHTML = db.projects.flatMap(pr =>
+    pr.views.map(v => `<button class="side-item" data-view="${v.id}" data-proj="${pr.id}" title="${esc(pr.name)} — ${esc(v.name)}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h13M3 12h13M3 19h7"/><circle cx="18" cy="16" r="3"/><path d="m21 19 2 2"/></svg>
+      <span class="sname">${esc(v.name)}</span></button>`)
+  ).join("");
+}
+
+/* ---------- home ---------- */
+function renderHome(p) {
+  const cards = db.projects.map(pr => {
+    const issues = projectIssues(pr.id);
+    const done = issues.filter(i => i.state === "done").length;
+    const pct = issues.length ? Math.round(done / issues.length * 100) : 0;
+    return `<article class="proj-card" data-proj="${pr.id}" tabindex="0" role="button" aria-label="Open ${esc(pr.name)}">
+      <div class="p-top">
+        <span class="p-ico" style="background:${pr.color}">${pr.key}</span>
+        <div><h3>${esc(pr.name)}</h3><span class="p-key">${pr.key}</span></div>
+      </div>
+      <p class="p-desc">${esc(pr.desc)}</p>
+      <div class="p-meta">
+        <span class="p-avatars">${pr.members.map(m => { const mm = member(m); return mm ? `<span class="avatar" title="${esc(mm.name)}" style="background:${mm.color}">${mm.initials}</span>` : ""; }).join("")}</span>
+        <span style="font-size:11px;color:var(--text-faint)">${issues.length} items</span>
+      </div>
+      <div class="pbar"><i style="width:${pct}%"></i></div>
+    </article>`;
+  }).join("");
+  p.innerHTML = `
+    <div class="home-head">
+      <div><h1>Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, Alex</h1>
+      <div class="sub">${db.issues.filter(i => !["done", "cancelled"].includes(i.state)).length} open work items across ${db.projects.length} projects</div></div>
+      <button class="btn btn-primary" id="home-new">${svgPlus}New work item</button>
+    </div>
+    <div class="proj-grid">${cards}</div>`;
+  $("#home-new").onclick = () => openNewItemModal(app.openProjectId || db.projects[0].id);
+  $$(".proj-card", p).forEach(c => {
+    c.onclick = () => nav("project", { projectId: c.dataset.proj });
+    c.onkeydown = e => { if (e.key === "Enter") nav("project", { projectId: c.dataset.proj }); };
+  });
+}
+
+/* ---------- project ---------- */
+function renderProject(p) {
+  const pr = proj(app.projectId);
+  if (!pr) { app.view = "home"; return renderHome(p); }
+  const tabs = [
+    ["items", "Work Items"], ["cycles", "Cycles"], ["modules", "Modules"],
+    ["views", "Views"], ["pages", "Pages"], ["analytics", "Analytics"],
+  ];
+  p.innerHTML = `
+    <div class="proj-head">
+      <span class="p-ico" style="background:${pr.color};width:38px;height:38px;border-radius:10px;display:grid;place-items:center;color:#fff;font-weight:700">${pr.key}</span>
+      <div><h2>${esc(pr.name)}</h2><span class="p-key">${pr.key}</span></div>
+      <div class="head-actions">
+        <button class="btn btn-ghost" id="proj-members">${pr.members.length} members</button>
+        <button class="btn btn-primary" id="proj-new">${svgPlus}New work item</button>
+      </div>
+    </div>
+    <div class="tabs">${tabs.map(([id, name]) => `<button class="tab ${app.tab === id ? "active" : ""}" data-tab="${id}">${name}</button>`).join("")}</div>
+    <div id="tab-body"></div>`;
+  $("#proj-new").onclick = () => openNewItemModal(pr.id);
+  $("#proj-members").onclick = () => toast(`Members: ${pr.members.map(m => member(m)?.name).filter(Boolean).join(", ")}`);
+  $$(".tab", p).forEach(t => t.onclick = () => { app.tab = t.dataset.tab; app.openPageId = null; render(); });
+  renderTab($("#tab-body", p), pr);
+}
+
+function renderTab(body, pr) {
+  if (app.tab === "items") renderItemsTab(body, pr);
+  else if (app.tab === "cycles") renderCyclesTab(body, pr);
+  else if (app.tab === "modules") renderModulesTab(body, pr);
+  else if (app.tab === "views") renderViewsTab(body, pr);
+  else if (app.tab === "pages") renderPagesTab(body, pr);
+  else if (app.tab === "analytics") renderAnalytics(body, pr);
+}
+
+/* ---------- work items tab ---------- */
+function filteredIssues(pr) {
+  const f = app.filters;
+  return projectIssues(pr.id).filter(i => {
+    if (f.state.length && !f.state.includes(i.state)) return false;
+    if (f.pri.length && !f.pri.includes(i.pri)) return false;
+    if (f.assignee.length && !f.assignee.includes(i.as || "")) return false;
+    if (f.label.length && !i.labels.some(l => f.label.includes(l))) return false;
+    if (f.cycle.length && !f.cycle.includes(i.cycle || "")) return false;
+    if (f.module.length && !f.module.includes(i.module || "")) return false;
+    if (f.search) {
+      const q = f.search.toLowerCase();
+      if (!(i.title.toLowerCase().includes(q) || (i.desc || "").toLowerCase().includes(q) || issueId(i).toLowerCase().includes(q))) return false;
+    }
+    return true;
+  });
+}
+
+function renderItemsTab(body, pr) {
+  const f = app.filters;
+  const has = (k) => f[k].length > 0;
+  body.innerHTML = `
+    <div class="toolbar">
+      <div class="t-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="it-search" type="search" placeholder="Search work items…" value="${esc(f.search)}" aria-label="Search work items"></div>
+      <div style="position:relative"><button class="fbtn ${has("state") ? "has" : ""}" data-fdrop="state">State ${chevDown()}</button>${dropFor("state")}</div>
+      <div style="position:relative"><button class="fbtn ${has("pri") ? "has" : ""}" data-fdrop="pri">Priority ${chevDown()}</button>${dropFor("pri")}</div>
+      <div style="position:relative"><button class="fbtn ${has("assignee") ? "has" : ""}" data-fdrop="assignee">Assignee ${chevDown()}</button>${dropFor("assignee")}</div>
+      <div style="position:relative"><button class="fbtn ${has("label") ? "has" : ""}" data-fdrop="label">Label ${chevDown()}</button>${dropFor("label")}</div>
+      ${pr.cycles.length ? `<div style="position:relative"><button class="fbtn ${has("cycle") ? "has" : ""}" data-fdrop="cycle">Cycle ${chevDown()}</button>${dropFor("cycle")}</div>` : ""}
+      ${pr.modules.length ? `<div style="position:relative"><button class="fbtn ${has("module") ? "has" : ""}" data-fdrop="module">Module ${chevDown()}</button>${dropFor("module")}</div>` : ""}
+      <div style="margin-left:auto"></div>
+      <div class="seg" role="tablist" aria-label="Layout">
+        <button data-layout="list" class="${app.layout === "list" ? "active" : ""}">List</button>
+        <button data-layout="board" class="${app.layout === "board" ? "active" : ""}">Board</button>
+        <button data-layout="calendar" class="${app.layout === "calendar" ? "active" : ""}">Calendar</button>
+      </div>
+    </div>
+    <div id="items-body"></div>`;
+  const searchIn = $("#it-search", body);
+  searchIn.addEventListener("input", () => { f.search = searchIn.value; drawItems(pr); });
+  $$("[data-layout]", body).forEach(b => b.onclick = () => { app.layout = b.dataset.layout; render(); });
+  $$("[data-fdrop]", body).forEach(btn => btn.addEventListener("click", e => {
+    e.stopPropagation();
+    const d = btn.parentElement.querySelector(".fdrop");
+    $$(".fdrop", body).forEach(x => { if (x !== d) x.style.display = "none"; });
+    d.style.display = d.style.display === "block" ? "none" : "block";
+  }));
+  $$(".fdrop", body).forEach(d => d.addEventListener("click", e => e.stopPropagation()));
+  // Selecting a filter option toggles that value and redraws.
+  $$(".fdrop .f-opt", body).forEach(o => o.addEventListener("click", e => {
+    e.stopPropagation();
+    const kind = o.dataset.fk, v = o.dataset.fv;
+    const arr = app.filters[kind] || (app.filters[kind] = []);
+    const ix = arr.indexOf(v);
+    if (ix >= 0) arr.splice(ix, 1); else arr.push(v);
+    render();
+  }));
+  drawItems(pr);
+}
+
+function chevDown() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"/></svg>'; }
+
+function dropFor(kind) {
+  let opts = [];
+  if (kind === "state") opts = STATES.map(s => ({ id: s.id, name: s.name, color: s.color }));
+  if (kind === "pri") opts = PRIORITIES.map(s => ({ id: s.id, name: s.name, color: s.color }));
+  if (kind === "assignee") opts = [{ id: "", name: "Unassigned", color: "#a6abb5" }, ...MEMBERS.map(m => ({ id: m.id, name: m.name, color: m.color }))];
+  if (kind === "label") opts = Object.entries(LBL).map(([id, l]) => ({ id, name: l.name, color: l.fg }));
+  if (kind === "cycle") opts = proj(app.projectId).cycles.map(c => ({ id: c.id, name: c.name, color: "#4453e6" }));
+  if (kind === "module") opts = proj(app.projectId).modules.map(m => ({ id: m.id, name: m.name, color: "#4453e6" }));
+  const f = app.filters;
+  return `<div class="fdrop" style="display:none">
+    <div class="f-title">${kind === "pri" ? "Priority" : kind.charAt(0).toUpperCase() + kind.slice(1)}</div>
+    ${opts.map(o => `<button class="f-opt ${f[kind].includes(o.id) ? "on" : ""}" data-fk="${kind}" data-fv="${o.id}">
+      <span class="chk">${svgCheck}</span>
+      ${o.color ? `<i style="width:8px;height:8px;border-radius:50%;background:${o.color};flex:none"></i>` : ""}
+      ${esc(o.name)}</button>`).join("")}
+  </div>`;
+}
+
+function drawItems(pr) {
+  const body = $("#items-body");
+  const issues = filteredIssues(pr);
+  if (app.layout === "list") drawList(body, pr, issues);
+  else if (app.layout === "board") drawBoard(body, pr, issues);
+  else drawCalendar(body, pr, issues);
+  $$(".fbtn[data-fdrop]", $("#tab-body")).forEach(btn => {
+    const kind = btn.dataset.fdrop;
+    btn.classList.toggle("has", app.filters[kind].length > 0);
+  });
+}
+
+function issueRow(i) {
+  return `<div class="lv-row" data-issue="${i.id}" role="button" tabindex="0">
+    ${priChip(i.pri)}
+    ${stateChip(i.state)}
+    <span class="id">${issueId(i)}</span>
+    <span class="ttl">${esc(i.title)}</span>
+    <span class="labels">${i.labels.map(l => `<span class="chiplabel" style="background:${LBL[l].bg};color:${LBL[l].fg}">${LBL[l].name}</span>`).join("")}</span>
+    ${i.cycle ? `<span class="cyc" style="font-size:10.5px;color:var(--text-faint);flex:none">${esc(proj(i.p).cycles.find(c => c.id === i.cycle)?.name || "")}</span>` : ""}
+    ${avatarEl(i.as)}
+  </div>`;
+}
+
+function drawList(body, pr, issues) {
+  if (!issues.length) {
+    body.innerHTML = `<div class="empty">${icoInbox()}<b>No work items match</b>Clear the filters or create the first work item.</div>`;
+    return;
+  }
+  const groups = STATES.map(s => ({ s, items: issues.filter(i => i.state === s.id) })).filter(g => g.items.length);
+  body.innerHTML = `<div class="list-view">${groups.map(g => `
+    <div class="lv-group">
+      <div class="lv-group-head"><i style="width:8px;height:8px;border-radius:50%;background:${g.s.color}"></i>${g.s.name} <span class="gcount">${g.items.length}</span></div>
+      ${g.items.map(issueRow).join("")}
+    </div>`).join("")}</div>`;
+  $$(".lv-row", body).forEach(r => {
+    const open = () => openDrawer(r.dataset.issue);
+    r.onclick = open; r.onkeydown = e => { if (e.key === "Enter") open(); };
+  });
+}
+
+function drawBoard(body, pr, issues) {
+  body.innerHTML = `<div class="board">${STATES.map(s => {
+    const items = issues.filter(i => i.state === s.id);
+    return `<div class="bcol" data-state="${s.id}">
+      <div class="bcol-head"><i style="width:8px;height:8px;border-radius:50%;background:${s.color}"></i>${s.name} <span class="gcount">${items.length}</span></div>
+      <div class="bcol-body">${items.map(i => `
+        <div class="bcard" draggable="true" data-issue="${i.id}">
+          <div class="b-id">${issueId(i)}</div>
+          <div class="b-ttl">${esc(i.title)}</div>
+          <div class="b-foot">${priChip(i.pri)}
+            <span class="chiplabel" style="background:${LBL[i.labels[0]]?.bg || "#eceef2"};color:${LBL[i.labels[0]]?.fg || "#9aa0aa"}">${LBL[i.labels[0]]?.name || "No label"}</span>
+            ${avatarEl(i.as)}
+          </div>
+        </div>`).join("")}</div>
+    </div>`;
+  }).join("")}</div>`;
+  $$(".bcard", body).forEach(c => {
+    c.onclick = () => openDrawer(c.dataset.issue);
+    c.addEventListener("dragstart", e => { e.dataTransfer.setData("text/plain", c.dataset.issue); c.classList.add("dragging"); });
+    c.addEventListener("dragend", () => c.classList.remove("dragging"));
+  });
+  $$(".bcol", body).forEach(col => {
+    col.addEventListener("dragover", e => { e.preventDefault(); col.classList.add("dragover"); });
+    col.addEventListener("dragleave", () => col.classList.remove("dragover"));
+    col.addEventListener("drop", e => {
+      e.preventDefault(); col.classList.remove("dragover");
+      const id = e.dataTransfer.getData("text/plain");
+      const i = db.issues.find(x => x.id === id);
+      if (i && i.state !== col.dataset.state) { i.state = col.dataset.state; save(); drawItems(pr); }
+    });
+  });
+}
+
+function drawCalendar(body, pr, issues) {
+  const base = app.calMonth ? new Date(app.calMonth.y, app.calMonth.m, 1) : new Date();
+  const y = base.getFullYear(), m = base.getMonth();
+  const first = new Date(y, m, 1);
+  const startDow = (first.getDay() + 6) % 7; // Monday-first
+  const dim = new Date(y, m + 1, 0).getDate();
+  const prevDim = new Date(y, m, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const dt = new Date(y, m, i - startDow + 1);
+    cells.push({ iso: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`, out: dt.getMonth() !== m, label: dt.getDate() });
+  }
+  const today = todayISO();
+  const monthName = first.toLocaleString("en-GB", { month: "long", year: "numeric" });
+  body.innerHTML = `
+    <div class="cal-head">
+      <h3>${monthName}</h3>
+      <div class="cal-nav">
+        <button class="btn btn-ghost btn-sm" data-cal="-1">‹ Prev</button>
+        <button class="btn btn-ghost btn-sm" data-cal="0">Today</button>
+        <button class="btn btn-ghost btn-sm" data-cal="1">Next ›</button>
+      </div>
+    </div>
+    <div class="cal-grid">
+      ${["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => `<div class="cal-dow">${d}</div>`).join("")}
+      ${cells.map(c => {
+        const evs = issues.filter(i => i.due === c.iso);
+        return `<div class="cal-cell ${c.out ? "out" : ""} ${c.iso === today ? "today" : ""}">
+          <div class="dnum">${c.label}</div>
+          ${evs.map(i => `<div class="cal-ev" data-issue="${i.id}" style="background:${stateOf(i.state).color}1d;color:${stateOf(i.state).color}"><i style="background:${stateOf(i.state).color}"></i>${esc(i.title)}</div>`).join("")}
+        </div>`;
+      }).join("")}
+    </div>`;
+  $$("[data-cal]", body).forEach(b => b.onclick = () => {
+    const d = new Date(y, m, 1);
+    if (b.dataset.cal === "0") app.calMonth = null;
+    else d.setMonth(d.getMonth() + Number(b.dataset.cal)), app.calMonth = { y: d.getFullYear(), m: d.getMonth() };
+    render();
+  });
+  $$(".cal-ev", body).forEach(e => e.onclick = () => openDrawer(e.dataset.issue));
+}
+
+/* ---------- cycles / modules / views / pages ---------- */
+function renderCyclesTab(body, pr) {
+  if (!pr.cycles.length) { body.innerHTML = `<div class="empty">${icoCal()}<b>No cycles yet</b>Cycles are time-boxed sprints that group work items.</div>`; return; }
+  body.innerHTML = pr.cycles.map(c => {
+    const items = projectIssues(pr.id).filter(i => i.cycle === c.id);
+    const done = items.filter(i => i.state === "done").length;
+    const pct = items.length ? Math.round(done / items.length * 100) : 0;
+    return `<div class="cycle-row" data-cycle="${c.id}">
+      <div class="c-info">
+        <div class="c-name">${esc(c.name)} <span class="badge ${c.state}">${c.state}</span></div>
+        <div class="c-dates">${fmtDate(c.start)} → ${fmtDate(c.end)}</div>
+      </div>
+      <div class="c-stats">
+        <div class="c-stat"><b>${items.length}</b><span>Items</span></div>
+        <div class="c-stat"><b>${done}</b><span>Done</span></div>
+        <div class="cprog"><span class="pct">${pct}%</span><div class="pbar"><i style="width:${pct}%"></i></div></div>
+      </div>
+    </div>`;
+  }).join("");
+  $$(".cycle-row", body).forEach(r => r.onclick = () => {
+    app.filters = Object.assign(freshFilters(), { cycle: [r.dataset.cycle] });
+    app.tab = "items"; render();
+  });
+}
+
+function renderModulesTab(body, pr) {
+  if (!pr.modules.length) { body.innerHTML = `<div class="empty">${icoGrid()}<b>No modules yet</b>Modules group related work items by theme or milestone.</div>`; return; }
+  body.innerHTML = `<div class="mod-grid">${pr.modules.map(mo => {
+    const items = projectIssues(pr.id).filter(i => i.module === mo.id);
+    const done = items.filter(i => i.state === "done").length;
+    const pct = items.length ? Math.round(done / items.length * 100) : 0;
+    return `<div class="mod-card" data-module="${mo.id}">
+      <h4>${esc(mo.name)}</h4>
+      <p class="m-desc">${esc(mo.desc)}</p>
+      <div class="m-meta"><span>${items.length} work items · ${done} done</span><span>${pct}%</span></div>
+      <div class="pbar" style="margin-top:9px"><i style="width:${pct}%"></i></div>
+    </div>`;
+  }).join("")}</div>`;
+  $$(".mod-card", body).forEach(c => c.onclick = () => {
+    app.filters = freshFilters();
+    app.filters.module = [c.dataset.module];
+    app.tab = "items"; render();
+  });
+}
+
+function renderViewsTab(body, pr) {
+  if (!pr.views.length) { body.innerHTML = `<div class="empty">${icoFilter()}<b>No saved views</b>Views are saved filters you can share with the team.</div>`; return; }
+  body.innerHTML = pr.views.map(v => `
+    <div class="view-row" data-sview="${v.id}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h13M3 12h13M3 19h7"/><circle cx="18" cy="16" r="3"/><path d="m21 19 2 2"/></svg>
+      <div><div class="v-name">${esc(v.name)}</div><div class="v-desc">${esc(v.desc)}</div></div>
+      <span class="v-apply btn btn-ghost btn-sm">Apply view</span>
+    </div>`).join("");
+  $$(".view-row", body).forEach(r => r.onclick = () => {
+    const v = pr.views.find(x => x.id === r.dataset.sview);
+    app.filters = Object.assign(freshFilters(), {
+      state: [...v.filters.state || []], pri: [...v.filters.pri || []], assignee: [...v.filters.assignee || []],
+      label: [...v.filters.label || []], cycle: [...v.filters.cycle || []], module: [...v.filters.module || []],
+    });
+    app.tab = "items"; render();
+  });
+}
+
+function renderPagesTab(body, pr) {
+  if (app.openPageId) return renderPageEditor(body, pr);
+  if (!pr.pages.length) { body.innerHTML = `<div class="empty">${icoDoc()}<b>No pages yet</b>Pages hold meeting notes, specs and knowledge alongside the work.</div>`; return; }
+  body.innerHTML = pr.pages.map(pg => `
+    <div class="page-row" data-page="${pg.id}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+      <span class="pg-name">${esc(pg.title)}</span>
+      <span class="pg-meta">Updated ${fmtDate(pg.updated)}</span>
+    </div>`).join("");
+  $$(".page-row", body).forEach(r => r.onclick = () => { app.openPageId = r.dataset.page; render(); });
+}
+
+function renderPageEditor(body, pr) {
+  const pg = pr.pages.find(x => x.id === app.openPageId);
+  if (!pg) { app.openPageId = null; return renderPagesTab(body, pr); }
+  body.innerHTML = `
+    <div style="margin-bottom:12px"><button class="btn btn-ghost btn-sm" id="pg-back">‹ All pages</button></div>
+    <div class="page-editor">
+      <div class="pe-head"><input class="pe-title" id="pe-title" value="${esc(pg.title)}" aria-label="Page title"></div>
+      <div class="pe-toolbar"><span class="hint">Changes save as you type</span></div>
+      <div class="pe-body"><textarea class="pe-content" id="pe-content" aria-label="Page content">${esc(pg.content)}</textarea></div>
+    </div>`;
+  $("#pg-back").onclick = () => { app.openPageId = null; render(); };
+  const title = $("#pe-title"), content = $("#pe-content");
+  const persist = () => { pg.title = title.value || "Untitled"; pg.content = content.value; pg.updated = todayISO(); save(); };
+  title.addEventListener("input", persist);
+  content.addEventListener("input", persist);
+}
+
+/* ---------- analytics ---------- */
+function renderAnalytics(body, pr) {
+  const issues = pr ? projectIssues(pr.id) : db.issues;
+  const open = issues.filter(i => !["done", "cancelled"].includes(i.state));
+  const done = issues.filter(i => i.state === "done");
+  const rows = (list, colors, nameOf) => list.map(x => {
+    const n = issues.filter(i => (pr ? true : true) && (nameOf(i) === x.id)).length;
+    return `<div class="an-row"><span class="a-label"><i style="background:${x.color}"></i>${x.name}</span><div class="a-bar"><i style="width:${issues.length ? Math.round(n / issues.length * 100) : 0}%"></i></div><span class="a-num">${n}</span></div>`;
+  }).join("");
+  body.innerHTML = `
+    <div class="home-head"><div><h1 style="font-size:19px">Analytics</h1><div class="sub">${pr ? esc(pr.name) : "Whole workspace"} — live counts from the board</div></div></div>
+    <div class="an-big" style="margin-bottom:14px">
+      <div class="an-stat"><b>${issues.length}</b><span>total work items</span></div>
+      <div class="an-stat"><b>${open.length}</b><span>open</span></div>
+      <div class="an-stat"><b>${done.length}</b><span>completed</span></div>
+      <div class="an-stat"><b>${issues.filter(i => i.pri === "urgent" && !["done", "cancelled"].includes(i.state)).length}</b><span>urgent & open</span></div>
+    </div>
+    <div class="an-grid">
+      <div class="an-card"><h4>Work items by state</h4>${rows(STATES, null, i => i.state)}</div>
+      <div class="an-card"><h4>Work items by priority</h4>${rows(PRIORITIES, null, i => i.pri)}</div>
+      <div class="an-card"><h4>Open items by assignee</h4>${MEMBERS.map(m => {
+        const n = open.filter(i => i.as === m.id).length;
+        return `<div class="an-row"><span class="a-label"><i style="background:${m.color}"></i>${m.name.split(" ")[0]}</span><div class="a-bar"><i style="width:${open.length ? Math.round(n / open.length * 100) : 0}%"></i></div><span class="a-num">${n}</span></div>`;
+      }).join("")}</div>
+    </div>`;
+}
+
+/* ---------- my items / inbox / settings ---------- */
+function renderMyItems(p) {
+  const mine = db.issues.filter(i => i.as === ME);
+  const open = mine.filter(i => !["done", "cancelled"].includes(i.state));
+  p.innerHTML = `
+    <div class="home-head"><div><h1 style="font-size:19px">My work items</h1><div class="sub">${open.length} open · ${mine.length - open.length} completed</div></div></div>
+    <div class="list-view">
+      ${open.length ? open.map(i => `<div class="lv-group">${issueRow(i)}</div>`).join("") : `<div class="empty">${icoCheck()}<b>All clear</b>Nothing assigned to you right now.</div>`}
+    </div>`;
+  $$(".lv-row", p).forEach(r => r.onclick = () => openDrawer(r.dataset.issue));
+}
+
+function renderInbox(p) {
+  const recent = db.issues.filter(i => i.comments.length).flatMap(i => i.comments.map(c => ({ i, c })))
+    .sort((a, b) => b.c.at.localeCompare(a.c.at)).slice(0, 12);
+  p.innerHTML = `
+    <div class="home-head"><div><h1 style="font-size:19px">Inbox</h1><div class="sub">Recent activity on your work items</div></div></div>
+    ${recent.length ? recent.map(({ i, c }) => `
+      <div class="view-row" data-issue="${i.id}" style="cursor:pointer">
+        ${avatarEl(c.by)}
+        <div><div class="v-name"><b>${esc(member(c.by)?.name || "?")}</b> commented on ${esc(issueId(i))}</div>
+        <div class="v-desc">“${esc(c.text)}”</div></div>
+        <span class="pg-meta" style="margin-left:auto">${fmtDate(c.at)}</span>
+      </div>`).join("") : `<div class="empty">${icoInbox()}<b>No activity yet</b>Comments and mentions appear here.</div>`}`;
+  $$(".view-row", p).forEach(r => r.onclick = () => openDrawer(r.dataset.issue));
+}
+
+function renderSettings(p, which) {
+  if (which === "invite") {
+    p.innerHTML = `<div class="home-head"><div><h1 style="font-size:19px">Invite members</h1><div class="sub">Reconstruction note: this is a static app — invites are simulated.</div></div></div>
+    <div class="empty">${icoInbox()}<b>Not available offline</b>PlaneCraft runs entirely in your browser and has no server. Real Plane invites need a workspace server.</div>`;
+    return;
+  }
+  p.innerHTML = `
+    <div class="home-head"><div><h1 style="font-size:19px">Workspace settings</h1><div class="sub">Aurora Studio — local-only data</div></div></div>
+    <div class="an-grid">
+      <div class="an-card"><h4>Workspace</h4>
+        <p style="font-size:12.5px;color:var(--text-muted)">Name: <b style="color:var(--text)">Aurora Studio</b><br>Members: ${MEMBERS.length}<br>Projects: ${db.projects.length}<br>Work items: ${db.issues.length}</p>
+      </div>
+      <div class="an-card"><h4>Data</h4>
+        <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:12px">Everything is stored in your browser's local storage. Nothing leaves this page.</p>
+        <button class="btn btn-ghost" id="reset-data">Reset to sample data</button>
+      </div>
+    </div>`;
+  $("#reset-data").onclick = () => { store.reset(); db = seedData(); save(); toast("Workspace reset to sample data"); render(); };
+}
+
+/* ---------- drawer (work item detail) ---------- */
+function openDrawer(issueIdStr) {
+  const i = db.issues.find(x => x.id === issueIdStr);
+  if (!i) return;
+  app.selectedIssue = i.id;
+  const pr = proj(i.p);
+  $("#dr-id").textContent = issueId(i);
+  const body = $("#dr-body");
+  body.innerHTML = `
+    <input class="dr-title" id="dr-title" value="${esc(i.title)}" aria-label="Title">
+    <div class="dr-desc-label">Description</div>
+    <textarea class="dr-desc" id="dr-desc" aria-label="Description">${esc(i.desc || "")}</textarea>
+    <div class="dr-props">
+      <span class="dp-label">State</span><select id="dp-state">${STATES.map(s => `<option value="${s.id}" ${s.id === i.state ? "selected" : ""}>${s.name}</option>`).join("")}</select>
+      <span class="dp-label">Priority</span><select id="dp-pri">${PRIORITIES.map(s => `<option value="${s.id}" ${s.id === i.pri ? "selected" : ""}>${s.name}</option>`).join("")}</select>
+      <span class="dp-label">Assignee</span><select id="dp-as"><option value="" ${!i.as ? "selected" : ""}>Unassigned</option>${MEMBERS.map(m => `<option value="${m.id}" ${m.id === i.as ? "selected" : ""}>${m.name}</option>`).join("")}</select>
+      <span class="dp-label">Labels</span><div style="position:relative"><div class="labels-cell" id="dp-labels">${i.labels.length ? i.labels.map(l => `<span class="chiplabel" style="background:${LBL[l].bg};color:${LBL[l].fg}">${LBL[l].name}</span>`).join("") : '<span style="color:var(--text-faint);font-size:12px">None</span>'}</div><div class="fdrop" id="dp-labels-drop" style="width:190px"></div></div>
+      <span class="dp-label">Cycle</span><select id="dp-cycle"><option value="" ${!i.cycle ? "selected" : ""}>None</option>${pr.cycles.map(c => `<option value="${c.id}" ${c.id === i.cycle ? "selected" : ""}>${c.name}</option>`).join("")}</select>
+      <span class="dp-label">Module</span><select id="dp-module"><option value="" ${!i.module ? "selected" : ""}>None</option>${pr.modules.map(m => `<option value="${m.id}" ${m.id === i.module ? "selected" : ""}>${m.name}</option>`).join("")}</select>
+      <span class="dp-label">Estimate</span><select id="dp-est">${[0, 1, 2, 3, 5, 8, 13].map(e => `<option value="${e}" ${e === i.est ? "selected" : ""}>${e ? e + " points" : "None"}</option>`).join("")}</select>
+      <span class="dp-label">Due date</span><input type="date" id="dp-due" value="${i.due || ""}" style="background:var(--surface-2);border:1px solid transparent;border-radius:var(--radius);padding:5.5px 8px;font-size:12.5px;width:100%">
+    </div>
+    <div class="dr-sec">
+      <div class="dr-sec-head"><b>Sub-items</b><button class="btn btn-ghost btn-sm" id="sub-add">${svgPlus} Add</button></div>
+      <div id="sub-list">${i.subs.map((s, ix) => `<div class="subitem ${s.done ? "done" : ""}" data-ix="${ix}">
+        <button class="cb" aria-label="Toggle sub-item">${svgCheck}</button><span>${esc(s.t)}</span>
+        <button class="del" aria-label="Delete sub-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2m1 0-1 14H8L7 6"/></svg></button>
+      </div>`).join("") || '<span style="color:var(--text-faint);font-size:12px">No sub-items</span>'}</div>
+    </div>
+    <div class="dr-sec">
+      <div class="dr-sec-head"><b>Activity</b></div>
+      ${i.comments.map(c => `<div class="comment">${avatarEl(c.by)}<div class="c-body"><b>${esc(member(c.by)?.name || "?")}</b><span class="c-at">${fmtDate(c.at)}</span><p>${esc(c.text)}</p></div></div>`).join("") || '<span style="color:var(--text-faint);font-size:12px">No comments yet</span>'}
+      <div class="c-new">${avatarEl(ME)}<input id="c-input" placeholder="Add a comment…" aria-label="Add a comment"></div>
+    </div>`;
+  $("#drawer").classList.add("open");
+  $("#drawer-veil").classList.add("open");
+
+  const rerenderList = () => { if (app.view === "project" && app.tab === "items" && app.projectId) drawItems(proj(app.projectId)); else if (app.view === "my-items") renderMyItems($("#page")); };
+  $("#dr-title").addEventListener("input", e => { i.title = e.target.value || "Untitled"; save(); rerenderList(); });
+  $("#dr-desc").addEventListener("input", e => { i.desc = e.target.value; save(); });
+  const bindSel = (sel, fn) => $(sel).addEventListener("change", e => { fn(e.target.value); save(); rerenderList(); if (sel === "#dp-state") refreshDrawerChips(); });
+  bindSel("#dp-state", v => i.state = v);
+  bindSel("#dp-pri", v => i.pri = v);
+  bindSel("#dp-as", v => i.as = v || null);
+  bindSel("#dp-cycle", v => i.cycle = v || null);
+  bindSel("#dp-module", v => i.module = v || null);
+  bindSel("#dp-est", v => i.est = Number(v));
+  $("#dp-due").addEventListener("change", e => { i.due = e.target.value || null; save(); rerenderList(); });
+  $("#dp-labels").onclick = (e) => { e.stopPropagation(); toggleLabelsDrop(); };
+  const labelsDrop = $("#dp-labels-drop");
+  function toggleLabelsDrop() {
+    if (!labelsDrop.innerHTML) {
+      labelsDrop.innerHTML = '<div class="f-title">Labels</div>' + Object.entries(LBL).map(([id, l]) =>
+        `<button class="f-opt ${i.labels.includes(id) ? "on" : ""}" data-lbl="${id}"><span class="chk">${svgCheck}</span><i style="width:9px;height:9px;border-radius:3px;background:${l.bg};border:1px solid ${l.fg}66"></i>${l.name}</button>`).join("");
+      $$(".f-opt", labelsDrop).forEach(b => b.onclick = (ev) => {
+        ev.stopPropagation();
+        const id = b.dataset.lbl;
+        const ix = i.labels.indexOf(id);
+        if (ix >= 0) i.labels.splice(ix, 1); else i.labels.push(id);
+        save(); rerenderList(); toggleLabelsDrop();
+        labelsDrop.style.display = "none";
+        refreshLabelsCell();
+      });
+    }
+    labelsDrop.style.display = labelsDrop.style.display === "block" ? "none" : "block";
+  }
+  function refreshLabelsCell() {
+    $("#dp-labels").innerHTML = i.labels.length ? i.labels.map(l => `<span class="chiplabel" style="background:${LBL[l].bg};color:${LBL[l].fg}">${LBL[l].name}</span>`).join("") : '<span style="color:var(--text-faint);font-size:12px">None</span>';
+  }
+  const subList = $("#sub-list");
+  subList.addEventListener("click", e => {
+    const row = e.target.closest(".subitem"); if (!row) return;
+    const ix = Number(row.dataset.ix);
+    if (e.target.closest(".cb")) { i.subs[ix].done = !i.subs[ix].done; save(); openDrawer(i.id); rerenderList(); }
+    else if (e.target.closest(".del")) { i.subs.splice(ix, 1); save(); openDrawer(i.id); rerenderList(); }
+  });
+  $("#sub-add").onclick = () => {
+    const t = prompt("Sub-item title"); if (!t) return;
+    i.subs.push({ t, done: false }); save(); openDrawer(i.id); rerenderList();
+  };
+  const cInput = $("#c-input");
+  const addComment = () => {
+    const t = cInput.value.trim(); if (!t) return;
+    i.comments.push({ by: ME, at: todayISO(), text: t }); save(); openDrawer(i.id);
+    cInput.focus();
+  };
+  cInput.addEventListener("keydown", e => { if (e.key === "Enter") addComment(); });
+}
+function refreshDrawerChips() { /* state chip lives in the list; nothing extra needed */ }
+
+function closeDrawer(silent) {
+  app.selectedIssue = null;
+  $("#drawer").classList.remove("open");
+  $("#drawer-veil").classList.remove("open");
+  if (!silent) render();
+}
+$("#dr-close").onclick = () => closeDrawer();
+$("#drawer-veil").onclick = () => closeDrawer();
+
+/* ---------- new item modal ---------- */
+function openNewItemModal(projectId) {
+  const pr = proj(projectId) || db.projects[0];
+  const modal = $("#modal");
+  modal.innerHTML = `
+    <div class="m-head"><h3>New work item</h3><span style="font-family:var(--mono);font-size:11px;color:var(--text-faint)">${pr.key}</span></div>
+    <div class="m-body">
+      <input class="m-title-in" id="mi-title" placeholder="Work item title" aria-label="Title">
+      <textarea id="mi-desc" placeholder="Add a description…"></textarea>
+      <div class="m-props">
+        <div><label for="mi-state">State</label><select id="mi-state">${STATES.map(s => `<option value="${s.id}" ${s.id === "todo" ? "selected" : ""}>${s.name}</option>`).join("")}</select></div>
+        <div><label for="mi-pri">Priority</label><select id="mi-pri">${PRIORITIES.map(s => `<option value="${s.id}" ${s.id === "medium" ? "selected" : ""}>${s.name}</option>`).join("")}</select></div>
+        <div><label for="mi-as">Assignee</label><select id="mi-as"><option value="">Unassigned</option>${MEMBERS.map(m => `<option value="${m.id}" ${m.id === ME ? "selected" : ""}>${m.name}</option>`).join("")}</select></div>
+        <div><label for="mi-cycle">Cycle</label><select id="mi-cycle"><option value="">None</option>${pr.cycles.filter(c => c.state === "current").map(c => `<option value="${c.id}" selected>${c.name}</option>`).join("")}${pr.cycles.filter(c => c.state !== "current").map(c => `<option value="${c.id}">${c.name}</option>`).join("")}</select></div>
+        <div><label for="mi-label">Label</label><select id="mi-label"><option value="">None</option>${Object.entries(LBL).map(([id, l]) => `<option value="${id}">${l.name}</option>`).join("")}</select></div>
+        <div><label for="mi-due">Due date</label><input type="date" id="mi-due" style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;font-size:12.5px"></div>
+      </div>
+    </div>
+    <div class="m-foot">
+      <button class="btn btn-ghost" id="mi-cancel">Cancel</button>
+      <button class="btn btn-primary" id="mi-create">Create work item</button>
+    </div>`;
+  $("#modal-veil").classList.add("open");
+  const title = $("#mi-title");
+  setTimeout(() => title.focus(), 30);
+  const close = () => { $("#modal-veil").classList.remove("open"); };
+  $("#mi-cancel").onclick = close;
+  const create = () => {
+    const t = title.value.trim();
+    if (!t) { title.focus(); return; }
+    const item = {
+      id: "i" + Date.now().toString(36), p: pr.id, seq: ++db.seq, title: t,
+      desc: $("#mi-desc").value, state: $("#mi-state").value, pri: $("#mi-pri").value,
+      as: $("#mi-as").value || null, labels: $("#mi-label").value ? [$("#mi-label").value] : [],
+      cycle: $("#mi-cycle").value || null, module: null, est: 0, due: $("#mi-due").value || null,
+      subs: [], comments: [], created: todayISO(),
+    };
+    db.issues.push(item); save(); close();
+    toast(`${pr.key}-${item.seq} created`);
+    if (!(app.view === "project" && app.projectId === pr.id)) nav("project", { projectId: pr.id, tab: "items" });
+    else render();
+  };
+  $("#mi-create").onclick = create;
+  title.addEventListener("keydown", e => { if (e.key === "Enter") create(); });
+  $("#modal-veil").onclick = e => { if (e.target === $("#modal-veil")) close(); };
+}
+
+/* ---------- new project modal ---------- */
+function openNewProjectModal() {
+  const modal = $("#modal");
+  const colors = ["#4453e6", "#0e8a6d", "#b0562f", "#7a49a8", "#2d7bb0", "#c0392b", "#8a6a10"];
+  modal.innerHTML = `
+    <div class="m-head"><h3>New project</h3></div>
+    <div class="m-body">
+      <input class="m-title-in" id="np-name" placeholder="Project name" aria-label="Project name">
+      <textarea id="np-desc" placeholder="What is this project about?"></textarea>
+      <div class="m-props">
+        <div><label for="np-key">Key</label><input id="np-key" maxlength="4" placeholder="e.g. AUR" style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;font-size:12.5px;text-transform:uppercase"></div>
+        <div><label>Colour</label><div style="display:flex;gap:6px;padding-top:3px">${colors.map((c, ix) => `<button data-color="${c}" class="np-color ${ix === 0 ? "on" : ""}" style="width:22px;height:22px;border-radius:6px;background:${c};border:2px solid ${ix === 0 ? "#17181c" : "transparent"}" aria-label="Colour"></button>`).join("")}</div></div>
+      </div>
+    </div>
+    <div class="m-foot"><button class="btn btn-ghost" id="np-cancel">Cancel</button><button class="btn btn-primary" id="np-create">Create project</button></div>`;
+  $("#modal-veil").classList.add("open");
+  let color = colors[0];
+  $$(".np-color", modal).forEach(b => b.onclick = () => {
+    color = b.dataset.color;
+    $$(".np-color", modal).forEach(x => x.style.borderColor = "transparent");
+    b.style.borderColor = "#17181c";
+  });
+  const name = $("#np-name"); setTimeout(() => name.focus(), 30);
+  $("#np-key").addEventListener("input", e => e.target.value = e.target.value.toUpperCase());
+  $("#np-cancel").onclick = () => $("#modal-veil").classList.remove("open");
+  $("#np-create").onclick = () => {
+    const n = name.value.trim(); if (!n) { name.focus(); return; }
+    let key = $("#np-key").value.trim().toUpperCase() || n.split(" ").map(w => w[0]).join("").slice(0, 3);
+    if (db.projects.some(p => p.key === key)) key = key + "2";
+    const p = { id: "p" + Date.now().toString(36), key, name: n, color, desc: $("#np-desc").value || "No description yet.", members: [ME], cycles: [], modules: [], pages: [], views: [] };
+    db.projects.push(p); save();
+    $("#modal-veil").classList.remove("open");
+    nav("project", { projectId: p.id, tab: "items" });
+    toast(`Project ${key} created`);
+  };
+}
+
+/* ---------- small icons ---------- */
+function icoInbox() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.5 5h13l3.5 7v5a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-5z"/></svg>'; }
+function icoCal() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>'; }
+function icoGrid() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>'; }
+function icoFilter() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h13M3 12h13M3 19h7"/></svg>'; }
+function icoDoc() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>'; }
+function icoCheck() { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-5.5-8.3"/><path d="m9 12 2.5 2.5L21 5"/></svg>'; }
+
+/* ---------- misc ---------- */
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+}
+
+/* global events */
+document.addEventListener("click", e => {
+  if (!e.target.closest(".fdrop") && !e.target.closest("[data-fdrop]")) {
+    $$(".fdrop").forEach(d => d.style.display = "none");
+  }
+  const navBtn = e.target.closest("[data-nav]");
+  if (navBtn) {
+    const v = navBtn.dataset.nav;
+    if (v === "home") nav("home");
+    else if (v === "work-items") nav("my-items");
+    else if (v === "inbox") nav("inbox");
+    else if (v === "analytics") nav("analytics");
+    else if (v === "settings") nav("settings");
+    else if (v === "invite") nav("invite");
+  }
+  const projBtn = e.target.closest("[data-proj]");
+  if (projBtn && !e.target.closest("[data-view]")) nav("project", { projectId: projBtn.dataset.proj });
+  const viewBtn = e.target.closest("[data-view]");
+  if (viewBtn) {
+    const pr = proj(viewBtn.dataset.proj);
+    const v = pr.views.find(x => x.id === viewBtn.dataset.view);
+    if (v) {
+      nav("project", { projectId: pr.id, tab: "items" });
+      app.filters = Object.assign(freshFilters(), {
+      state: [...v.filters.state || []], pri: [...v.filters.pri || []], assignee: [...v.filters.assignee || []],
+      label: [...v.filters.label || []], cycle: [...v.filters.cycle || []], module: [...v.filters.module || []],
+    });
+      render();
+    }
+  }
+});
+$("#side-add-proj").onclick = (e) => { e.stopPropagation(); openNewProjectModal(); };
+
+$("#global-search").addEventListener("input", e => {
+  const q = e.target.value.trim().toLowerCase();
+  if (!q) return;
+  const hit = db.issues.find(i => i.title.toLowerCase().includes(q) || issueId(i).toLowerCase() === q);
+  if (hit) { e.target.blur(); openDrawer(hit.id); }
+});
+$("#global-search").addEventListener("keydown", e => {
+  if (e.key === "Escape") { e.target.value = ""; e.target.blur(); }
+});
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { closeDrawer(); $("#modal-veil").classList.remove("open"); return; }
+  const typing = e.target.matches("input, textarea, select") || e.target.isContentEditable;
+  if (typing) return;
+  if (e.key === "/") { e.preventDefault(); $("#global-search").focus(); }
+  if (e.key === "c") { e.preventDefault(); openNewItemModal(app.openProjectId || db.projects[0].id); }
+});
+
+/* boot */
+render();
+</script>
+</body>
+</html>
