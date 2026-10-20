@@ -8,7 +8,7 @@ A single-file browser flight simulator: design an airframe in the workshop, tune
 
 ## Provenance
 
-This app is the site owner's own HTML file (`FlightWorldTest17.2_Responsive_UI_Damage.html`, 2026-10-20), published here under the **AirplaneCraft** name with only the title/menu branding changed — the simulator code is untouched. All artwork and code are original to that file. Not affiliated with any aircraft or flight-sim manufacturer.
+This app is a user-supplied HTML file (`FlightWorldTest17.2_Responsive_UI_Damage.html`, 2026-10-20), published under the **AirplaneCraft** name with only the title/menu branding changed — the simulator code is untouched. The site owner vouched for the right to publish it; its internal authorship was not independently verified. Not affiliated with any aircraft or flight-sim manufacturer.
 
 ## Run
 

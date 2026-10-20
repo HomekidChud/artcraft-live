@@ -796,9 +796,13 @@ function openEditor(project) {
 
 /* storage: localStorage when available, in-memory fallback (e.g. sandboxed preview) */
 const store = (() => {
-  let mem = null;
   try { const t = window.localStorage; t.setItem('__uc', '1'); t.removeItem('__uc'); return t; }
-  catch (e) { return { getItem: () => mem, setItem: (k, v) => { mem = v; }, removeItem: () => { mem = null; } }; }
+  catch (e) {
+    // sandboxed preview fallback: a keyed map so the different storage
+    // domains (scene quick-save, named scenes, prefabs) don't collide
+    const map = new Map();
+    return { getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => { map.set(k, v); }, removeItem: (k) => { map.delete(k); } };
+  }
 })();
 
 const ed = {
@@ -1178,7 +1182,7 @@ function bindVec3(kind, o) {
 }
 
 /* ---- project window & console ---- */
-const escAttr = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' }[c]));
+const escAttr = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&' + 'amp;', '<': '&' + 'lt;', '>': '&' + 'gt;', '"': '&' + 'quot;', "'": '&' + '#39;' }[c]));
 function loadScenesMap() {
   try { return JSON.parse(store.getItem('unitycraft-scenes')) || {}; } catch (e) { return {}; }
 }
@@ -1299,7 +1303,11 @@ function bindToolbar() {
     document.querySelectorAll('.ptab[data-viewtab]').forEach(x => x.classList.remove('active'));
     t.classList.add('active');
     ed.viewTab = t.dataset.viewtab;
-    if (ed.viewTab === 'game') log('sys', 'Switched to Game view (Main Camera)');
+    if (ed.viewTab === 'game') {
+      const c = activeCamera();
+      if (c && c !== sceneCamera) c.userData.followDir = null; // re-capture follow yaw
+      log('sys', 'Switched to Game view (Main Camera)');
+    }
   });
   document.querySelectorAll('.ptab[data-bottomtab]').forEach(t => t.onclick = () => {
     document.querySelectorAll('.ptab[data-bottomtab]').forEach(x => x.classList.remove('active'));
@@ -1645,10 +1653,19 @@ function stepPlayerControllers(dt) {
     } else u.pcGrounded = false;
     if (keys.Space && u.pcGrounded) { u.pcVel = 5.2; u.pcGrounded = false; }
     if (o.position.y < -30) { o.position.set(0, 3, 0); u.pcVel = 0; }
-    // third-person follow camera (Game view)
+    // third-person follow camera (Game view): Roblox-style — the camera
+    // keeps a FIXED yaw (captured when Game view opens) and only follows
+    // the player's position. It never swings behind the avatar's facing or
+    // the movement direction, so strafing is a straight line and WASD
+    // stays stable.
     if (ed.viewTab === 'game' && cam.isPerspectiveCamera && cam !== sceneCamera) {
-      const ry = o.rotation.y;
-      cam.position.set(o.position.x - Math.sin(ry) * 8, o.position.y + 4, o.position.z - Math.cos(ry) * 8);
+      if (!cam.userData.followDir) {
+        let dx = o.position.x - cam.position.x, dz = o.position.z - cam.position.z;
+        const dl = Math.hypot(dx, dz) || 1;
+        cam.userData.followDir = { x: dx / dl, z: dz / dl };
+      }
+      const d = cam.userData.followDir;
+      cam.position.set(o.position.x - d.x * 8, o.position.y + 4, o.position.z - d.z * 8);
       cam.lookAt(o.position.x, o.position.y + 1, o.position.z);
     }
   }

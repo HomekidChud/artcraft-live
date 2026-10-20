@@ -70,7 +70,8 @@ Files: `unitycraft/index.html` (single file, ~1430 lines). Key globals: `ed`
 
 ### Known limitations (do not claim otherwise in README)
 
-- No real C# scripting; the two built-in behaviours are simulated.
+- No real C# scripting; the three built-in behaviours (Spin, Bob,
+  PlayerController) are simulated.
 - No lighting bake, no UI toolkit, no asset import, no build pipeline.
 - Physics is AABB only (no rotation-aware collisions).
 
@@ -162,9 +163,22 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
   Measurement note: displacement-based speed checks are noisy (page timer
   jitter) — the QA handle exposes `state.speed` (live velocity) for exact
   checks.
+- 2026-10-20 commit 6 (repair pass, from a review audit): backpack no
+  longer overlaps the People panel (starts hidden, mutually exclusive,
+  reset on join); avatar (colors/face) now rebuilds the rig on every
+  experience entry; wallet coins sync before the board renders; the
+  UnityCraft in-memory storage fallback is per-key (prefabs/scenes/
+  quick-save no longer collide when localStorage is blocked);
+  `escAttr` now really HTML-escapes (was an identity map); the Game-view
+  follow camera keeps a FIXED yaw so strafing is a straight line (was a
+  basis feedback loop); speed verified step-exact (dist/steps = 25.6/60
+  with coil, 16/60 base); platform carrying and emote arm animation now
+  covered by QA. 59/59 PASS, exit 0. Stale doc claims corrected
+  (UnityCraft script count, RobloxCraft tools row, AirplaneCraft
+  authorship wording).
 - 2026-10-20 commit 5 (robloxcraft pass 2): `node qa/reconstructions-qa.mjs`
   51/51 PASS (friends join, Neon City 100+ meshes, chat commands, obby
   checkpoints 1→2, best persistence, checkpoint respawn, /reset). `npm
-  test` 64 pass. Bugs found & fixed during QA: city loop missing braces
-  (only 7 of 40 towers spawned) and buildWorld carrying a stale inline
-  level copy (showcase entered with the baseplate layout).
+  test` 64 pass. Bugs found & fixed during QA: buildWorld carried a stale
+  inline level copy (showcase entered with the baseplate layout —
+  mesh-count check caught it).

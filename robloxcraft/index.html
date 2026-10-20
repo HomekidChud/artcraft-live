@@ -489,7 +489,7 @@
     </div>
   </div>
 
-  <div id="backpack" aria-label="Backpack">
+  <div id="backpack" class="hidden" aria-label="Backpack">
     <div class="bd-head">Backpack <span class="count" id="bp-count">0</span></div>
     <div id="bp-rows"></div>
   </div>
@@ -775,6 +775,7 @@ const CFG = {
 };
 
 const state = {
+  steps: 0, // physics steps executed (QA instrumentation)
   pos: new THREE.Vector3(0, 4, 0),
   vel: new THREE.Vector3(),
   onGround: false,
@@ -1078,6 +1079,7 @@ function groundHeightAt(x, z, py) {
 }
 
 function stepPhysics(dt) {
+  state.steps++;
   const k = state.keys;
   const fwd = (k['KeyW'] ? 1 : 0) - (k['KeyS'] ? 1 : 0);
   const strafe = (k['KeyD'] ? 1 : 0) - (k['KeyA'] ? 1 : 0);
@@ -1429,8 +1431,9 @@ function toggleEscMenu(force) {
 }
 function bindHud() {
   $('#tb-chat').addEventListener('click', () => { $('#chat').classList.toggle('hidden'); sfxClick(); });
-  $('#tb-board').addEventListener('click', () => { $('#board').classList.toggle('hidden'); sfxClick(); });
-  $('#tb-inventory').addEventListener('click', () => { $('#backpack').classList.toggle('hidden'); sfxClick(); });
+  $('#tb-board').addEventListener('click', () => { $('#backpack').classList.add('hidden'); $('#board').classList.toggle('hidden'); sfxClick(); });
+  $('#tb-inventory').addEventListener('click', () => { $('#board').classList.add('hidden'); $('#backpack').classList.toggle('hidden'); sfxClick(); });
+
   $('#tb-more').addEventListener('click', () => { toggleEscMenu(true); sfxClick(); });
   $('#esc-resume').addEventListener('click', () => { toggleEscMenu(false); sfxClick(); });
   $('#esc-respawn').addEventListener('click', () => {
@@ -1481,13 +1484,20 @@ function enterExperience() {
     bindInput();
     initChat();
     bindHud();
-    updateBoard();
     started = true;
   } else {
     // fresh world per session
     rebuildWorld();
   }
   state.coins = WALLET.coins; // wallet persists across sessions
+  // rebuild the rig so the persisted avatar (colors/face) applies on every entry
+  if (playerRig) scene.remove(playerRig);
+  playerRig = buildR6();
+  scene.add(playerRig);
+  $('#backpack').classList.add('hidden'); // joining resets panel UI to default
+  updateBoard();
+  updateBackpackUI();
+  updateGearVisual();
   state.playing = true;
   experience.classList.add('on');
   // narrow screens: keep the leaderboard hidden by default (Roblox mobile behavior)
@@ -1537,7 +1547,6 @@ function buildLevel() {
     let n = 0;
     for (let gx = -3; gx <= 3; gx++) for (let gz = -3; gz <= 3; gz++) {
       if (Math.abs(gx) < 1.2 && Math.abs(gz) < 1.2) continue; // clear main street
-      {
       const x = gx * 26 + (n % 3) * 3, z = gz * 26 + (n % 2) * 4;
       const h = 14 + ((n * 37) % 40);
       const c = bcol[n % 3];
@@ -1554,7 +1563,6 @@ function buildLevel() {
       sign.userData.level = true;
       scene.add(sign);
       n++;
-      }
     }
     // street lamps (emissive posts)
     for (let i = -2; i <= 2; i++) {
@@ -1656,9 +1664,20 @@ window.robloxcraft = {
       checkpoint: state.checkpoint,
       bestObby: (WALLET.best && WALLET.best.obby) || 0,
       speed: +Math.hypot(state.vel.x, state.vel.z).toFixed(2),
+      steps: state.steps,
+      emote: state.emote ? state.emote.type : null,
+      armRX: playerParts.armR ? +playerParts.armR.rotation.x.toFixed(2) : null,
     };
   },
   respawn: () => resetPlayer(),
+  get movers() { return world.movers.map((m) => ({ x: +m.position.x.toFixed(1), y: +m.position.y.toFixed(1), z: +m.position.z.toFixed(1) })); },
+  rigColors() {
+    return {
+      torso: '#' + playerParts.torso.material.color.getHexString(),
+      armL: '#' + playerParts.armL.material.color.getHexString(),
+      legL: '#' + playerParts.legL.material.color.getHexString(),
+    };
+  },
   pressKey: (code, down = true) => { state.keys[code] = down; },
   teleport: (x, y, z) => { state.pos.set(x, y, z); state.vel.set(0, 0, 0); },
   get cfg() { return { camYaw: +CFG.camYaw.toFixed(3), camDist: +CFG.camDist.toFixed(2), sensitivity: CFG.sensitivity }; },

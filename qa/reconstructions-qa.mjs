@@ -199,8 +199,66 @@ try {
   }));
   check("unitycraft: statistics window shows live values",
     stats.on && /^\d+$/.test(stats.fps) && /^\d+$/.test(stats.calls), JSON.stringify(stats));
+  // corrective: Game-view strafe must not spiral (stable camera basis)
+  await page.evaluate(() => {
+    document.querySelector('.ptab[data-viewtab="game"]').click();
+    document.querySelector('[data-act="play"]').click();
+  });
+  await page.waitForTimeout(400);
+  await page.keyboard.down("KeyD");
+  await page.waitForTimeout(600);
+  const rotA = await page.evaluate(() => {
+    const p = window.unitycraft.ed.objects.find((x) => x.userData.type === "cube");
+    return p.rotation.y;
+  });
+  await page.waitForTimeout(500);
+  const rotB = await page.evaluate(() => {
+    const p = window.unitycraft.ed.objects.find((x) => x.userData.type === "cube");
+    return p.rotation.y;
+  });
+  await page.keyboard.up("KeyD");
+  const rotDelta = Math.abs(rotB - rotA);
+  check("unitycraft: game-view strafe keeps a stable basis (no spiral)",
+    rotDelta < 0.35, "rotation.y delta while holding D: " + rotDelta.toFixed(2) + " rad");
+  await page.evaluate(() => {
+    document.querySelector('[data-act="play"]').click(); // exit play
+    document.querySelector('.ptab[data-viewtab="scene"]').click();
+  });
+  await page.waitForTimeout(300);
   await zeroErrors("unitycraft");
 } catch (e) { check("unitycraft: suite ran", false, String(e).slice(0, 160)); }
+
+/* UnityCraft in a localStorage-blocked context (sandboxed-preview fallback) */
+try {
+  const blockedCtx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  await blockedCtx.addInitScript(() => {
+    Object.defineProperty(window, "localStorage", { get() { throw new DOMException("blocked", "SecurityError"); } });
+  });
+  const bp = await blockedCtx.newPage();
+  await bp.bringToFront();
+  await bp.goto(BASE + "/unitycraft/", { waitUntil: "load", timeout: 45000 });
+  await bp.waitForTimeout(2500);
+  await bp.evaluate(() => { document.querySelector(".project-card").click(); });
+  await bp.waitForTimeout(2000);
+  await bp.evaluate(() => { window.prompt = () => "FallbackScene"; });
+  await bp.evaluate(() => { document.querySelector('[data-act="save-scene-as"]').click(); });
+  await bp.evaluate(() => { window.prompt = () => "FallbackPrefab"; });
+  await bp.evaluate(() => {
+    const uc = window.unitycraft;
+    uc.ed.selected = uc.ed.objects.find((x) => x.userData.type === "cube");
+    document.querySelector('[data-act="create-prefab"]').click();
+  });
+  await bp.evaluate(() => { document.querySelector('[data-act="new-scene"]').click(); });
+  await bp.evaluate(() => { document.querySelector('.ptab[data-bottomtab="project"]').click(); });
+  await bp.waitForTimeout(200);
+  const fallbackOk = await bp.evaluate(() => ({
+    sceneRow: !!document.querySelector('.asset[data-scene="FallbackScene"]'),
+    prefabRow: !!document.querySelector('.asset[data-prefab="FallbackPrefab"]'),
+  }));
+  check("unitycraft: blocked localStorage falls back per-key (scenes + prefabs)",
+    fallbackOk.sceneRow && fallbackOk.prefabRow, JSON.stringify(fallbackOk));
+  await blockedCtx.close();
+} catch (e) { check("unitycraft: fallback suite ran", false, String(e).slice(0, 160)); }
 
 /* ---------------- RobloxCraft ---------------- */
 try {
@@ -330,6 +388,80 @@ try {
   check("robloxcraft: /reset returns to spawn checkpoint",
     afterReset.checkpoint === 1 && Math.abs(afterReset.pos.x) < 3 && Math.abs(afterReset.pos.z) < 3,
     JSON.stringify({ cp: afterReset.checkpoint, pos: afterReset.pos }));
+  // corrective: backpack starts hidden on entry (no People-panel overlap)
+  await page.evaluate(() => { document.getElementById("tb-more").click(); });
+  await page.evaluate(() => { document.getElementById("esc-leave").click(); });
+  await page.evaluate(() => { document.getElementById("lc-leave").click(); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { document.querySelector('.lx-card[data-exp="baseplate"]').click(); });
+  await page.waitForTimeout(3500);
+  check("robloxcraft: backpack hidden on entry",
+    await page.evaluate(() => document.getElementById("backpack").classList.contains("hidden")));
+  // corrective: avatar changes apply on re-entry (rig rebuilt)
+  await page.evaluate(() => { localStorage.setItem("robloxcraft-avatar", JSON.stringify({ skin: "#f5cd30", shirt: "#d05656", pants: "#37a34a", face: "smile" })); });
+  await page.reload({ waitUntil: "load", timeout: 45000 }); // avatar is read at boot, like a fresh visit
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => { document.querySelector('.lx-card[data-exp="baseplate"]').click(); });
+  await page.waitForTimeout(3500);
+  const rigCols = await page.evaluate(() => window.robloxcraft.rigColors());
+  check("robloxcraft: persisted avatar applies on re-entry", rigCols.torso === "#d05656", JSON.stringify(rigCols));
+  // corrective: moving platform carries a standing player (showcase)
+  await page.evaluate(() => { document.getElementById("tb-more").click(); });
+  await page.evaluate(() => { document.getElementById("esc-leave").click(); });
+  await page.evaluate(() => { document.getElementById("lc-leave").click(); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { document.querySelector('.lx-card[data-exp="showcase"]').click(); });
+  await page.waitForTimeout(3500);
+  // stand on the x-mover (retry — the platform keeps moving between sample and teleport)
+  let onPlatform = false;
+  for (let i = 0; i < 4 && !onPlatform; i++) {
+    const mp = await page.evaluate(() => window.robloxcraft.movers[0]);
+    await page.evaluate((mp) => { window.robloxcraft.teleport(mp.x, mp.y + 3.5, mp.z); }, mp);
+    await page.waitForTimeout(400);
+    const chk = await page.evaluate(() => {
+      const m = window.robloxcraft.movers[0];
+      const p = window.robloxcraft.state.pos;
+      return { on: Math.abs(p.y - (m.y + 3)) < 0.6 && Math.abs(p.x - m.x) < 5 && Math.abs(p.z - m.z) < 5, y: p.y };
+    });
+    onPlatform = chk.on;
+  }
+  check("robloxcraft: player stands on the moving platform", onPlatform);
+  const carried = await page.evaluate(() => new Promise(res => {
+    const xs = [];
+    const iv = setInterval(() => xs.push(window.robloxcraft.state.pos.x), 150);
+    setTimeout(() => { clearInterval(iv); res(xs); }, 2200);
+  }));
+  const carrySpread = Math.max(...carried) - Math.min(...carried);
+  check("robloxcraft: moving platform carries the player", carrySpread > 4, "x spread " + carrySpread.toFixed(1) + " over 2.2s");
+  // corrective: emote animates arms (armRX changes over time during /e wave)
+  await page.locator("#chat-input").fill("/e wave");
+  await page.locator("#chat-input").press("Enter");
+  await page.waitForTimeout(300);
+  const armSamples = await page.evaluate(() => new Promise(res => {
+    const vals = [];
+    const iv = setInterval(() => vals.push(window.robloxcraft.state.armRX), 200);
+    setTimeout(() => { clearInterval(iv); res(vals); }, 1200);
+  }));
+  check("robloxcraft: /e wave animates the arm",
+    armSamples.some((v) => v < -2) && armSamples.some((v) => Math.abs(v) > 0.001),
+    JSON.stringify(armSamples));
+  // corrective: exact speed via physics-step instrumentation (coil)
+  await page.evaluate(() => { if (window.robloxcraft.gear.equipped !== "speed") window.robloxcraft.equipGear("speed"); });
+  await page.waitForTimeout(150);
+  const speedCheck = await page.evaluate(() => new Promise(res => {
+    const s0 = window.robloxcraft.state;
+    const start = { steps: s0.steps, x: s0.pos.x, z: s0.pos.z };
+    window.robloxcraft.pressKey("KeyW", true);
+    setTimeout(() => {
+      window.robloxcraft.pressKey("KeyW", false);
+      const s1 = window.robloxcraft.state;
+      const dist = Math.hypot(s1.pos.x - start.x, s1.pos.z - start.z);
+      const steps = s1.steps - start.steps;
+      res({ perStep: +(dist / steps).toFixed(3), expected: +(25.6 / 60).toFixed(3), steps });
+    }, 900);
+  }));
+  check("robloxcraft: speed coil 25.6 studs/s (step-exact)",
+    Math.abs(speedCheck.perStep - speedCheck.expected) < 0.02, JSON.stringify(speedCheck));
   await zeroErrors("robloxcraft");
 } catch (e) { check("robloxcraft: suite ran", false, String(e).slice(0, 160)); }
 
