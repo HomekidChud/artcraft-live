@@ -273,6 +273,63 @@ try {
   await page.evaluate(() => { document.getElementById("tb-inventory").click(); });
   await page.waitForTimeout(200);
   check("robloxcraft: backpack lists owned gear", (await page.locator("#bp-rows .bp-row").count()) === 1);
+  // Pass 2: friends panel joins an experience
+  await page.evaluate(() => { document.getElementById("tb-more").click(); });
+  await page.evaluate(() => { document.getElementById("esc-leave").click(); });
+  await page.evaluate(() => { document.getElementById("lc-leave").click(); });
+  await page.waitForTimeout(400);
+  await page.locator('[data-lxnav="friends"]').click();
+  check("robloxcraft: friends panel renders", (await page.locator("#lx-friends .lx-card").count()) === 4);
+  await page.locator("#lx-friends .lx-card").nth(1).click(); // BuilderWoman in Neon City
+  await page.waitForTimeout(3500);
+  check("robloxcraft: join via friends enters Neon City",
+    (await page.evaluate(() => window.robloxcraft.state.exp)) === "showcase");
+  check("robloxcraft: Neon City builds (night city meshes)",
+    (await page.evaluate(() => window.robloxcraft.sceneInfo.meshCount)) > 60);
+  // chat commands
+  await page.locator("#chat-input").fill("/stage");
+  await page.locator("#chat-input").press("Enter");
+  await page.waitForTimeout(200);
+  const stageReply = await page.evaluate(() => document.querySelector("#chat-log .msg:last-child").textContent);
+  check("robloxcraft: /stage replies outside obby", stageReply.includes("obby"), stageReply);
+  await page.locator("#chat-input").fill("/e dance");
+  await page.locator("#chat-input").press("Enter");
+  await page.waitForTimeout(200);
+  const danceReply = await page.evaluate(() => document.querySelector("#chat-log .msg:last-child").textContent);
+  check("robloxcraft: /e dance emote", danceReply.includes("dance"), danceReply);
+  // obby checkpoints
+  await page.evaluate(() => { document.getElementById("tb-more").click(); });
+  await page.evaluate(() => { document.getElementById("esc-leave").click(); });
+  await page.evaluate(() => { document.getElementById("lc-leave").click(); });
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { document.querySelector('.lx-card[data-exp="obby"]').click(); });
+  await page.waitForTimeout(3500);
+  check("robloxcraft: obby spawn checkpoint", (await page.evaluate(() => window.robloxcraft.state.checkpoint)) === 1);
+  const cp2 = await page.evaluate(() => {
+    const angle = 0.42 * 6, r = Math.max(7, 14 - 2.1);
+    return { x: Math.cos(angle) * r, z: Math.sin(angle) * r, y: 2 + 6 * 2.1 + 0.6 };
+  });
+  await page.evaluate((cp) => { window.robloxcraft.teleport(cp.x, cp.y + 3, cp.z); }, cp2);
+  await page.waitForTimeout(600);
+  check("robloxcraft: checkpoint 2 reached",
+    (await page.evaluate(() => window.robloxcraft.state.checkpoint)) === 2);
+  const bestSaved = await page.evaluate(() => JSON.parse(localStorage.getItem("robloxcraft-save")).best);
+  check("robloxcraft: best obby stage persisted", bestSaved && bestSaved.obby === 2, JSON.stringify(bestSaved));
+  // fall -> respawn at checkpoint
+  await page.evaluate(() => { window.robloxcraft.teleport(0, -60, 0); });
+  await page.waitForTimeout(500);
+  const cpRespawn = await page.evaluate(() => window.robloxcraft.state);
+  check("robloxcraft: respawn keeps checkpoint",
+    cpRespawn.checkpoint === 2 && Math.hypot(cpRespawn.pos.x - cp2.x, cpRespawn.pos.z - cp2.z) < 6,
+    JSON.stringify({ cp: cpRespawn.checkpoint, pos: cpRespawn.pos }));
+  // /reset returns to spawn checkpoint
+  await page.locator("#chat-input").fill("/reset");
+  await page.locator("#chat-input").press("Enter");
+  await page.waitForTimeout(300);
+  const afterReset = await page.evaluate(() => window.robloxcraft.state);
+  check("robloxcraft: /reset returns to spawn checkpoint",
+    afterReset.checkpoint === 1 && Math.abs(afterReset.pos.x) < 3 && Math.abs(afterReset.pos.z) < 3,
+    JSON.stringify({ cp: afterReset.checkpoint, pos: afterReset.pos }));
   await zeroErrors("robloxcraft");
 } catch (e) { check("robloxcraft: suite ran", false, String(e).slice(0, 160)); }
 

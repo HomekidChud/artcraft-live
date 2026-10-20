@@ -112,11 +112,17 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
   inventory button + number keys 1-9 equip, `updateBackpackUI`), gear
   effects in physics (x1.6 walk / x1.35 jump), equipped coil shown in
   hand (`updateGearVisual`).
-- Obby checkpoints (glowing pads, respawn at last checkpoint, best stage
-  persisted), Neon City Showcase world playable (night city, neon towers,
-  moving platforms), chat commands (`/help`, `/respawn`, `/reset`, `/stage`,
-  `/e wave|dance` emotes with animations), friends panel in the launcher,
-  per-experience best stats.
+- (commit 5) RobloxCraft pass 2: obby checkpoints (5 glowing pads,
+  `addCheckpoint` — respawn at last checkpoint, best stage persisted in
+  `WALLET.best.obby`), Neon City Showcase world now playable (night sky
+  `applySky`, ~40 emissive-window towers + neon signs + street lamps,
+  2 moving platforms that carry the player `addMover`, rooftop/street
+  coins, hazard barriers), chat commands (`/help` expanded, `/respawn`,
+  `/reset`, `/stage`, `/e wave|dance` arm animations), friends panel in
+  the launcher (simulated, Join buttons enter experiences). buildWorld
+  now delegates to buildLevel (was a stale duplicate that ignored
+  showcase).
+- (none — see next actions below for the next candidates)
 
 ### Known limitations (do not claim otherwise in README)
 
@@ -128,7 +134,8 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
 1. Mobile touch controls (virtual joystick + jump button) — currently desktop
    keyboard only at usable fidelity.
 2. Settings: persist volume/sensitivity (currently reset per session).
-3. Backpack: unequip-all button + gear descriptions in the panel tooltip.
+3. Obby: checkpoints are position-teleport based — add visual stage
+   banners + a finish-line objective (coin gate) at the top.
 
 ## Verification log (append per push)
 
@@ -155,3 +162,9 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
   Measurement note: displacement-based speed checks are noisy (page timer
   jitter) — the QA handle exposes `state.speed` (live velocity) for exact
   checks.
+- 2026-10-20 commit 5 (robloxcraft pass 2): `node qa/reconstructions-qa.mjs`
+  51/51 PASS (friends join, Neon City 100+ meshes, chat commands, obby
+  checkpoints 1→2, best persistence, checkpoint respawn, /reset). `npm
+  test` 64 pass. Bugs found & fixed during QA: city loop missing braces
+  (only 7 of 40 towers spawned) and buildWorld carrying a stale inline
+  level copy (showcase entered with the baseplate layout).

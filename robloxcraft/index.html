@@ -397,13 +397,13 @@
       </button>
       <button class="lx-card" data-exp="showcase" type="button">
         <div class="lx-thumb" style="background: linear-gradient(160deg, #2b3a4d, #171d26);">
-          <span class="soon">Coming soon</span>
+          <span class="live">6,142 playing</span>
           <span class="glyph" aria-hidden="true">🌆</span>
         </div>
         <div class="lx-card-body">
           <h3>Neon City Showcase</h3>
           <div class="meta"><span>By StudioNova</span><span class="rating">★ 95%</span></div>
-          <div class="lx-playbar"><span style="color:var(--rbx-muted);font-size:12px;">All ages</span><span class="btn-play" disabled style="opacity:.4;">Play</span></div>
+          <div class="lx-playbar"><span style="color:var(--rbx-muted);font-size:12px;">All ages</span><span class="btn-play">Play</span></div>
         </div>
       </button>
     </div>
@@ -692,20 +692,57 @@ function drawFacePreview(canvas, face) {
 loadAvatar();
 renderAvatarEditor();
 
+/* friends panel (simulated demo data, labeled as such) */
+const FRIENDS = [
+  { name: 'BrickMaster99', online: true, exp: 'Baseplate Classic' },
+  { name: 'BuilderWoman', online: true, exp: 'Neon City Showcase' },
+  { name: 'noobslayer_x', online: false, exp: '' },
+  { name: 'Guest1337', online: false, exp: '' },
+];
+function renderFriends() {
+  const el = $('#lx-friends');
+  const list = document.createElement('div');
+  list.className = 'lx-grid';
+  list.style.marginTop = '8px';
+  for (const f of FRIENDS) {
+    const card = document.createElement('div');
+    card.className = 'lx-card';
+    card.style.cursor = 'default';
+    card.innerHTML = `
+      <div class="lx-thumb" style="height:96px;background:linear-gradient(160deg,#23283a,#16181d);display:grid;place-items:center;">
+        <span class="glyph" aria-hidden="true">${f.online ? '🟢' : '⚫'}</span>
+      </div>
+      <div class="lx-card-body">
+        <h3>${f.name}</h3>
+        <div class="meta"><span>${f.online ? 'Playing ' + f.exp : 'Offline'}</span></div>
+        ${f.online ? '<div class="lx-playbar"><span style="color:var(--rbx-muted);font-size:12px;">Simulated</span><span class="btn-play">Join</span></div>' : ''}
+      </div>`;
+    if (f.online) card.addEventListener('click', () => {
+      currentExp = f.exp === 'Neon City Showcase' ? 'showcase' : f.exp === 'Tower Climb Obby' ? 'obby' : 'baseplate';
+      startLoading(currentExp);
+    });
+    list.appendChild(card);
+  }
+  el.appendChild(list);
+  const note = document.createElement('p');
+  note.className = 'lx-footnote';
+  note.textContent = 'Friends are simulated demo data — RobloxCraft is a local single-player reconstruction.';
+  el.appendChild(note);
+}
+renderFriends();
+
 document.querySelectorAll('.lx-card[data-exp]').forEach((card) => {
   card.addEventListener('click', () => {
-    const exp = card.dataset.exp;
-    if (exp === 'showcase') { chatToast('Neon City Showcase is coming soon.'); return; }
-    currentExp = exp;
+    currentExp = card.dataset.exp;
     sfxClick();
-    startLoading(exp);
+    startLoading(card.dataset.exp);
   });
 });
 
 function startLoading(exp) {
   launcher.style.display = 'none';
   loading.classList.add('on');
-  $('#ld-title').textContent = exp === 'obby' ? 'Tower Climb Obby' : 'Loading Experience';
+  $('#ld-title').textContent = exp === 'obby' ? 'Tower Climb Obby' : exp === 'showcase' ? 'Neon City Showcase' : 'Loading Experience';
   const fill = $('#ld-fill');
   let p = 0;
   const iv = setInterval(() => {
@@ -724,7 +761,7 @@ function startLoading(exp) {
 /* ---------------- Three.js world ---------------- */
 let renderer, scene, camera, clock;
 let playerRig, playerParts = {}, nametag;
-let world = { colliders: [], coins: [], hazards: [], spinners: [] };
+let world = { colliders: [], coins: [], hazards: [], spinners: [], checkpoints: [], movers: [] };
 let started = false;
 
 const CFG = {
@@ -750,6 +787,9 @@ const state = {
   jumpBuffer: 0, // physics-step countdown; survives frame gaps under throttling
   jumpCount: 0,
   maxY: 3,
+  checkpoint: 0,
+  checkpointPos: null,
+  emote: null, // { type, until } — /e wave|dance
 };
 
 function makeStudTexture(base = '#9d9ea1', stud = '#8e8f92', size = 256, cells = 8) {
@@ -875,6 +915,44 @@ function addCoin(x, y, z) {
   world.coins.push(m);
 }
 
+function addCheckpoint(x, y, z, stage) {
+  const m = new THREE.Mesh(
+    new THREE.CylinderGeometry(3, 3, 0.35, 28),
+    new THREE.MeshStandardMaterial({ color: 0x00b06f, emissive: 0x00512f, emissiveIntensity: 0.7, roughness: 0.5 })
+  );
+  m.position.set(x, y + 0.18, z);
+  m.userData.checkpoint = stage;
+  scene.add(m);
+  world.checkpoints.push(m);
+  const c = { w: 6, h: 0.35, d: 6, x, y: y + 0.18, z };
+  world.colliders.push(c);
+  m.userData.collider = c;
+  return m;
+}
+function addMover(x, y, z, w, h, d, color, axis, range, speed) {
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.25, roughness: 0.6 })
+  );
+  m.position.set(x, y, z);
+  m.userData.mover = { axis, base: axis === 'x' ? x : z, range, speed, phase: Math.random() * Math.PI * 2 };
+  m.userData.level = true;
+  scene.add(m);
+  const c = { w, h, d, x, y, z };
+  world.colliders.push(c);
+  m.userData.collider = c;
+  world.movers.push(m);
+  return m;
+}
+function applySky() {
+  if (currentExp === 'showcase') {
+    scene.background = new THREE.Color(0x0a0e1a);
+    scene.fog = new THREE.Fog(0x0a0e1a, 60, 340);
+  } else {
+    scene.background = new THREE.Color(0x9fd0f5);
+    scene.fog = new THREE.Fog(0x9fd0f5, 220, 640);
+  }
+}
 function buildWorld() {
   renderer = new THREE.WebGLRenderer({ canvas: $('#c3d'), antialias: true });
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -917,32 +995,7 @@ function buildWorld() {
   spawn.position.set(0, 0.2, 0);
   scene.add(spawn);
 
-  if (currentExp === 'obby') {
-    // Spiral staircase of bricks around spawn
-    let angle = 0, r = 14;
-    for (let i = 0; i < 22; i++) {
-      angle += 0.42; r = Math.max(7, r - 0.35);
-      const x = Math.cos(angle) * r, z = Math.sin(angle) * r, y = 2 + i * 2.1;
-      const colors = [0xd4322c, 0xf5c518, 0x2a5fd4, 0x37a34a, 0xffffff];
-      addPart(6, 1, 6, x, y, z, colors[i % colors.length]);
-      if (i % 5 === 2) addCoin(x, y + 1.6, z);
-    }
-    addCoin(0, 50, 0); // top prize
-  } else {
-    // A friendly parkour arrangement
-    const steps = [
-      [10, 2, 10, 6, 1, -14, 0xd4322c], [18, 4, 10, -6, 3, -26, 0xf5c518],
-      [6, 6, 10, 6, 5, -34, 0x2a5fd4], [-8, 8, 10, -18, 7, -30, 0x37a34a],
-    ];
-    for (const [w, h, d, x, y, z, c] of steps) { addPart(w, h, d, x, y, z, c); addCoin(x, y + h / 2 + 1.4, z); }
-    // hazards near spawn
-    addPart(8, 1, 8, -16, 0.5, 8, 0xff2222, { hazard: true, mat: { emissive: 0x550000 } });
-    addPart(8, 1, 8, 24, 0.5, 16, 0xff2222, { hazard: true, mat: { emissive: 0x550000 } });
-    // free coins
-    addCoin(4, 1.6, 6); addCoin(-6, 1.6, 12); addCoin(12, 1.6, 20);
-    // decorative spinning part
-    addPart(4, 4, 4, 30, 4, -20, 0xffffff, { spin: 0.8, noCollide: false });
-  }
+  buildLevel(); // shared level builder (per-experience)
 
   playerRig = buildR6();
   scene.add(playerRig);
@@ -956,7 +1009,11 @@ function buildWorld() {
 }
 
 function resetPlayer() {
-  state.pos.set(0, 4, 0);
+  if (currentExp === 'obby' && state.checkpointPos) {
+    state.pos.copy(state.checkpointPos).y += 2;
+  } else {
+    state.pos.set(0, 4, 0);
+  }
   state.vel.set(0, 0, 0);
   state.health = 100;
   updateHealth();
@@ -1104,6 +1161,37 @@ function stepGameplay(dt) {
   }
   // spinners
   for (const s of world.spinners) { s.rotation.y += s.userData.spin * dt; }
+  // moving platforms
+  for (const mv of world.movers) {
+    const m = mv.userData.mover;
+    const prev = mv.position[m.axis];
+    mv.position[m.axis] = m.base + Math.sin(performance.now() / 1000 * m.speed + m.phase) * m.range;
+    const delta = mv.position[m.axis] - prev;
+    mv.userData.collider[m.axis] = mv.position[m.axis];
+    // carry the player when standing on this platform
+    if (state.onGround) {
+      const c = mv.userData.collider;
+      const withinX = state.pos.x > c.x - c.w / 2 - 0.5 && state.pos.x < c.x + c.w / 2 + 0.5;
+      const withinZ = state.pos.z > c.z - c.d / 2 - 0.5 && state.pos.z < c.z + c.d / 2 + 0.5;
+      const onTop = Math.abs(state.pos.y - 3 - (c.y + c.h / 2)) < 0.4;
+      if (withinX && withinZ && onTop) state.pos[m.axis] += delta;
+    }
+  }
+  // checkpoints
+  for (const cp of world.checkpoints) {
+    const stage = cp.userData.checkpoint;
+    if (stage > state.checkpoint && cp.position.distanceTo(new THREE.Vector3(state.pos.x, state.pos.y, state.pos.z)) < 4.2) {
+      state.checkpoint = stage;
+      state.checkpointPos = cp.position.clone();
+      cp.material.emissive.set(0xf5c518);
+      cp.material.color.set(0xf5c518);
+      sfxCoin();
+      chatToast('Checkpoint ' + stage + '!');
+      addChat('sys', 'Checkpoint ' + stage + ' reached — you will respawn here.');
+      if (!WALLET.best) WALLET.best = {};
+      if ((WALLET.best.obby || 0) < stage) { WALLET.best.obby = stage; saveWallet(); }
+    }
+  }
 }
 
 /* ---------------- Gear: shop, backpack, equip ---------------- */
@@ -1200,6 +1288,24 @@ function stepVisuals(dt) {
   if (!state.onGround) {
     playerParts.armL.rotation.x = -2.6; playerParts.armR.rotation.x = -2.6;
   }
+  // emotes (/e wave, /e dance)
+  if (state.emote && performance.now() < state.emote.until) {
+    const t = performance.now() / 1000;
+    if (state.emote.type === 'wave') {
+      playerParts.armR.rotation.x = -2.9;
+      playerParts.armR.rotation.z = Math.sin(t * 8) * 0.5;
+    } else if (state.emote.type === 'dance') {
+      playerParts.armL.rotation.x = -2.2 + Math.sin(t * 6) * 0.6;
+      playerParts.armR.rotation.x = -2.2 - Math.sin(t * 6) * 0.6;
+      playerParts.armL.rotation.z = 0.7;
+      playerParts.armR.rotation.z = -0.7;
+      playerRig.rotation.y = state.yaw + Math.sin(t * 3) * 0.25;
+    }
+  } else {
+    state.emote = null;
+    playerParts.armL.rotation.z = 0;
+    playerParts.armR.rotation.z = 0;
+  }
   // camera: third person orbit
   const cp = CFG.camPitch, cy = CFG.camYaw;
   const hd = CFG.camDist * Math.cos(cp), vd = CFG.camDist * Math.sin(cp) + 2.5;
@@ -1271,6 +1377,23 @@ function addChat(kind, text) {
 }
 function focusChat() { $('#chat-input').focus(); }
 function handleChatCommand(cmd) {
+  const e = /^e\s+(wave|dance)$/.exec(cmd);
+  if (e) {
+    state.emote = { type: e[1], until: performance.now() + 2600 };
+    addChat('cmd', e[1] === 'wave' ? 'You wave.' : 'You dance.');
+    return;
+  }
+  if (cmd === 'respawn') { chatToast('Respawning…'); resetPlayer(); return; }
+  if (cmd === 'reset') {
+    state.checkpoint = 0; state.checkpointPos = null;
+    chatToast('Respawning…'); resetPlayer();
+    addChat('sys', 'Checkpoints reset.');
+    return;
+  }
+  if (cmd === 'stage') {
+    addChat('cmd', currentExp === 'obby' ? `Obby stage: ${state.checkpoint} (best ${WALLET.best?.obby || 0})` : 'Not in the obby — /stage works in Tower Climb Obby.');
+    return;
+  }
   addChat('cmd', `Unknown command: "${cmd}" — try /help`);
 }
 function initChat() {
@@ -1285,9 +1408,7 @@ function initChat() {
       if (text.startsWith('/')) {
         const cmd = text.slice(1).toLowerCase();
         if (cmd === '?' || cmd === 'help') {
-          addChat('cmd', 'Commands: /help — this list. (Emotes are not available in this reconstruction.)');
-        } else if (cmd.startsWith('e ') || cmd.startsWith('e')) {
-          addChat('cmd', 'Emotes are not available in this reconstruction.');
+          addChat('cmd', 'Commands: /help, /respawn, /reset (obby checkpoints), /stage, /e wave, /e dance.');
         } else {
           handleChatCommand(cmd);
         }
@@ -1379,28 +1500,81 @@ function enterExperience() {
 
 function rebuildWorld() {
   // remove level objects and rebuild (ground, spawn pad, lights and player are preserved)
-  for (const c of [...world.coins, ...world.hazards, ...world.spinners]) scene.remove(c);
+  for (const c of [...world.coins, ...world.hazards, ...world.spinners, ...world.checkpoints, ...world.movers]) scene.remove(c);
   world.colliders.length = 0; world.coins.length = 0; world.hazards.length = 0; world.spinners.length = 0;
+  world.checkpoints.length = 0; world.movers.length = 0;
   for (const child of [...scene.children]) {
     if (child.isMesh && child.userData.level) scene.remove(child);
   }
   world.colliders.push(world.groundCollider); // keep the baseplate solid
+  state.checkpoint = 0; state.checkpointPos = null;
   buildLevel();
   resetPlayer();
   updateBoard();
 }
 
 function buildLevel() {
+  applySky();
   if (currentExp === 'obby') {
     let angle = 0, r = 14;
+    const colors = [0xd4322c, 0xf5c518, 0x2a5fd4, 0x37a34a, 0xffffff];
     for (let i = 0; i < 22; i++) {
       angle += 0.42; r = Math.max(7, r - 0.35);
       const x = Math.cos(angle) * r, z = Math.sin(angle) * r, y = 2 + i * 2.1;
-      const colors = [0xd4322c, 0xf5c518, 0x2a5fd4, 0x37a34a, 0xffffff];
       addPart(6, 1, 6, x, y, z, colors[i % colors.length]);
       if (i % 5 === 2) addCoin(x, y + 1.6, z);
     }
+    addCheckpoint(0, 0.6, 0, 1); // spawn
+    addCheckpoint(Math.cos(0.42 * 6) * Math.max(7, 14 - 2.1), 2 + 6 * 2.1 + 0.6, Math.sin(0.42 * 6) * Math.max(7, 14 - 2.1), 2);
+    addCheckpoint(Math.cos(0.42 * 12) * Math.max(7, 14 - 4.2), 2 + 12 * 2.1 + 0.6, Math.sin(0.42 * 12) * Math.max(7, 14 - 4.2), 3);
+    addCheckpoint(Math.cos(0.42 * 18) * Math.max(7, 14 - 6.3), 2 + 18 * 2.1 + 0.6, Math.sin(0.42 * 18) * Math.max(7, 14 - 6.3), 4);
+    addCheckpoint(0, 2 + 22 * 2.1 + 0.6, 0, 5); // top prize platform
     addCoin(0, 50, 0);
+  } else if (currentExp === 'showcase') {
+    // Neon City Showcase: night grid of emissive-window towers, moving
+    // platforms between rooftops, coins on roofs and streets.
+    const bcol = [0x1c2430, 0x232c3a, 0x2a3446];
+    let n = 0;
+    for (let gx = -3; gx <= 3; gx++) for (let gz = -3; gz <= 3; gz++) {
+      if (Math.abs(gx) < 1.2 && Math.abs(gz) < 1.2) continue; // clear main street
+      {
+      const x = gx * 26 + (n % 3) * 3, z = gz * 26 + (n % 2) * 4;
+      const h = 14 + ((n * 37) % 40);
+      const c = bcol[n % 3];
+      const part = addPart(14, h, 14, x, h / 2, z, c);
+      part.material.emissive = new THREE.Color((n % 2) ? 0x0e2a4a : 0x2a0e3a);
+      part.material.emissiveIntensity = 0.5;
+      if (n % 4 === 0) addCoin(x, h + 2, z);
+      // neon sign
+      const sign = new THREE.Mesh(
+        new THREE.BoxGeometry(1.2, 6, 1.2),
+        new THREE.MeshStandardMaterial({ color: [0x335fff, 0xf5c518, 0xff4a9e, 0x23b5a3][n % 4], emissive: [0x335fff, 0xf5c518, 0xff4a9e, 0x23b5a3][n % 4], emissiveIntensity: 1.2 })
+      );
+      sign.position.set(x + 8, h * 0.6, z + 8);
+      sign.userData.level = true;
+      scene.add(sign);
+      n++;
+      }
+    }
+    // street lamps (emissive posts)
+    for (let i = -2; i <= 2; i++) {
+      const lamp = new THREE.Mesh(
+        new THREE.BoxGeometry(0.8, 9, 0.8),
+        new THREE.MeshStandardMaterial({ color: 0x39445a, emissive: 0xf5c518, emissiveIntensity: 0.35 })
+      );
+      lamp.position.set(i * 18, 4.5, 8);
+      lamp.userData.level = true;
+      scene.add(lamp);
+    }
+    // rooftop circuit: moving platforms between two towers
+    addMover(0, 12, -34, 8, 1, 8, 0x335fff, 'x', 16, 0.5);
+    addMover(0, 20, -60, 8, 1, 8, 0x23b5a3, 'z', 14, 0.7);
+    addCoin(0, 14, -34); addCoin(0, 22, -60);
+    // street-level pickups + hazard barriers
+    addCoin(10, 1.6, 4); addCoin(-10, 1.6, 4); addCoin(0, 1.6, -16);
+    addPart(7, 1, 7, 22, 0.5, -12, 0xff2222, { hazard: true, mat: { emissive: 0x550000 } });
+    addPart(7, 1, 7, -22, 0.5, -12, 0xff2222, { hazard: true, mat: { emissive: 0x550000 } });
+    addChat('sys', 'Welcome to Neon City — collect the rooftop coins. Watch the red barriers.');
   } else {
     const steps = [
       [10, 2, 10, 6, 1, -14, 0xd4322c], [18, 4, 10, -6, 3, -26, 0xf5c518],
@@ -1479,6 +1653,8 @@ window.robloxcraft = {
       playing: state.playing, exp: currentExp,
       jumpCount: state.jumpCount, maxY: +state.maxY.toFixed(2),
       coinsLeft: world.coins.length,
+      checkpoint: state.checkpoint,
+      bestObby: (WALLET.best && WALLET.best.obby) || 0,
       speed: +Math.hypot(state.vel.x, state.vel.z).toFixed(2),
     };
   },
