@@ -245,6 +245,21 @@
     position: absolute; right: 14px; bottom: 14px; width: 92px; height: 92px; z-index: 5;
     pointer-events: none;
   }
+  #stats-panel {
+    position: absolute; top: 34px; right: 14px; z-index: 6;
+    background: rgba(20, 20, 20, .87); border: 1px solid #2f2f2f; border-radius: 4px;
+    padding: 6px 10px; font-size: 10.5px; color: #b8b8b8; display: none; min-width: 168px;
+  }
+  #stats-panel.on { display: block; }
+  #stats-panel .sp-row { display: flex; justify-content: space-between; gap: 14px; line-height: 1.7; }
+  #stats-panel .sp-title { color: #e6e6e6; font-weight: 600; border-bottom: 1px solid #2f2f2f; margin-bottom: 2px; }
+  .pw-section {
+    grid-column: 1 / -1; font-size: 10.5px; font-weight: 600; color: #8f8f8f; text-transform: uppercase;
+    letter-spacing: .06em; margin: 8px 0 2px;
+  }
+  .pw-section:first-child { margin-top: 2px; }
+  .pw-empty { grid-column: 1 / -1; color: #666; font-size: 11px; padding: 2px 0; }
+  .pw-hint { margin-left: auto; font-size: 9.5px; color: #6f6f6f; align-self: end; }
   #scene-overlay {
     position: absolute; left: 10px; bottom: 10px; color: #8f8f8f; font-size: 11px; z-index: 5;
     text-shadow: 0 1px 2px rgba(0,0,0,.6);
@@ -415,6 +430,7 @@
         <button data-act="new-scene">New Scene <span>Ctrl+N</span></button>
         <button data-act="open-scene">Open Scene <span>Ctrl+O</span></button>
         <button data-act="save-scene">Save Scene <span>Ctrl+S</span></button>
+        <button data-act="save-scene-as">Save Scene As…</button>
         <div class="sep"></div>
         <button data-act="save-project">Save Project</button>
         <button data-act="build-profiles">Build Profiles…</button>
@@ -439,6 +455,7 @@
       <div class="ed-dropdown">
         <button data-act="create-scene-asset">Create ▸ Scene</button>
         <button data-act="create-material">Create ▸ Material</button>
+        <button data-act="create-prefab">Create ▸ Prefab From Selection</button>
         <button data-act="show-in-explorer">Show in Explorer</button>
       </div>
     </div>
@@ -470,6 +487,7 @@
       <div class="ed-dropdown">
         <button data-act="addcomp" data-comp="SpinScript">Scripts ▸ Spin.cs</button>
         <button data-act="addcomp" data-comp="BobScript">Scripts ▸ Bob (float).cs</button>
+        <button data-act="addcomp" data-comp="PlayerController">Scripts ▸ PlayerController (WASD).cs</button>
       </div>
     </div>
     <div class="ed-menu" data-menu="window"><button>Window</button>
@@ -477,6 +495,7 @@
         <button data-act="win-project">General ▸ Project <span>Ctrl+5</span></button>
         <button data-act="win-console">General ▸ Console <span>Ctrl+Shift+C</span></button>
         <button data-act="win-services">General ▸ Services</button>
+        <button data-act="win-stats">General ▸ Statistics</button>
         <div class="sep"></div>
         <button data-act="save-layout">Layouts ▸ Save Layout…</button>
       </div>
@@ -541,6 +560,13 @@
           <label><input type="checkbox" id="chk-snap" checked> Snap</label>
         </div>
         <canvas id="axis-gizmo" width="184" height="184"></canvas>
+        <div id="stats-panel">
+          <div class="sp-row sp-title">Statistics</div>
+          <div class="sp-row"><span>Frames per Second</span><span id="sp-fps">—</span></div>
+          <div class="sp-row"><span>Draw Calls</span><span id="sp-calls">—</span></div>
+          <div class="sp-row"><span>Triangles</span><span id="sp-tris">—</span></div>
+          <div class="sp-row"><span>Total Objects</span><span id="sp-objs">—</span></div>
+        </div>
         <div id="scene-overlay"></div>
       </div>
     </div>
@@ -778,7 +804,7 @@ const store = (() => {
 const ed = {
   objects: [], selected: null, idSeq: 1, tool: 'move', playing: false, paused: false,
   viewTab: 'scene', playSnapshot: null, history: [], redoStack: [], sceneName: 'SampleScene',
-  clipboard: null,
+  clipboard: null, prefabs: {}, keys: {},
 };
 
 /* ---- three.js setup ---- */
@@ -875,6 +901,7 @@ function makeObject(type, opts = {}) {
   } else {
     const geo = GEOM[type]();
     if (type === 'plane') { geo.rotateX(-Math.PI / 2); }
+    geo.computeBoundingBox();
     const mat = new THREE.MeshStandardMaterial({ color: 0xcfcfcf, roughness: 0.65, metalness: 0.05 });
     obj = new THREE.Mesh(geo, mat);
     obj.castShadow = true; obj.receiveShadow = true;
@@ -889,7 +916,7 @@ function makeObject(type, opts = {}) {
   obj.userData.type = type;
   obj.userData.name = opts.name || defaultName(type);
   obj.userData.components = { meshRenderer: type !== 'empty', collider: type !== 'plane' && type !== 'empty', script: null, ...opts.components };
-  obj.userData.scriptParams = { speed: 90, amp: 0.5 };
+  obj.userData.scriptParams = { speed: 90, amp: 0.5, playerSpeed: 6 };
   scene.add(obj);
   ed.objects.push(obj);
   return obj;
@@ -923,6 +950,7 @@ function resetSceneFor(project) {
 
 function initEditor() {
   bindToolbar(); bindMenus(); bindKeys(); bindPanels();
+  try { ed.prefabs = JSON.parse(store.getItem('unitycraft-prefabs')) || {}; } catch (e) { ed.prefabs = {}; }
   renderProjectWindow();
   const ro = new ResizeObserver(resize);
   ro.observe(container);
@@ -1087,7 +1115,8 @@ function renderInspector() {
         ${u.components.script ? `
         <div class="kv"><span class="k">Script</span><input type="text" value="${u.components.script}.cs" disabled /></div>
         ${u.components.script === 'SpinScript' ? `<div class="kv"><span class="k">Speed (deg/s)</span><input type="number" id="insp-speed" step="10" value="${u.scriptParams.speed}" /></div>` : ''}
-        ${u.components.script === 'BobScript' ? `<div class="kv"><span class="k">Amplitude</span><input type="number" id="insp-amp" step="0.1" value="${u.scriptParams.amp}" /></div>` : ''}` : `
+        ${u.components.script === 'BobScript' ? `<div class="kv"><span class="k">Amplitude</span><input type="number" id="insp-amp" step="0.1" value="${u.scriptParams.amp}" /></div>` : ''}
+        ${u.components.script === 'PlayerController' ? `<div class="kv"><span class="k">Move Speed</span><input type="number" id="insp-pspeed" step="0.5" value="${u.scriptParams.playerSpeed ?? 6}" /></div>` : ''}` : `
         <div style="color:#777;font-size:11.5px">Use Component ▸ Scripts to attach a behaviour.</div>`}
       </div>
     </div>`;
@@ -1125,6 +1154,8 @@ function renderInspector() {
   if (spd) spd.onchange = e => { u.scriptParams.speed = parseFloat(e.target.value || 90); };
   const amp = $('#insp-amp');
   if (amp) amp.onchange = e => { u.scriptParams.amp = parseFloat(e.target.value || 0.5); };
+  const pspeed = $('#insp-pspeed');
+  if (pspeed) pspeed.onchange = e => { u.scriptParams.playerSpeed = parseFloat(e.target.value || 6); };
   const coll = $('#insp-coll');
   if (coll) coll.onchange = e => { u.components.collider = e.target.checked; };
 }
@@ -1147,15 +1178,53 @@ function bindVec3(kind, o) {
 }
 
 /* ---- project window & console ---- */
+const escAttr = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&', '<': '<', '>': '>', '"': '"', "'": '&#39;' }[c]));
+function loadScenesMap() {
+  try { return JSON.parse(store.getItem('unitycraft-scenes')) || {}; } catch (e) { return {}; }
+}
 function renderProjectWindow() {
   const b = $('#bottom-body');
   if (b.dataset.tab === 'console') return;
+  const scenes = loadScenesMap();
   const assets = [
-    ['SampleScene.unity', '🗂️'], ['Player.cs', '📜'], ['Spin.cs', '📜'], ['Bob.cs', '📜'],
-    ['Ground.mat', '🎨'], ['Player.mat', '🎨'], ['Sprites', '🖼️'], ['Prefabs', '📦'],
+    ['Player.cs', '📜'], ['Spin.cs', '📜'], ['Bob.cs', '📜'],
+    ['Ground.mat', '🎨'], ['Player.mat', '🎨'], ['Sprites', '🖼️'],
   ];
-  b.innerHTML = `<div class="assets">${assets.map(([n, i]) => `<div class="asset"><span class="ico">${i}</span>${n}</div>`).join('')}</div>`;
-  b.querySelectorAll('.asset').forEach(a => a.onclick = () => status(`Asset selected: ${a.textContent.trim()}`));
+  const sceneRows = Object.keys(scenes).map((n) =>
+    `<div class="asset" data-scene="${escAttr(n)}"><span class="ico">🗂️</span>${escAttr(n)}<span class="pw-hint">click to open</span></div>`).join('')
+    || '<div class="pw-empty">No saved scenes — File ▸ Save Scene As…</div>';
+  const prefabRows = Object.keys(ed.prefabs).map((n) =>
+    `<div class="asset" data-prefab="${escAttr(n)}"><span class="ico">📦</span>${escAttr(n)}<span class="pw-hint">click to instantiate</span></div>`).join('')
+    || '<div class="pw-empty">No prefabs — Assets ▸ Create ▸ Prefab From Selection</div>';
+  b.innerHTML = `<div class="assets">
+    <div class="pw-section">Scenes</div>${sceneRows}
+    <div class="pw-section">Prefabs</div>${prefabRows}
+    <div class="pw-section">Assets</div>${assets.map(([n, i]) => `<div class="asset"><span class="ico">${i}</span>${n}</div>`).join('')}
+  </div>`;
+  b.querySelectorAll('.asset').forEach((a) => a.onclick = () => {
+    if (a.dataset.scene) { openSavedScene(a.dataset.scene); return; }
+    if (a.dataset.prefab) { instantiatePrefab(a.dataset.prefab); return; }
+    status(`Asset selected: ${a.textContent.trim()}`);
+  });
+}
+function openSavedScene(name) {
+  const scenes = loadScenesMap();
+  if (!scenes[name]) { log('warn', `Scene not found: ${name}`); return; }
+  loadSceneFromSpec(JSON.parse(scenes[name]));
+  ed.sceneName = name;
+  $('#hier-tab').textContent = 'Hierarchy — ' + name;
+  renderProjectWindow();
+  log('sys', `${name} loaded`);
+}
+function instantiatePrefab(name) {
+  const spec = ed.prefabs[name];
+  if (!spec) { log('warn', `Prefab not found: ${name}`); return; }
+  pushHistory();
+  const o = makeObject(spec.type, { name: spec.name });
+  restoreObject(o, spec);
+  o.position.x += 1.5;
+  select(o);
+  log('sys', `Instantiated prefab ${name}`);
 }
 function log(kind, msg) {
   const b = $('#bottom-body');
@@ -1334,9 +1403,35 @@ function handleAction(d) {
   if (d.act === 'new-scene') { newScene(); }
   if (d.act === 'save-scene') {
     store.setItem('unitycraft-scene', serializeScene());
+    const scenes = loadScenesMap();
+    if (scenes[ed.sceneName] !== undefined) { scenes[ed.sceneName] = serializeScene(); store.setItem('unitycraft-scenes', JSON.stringify(scenes)); }
+    renderProjectWindow();
     log('sys', `${ed.sceneName} saved`);
     toast('Scene saved');
   }
+  if (d.act === 'save-scene-as') {
+    const name = (prompt('Save scene as', ed.sceneName) || '').trim();
+    if (!name) return;
+    ed.sceneName = name;
+    const scenes = loadScenesMap();
+    scenes[name] = serializeScene();
+    store.setItem('unitycraft-scenes', JSON.stringify(scenes));
+    store.setItem('unitycraft-scene', serializeScene()); // keep the quick-save key in sync
+    $('#hier-tab').textContent = 'Hierarchy — ' + name;
+    renderProjectWindow();
+    log('sys', `${name} saved`);
+    toast('Scene saved as ' + name);
+  }
+  if (d.act === 'create-prefab') {
+    if (!ed.selected) { toast('Select an object first'); return; }
+    const name = (prompt('Prefab name', ed.selected.userData.name) || '').trim();
+    if (!name) return;
+    ed.prefabs[name] = serializeObject(ed.selected);
+    store.setItem('unitycraft-prefabs', JSON.stringify(ed.prefabs));
+    renderProjectWindow();
+    log('sys', `Prefab created: ${name}`);
+  }
+  if (d.act === 'win-stats') { $('#stats-panel').classList.toggle('on'); }
   if (d.act === 'open-scene') {
     const data = store.getItem('unitycraft-scene');
     if (!data) { log('warn', 'No saved scene found'); toast('No saved scene'); return; }
@@ -1385,6 +1480,8 @@ function togglePlay() {
     document.querySelector('[data-act="play"]').classList.add('active');
     status('Play mode — press Stop to return to editing');
     log('sys', 'Entered Play Mode');
+    if (ed.objects.some((o) => o.userData.components.script === 'PlayerController'))
+      log('sys', 'PlayerController active — WASD to move, Space to jump (Game view)');
   } else {
     ed.playing = false; ed.paused = false;
     $('#editor').classList.remove('playing');
@@ -1401,6 +1498,8 @@ function togglePlay() {
       ed.objects = ed.playSnapshot.map(x => x.o);
     }
     ed.playSnapshot = null;
+    ed.keys = {};
+    ed.objects.forEach((o) => { if (o.userData.pcVel !== undefined) o.userData.pcVel = 0; });
     renderHierarchy();
     renderInspector();
     log('sys', 'Exited Play Mode (scene state restored)');
@@ -1446,11 +1545,14 @@ function pushHistory() { ed.history.push(snapshotScene()); ed.redoStack.length =
 function bindKeys() {
   document.addEventListener('keyup', e => {
     if (e.key === 'Control') { ed.snapOverride = false; applySnap(); }
+    ed.keys[e.code] = false;
   });
   document.addEventListener('keydown', e => {
     if ($('#editor').style.display === 'none') return;
     if (e.key === 'Control') { ed.snapOverride = true; applySnap(); }
     if (e.target.matches('input, select, textarea')) return;
+    ed.keys[e.code] = true;
+    if (ed.playing && e.code === 'Space') e.preventDefault();
     const k = e.key.toLowerCase();
     const tools = { q: 'hand', w: 'move', e: 'rotate', r: 'scale', t: 'rect' };
     if (tools[k]) { document.querySelector(`.tool[data-tool="${tools[k]}"]`).click(); return; }
@@ -1489,6 +1591,67 @@ function advancePlay(dt) {
     if (sc === 'SpinScript') o.rotation.y += THREE.MathUtils.degToRad(o.userData.scriptParams.speed) * dt;
     if (sc === 'BobScript') o.position.y += Math.sin(performance.now() / 300) * o.userData.scriptParams.amp * dt * 2;
   });
+  stepPlayerControllers(dt);
+}
+/* PlayerController: WASD movement + gravity/jump in Play mode (Game view gets a
+   third-person follow camera). Collisions are vertical AABB (ground) only. */
+function groundTopFor(o) {
+  let best = -Infinity;
+  const r = 0.5; // player half-extent
+  const bb = o.geometry.boundingBox;
+  for (const c of ed.objects) {
+    if (c === o || !c.isMesh) continue;
+    const isPlane = c.userData.type === 'plane';
+    if (!isPlane && c.userData.components.collider === false) continue;
+    const cbb = c.geometry.boundingBox;
+    const hx = ((cbb.max.x - cbb.min.x) / 2) * c.scale.x, hz = ((cbb.max.z - cbb.min.z) / 2) * c.scale.z;
+    const top = c.position.y + cbb.max.y * c.scale.y;
+    if (Math.abs(o.position.x - c.position.x) < hx + r && Math.abs(o.position.z - c.position.z) < hz + r) {
+      if (top <= o.position.y + 0.6 && top > best) best = top;
+    }
+  }
+  return best;
+}
+function stepPlayerControllers(dt) {
+  const keys = ed.keys || {};
+  for (const o of ed.objects) {
+    if (o.userData.components.script !== 'PlayerController' || !o.isMesh) continue;
+    const u = o.userData;
+    if (u.pcVel === undefined) u.pcVel = 0;
+    const bb = o.geometry.boundingBox;
+    const speed = u.scriptParams.playerSpeed ?? 6;
+    const cam = activeCamera();
+    // camera-relative WASD
+    let fx = o.position.x - cam.position.x, fz = o.position.z - cam.position.z;
+    const fl = Math.hypot(fx, fz) || 1; fx /= fl; fz /= fl;
+    const fwd = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0);
+    const strafe = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0);
+    if (fwd || strafe) {
+      const rx = -fz, rz = fx;
+      let mx = fx * fwd + rx * strafe, mz = fz * fwd + rz * strafe;
+      const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
+      o.position.x += mx * speed * dt;
+      o.position.z += mz * speed * dt;
+      o.rotation.y = Math.atan2(mx, mz);
+    }
+    // gravity + jump
+    u.pcVel -= 9.8 * dt;
+    o.position.y += u.pcVel * dt;
+    const halfH = bb.max.y * o.scale.y;
+    const ground = groundTopFor(o);
+    if (u.pcVel <= 0 && o.position.y - halfH <= ground + 0.02) {
+      o.position.y = ground + halfH;
+      u.pcVel = 0; u.pcGrounded = true;
+    } else u.pcGrounded = false;
+    if (keys.Space && u.pcGrounded) { u.pcVel = 5.2; u.pcGrounded = false; }
+    if (o.position.y < -30) { o.position.set(0, 3, 0); u.pcVel = 0; }
+    // third-person follow camera (Game view)
+    if (ed.viewTab === 'game' && cam.isPerspectiveCamera && cam !== sceneCamera) {
+      const ry = o.rotation.y;
+      cam.position.set(o.position.x - Math.sin(ry) * 8, o.position.y + 4, o.position.z - Math.cos(ry) * 8);
+      cam.lookAt(o.position.x, o.position.y + 1, o.position.z);
+    }
+  }
 }
 function loop(now) {
   requestAnimationFrame(loop);
@@ -1503,8 +1666,16 @@ function loop(now) {
   drawAxisGizmo();
   frames++; fpsT += dt;
   if (fpsT > 0.5) {
-    $('#status-fps').textContent = `${Math.round(frames / fpsT)} fps`;
+    const fps = Math.round(frames / fpsT);
+    $('#status-fps').textContent = `${fps} fps`;
     $('#status-objcount').textContent = `${ed.objects.length} objects`;
+    const sp = $('#stats-panel');
+    if (sp.classList.contains('on')) {
+      $('#sp-fps').textContent = fps;
+      $('#sp-calls').textContent = renderer.info.render.calls;
+      $('#sp-tris').textContent = renderer.info.render.triangles.toLocaleString();
+      $('#sp-objs').textContent = ed.objects.length;
+    }
     frames = 0; fpsT = 0;
   }
 }

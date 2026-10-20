@@ -45,8 +45,12 @@ This is a clean-room reconstruction — no Unity Technologies code, assets, or b
 | Hierarchy search | Unity Editor feature (documentation-based) | Implemented: filters the hierarchy list by name or type, shows match count |
 | Material metallic / emission / presets (Standard, Plastic, Metal, Chrome, Neon) | Unity Manual (Standard Shader material properties) | Implemented: inspector controls + presets; values persist through save/reload (verified: metalness 0.9 + emissive restored after page reload) |
 | Console severity filters + clear | Unity Editor Console window (documentation-based) | Implemented: All/Info/Warnings/Errors filter buttons and a Clear button |
+| Prefabs: create from selection, instantiate from Project window | Unity Manual (prefabs) | Implemented: single-object prefabs persisted in localStorage; verified create + instantiate + persistence |
+| Multi-slot scene save (Save Scene As…, scene list in Project window) | Unity Manual (scenes as assets) | Implemented: named scenes persisted in a localStorage map; verified save-as + reopen round-trip |
+| PlayerController play-mode physics: WASD movement, gravity, jump, ground collision, follow camera | Unity Manual (character controllers) | Implemented: camera-relative movement, vertical AABB ground collision, third-person follow camera in Game view; verified settle/jump/WASD/restore in QA. Design choice: horizontal collisions not simulated |
+| Statistics window (fps, draw calls, triangles, objects) | Unity Editor Statistics overlay (documentation-based) | Implemented: Window ▸ Statistics toggle; live values verified in QA |
 
-Not implemented: physics/colliders (checkbox only), multi-scene, asset import, C# compilation (script components are built-in JS behaviors), Hierarchy parenting (so Create Empty Parent is partial), Preferences. The real Editor's runtime behavior was not execution-verified (static analysis only) — parity with Unity documentation is the working standard.
+Not implemented: horizontal physics (PlayerController collision is vertical/ground only), multi-object prefabs (one object per prefab), asset import, C# compilation (script components are built-in JS behaviors), Hierarchy parenting (so Create Empty Parent is partial), Preferences. The real Editor's runtime behavior was not execution-verified (static analysis only) — parity with Unity documentation is the working standard.
 
 Unity® is a trademark of Unity Technologies — this project is not affiliated with or endorsed by them. For the real editor, download it from https://unity.com/download.
 

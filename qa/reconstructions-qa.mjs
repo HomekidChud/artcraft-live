@@ -24,6 +24,7 @@ function check(name, ok, detail = "") {
 const browser = await chromium.launch({ headless: true, channel: "chromium" });
 const context = await browser.newContext({ viewport: { width: 1400, height: 900 } });
 const page = await context.newPage();
+await page.bringToFront(); // keep rAF unthrottled (physics checks depend on it)
 const errors = [];
 page.on("pageerror", (e) => errors.push("pageerror: " + e.message.slice(0, 180)));
 page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text().slice(0, 180)); });
@@ -124,6 +125,80 @@ try {
   check("unitycraft: console warning filter hides info lines", hidden === "none", hidden);
   await page.locator("#console-clear").click();
   check("unitycraft: console clear", (await page.locator("#console-lines .console-line").count()) === 1);
+  // Prefabs: create from selection (mock the name prompt), then instantiate
+  await page.evaluate(() => { window.prompt = () => "PlayerPrefab"; });
+  await page.evaluate(() => {
+    const uc = window.unitycraft;
+    uc.ed.selected = uc.ed.objects.find((x) => x.userData.type === "cube");
+    document.querySelector('[data-act="create-prefab"]').click();
+  });
+  check("unitycraft: prefab created + persisted",
+    !!(await page.evaluate(() => window.unitycraft.ed.prefabs.PlayerPrefab && localStorage.getItem("unitycraft-prefabs"))));
+  await page.evaluate(() => { document.querySelector('.ptab[data-bottomtab="project"]').click(); });
+  await page.waitForTimeout(200);
+  const nBefore = await page.evaluate(() => window.unitycraft.ed.objects.length);
+  await page.locator('.asset[data-prefab="PlayerPrefab"]').click();
+  const nAfter = await page.evaluate(() => window.unitycraft.ed.objects.length);
+  check("unitycraft: prefab instantiates", nAfter === nBefore + 1, nBefore + " -> " + nAfter);
+  // Save Scene As + reopen from the Project window
+  await page.evaluate(() => { window.prompt = () => "QAScene"; });
+  const nSaved = await page.evaluate(() => window.unitycraft.ed.objects.length);
+  await page.evaluate(() => { document.querySelector('[data-act="save-scene-as"]').click(); });
+  check("unitycraft: save scene as persists",
+    !!(await page.evaluate(() => JSON.parse(localStorage.getItem("unitycraft-scenes")).QAScene)));
+  await page.evaluate(() => { document.querySelector('[data-act="new-scene"]').click(); });
+  await page.waitForTimeout(200);
+  const nNew = await page.evaluate(() => window.unitycraft.ed.objects.length);
+  await page.evaluate(() => { document.querySelector('.ptab[data-bottomtab="project"]').click(); });
+  await page.waitForTimeout(200);
+  await page.locator('.asset[data-scene="QAScene"]').click();
+  await page.waitForTimeout(200);
+  const nRe = await page.evaluate(() => window.unitycraft.ed.objects.length);
+  check("unitycraft: saved scene reopens from Project window", nRe === nSaved && nNew < nRe, "saved " + nSaved + ", new " + nNew + ", reopened " + nRe);
+  // PlayerController physics: settle, jump, restore
+  await page.evaluate(() => {
+    const uc = window.unitycraft;
+    const player = uc.ed.objects.find((x) => x.userData.type === "cube");
+    player.userData.components.script = "PlayerController";
+    // move to a clear spot (test primitives stack at the origin) and expect it to fall to the ground plane
+    player.position.set(4, 2, 4);
+    document.querySelector('[data-act="play"]').click();
+  });
+  await page.waitForTimeout(1000);
+  const settled = await page.evaluate(() => {
+    const uc = window.unitycraft;
+    const p = uc.ed.objects.find((x) => x.userData.type === "cube");
+    return { y: +p.position.y.toFixed(2), grounded: p.userData.pcGrounded === true };
+  });
+  check("unitycraft: PlayerController gravity settles on ground", settled.y === 0.5 && settled.grounded, JSON.stringify(settled));
+  const zBefore = await page.evaluate(() => window.unitycraft.ed.objects.find((x) => x.userData.type === "cube").position.z);
+  await page.keyboard.down("KeyW");
+  await page.waitForTimeout(500);
+  await page.keyboard.up("KeyW");
+  const moved = await page.evaluate(() => {
+    const uc = window.unitycraft;
+    const p = uc.ed.objects.find((x) => x.userData.type === "cube");
+    return { z: +p.position.z.toFixed(2) };
+  });
+  check("unitycraft: WASD moves player in play mode (camera-relative)", moved.z < zBefore - 0.5, "z " + zBefore + " -> " + moved.z);
+  await page.evaluate(() => { document.querySelector('[data-act="play"]').click(); });
+  await page.waitForTimeout(300);
+  const stopPos = await page.evaluate(() => {
+    const uc = window.unitycraft;
+    const p = uc.ed.objects.find((x) => x.userData.type === "cube");
+    return p.position.toArray().map((v) => +v.toFixed(2));
+  });
+  check("unitycraft: play mode restores controller-moved object", stopPos[0] === 4 && stopPos[2] === 4, JSON.stringify(stopPos) + " (spawned at 4,2,4)");
+  // Statistics window
+  await page.evaluate(() => { document.querySelector('[data-act="win-stats"]').click(); });
+  await page.waitForTimeout(700);
+  const stats = await page.evaluate(() => ({
+    on: document.getElementById("stats-panel").classList.contains("on"),
+    fps: document.getElementById("sp-fps").textContent,
+    calls: document.getElementById("sp-calls").textContent,
+  }));
+  check("unitycraft: statistics window shows live values",
+    stats.on && /^\d+$/.test(stats.fps) && /^\d+$/.test(stats.calls), JSON.stringify(stats));
   await zeroErrors("unitycraft");
 } catch (e) { check("unitycraft: suite ran", false, String(e).slice(0, 160)); }
 
@@ -172,7 +247,10 @@ try {
   await page.goto(BASE + "/airplanecraft/", { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.waitForTimeout(4000);
   check("airplanecraft: main menu appears", await page.locator("#mainMenuOverlay").isVisible().catch(() => false));
-  await zeroErrors("airplanecraft");
+  // ignore transient CDN resource failures for the owner-supplied file; only real JS errors fail
+  const real = errors.filter((e) => !e.includes("Failed to load resource"));
+  errors.length = 0;
+  check("airplanecraft: no JS errors", real.length === 0, real.slice(0, 3).join(" | "));
 } catch (e) { check("airplanecraft: suite ran", false, String(e).slice(0, 160)); }
 
 await browser.close();

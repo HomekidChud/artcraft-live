@@ -53,15 +53,20 @@ Files: `unitycraft/index.html` (single file, ~1430 lines). Key globals: `ed`
   through `serializeObject`/`restoreObject` so saves keep them), console
   filter bar (All/Info/Warnings/Errors + Clear via `showConsole` + CSS
   `[data-cfilter]` rules). QA handle now exposes `tcontrols`/`applySnap`.
+- (commit 3) UnityCraft editor pass 2: prefabs (Assets ▸ Create ▸ Prefab
+  From Selection → `ed.prefabs` + `unitycraft-prefabs` key; instantiate by
+  clicking the prefab in the Project window — `instantiatePrefab`),
+  multi-slot scenes (File ▸ Save Scene As… → `unitycraft-scenes` map;
+  Project window lists scenes — `openSavedScene`; legacy `unitycraft-scene`
+  quick-save key kept in sync), play-mode physics (PlayerController script:
+  camera-relative WASD, gravity + jump + vertical AABB ground collision
+  `stepPlayerControllers`/`groundTopFor`, third-person follow camera in
+  Game view, respawn below y<-30; state restored on Stop), Window ▸
+  Statistics panel (`#stats-panel`, renderer.info draw calls/tris + fps).
 
 ### Planned milestones (move each to "completed" as it lands)
 
-- Prefabs (create from selection, instantiate via Project window, stored in
-  localStorage `unitycraft-prefabs`), multi-slot scene save
-  (`unitycraft-scenes` map; Project window lists scenes), play-mode physics
-  (gravity + collisions on colliders, PlayerController script with WASD +
-  camera-follow in Game view), Window > Statistics panel (draw calls, tris,
-  objects, fps).
+- (none — see next actions below for the next candidates)
 
 ### Known limitations (do not claim otherwise in README)
 
@@ -71,10 +76,12 @@ Files: `unitycraft/index.html` (single file, ~1430 lines). Key globals: `ed`
 
 ### Next 3 actions for the next AI
 
-1. Hierarchy: real parent/child nesting (drag to reparent) — currently flat.
-2. Inspector: material presets now save with the scene; next add per-object
-   shadow toggle to the inspector UI (castShadow is serialized).
-3. Play mode: pause menu + respawn point (spawn marker object type).
+1. Hierarchy: real parent/child nesting (drag to reparent) — currently flat
+   (Create Empty Parent is still partial).
+2. Play-mode physics: horizontal collision (walls) — currently vertical
+   ground collision only; and a visible spawn-marker object type.
+3. Project window: prefab rename/delete + scene delete buttons (data is in
+   `ed.prefabs` / `unitycraft-scenes`).
 
 ## RobloxCraft — status
 
@@ -135,3 +142,9 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
   play-mode restore). `npm test` 64 pass. One bug found & fixed during QA:
   snapping was not initialized on editor open (applySnap now called in
   bindToolbar).
+- 2026-10-20 commit 3 (unitycraft pass 2): `node qa/reconstructions-qa.mjs`
+  32/32 PASS (prefab create+instantiate, save-as+reopen from Project window,
+  PlayerController gravity/jump/WASD/restore, statistics window). `npm
+  test` 64 pass. QA harness note: headless rAF throttling on background
+  pages can fake physics failures — always bringToFront / close stale
+  contexts (the QA script launches its own browser, unaffected).
