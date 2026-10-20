@@ -44,13 +44,18 @@ Files: `unitycraft/index.html` (single file, ~1430 lines). Key globals: `ed`
 ### Milestones completed in this upgrade
 
 - (commit 1) Baseline: this ledger created; no app changes yet.
+- (commit 2) UnityCraft editor pass 1: grid snapping (Snap checkbox in the
+  scene toolbar, 0.5 translate / 15° rotate / 0.25 scale, hold Ctrl to
+  invert while dragging — `SNAP` + `applySnap()`), 5 new primitives (cone,
+  torus, torusknot, ring, icosahedron in `GEOM` + GameObject menu),
+  hierarchy search (`#hier-search` → `ed.hierFilter` → `renderHierarchy`),
+  richer materials (metallic/emission/preset in the inspector; serialized
+  through `serializeObject`/`restoreObject` so saves keep them), console
+  filter bar (All/Info/Warnings/Errors + Clear via `showConsole` + CSS
+  `[data-cfilter]` rules). QA handle now exposes `tcontrols`/`applySnap`.
 
 ### Planned milestones (move each to "completed" as it lands)
 
-- Grid snapping (toolbar toggle, hold Ctrl to override), 5 new primitives
-  (Cone, Torus, Torus Knot, Ring, Icosahedron), hierarchy search filter,
-  richer materials (metalness/emissive/presets in inspector), console filters
-  + clear button.
 - Prefabs (create from selection, instantiate via Project window, stored in
   localStorage `unitycraft-prefabs`), multi-slot scene save
   (`unitycraft-scenes` map; Project window lists scenes), play-mode physics
@@ -67,8 +72,8 @@ Files: `unitycraft/index.html` (single file, ~1430 lines). Key globals: `ed`
 ### Next 3 actions for the next AI
 
 1. Hierarchy: real parent/child nesting (drag to reparent) — currently flat.
-2. Inspector: per-object material presets saved with the scene (color/roughness
-   are; metalness/emissive need adding to `serializeObject`).
+2. Inspector: material presets now save with the scene; next add per-object
+   shadow toggle to the inspector UI (castShadow is serialized).
 3. Play mode: pause menu + respawn point (spawn marker object type).
 
 ## RobloxCraft — status
@@ -124,3 +129,9 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
   `airplanecraft/index.html` (title/menu rebrand only), README + landing
   registration. QA: main menu → Sandbox starts, plane on runway with HUD,
   0 console errors. `npm test` 64 pass.
+- 2026-10-20 commit 2 (unitycraft pass 1): `node qa/reconstructions-qa.mjs`
+  24/24 PASS (incl. new: snap default/toggle, 5 primitives, hierarchy
+  search, save/reload keeps metalness+emissive, console filters+clear,
+  play-mode restore). `npm test` 64 pass. One bug found & fixed during QA:
+  snapping was not initialized on editor open (applySnap now called in
+  bindToolbar).

@@ -48,26 +48,20 @@ try {
   await page.evaluate(() => window.unitycraft.makeObject("cube", { name: "QACube" }));
   const after = await page.evaluate(() => window.unitycraft.ed.objects.length);
   check("unitycraft: create object", after === before + 1, before + " -> " + after);
-  await page.evaluate(() => window.unitycraft.ed.history.push(undefined)); // guard
-  // save/reload round-trip via the exposed handle
-  await page.evaluate(() => {
-    const { ed } = window.unitycraft;
-    localStorage.setItem("unitycraft-scene", JSON.stringify(ed.objects.map(window.unitycraft.ed.__serialize || JSON.stringify)));
-  }).catch(() => {});
-  check("unitycraft: QA handle exposed", !!(await page.evaluate(() => window.unitycraft && window.unitycraft.ed)));
+  check("unitycraft: QA handle exposes tcontrols", !!(await page.evaluate(() => window.unitycraft.tcontrols)));
   // Play mode snapshot: enter play, move an object, exit — state must restore
   const posBefore = await page.evaluate(() => {
     const o = window.unitycraft.ed.objects.find((x) => x.userData.type === "cube");
     return o ? o.position.clone().toArray() : null;
   });
-  await page.keyboard.press("p");
-  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.querySelector('[data-act="play"]').click(); });
+  await page.waitForTimeout(200);
   await page.evaluate(() => {
     const o = window.unitycraft.ed.objects.find((x) => x.userData.type === "cube");
     if (o) o.position.x += 5;
   });
-  await page.keyboard.press("p"); // exit play
-  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.querySelector('[data-act="play"]').click(); }); // exit play
+  await page.waitForTimeout(200);
   const posAfter = await page.evaluate(() => {
     const o = window.unitycraft.ed.objects.find((x) => x.userData.type === "cube");
     return o ? o.position.clone().toArray() : null;
@@ -75,6 +69,61 @@ try {
   check("unitycraft: play mode restores scene state",
     posBefore && posAfter && Math.abs(posBefore[0] - posAfter[0]) < 0.001,
     JSON.stringify(posBefore) + " vs " + JSON.stringify(posAfter));
+  // Grid snapping default + toggle
+  const snapOn = await page.evaluate(() => ({ t: window.unitycraft.tcontrols.translationSnap, r: window.unitycraft.tcontrols.rotationSnap, s: window.unitycraft.tcontrols.scaleSnap }));
+  check("unitycraft: grid snap on by default",
+    snapOn.t === 0.5 && Math.abs(snapOn.r - 0.2618) < 0.001 && snapOn.s === 0.25,
+    JSON.stringify(snapOn));
+  await page.locator("#chk-snap").uncheck();
+  const snapOff = await page.evaluate(() => window.unitycraft.tcontrols.translationSnap);
+  check("unitycraft: snap toggle disables", snapOff === null, String(snapOff));
+  await page.locator("#chk-snap").check();
+  // New primitives
+  const primOk = await page.evaluate(() => {
+    const uc = window.unitycraft;
+    const n0 = uc.ed.objects.length;
+    for (const t of ["cone", "torus", "torusknot", "ring", "icosahedron"]) uc.makeObject(t);
+    return uc.ed.objects.length - n0;
+  });
+  check("unitycraft: 5 new primitives create", primOk === 5, "created " + primOk);
+  // Hierarchy search
+  await page.locator("#hier-search").fill("torus");
+  const hRows = await page.locator("#hierarchy .hitem").count();
+  check("unitycraft: hierarchy search filters", hRows === 2, "rows: " + hRows);
+  await page.locator("#hier-search").fill("");
+  // Save + reload round-trip incl. metalness/emissive
+  await page.evaluate(() => {
+    const uc = window.unitycraft;
+    const o = uc.ed.objects.find((x) => x.userData.type === "cube");
+    o.material.metalness = 0.9;
+    o.material.emissive.set("#aa2200");
+    document.querySelector('[data-act="save-scene"]').click();
+  });
+  await page.reload({ waitUntil: "load", timeout: 45000 });
+  await page.waitForTimeout(2500);
+  await page.evaluate(() => { document.querySelector(".project-card").click(); });
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => { document.querySelector('[data-act="open-scene"]').click(); });
+  await page.waitForTimeout(300);
+  const matAfter = await page.evaluate(() => {
+    const uc = window.unitycraft;
+    const o = uc.ed.objects.find((x) => x.userData.type === "cube");
+    return o ? { m: o.material.metalness, e: "#" + o.material.emissive.getHexString() } : null;
+  });
+  check("unitycraft: save/reload keeps material state",
+    matAfter && matAfter.m === 0.9 && matAfter.e === "#aa2200", JSON.stringify(matAfter));
+  // Console filters + clear
+  await page.locator('.ptab[data-bottomtab="console"]').click();
+  await page.waitForTimeout(200);
+  check("unitycraft: console filter bar", (await page.locator(".console-bar .cbtn").count()) === 5);
+  await page.locator('.cbtn[data-cf="warn"]').click();
+  const hidden = await page.evaluate(() => {
+    const line = document.querySelector("#bottom-body .console-line.sys");
+    return line ? getComputedStyle(line).display : "missing";
+  });
+  check("unitycraft: console warning filter hides info lines", hidden === "none", hidden);
+  await page.locator("#console-clear").click();
+  check("unitycraft: console clear", (await page.locator("#console-lines .console-line").count()) === 1);
   await zeroErrors("unitycraft");
 } catch (e) { check("unitycraft: suite ran", false, String(e).slice(0, 160)); }
 

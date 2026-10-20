@@ -215,6 +215,13 @@
   .panel-body { flex: 1; overflow-y: auto; min-height: 0; position: relative; }
 
   /* Hierarchy */
+  #hier-search-wrap { padding: 6px 8px; border-bottom: 1px solid var(--ed-border); flex-shrink: 0; background: var(--ed-header); }
+  #hier-search {
+    width: 100%; background: #191919; border: 1px solid #2f2f2f; border-radius: 3px;
+    color: #dcdcdc; padding: 4px 8px; font-size: 11.5px; outline: none;
+  }
+  #hier-search:focus { border-color: #4a6a8f; }
+  #hier-search::placeholder { color: #6f6f6f; }
   #hierarchy { font-size: 12px; }
   .hitem {
     display: flex; align-items: center; gap: 6px; padding: 3px 8px; cursor: default; color: #c8c8c8;
@@ -294,6 +301,19 @@
   .console-line.warn { color: #d8b93c; }
   .console-line.err { color: #e06060; }
   .console-line.sys { color: #7aa5d8; }
+  .console-bar {
+    display: flex; align-items: center; gap: 2px; padding: 3px 8px; background: var(--ed-header);
+    border-bottom: 1px solid var(--ed-border); flex-shrink: 0;
+  }
+  .console-bar .cbtn {
+    font-size: 11px; color: #a0a0a0; padding: 2px 10px; border-radius: 3px; cursor: pointer; background: none; border: none;
+  }
+  .console-bar .cbtn:hover { background: #313131; color: #d6d6d6; }
+  .console-bar .cbtn.active { background: #3a3a3a; color: #fff; }
+  #bottom-body[data-cfilter="sys"] .console-line.warn { display: none; }
+  #bottom-body[data-cfilter="sys"] .console-line.err { display: none; }
+  #bottom-body[data-cfilter="warn"] .console-line:not(.warn) { display: none; }
+  #bottom-body[data-cfilter="err"] .console-line:not(.err) { display: none; }
 
   .ed-statusbar {
     height: 22px; background: #1c1c1c; color: #7c7c7c; font-size: 11px; display: flex; align-items: center;
@@ -435,6 +455,11 @@
         <button data-act="create" data-type="capsule">3D Object ▸ Capsule</button>
         <button data-act="create" data-type="cylinder">3D Object ▸ Cylinder</button>
         <button data-act="create" data-type="plane">3D Object ▸ Plane</button>
+        <button data-act="create" data-type="cone">3D Object ▸ Cone</button>
+        <button data-act="create" data-type="torus">3D Object ▸ Torus</button>
+        <button data-act="create" data-type="torusknot">3D Object ▸ Torus Knot</button>
+        <button data-act="create" data-type="ring">3D Object ▸ Ring</button>
+        <button data-act="create" data-type="icosahedron">3D Object ▸ Icosphere</button>
         <div class="sep"></div>
         <button data-act="create" data-type="light">Light ▸ Directional Light</button>
         <button data-act="create" data-type="pointlight">Light ▸ Point Light</button>
@@ -497,6 +522,7 @@
   <div class="ed-body">
     <div class="ed-col-left">
       <div class="panel-tabs"><div class="ptab active" id="hier-tab">Hierarchy — SampleScene</div></div>
+      <div id="hier-search-wrap"><input id="hier-search" type="text" placeholder="Search hierarchy…" /></div>
       <div class="panel-body" id="hierarchy"></div>
     </div>
 
@@ -512,6 +538,7 @@
           <label><input type="checkbox" id="chk-grid" checked> Grid</label>
           <label><input type="checkbox" id="chk-gizmos" checked> Gizmos</label>
           <label><input type="checkbox" id="chk-wire" > Wireframe</label>
+          <label><input type="checkbox" id="chk-snap" checked> Snap</label>
         </div>
         <canvas id="axis-gizmo" width="184" height="184"></canvas>
         <div id="scene-overlay"></div>
@@ -786,6 +813,16 @@ tcontrols.addEventListener('dragging-changed', e => {
 });
 scene.add(tcontrols);
 
+/* grid snapping — Unity-style increments (0.5m translate, 15° rotate, 0.25 scale);
+   hold Ctrl to invert the toggle while dragging */
+const SNAP = { t: 0.5, r: THREE.MathUtils.degToRad(15), s: 0.25 };
+function applySnap() {
+  const on = ed.snap !== false && !ed.snapOverride;
+  tcontrols.setTranslationSnap(on ? SNAP.t : null);
+  tcontrols.setRotationSnap(on ? SNAP.r : null);
+  tcontrols.setScaleSnap(on ? SNAP.s : null);
+}
+
 /* axis gizmo (scene view corner) */
 const axCanvas = $('#axis-gizmo');
 const axCtx = axCanvas.getContext('2d');
@@ -797,6 +834,11 @@ const GEOM = {
   cylinder: () => new THREE.CylinderGeometry(0.5, 0.5, 1, 24),
   capsule: () => new THREE.CapsuleGeometry(0.35, 0.6, 8, 16),
   plane: () => new THREE.PlaneGeometry(4, 4),
+  cone: () => new THREE.ConeGeometry(0.5, 1, 24),
+  torus: () => new THREE.TorusGeometry(0.4, 0.15, 16, 32),
+  torusknot: () => new THREE.TorusKnotGeometry(0.35, 0.11, 100, 12),
+  ring: () => new THREE.RingGeometry(0.25, 0.5, 32),
+  icosahedron: () => new THREE.IcosahedronGeometry(0.5, 0),
   empty: () => null,
 };
 function scenePivotSpawn() {
@@ -853,7 +895,7 @@ function makeObject(type, opts = {}) {
   return obj;
 }
 function defaultName(type) {
-  const names = { cube: 'Cube', sphere: 'Sphere', cylinder: 'Cylinder', capsule: 'Capsule', plane: 'Plane', empty: 'GameObject', light: 'Directional Light', pointlight: 'Point Light', camera: 'Camera' };
+  const names = { cube: 'Cube', sphere: 'Sphere', cylinder: 'Cylinder', capsule: 'Capsule', plane: 'Plane', cone: 'Cone', torus: 'Torus', torusknot: 'TorusKnot', ring: 'Ring', icosahedron: 'Icosphere', empty: 'GameObject', light: 'Directional Light', pointlight: 'Point Light', camera: 'Camera' };
   const base = names[type];
   const n = ed.objects.filter(o => o.userData.name.startsWith(base)).length;
   return n ? `${base} (${n + 1})` : base;
@@ -944,11 +986,26 @@ function select(obj) {
 }
 
 /* ---- hierarchy ---- */
-const ICONS = { cube: '▪', sphere: '●', cylinder: '▮', capsule: '⬮', plane: '▬', empty: '▫', light: '☀', pointlight: '💡', camera: '🎥' };
+const ICONS = { cube: '▪', sphere: '●', cylinder: '▮', capsule: '⬮', plane: '▬', cone: '▲', torus: '◯', torusknot: '❋', ring: '○', icosahedron: '⬡', empty: '▫', light: '☀', pointlight: '💡', camera: '🎥' };
 function renderHierarchy() {
   const h = $('#hierarchy');
   h.innerHTML = '';
-  ed.objects.forEach(o => {
+  const q = (ed.hierFilter || '').trim().toLowerCase();
+  const list = q ? ed.objects.filter(o => o.userData.name.toLowerCase().includes(q) || (o.userData.type || '').includes(q)) : ed.objects;
+  if (q) {
+    const info = document.createElement('div');
+    info.style.cssText = 'padding:4px 8px;color:#777;font-size:10.5px';
+    info.textContent = list.length + ' of ' + ed.objects.length + ' objects';
+    h.appendChild(info);
+  }
+  if (!list.length && q) {
+    const none = document.createElement('div');
+    none.style.cssText = 'padding:8px;color:#666;font-size:11.5px';
+    none.textContent = 'No objects match “' + q + '”.';
+    h.appendChild(none);
+    return;
+  }
+  list.forEach(o => {
     const row = document.createElement('div');
     row.className = 'hitem' + (o === ed.selected ? ' selected' : '');
     row.innerHTML = `<span class="icon">${ICONS[o.userData.type] || '▪'}</span>${o.userData.name}`;
@@ -997,6 +1054,9 @@ function renderInspector() {
         <div class="kv"><span class="k">Cast Shadows</span><input type="checkbox" id="insp-shadow" ${o.castShadow !== false ? 'checked' : ''} /></div>
         <div class="kv"><span class="k">Material</span><input type="color" id="insp-color" value="${col}" /></div>
         <div class="kv"><span class="k">Smoothness</span><input type="number" id="insp-smooth" step="0.05" min="0" max="1" value="${o.material.roughness !== undefined ? (1 - o.material.roughness).toFixed(2) : 0.35}" /></div>
+        <div class="kv"><span class="k">Metallic</span><input type="number" id="insp-metal" step="0.05" min="0" max="1" value="${(o.material.metalness ?? 0.05).toFixed(2)}" /></div>
+        <div class="kv"><span class="k">Emission</span><input type="color" id="insp-emissive" value="#${o.material.emissive.getHexString()}" /></div>
+        <div class="kv"><span class="k">Preset</span><select id="insp-preset" style="background:#191919;border:1px solid #2f2f2f;color:#dcdcdc;border-radius:3px;padding:2px 4px;font-size:11px"><option value="">—</option><option value="standard">Standard</option><option value="plastic">Plastic</option><option value="metal">Metal</option><option value="chrome">Chrome</option><option value="neon">Neon</option></select></div>
       </div>
     </div>
     <div class="comp">
@@ -1040,6 +1100,21 @@ function renderInspector() {
   if (shadow) shadow.onchange = e => { o.castShadow = e.target.checked; };
   const smooth = $('#insp-smooth');
   if (smooth) smooth.onchange = e => { o.material.roughness = 1 - parseFloat(e.target.value || 0.35); };
+  const metal = $('#insp-metal');
+  if (metal) metal.onchange = e => { o.material.metalness = Math.min(1, Math.max(0, parseFloat(e.target.value || 0))); };
+  const emis = $('#insp-emissive');
+  if (emis) emis.oninput = e => { o.material.emissive.set(e.target.value); };
+  const preset = $('#insp-preset');
+  if (preset) preset.onchange = e => {
+    const m = o.material; if (!m) return;
+    const p = e.target.value;
+    if (p === 'standard') { m.roughness = 0.65; m.metalness = 0.05; m.emissive.set(0x000000); }
+    if (p === 'plastic') { m.roughness = 0.35; m.metalness = 0; m.emissive.set(0x000000); }
+    if (p === 'metal') { m.roughness = 0.3; m.metalness = 0.9; m.emissive.set(0x000000); }
+    if (p === 'chrome') { m.roughness = 0.1; m.metalness = 1; m.emissive.set(0x000000); }
+    if (p === 'neon') { m.roughness = 0.5; m.metalness = 0; m.emissive.copy(m.color).multiplyScalar(0.55); }
+    renderInspector();
+  };
   const fov = $('#insp-fov');
   if (fov) fov.onchange = e => { o.fov = parseFloat(e.target.value || 60); o.updateProjectionMatrix(); };
   const near = $('#insp-near');
@@ -1084,19 +1159,45 @@ function renderProjectWindow() {
 }
 function log(kind, msg) {
   const b = $('#bottom-body');
-  if (b.dataset.tab !== 'console') { b.dataset.pending = (b.dataset.pending || '') ; }
   const line = document.createElement('div');
   line.className = 'console-line ' + kind;
   const t = new Date();
   line.innerHTML = `<span class="t">${t.getHours().toString().padStart(2, '0')}:${t.getMinutes().toString().padStart(2, '0')}:${t.getSeconds().toString().padStart(2, '0')}</span><span>${msg}</span>`;
-  if (b.dataset.tab === 'console') b.prepend(line);
-  else (b.dataset.pending = (b.dataset.pending || '') + line.outerHTML);
+  if (b.dataset.tab === 'console') {
+    const wrap = $('#console-lines');
+    if (wrap) wrap.prepend(line); else b.prepend(line);
+  } else {
+    b.dataset.pending = (b.dataset.pending || '') + line.outerHTML;
+  }
 }
 function showConsole() {
   const b = $('#bottom-body');
   b.dataset.tab = 'console';
-  b.innerHTML = b.dataset.pending || '<div class="console-line sys"><span class="t">--:--:--</span><span>Console cleared.</span></div>';
+  const cur = b.dataset.cfilter || 'all';
+  b.dataset.cfilter = cur;
+  b.innerHTML = `
+    <div class="console-bar">
+      <button class="cbtn" data-cf="all">All</button>
+      <button class="cbtn" data-cf="sys">Info</button>
+      <button class="cbtn" data-cf="warn">Warnings</button>
+      <button class="cbtn" data-cf="err">Errors</button>
+      <span style="flex:1"></span>
+      <button class="cbtn" id="console-clear">Clear</button>
+    </div>
+    <div id="console-lines">${b.dataset.pending || ''}</div>`;
   b.dataset.pending = '';
+  const curBtn = b.querySelector(`[data-cf="${cur}"]`);
+  if (curBtn) curBtn.classList.add('active');
+  b.querySelectorAll('[data-cf]').forEach(btn => {
+    btn.onclick = () => {
+      b.querySelectorAll('[data-cf]').forEach(x => x.classList.remove('active'));
+      btn.classList.add('active');
+      b.dataset.cfilter = btn.dataset.cf;
+    };
+  });
+  const clr = $('#console-clear');
+  if (clr) clr.onclick = () => { b.dataset.pending = ''; $('#console-lines').innerHTML = '';
+    log('sys', 'Console cleared.'); };
 }
 function showProject() {
   const b = $('#bottom-body');
@@ -1136,6 +1237,9 @@ function bindToolbar() {
     t.classList.add('active');
     ({ project: showProject, console: showConsole, services: showServices })[t.dataset.bottomtab]();
   });
+  $('#chk-snap').onchange = e => { ed.snap = e.target.checked; applySnap(); };
+  $('#hier-search').oninput = e => { ed.hierFilter = e.target.value; renderHierarchy(); };
+  ed.snap = $('#chk-snap').checked; applySnap(); // initialize snapping to the checkbox state
   $('#chk-grid').onchange = e => grid.visible = e.target.checked;
   $('#chk-gizmos').onchange = e => {
     ed.objects.forEach(o => { if (o.userData.helper) o.userData.helper.visible = e.target.checked; });
@@ -1163,7 +1267,7 @@ function serializeObject(o) {
   const d = { name: u.name, type: u.type, p: o.position.toArray(), r: [o.rotation.x, o.rotation.y, o.rotation.z], s: o.scale.toArray(), comps: { ...u.components }, params: { ...u.scriptParams } };
   if (u.type === 'light' || u.type === 'pointlight') { d.color = '#' + o.color.getHexString(); d.intensity = o.intensity; }
   if (u.type === 'camera') { d.fov = o.fov; d.near = o.near; }
-  if (o.material) d.mat = { color: '#' + o.material.color.getHexString(), roughness: o.material.roughness };
+  if (o.material) d.mat = { color: '#' + o.material.color.getHexString(), roughness: o.material.roughness, metalness: o.material.metalness, emissive: '#' + o.material.emissive.getHexString() };
   if (o.isMesh || o.isObject3D) { d.castShadow = o.castShadow === true; d.receiveShadow = o.receiveShadow === true; }
   return d;
 }
@@ -1173,7 +1277,7 @@ function restoreObject(o, d) {
   o.userData.name = d.name;
   if (d.comps) Object.assign(o.userData.components, d.comps);
   if (d.params) Object.assign(o.userData.scriptParams, d.params);
-  if (d.mat && o.material) { o.material.color.set(d.mat.color); o.material.roughness = d.mat.roughness; }
+  if (d.mat && o.material) { o.material.color.set(d.mat.color); o.material.roughness = d.mat.roughness; o.material.metalness = d.mat.metalness ?? 0.05; o.material.emissive.set(d.mat.emissive || '#000000'); }
   if (d.color) o.color.set(d.color);
   if (d.intensity !== undefined) o.intensity = d.intensity;
   if (d.fov !== undefined) { o.fov = d.fov; o.near = d.near; o.updateProjectionMatrix(); }
@@ -1340,8 +1444,12 @@ function applySnapshot(snap) {
 function pushHistory() { ed.history.push(snapshotScene()); ed.redoStack.length = 0; if (ed.history.length > 50) ed.history.shift(); }
 
 function bindKeys() {
+  document.addEventListener('keyup', e => {
+    if (e.key === 'Control') { ed.snapOverride = false; applySnap(); }
+  });
   document.addEventListener('keydown', e => {
     if ($('#editor').style.display === 'none') return;
+    if (e.key === 'Control') { ed.snapOverride = true; applySnap(); }
     if (e.target.matches('input, select, textarea')) return;
     const k = e.key.toLowerCase();
     const tools = { q: 'hand', w: 'move', e: 'rotate', r: 'scale', t: 'rect' };
@@ -1424,7 +1532,7 @@ function drawAxisGizmo() {
 }
 
 /* ---- boot: show Hub after loading screen (mirrors Hub splash) ---- */
-window.unitycraft = { ed, scene, makeObject }; // debug/test handle
+window.unitycraft = { ed, scene, makeObject, tcontrols, applySnap }; // debug/test handle
 renderHub();
 setTimeout(() => $('#loading').classList.add('is-dismissed'), 1400);
 </script>

@@ -3,7 +3,7 @@
 A browser reconstruction of the **Unity Hub** launcher and a **Unity Editor**-style 3D workspace — the UnityCraft take on "Unity in the browser".
 
 - **Hub** — dark launcher with Projects / Installs / Learn / Community / Preferences, a New Project flow with templates and editor-version selection, project cards with version chips and favorites, and a splash screen with a spinning-progress ring.
-- **Editor** — Three.js scene view with grid, gizmos and an axis widget; Hierarchy; Inspector (Transform / Mesh Renderer / Box Collider / Light / Camera); GameObject creation menu; script components (Spin, Bob) with **Play mode** that animates objects and restores scene state on Stop; play/pause/step; undo/redo; scene save/load (localStorage with in-memory fallback); console; Game view rendered from the scene's Main Camera.
+- **Editor** — Three.js scene view with grid, gizmos and an axis widget; Hierarchy with live search; Inspector (Transform / Mesh Renderer with metallic-emission-preset material controls / Box Collider / Light / Camera); GameObject creation menu with ten 3D primitives; grid snapping (0.5 translate, 15° rotate, 0.25 scale, Ctrl to invert); script components (Spin, Bob) with **Play mode** that animates objects and restores scene state on Stop; play/pause/step; undo/redo; scene save/load (localStorage with in-memory fallback); console with severity filters and clear; Game view rendered from the scene's Main Camera.
 
 ## Provenance
 
@@ -40,6 +40,11 @@ This is a clean-room reconstruction — no Unity Technologies code, assets, or b
 | Full play-mode state restore: position, color, name, attached script, object set all revert on Stop | Unity Manual (Game view: "changes are reset when you exit Play mode") | Verified: mutated name/color/position/script plus a created object and a deleted object all restored; Pause frozen (two equal readings) |
 | Cast/receive shadows, camera near-clip persist through save/reload | Design choice (standard Unity properties) | Verified round-trip via both the Inspector UI and the model: castShadow off + near 0.42 restored after page reload (localhost, working localStorage). Scope note: in the deployed preview the iframe blocks localStorage, so the in-memory fallback keeps scenes only for the session — save/load across reloads is not available there |
 | New scene titled "Untitled" | Unity Manual (Creating scenes) | Implemented |
+| Grid snapping (Snap toggle, Ctrl to invert) | Unity Manual (grid snapping: hold Cmd/Ctrl to toggle snapping while dragging) | Implemented: 0.5-unit translate / 15° rotate / 0.25 scale applied through the transform gizmo; verified via the exposed transform-controls state |
+| New primitives: Cone, Torus, Torus Knot, Ring, Icosphere | Unity Manual (3D primitives) | Implemented: creatable from the GameObject menu; serialized through save/load |
+| Hierarchy search | Unity Editor feature (documentation-based) | Implemented: filters the hierarchy list by name or type, shows match count |
+| Material metallic / emission / presets (Standard, Plastic, Metal, Chrome, Neon) | Unity Manual (Standard Shader material properties) | Implemented: inspector controls + presets; values persist through save/reload (verified: metalness 0.9 + emissive restored after page reload) |
+| Console severity filters + clear | Unity Editor Console window (documentation-based) | Implemented: All/Info/Warnings/Errors filter buttons and a Clear button |
 
 Not implemented: physics/colliders (checkbox only), multi-scene, asset import, C# compilation (script components are built-in JS behaviors), Hierarchy parenting (so Create Empty Parent is partial), Preferences. The real Editor's runtime behavior was not execution-verified (static analysis only) — parity with Unity documentation is the working standard.
 
