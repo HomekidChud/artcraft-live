@@ -111,6 +111,7 @@
 
 <script>
 const APPS = [
+  { name: "ArtCraft Launcher", path: "launcher/", tag: "App hub", desc: "The home screen for the Crafting Apps — browse, search and open every craft from one place.", ver: "v0.5.1", src: "storytold/craft-launcher", hue: 170 },
   { name: "VectorCraft", path: "vectorcraft/", tag: "Vector illustration", desc: "Clean-room Adobe Illustrator alternative — pens, panels, artboards, exact booleans.", ver: "v0.13.1", src: "storytold/vectorcraft", hue: 16 },
   { name: "PhotoCraft", path: "photocraft/", tag: "Photo editor", desc: "Clean-room Adobe Photoshop alternative — layers, masks, filters, retouching.", ver: "v0.10.0", src: "storytold/photocraft", hue: 200 },
   { name: "FilmCraft", path: "filmcraft/", tag: "Video editing", desc: "Nonlinear video editor — a Premiere Pro alternative in pure Rust.", ver: "v0.9.0", src: "storytold/filmcraft", hue: 280 },
@@ -120,9 +121,9 @@ const APPS = [
   { name: "EffectCraft", path: "effectcraft/", tag: "Motion graphics", desc: "Motion graphics and compositing — an After Effects alternative.", ver: "v0.11.1", src: "storytold/effectcraft", hue: 260 },
   { name: "GridCraft", path: "gridcraft/", tag: "Spreadsheets", desc: "Clean-room Microsoft Excel-style spreadsheet with formulas and charts.", ver: "v0.8.0", src: "storytold/gridcraft", hue: 130 },
   { name: "WordCraft", path: "wordcraft/", tag: "Documents", desc: "Clean-room Microsoft Word reimplementation for writing and documents.", ver: "v0.8.0", src: "storytold/wordcraft", hue: 220 },
-  { name: "DeckCraft", path: "deckcraft/", tag: "Presentations", desc: "Slides and presentations — a PowerPoint alternative in pure Rust.", ver: "v0.7.0", src: "storytold/deckcraft", hue: 30 },
+  { name: "DeckCraft", path: "deckcraft/", tag: "Presentations", desc: "Slides and presentations — a PowerPoint alternative in pure Rust.", ver: "v0.8.0", src: "storytold/deckcraft", hue: 30 },
   { name: "CADCraft", path: "cadcraft/", tag: "CAD & drafting", desc: "Computer-aided design and drafting — an AutoCAD-style app.", ver: "v0.8.0", src: "storytold/cadcraft", hue: 190 },
-  { name: "SoundCraft", path: "soundcraft/", tag: "Audio & DAW", desc: "Clean-room Avid Pro Tools reimplementation for audio production.", ver: "v0.8.0", src: "storytold/soundcraft", hue: 100 },
+  { name: "SoundCraft", path: "soundcraft/", tag: "Audio & DAW", desc: "Clean-room Avid Pro Tools reimplementation for audio production.", ver: "v0.10.0", src: "storytold/soundcraft", hue: 100 },
   { name: "FigCraft", path: "figcraft/", tag: "Interface design", desc: "Interface design and prototyping — collaborative design workflows.", ver: "v0.7.0", src: "storytold/figcraft", hue: 300 },
   { name: "UnityCraft", path: "unitycraft/", tag: "3D editor & hub", desc: "Browser reconstruction of the Unity Hub and a Unity Editor-style 3D workspace — scene view, hierarchy, inspector, play mode.", ver: "v0.1.0", src: "HomekidChud/artcraft-live", hue: 80 },
   { name: "RobloxCraft", path: "robloxcraft/", tag: "Play & create", desc: "Independently implemented Roblox reconstruction — launcher, topbar, chat, leaderboard, playable baseplate world.", ver: "v0.1.0", src: "HomekidChud/artcraft-live", hue: 350 },

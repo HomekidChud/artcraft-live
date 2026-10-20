@@ -506,6 +506,29 @@
         "prototype a mobile checkout flow",
         "prototype reusable components for an app interface"
       ]
+    },
+    {
+      "id": "launcher",
+      "name": "ArtCraft Launcher",
+      "topic": "launcher suite hub apps install discover start",
+      "guide": "The launcher is the home screen for the ArtCraft Crafting Apps. Browse or search the app list, open a craft, and pin favourites for quick access.",
+      "export": "The launcher itself does not export files; open a craft from its app list to create or export documents.",
+      "starter": "md",
+      "example": "Make a starter list of crafting apps to try",
+      "examples": [
+        "list the crafting apps in the launcher",
+        "open the spreadsheet craft from the launcher",
+        "search the launcher for a photo editor",
+        "pin a favourite craft in the launcher",
+        "find the video editing app in the launcher hub"
+      ],
+      "checks": [
+        "open the crafting apps launcher",
+        "find an app in the artcraft launcher",
+        "browse the launcher app hub",
+        "search the launcher for the spreadsheet app",
+        "pin my favourite craft in the launcher"
+      ]
     }
   ],
   "intents": [

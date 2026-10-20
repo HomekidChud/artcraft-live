@@ -49,7 +49,7 @@
 </head>
 <body>
   <canvas id="effectcraft_canvas"></canvas>
-  <div id="loading"><img src="favicon.svg" alt=""><div id="status">Loading EffectCraft…</div><div id="recovery" hidden><p>If startup is stuck, try another renderer:</p><a data-renderer="webgl">Try WebGL2</a><a data-renderer="cpu">Try CPU · slower</a></div></div>
+  <div id="loading"><img src="favicon.svg" alt=""><div id="status">Loading EffectCraft…</div><div id="recovery" hidden><p>If startup is stuck, the page retries renderers automatically; you can also force one:</p><a data-renderer="webgl">Try WebGL2</a><a data-renderer="cpu">Try CPU · slower</a></div></div>
   <script>
     (() => {
       const status = document.getElementById("status");
@@ -64,13 +64,33 @@
         if (!recovery.isConnected) return;
         recovery.hidden = false;
         status.className = "err";
-        status.textContent = "EffectCraft could not start. Try WebGL2, then CPU mode if needed.";
+        status.textContent = "EffectCraft could not start. It already retried other renderers; the links below force one.";
         if (document.getElementById("startup-error-details")) return;
         const details = document.createElement("details"); details.id = "startup-error-details";
         const summary = document.createElement("summary"); summary.textContent = "Technical error details";
         const pre = document.createElement("pre"); pre.textContent = String(error?.stack || error || "Unknown startup error");
         details.append(summary, pre); recovery.after(details);
       };
+      // GPU availability: when the browser has neither a usable WebGPU adapter nor
+      // WebGL2, switch this page to the app's CPU path before the application
+      // starts, instead of the upstream "no renderer" message. An explicit
+      // ?webgl or ?cpu choice is never overridden, and nothing is stored.
+      window.effectcraftRendererProbe = (async () => {
+        const chosen = new URLSearchParams(location.search);
+        if (chosen.has("webgl") || chosen.has("cpu")) return;
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("adapter timeout")), 4000));
+        let webgpu = false;
+        try { webgpu = !!navigator.gpu && !!(await Promise.race([navigator.gpu.requestAdapter(), timeout])); }
+        catch { webgpu = false; }
+        if (!webgpu) {
+          let webgl2 = false;
+          try { webgl2 = !!document.createElement("canvas").getContext("webgl2"); } catch { webgl2 = false; }
+          if (!webgl2) {
+            history.replaceState(null, "", `${location.pathname}?cpu`);
+            return "cpu";
+          }
+        }
+      })();
       const timer = setTimeout(() => { recovery.hidden = false; }, 12000);
       window.effectcraftRecovery = {ready: () => clearTimeout(timer), fail: error => { clearTimeout(timer); showError(error); }};
       window.addEventListener("error", event => {
@@ -80,7 +100,11 @@
     })();
   </script>
   <script type="module">
-    import init, * as ec from "./effectcraft_web.js";
+    // Wait for the renderer probe: it may switch this page to the CPU path
+    // before the application reads its renderer flags.
+    await window.effectcraftRendererProbe;
+    const ec = await import("./effectcraft_web.js");
+    const init = ec.default;
     const t0 = performance.now();
     window.effectcraftLoad = {};
     // The agent / test API: the desktop control channel as promises (docs/web.md).
@@ -123,26 +147,47 @@
     if ("serviceWorker" in navigator && !new URLSearchParams(location.search).has("nosw")) {
       navigator.serviceWorker.register("sw.js").catch((e) => console.warn("service worker:", e));
     }
-    try {
-      // Compile once: the page and its render workers instantiate the same module.
-      const wasmUrl = new URL("effectcraft_web_bg.wasm", location.href);
-      let module;
+    await (async () => {
       try {
-        module = await WebAssembly.compileStreaming(fetch(wasmUrl));
-      } catch {
-        module = await WebAssembly.compile(await (await fetch(wasmUrl)).arrayBuffer());
+        // Compile once: the page and its render workers instantiate the same module.
+        const wasmUrl = new URL("effectcraft_web_bg.wasm", location.href);
+        let module;
+        try {
+          module = await WebAssembly.compileStreaming(fetch(wasmUrl));
+        } catch {
+          module = await WebAssembly.compile(await (await fetch(wasmUrl)).arrayBuffer());
+        }
+        window.effectcraftModule = module;
+        await init({ module_or_path: module });
+        window.effectcraftLoad.wasmMs = performance.now() - t0;
+        await ec.start("effectcraft_canvas");
+        window.effectcraftRecovery.ready();
+        window.effectcraftLoad.readyMs = performance.now() - t0;
+      } catch (e) {
+        window.effectcraftRecovery.fail(e);
+        window.effectcraftLoad.error = String(e);
+        // Automatic renderer retry: unless the visitor chose a renderer, retry
+        // once with WebGL2 and then once with the CPU path before giving up and
+        // showing the manual recovery links.
+        try {
+          const chosen = new URLSearchParams(location.search);
+          const tried = sessionStorage.getItem("effectcraftRendererRetry") || "";
+          if (!chosen.has("webgl") && !chosen.has("cpu")) {
+            if (!tried.includes("webgl")) {
+              sessionStorage.setItem("effectcraftRendererRetry", tried + "webgl");
+              const url = new URL(location.href); url.searchParams.set("webgl", ""); location.replace(url.href);
+              return;
+            }
+            if (!tried.includes("cpu")) {
+              sessionStorage.setItem("effectcraftRendererRetry", tried + ",cpu");
+              const url = new URL(location.href); url.searchParams.set("cpu", ""); location.replace(url.href);
+              return;
+            }
+          }
+        } catch { /* storage unavailable: keep the manual recovery links */ }
+        throw e;
       }
-      window.effectcraftModule = module;
-      await init({ module_or_path: module });
-      window.effectcraftLoad.wasmMs = performance.now() - t0;
-      await ec.start("effectcraft_canvas");
-      window.effectcraftRecovery.ready();
-      window.effectcraftLoad.readyMs = performance.now() - t0;
-    } catch (e) {
-      window.effectcraftRecovery.fail(e);
-      window.effectcraftLoad.error = String(e);
-      throw e;
-    }
+    })();
   </script>
 <script src="../assistant/widget.js" data-craft="effectcraft" defer></script>
 </body>
