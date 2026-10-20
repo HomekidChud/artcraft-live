@@ -7,23 +7,25 @@
 - Official browser package: [`effectcraft-web-0.11.1.zip`](https://github.com/storytold/effectcraft/releases/download/v0.11.1/effectcraft-web-0.11.1.zip)
 - Release-package SHA-256: `8675e595d876408ce23d868d8530f17466029650da727d742028484cbde8a207`
 
-The core mirrored runtime files `effectcraft_web.js`, `effectcraft_web_bg.wasm`, `worker.js`, and `audio-worklet.js` were compared with the checksum-verified v0.11.1 package and are byte-for-byte identical. The app JS and WebAssembly were not changed or needlessly replaced. The local `sw.js` cache version has a `-local-recovery2` suffix so returning offline installs fetch the updated `index.html`; the app's entry page also contains local recovery UI. A source archive can be built from the tagged upstream checkout with `git archive`; web development builds use `cargo xtask web` and the upstream Rust 1.95 toolchain requirement.
+The core mirrored runtime files `effectcraft_web.js`, `effectcraft_web_bg.wasm`, `worker.js`, and `audio-worklet.js` were compared with the checksum-verified v0.11.1 package and are byte-for-byte identical. The app JS and WebAssembly were not changed or needlessly replaced. The local `sw.js` cache version has a `-local-recovery3` suffix so returning offline installs fetch the updated `index.html`; the app's entry page also contains local recovery UI. A source archive can be built from the tagged upstream checkout with `git archive`; web development builds use `cargo xtask web` and the upstream Rust 1.95 toolchain requirement.
 
 ## Startup recovery
 
-The upstream [web hosting guide](https://github.com/storytold/effectcraft/blob/v0.11.1/packaging/web/README.md) documents renderer selection with `?webgl` (force WebGL2) and `?cpu` (CPU fallback, slower). The app normally chooses WebGPU when available and falls back to WebGL2. It requires `.wasm` to be served as `application/wasm`; it does not require COOP/COEP isolation headers.
+The upstream [web hosting guide](https://github.com/storytold/effectcraft/blob/v0.11.1/packaging/web/README.md) documents renderer selection with `?webgl` and `?cpu` flags; source inspection of v0.11.1 and current `main` shows those flags are not actually read by the app — renderer selection is entirely the framework's WebGPU → WebGL2 fallback. The app requires `.wasm` to be served as `application/wasm`; it does not require COOP/COEP isolation headers.
 
-The repository's `index.html` adds recovery links that appear only after a long load or a startup error. Technical stack details are collapsed unless opened. The assistant can also offer WebGL2 and CPU links when the user reports an EffectCraft loading problem.
+The repository's `index.html` adds recovery UI that appears after a long load or a startup error: a reload link and collapsed technical details. See "GPU handling" below for the upfront capability probe.
 
-### Automatic renderer fallback (local change)
+### GPU handling (local change)
 
-Because a web build can run on browsers or machines with no usable GPU, the entry page now selects the renderer automatically before the application starts:
+EffectCraft's canvas requires WebGPU or WebGL2 — v0.11.1 has **no CPU canvas path**. Investigation of the v0.11.1 and current `main` source shows the app never reads the `?webgl`/`?cpu` flags documented in the upstream hosting README (empirically, `?cpu` still starts on the `BrowserWebGpu` backend), and the app already falls back WebGPU → WebGL2 on its own, rendering on the CPU internally when only WebGL2 exists. So browsers without WebGPU but with WebGL2 (Firefox, Safari without WebGPU, GPU-blocklisted machines) already work without a GPU.
 
-1. If the visitor set `?webgl` or `?cpu` explicitly, that choice is never overridden.
-2. Otherwise the page probes for a WebGPU adapter (4-second timeout that resolves to null, so no promise is ever left unhandled) and, if none, for a working WebGL2 context. When the browser has neither, the page adds the `cpu` flag to its own URL via `history.replaceState` — preserving every other parameter and the fragment — before the app initializes, so the CPU path starts instead of the upstream "no renderer available" message.
-3. If startup still fails, the page retries automatically once with `?webgl` and then once with `?cpu` (a renderer flag the page added itself still counts as automatic, so the chain can step from WebGL2 on to CPU; the state is kept in `sessionStorage`, cleared on successful startup, so a genuine failure cannot loop) and only then shows the manual recovery controls with the technical details.
+What the local entry page adds for the remaining case — a browser with neither WebGPU nor WebGL2, where upstream fails after the full download with a raw wgpu surface error:
 
-The application JavaScript and WebAssembly are untouched; the module import is only awaited after the probe so the renderer flags are read after any URL rewrite.
+1. Before downloading the ~63 MB application, the page probes for a WebGPU adapter (4-second timeout that resolves to null, so no promise is left unhandled) and, if none, for a working WebGL2 context.
+2. If the browser has neither, the page skips the download and startup entirely and explains immediately that EffectCraft needs WebGL2 or WebGPU, with a reload link in case the detection is wrong. An explicit `?webgl` or `?cpu` choice is always respected and never overridden.
+3. If startup fails with a GPU present, the page shows the error with a reload link and collapsible technical details.
+
+The application JavaScript and WebAssembly are untouched; the module import only happens after the probe.
 
 ## Verification
 

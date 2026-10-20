@@ -49,32 +49,29 @@
 </head>
 <body>
   <canvas id="effectcraft_canvas"></canvas>
-  <div id="loading"><img src="favicon.svg" alt=""><div id="status">Loading EffectCraft…</div><div id="recovery" hidden><p>If startup is stuck, the page retries renderers automatically; you can also force one:</p><a data-renderer="webgl">Try WebGL2</a><a data-renderer="cpu">Try CPU · slower</a></div></div>
+  <div id="loading"><img src="favicon.svg" alt=""><div id="status">Loading EffectCraft…</div><div id="recovery" hidden><p>If startup is stuck or fails, reload the page:</p><a id="reload">Reload the page</a></div></div>
   <script>
     (() => {
       const status = document.getElementById("status");
       const recovery = document.getElementById("recovery");
-      for (const link of recovery.querySelectorAll("[data-renderer]")) {
-        const url = new URL(location.href);
-        url.searchParams.delete("webgl"); url.searchParams.delete("cpu");
-        url.searchParams.set(link.dataset.renderer, "");
-        link.href = url.href;
-      }
+      const reload = document.getElementById("reload");
+      if (reload) reload.href = location.href;
       const showError = error => {
         if (!recovery.isConnected) return;
         recovery.hidden = false;
         status.className = "err";
-        status.textContent = "EffectCraft could not start. It retries other renderers automatically; the links below force one.";
+        status.textContent = "EffectCraft could not start. Reload the page to try again; the technical details are below.";
         if (document.getElementById("startup-error-details")) return;
         const details = document.createElement("details"); details.id = "startup-error-details";
         const summary = document.createElement("summary"); summary.textContent = "Technical error details";
         const pre = document.createElement("pre"); pre.textContent = String(error?.stack || error || "Unknown startup error");
         details.append(summary, pre); recovery.after(details);
       };
-      // GPU availability: when the browser has neither a usable WebGPU adapter nor
-      // WebGL2, switch this page to the app's CPU path before the application
-      // starts, instead of the upstream "no renderer" message. An explicit
-      // ?webgl or ?cpu choice is never overridden, and nothing is stored.
+      // GPU availability: EffectCraft's canvas needs WebGPU or WebGL2 — v0.11.1 has
+      // no CPU canvas path (the ?webgl/?cpu flags in the upstream hosting README
+      // are not read by the app). When the browser has neither, do not download
+      // and start the app at all: explain immediately instead. An explicit
+      // ?webgl or ?cpu choice is still respected and never overridden.
       window.effectcraftRendererProbe = (async () => {
         const chosen = new URLSearchParams(location.search);
         if (chosen.has("webgl") || chosen.has("cpu")) return;
@@ -92,13 +89,7 @@
         if (!webgpu) {
           let webgl2 = false;
           try { webgl2 = !!document.createElement("canvas").getContext("webgl2"); } catch { webgl2 = false; }
-          if (!webgl2) {
-            // Keep every other parameter and the fragment; only set the CPU flag.
-            const url = new URL(location.href);
-            url.searchParams.set("cpu", "");
-            history.replaceState(null, "", url.href);
-            return "cpu";
-          }
+          if (!webgl2) { window.effectcraftNoGpu = true; return "none"; }
         }
       })();
       const timer = setTimeout(() => { recovery.hidden = false; }, 12000);
@@ -110,9 +101,19 @@
     })();
   </script>
   <script type="module">
-    // Wait for the renderer probe: it may switch this page to the CPU path
-    // before the application reads its renderer flags.
+    // Wait for the renderer probe: on a browser with neither WebGPU nor WebGL2
+    // it reports the limitation instead of downloading an app that cannot run.
     await window.effectcraftRendererProbe;
+    if (window.effectcraftNoGpu) {
+      window.effectcraftRecovery.ready();
+      const status = document.getElementById("status");
+      status.className = "err";
+      status.textContent = "EffectCraft needs WebGL2 or WebGPU for its canvas, and this browser has neither, so the app cannot run here. Try a current desktop browser (Chrome, Edge, Firefox or Safari).";
+      const recovery = document.getElementById("recovery");
+      const p = recovery.querySelector("p");
+      if (p) p.textContent = "The app was not downloaded because it cannot run in this browser. If you think this is wrong, reload:";
+      recovery.hidden = false;
+    } else {
     const ec = await import("./effectcraft_web.js");
     const init = ec.default;
     const t0 = performance.now();
@@ -173,34 +174,13 @@
         await ec.start("effectcraft_canvas");
         window.effectcraftRecovery.ready();
         window.effectcraftLoad.readyMs = performance.now() - t0;
-        // Startup succeeded: forget any automatic renderer retry state.
-        try { sessionStorage.removeItem("effectcraftRendererRetry"); } catch { /* ignore */ }
       } catch (e) {
         window.effectcraftRecovery.fail(e);
         window.effectcraftLoad.error = String(e);
-        // Automatic renderer retry: unless the visitor chose a renderer
-        // explicitly, retry once with WebGL2 and then once with the CPU path
-        // before giving up and showing the manual recovery links. A renderer
-        // flag this page added itself counts as automatic, so the chain can
-        // still step from WebGL2 on to CPU.
-        try {
-          const chosen = new URLSearchParams(location.search);
-          const explicit = chosen.has("webgl") || chosen.has("cpu");
-          const tried = sessionStorage.getItem("effectcraftRendererRetry") || "";
-          const next = !tried.includes("webgl") && !chosen.has("webgl") ? "webgl"
-            : !tried.includes("cpu") && !chosen.has("cpu") ? "cpu" : null;
-          if ((!explicit || tried) && next) {
-            sessionStorage.setItem("effectcraftRendererRetry", (tried ? tried + "," : "") + next);
-            const url = new URL(location.href);
-            url.searchParams.delete("webgl"); url.searchParams.delete("cpu");
-            url.searchParams.set(next, "");
-            location.replace(url.href);
-            return;
-          }
-        } catch { /* storage unavailable: keep the manual recovery links */ }
         throw e;
       }
     })();
+    }
   </script>
 <script src="../assistant/widget.js" data-craft="effectcraft" defer></script>
 </body>
