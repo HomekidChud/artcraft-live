@@ -414,6 +414,21 @@ try {
   await page.waitForTimeout(3500);
   const rigCols = await page.evaluate(() => window.robloxcraft.rigColors());
   check("robloxcraft: persisted avatar applies on re-entry", rigCols.torso === "#d05656", JSON.stringify(rigCols));
+  // corrective: old-format save (no limbs/hat) — defaults apply, no hat on the actual rig
+  const oldFormatHat = await page.evaluate(() => window.robloxcraft.rigHat());
+  check("robloxcraft: old-format save yields default limbs, no hat",
+    rigCols.armR === "#f5cd30" && rigCols.legR === "#37a34a" && oldFormatHat === false,
+    JSON.stringify({ armR: rigCols.armR, legR: rigCols.legR, hat: oldFormatHat }));
+  // corrective: new-format save — per-limb colors + hat reach the actual gameplay rig
+  await page.evaluate(() => { localStorage.setItem("robloxcraft-avatar", JSON.stringify({ skin: "#f5cd30", shirt: "#2a5fd4", pants: "#37a34a", face: "mad", hat: "halo", limbs: { armR: "#d05656", legL: "#7b5cff" } })); });
+  await page.reload({ waitUntil: "load", timeout: 45000 });
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => { document.querySelector('.lx-card[data-exp="baseplate"]').click(); });
+  await page.waitForTimeout(3500);
+  const newRig = await page.evaluate(() => ({ cols: window.robloxcraft.rigColors(), hat: window.robloxcraft.rigHat() }));
+  check("robloxcraft: per-limb colors + hat apply to gameplay rig",
+    newRig.cols.armR === "#d05656" && newRig.cols.legL === "#7b5cff" && newRig.cols.armL === "#f5cd30" && newRig.hat === true,
+    JSON.stringify(newRig));
   // corrective: moving platform carries a standing player (showcase)
   await page.evaluate(() => { document.getElementById("tb-more").click(); });
   await page.evaluate(() => { document.getElementById("esc-leave").click(); });

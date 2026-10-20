@@ -649,13 +649,13 @@ function buildHat(id) {
     brim.position.y = -0.36; g.add(brim);
     const band = new THREE.Mesh(new THREE.CylinderGeometry(0.57, 0.57, 0.14, 24), std('#c0392b'));
     band.position.y = -0.18; g.add(band);
-    g.position.y = 0.62; // sits on head top (head local +y)
+    g.position.y = 1.0; // brim bottom rests on head top (head half-height 0.6)
   } else if (id === 'cap') {
     const dome = new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), std('#2a5fd4'));
     g.add(dome);
     const brim = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.09, 0.5), std('#23b5a3'));
     brim.position.set(0, 0.04, 0.72); g.add(brim);
-    g.position.y = 0.56;
+    g.position.y = 0.6;
   } else if (id === 'halo') {
     const h = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.07, 10, 32),
       new THREE.MeshStandardMaterial({ color: 0xf5c518, emissive: 0x8a6d00, emissiveIntensity: 0.8, roughness: 0.3 }));
@@ -761,7 +761,7 @@ function initAvatarPreview() {
   (function loop() {
     requestAnimationFrame(loop);
     const view = $('#lx-avatar');
-    if (!view || !view.classList.contains('active') || !avPreview.rig) return;
+    if (!view || !view.classList.contains('active') || !avPreview.rig || document.hidden) return;
     if (!avPreview.dragging) avPreview.rotY += 0.007;
     avPreview.rig.root.rotation.y = avPreview.rotY;
     avPreview.rig.root.rotation.x = avPreview.rotX;
@@ -769,10 +769,21 @@ function initAvatarPreview() {
   })();
 }
 function refreshAvatarPreview() {
-  if (!avPreview.renderer) { initAvatarPreview(); return; }
+  if (!avPreview.renderer) return; // lazy: inits on first time the avatar tab is opened
   if (avPreview.rig) avPreview.rig.dispose();
   avPreview.rig = createRig(AVATAR);
   avPreview.scene.add(avPreview.rig.root);
+  // frame the full rig (incl. nametag + hat): fit camera to bounding box
+  const box = new THREE.Box3().setFromObject(avPreview.rig.root);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const fov = (avPreview.camera.fov * Math.PI) / 180;
+  const dist = Math.max(
+    size.y / 2 / Math.tan(fov / 2),
+    size.x / 2 / (Math.tan(fov / 2) * avPreview.camera.aspect)
+  ) * 1.16 + 0.6;
+  avPreview.camera.position.set(0, center.y, dist);
+  avPreview.camera.lookAt(0, center.y, 0);
 }
 function drawFacePreview(canvas, face) {
   const ctx = canvas.getContext('2d');
@@ -822,13 +833,12 @@ function drawFacePreview(canvas, face) {
 }
 loadAvatar();
 renderAvatarEditor();
-// lazily spin up the 3D preview once the avatar view is first shown
+// lazily spin up the 3D preview the first time the avatar tab is opened
 document.querySelectorAll('[data-lxnav]').forEach((btn) => {
   btn.addEventListener('click', () => {
     if (btn.dataset.lxnav === 'avatar') initAvatarPreview();
   });
 });
-if ($('#lx-avatar').classList.contains('active')) initAvatarPreview();
 
 /* friends panel (simulated demo data, labeled as such) */
 const FRIENDS = [
@@ -949,12 +959,12 @@ function makeStudTexture(base = '#9d9ea1', stud = '#8e8f92', size = 256, cells =
   return tex;
 }
 
-function makeFaceTexture() {
+function makeFaceTexture(avatar = AVATAR) {
   // 256px canvas: eyes with highlights, brows, 6 expressions
   const S = 256;
   const c = document.createElement('canvas'); c.width = c.height = S;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = AVATAR.skin; ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = avatar.skin; ctx.fillRect(0, 0, S, S);
   const ink = '#33322e';
   const cx = (v) => v * S / 128;
   ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineWidth = cx(7); ctx.lineCap = 'round';
@@ -971,7 +981,7 @@ function makeFaceTexture() {
     ctx.lineWidth = cx(7);
   };
   const smile = () => { ctx.beginPath(); ctx.arc(cx(64), cx(66), cx(20), 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); };
-  switch (AVATAR.face) {
+  switch (avatar.face) {
     case 'cool':
       ctx.fillStyle = '#1c1c1e';
       ctx.fillRect(cx(22), cx(42), cx(38), cx(16)); ctx.fillRect(cx(68), cx(42), cx(38), cx(16));
@@ -1029,20 +1039,19 @@ function makeNametag(name) {
    Proportions stay R6 (2x2x1 torso, 1.2 head, 1x2x1 limbs) so physics
    (feet = center - 3, half-width 0.9) is unchanged. */
 function createRig(avatar = AVATAR) {
-  const prev = { ...AVATAR }; // face texture reads AVATAR; preview passes its own
-  Object.assign(AVATAR, avatar);
   const g = new THREE.Group();
+  const limbCol = (part, fallback) => (avatar.limbs && avatar.limbs[part]) ? avatar.limbs[part] : fallback;
   const partMat = (hex) => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.55, metalness: 0 });
   const rounded = (w, h, d, m) => new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, 0.07), m);
   const headMats = [partMat(avatar.skin), partMat(avatar.skin), partMat(avatar.skin), partMat(avatar.skin),
-    new THREE.MeshStandardMaterial({ map: makeFaceTexture(), roughness: 0.55 }), partMat(avatar.skin)];
+    new THREE.MeshStandardMaterial({ map: makeFaceTexture(avatar), roughness: 0.55 }), partMat(avatar.skin)];
   const head = new THREE.Mesh(new RoundedBoxGeometry(1.2, 1.2, 1.2, 3, 0.16), headMats);
   head.name = 'Head'; head.position.y = 1.6;
   const torso = rounded(2, 2, 1, partMat(avatar.shirt)); torso.name = 'Torso';
-  const armL = rounded(1, 2, 1, partMat(limbColor('armL'))); armL.name = 'LeftArm';
-  const armR = rounded(1, 2, 1, partMat(limbColor('armR'))); armR.name = 'RightArm';
-  const legL = rounded(1, 2, 1, partMat(limbColor('legL'))); legL.name = 'LeftLeg';
-  const legR = rounded(1, 2, 1, partMat(limbColor('legR'))); legR.name = 'RightLeg';
+  const armL = rounded(1, 2, 1, partMat(limbCol('armL', avatar.skin))); armL.name = 'LeftArm';
+  const armR = rounded(1, 2, 1, partMat(limbCol('armR', avatar.skin))); armR.name = 'RightArm';
+  const legL = rounded(1, 2, 1, partMat(limbCol('legL', avatar.pants))); legL.name = 'LeftLeg';
+  const legR = rounded(1, 2, 1, partMat(limbCol('legR', avatar.pants))); legR.name = 'RightLeg';
   // shoulder/hip pivots for limb swing
   armL.geometry.translate(0, -1 + 0.15, 0); armL.position.set(-1.5, 1.4, 0);
   armR.geometry.translate(0, -1 + 0.15, 0); armR.position.set(1.5, 1.4, 0);
@@ -1057,7 +1066,6 @@ function createRig(avatar = AVATAR) {
   const nametag = makeNametag('You');
   nametag.position.y = 3.1;
   g.add(nametag);
-  Object.assign(AVATAR, prev); // restore global avatar state
   return {
     root: g,
     parts: { head, torso, armL, armR, legL, legR },
@@ -1076,9 +1084,17 @@ function createRig(avatar = AVATAR) {
 }
 function buildPlayerRig() {
   const rig = createRig();
+  playerRig = rig.root;
+  playerRig.userData.dispose = rig.dispose; // consistent disposal path for every rig
   playerParts = rig.parts;
   nametag = rig.nametag;
   return rig.root;
+}
+function rebuildPlayerRig() {
+  if (playerRig && playerRig.userData.dispose) playerRig.userData.dispose();
+  else if (playerRig) scene.remove(playerRig);
+  playerRig = buildPlayerRig();
+  scene.add(playerRig);
 }
 
 function addPart(w, h, d, x, y, z, color, opts = {}) {
@@ -1695,14 +1711,7 @@ function enterExperience() {
   }
   state.coins = WALLET.coins; // wallet persists across sessions
   // rebuild the rig so the persisted avatar (colors/face) applies on every entry
-  if (playerRig && playerRig.userData.dispose) playerRig.userData.dispose();
-  else if (playerRig) scene.remove(playerRig);
-  const rig = createRig();
-  playerRig = rig.root;
-  playerRig.userData.dispose = rig.dispose;
-  playerParts = rig.parts;
-  nametag = rig.nametag;
-  scene.add(playerRig);
+  rebuildPlayerRig();
   $('#backpack').classList.add('hidden'); // joining resets panel UI to default
   updateBoard();
   updateBackpackUI();
@@ -1884,8 +1893,13 @@ window.robloxcraft = {
     return {
       torso: '#' + playerParts.torso.material.color.getHexString(),
       armL: '#' + playerParts.armL.material.color.getHexString(),
+      armR: '#' + playerParts.armR.material.color.getHexString(),
       legL: '#' + playerParts.legL.material.color.getHexString(),
+      legR: '#' + playerParts.legR.material.color.getHexString(),
     };
+  },
+  rigHat() {
+    return playerParts.head ? playerParts.head.children.some((c) => c.name === 'Hat') : false;
   },
   pressKey: (code, down = true) => { state.keys[code] = down; },
   teleport: (x, y, z) => { state.pos.set(x, y, z); state.vel.set(0, 0, 0); },
