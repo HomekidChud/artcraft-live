@@ -73,11 +73,12 @@ test("greetings and small talk receive friendly, honest replies",()=>{
   assert.equal(training.intent,"training");
   assert.match(training.text,/cannot see or control/);
 });
-test("EffectCraft startup troubleshooting offers official renderer fallbacks",()=>{
+test("EffectCraft startup troubleshooting explains the WebGL2/WebGPU requirement",()=>{
   const result=respond(catalog,model,"EffectCraft is stuck on a blank loading screen","auto");
   assert.equal(result.intent,"troubleshoot");
   assert.equal(result.craft.id,"effectcraft");
-  assert.deepEqual(result.recoveryOptions.map(option=>option.mode),["webgl","cpu"]);
+  assert.deepEqual(result.recoveryOptions.map(option=>option.mode),["reload"]);
+  assert.match(result.text,/WebGL2 or WebGPU/);
   assert.match(result.text,/application\/wasm/);
 });
 test("SVG starter escapes untrusted labels",async()=>{

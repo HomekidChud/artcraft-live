@@ -325,7 +325,8 @@ async function submit(text) {
   if(result.recoveryOptions?.length){
     const links=document.createElement("div");links.className="recovery-links";
     for(const option of result.recoveryOptions){
-      const url=new URL("../effectcraft/",location.href);url.searchParams.set(option.mode,"");
+      const url=new URL("../effectcraft/",location.href);
+      if(option.mode!=="reload")url.searchParams.set(option.mode,"");
       const link=document.createElement("a");link.className="recovery-link";link.href=url.href;
       link.target="_blank";link.rel="noopener";link.textContent=option.label;links.append(link);
     }

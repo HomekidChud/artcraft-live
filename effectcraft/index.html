@@ -69,12 +69,10 @@
       };
       // GPU availability: EffectCraft's canvas needs WebGPU or WebGL2 — v0.11.1 has
       // no CPU canvas path (the ?webgl/?cpu flags in the upstream hosting README
-      // are not read by the app). When the browser has neither, do not download
-      // and start the app at all: explain immediately instead. An explicit
-      // ?webgl or ?cpu choice is still respected and never overridden.
+      // are not read by the app, so they are no-ops and are not treated as
+      // choices). When the browser has neither, do not download and start the
+      // app at all: explain immediately instead.
       window.effectcraftRendererProbe = (async () => {
-        const chosen = new URLSearchParams(location.search);
-        if (chosen.has("webgl") || chosen.has("cpu")) return;
         let webgpu = false;
         if (navigator.gpu) {
           // Resolve (never reject) after the timeout, and only create it when an

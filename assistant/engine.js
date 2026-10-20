@@ -109,7 +109,7 @@ export function respond(catalog, model, text, selected, previousCraft, memoryEnt
   if (intent === "training") return {...base, text:"The local router covers 13 Crafts and seven request types using reviewed examples. Optional online chat can answer more freely, but it is not training data and is not saved. I cannot see or control your editor."};
   if (intent === "troubleshoot") {
     if (craft?.id === "effectcraft") {
-      return {...base, text:attachMemory("EffectCraft startup check: let the WebAssembly download finish. If the canvas stays blank, try WebGL; if that fails, try CPU mode (slower). On a self-hosted copy, effectcraft_web_bg.wasm should return HTTP 200 with application/wasm. I cannot inspect your browser console from chat.",relevant), recoveryOptions:[{label:"Try WebGL",mode:"webgl"},{label:"Try CPU · slower",mode:"cpu"}]};
+      return {...base, text:attachMemory("EffectCraft startup check: let the WebAssembly download finish. The app's canvas needs WebGL2 or WebGPU — a browser with neither cannot run it, and the page explains that before downloading anything. On a self-hosted copy, effectcraft_web_bg.wasm should return HTTP 200 with application/wasm. If the canvas stays blank on a capable browser, reload the page and check the first console error. I cannot inspect your browser console from chat.",relevant), recoveryOptions:[{label:"Reload EffectCraft",mode:"reload"}]};
     }
     return {...base, text:attachMemory(`${craft?.name || "Craft"} quick check:\n1. Refresh once and wait for app files to finish loading.\n2. If it is still blank, try a recent browser and check the first console error.\n3. Send the maintainer the app name and exact error. I cannot inspect or change the editor from this chat.`,relevant)};
   }

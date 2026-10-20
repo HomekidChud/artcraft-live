@@ -82,6 +82,7 @@ Verified locally on 19 October 2026:
 - Desktop assistant screenshot inspected at 1280×1100; a real 375×812 Chromium screenshot was inspected with no horizontal overflow. The assistant has two starter prompts, a compact Craft/memory row, and one persistent composer.
 - In the actual EffectCraft editor, the embedded chat iframe measured 358×513. After a troubleshooting response, its document remained 358×513; the composer, attach row, footer, collapsed “Show task steps” trace, and both renderer links stayed inside the panel.
 - EffectCraft default, `?webgl`, and `?cpu` URLs loaded the editor. The upstream `render.backend` status reported `active: cpu` on the CPU fallback URL. This sandbox has no usable GPU compositor, so the test does not establish performance or behavior on the user's device.
+- Correction, 20 October 2026: source inspection of v0.11.1 and current `main` shows the `?webgl`/`?cpu` query flags are never read by the app — the editor loading on those URLs reflected the app's automatic WebGPU→WebGL2 fallback plus CPU compositing, not the flags. The flags are no-ops; renderer selection is entirely the framework's. The assistant's troubleshoot guidance and recovery links were updated accordingly.
 - At that earlier revision, the local caches were `artcraft-assistant-v8` and `effectcraft-5d08653e92558abf-local-recovery1`; the assistant cache is now v10 and includes the online client and skill registry. The EffectCraft application JS/WASM still match upstream v0.11.1; only its service-worker version and HTML entrypoint were locally customized.
 
 

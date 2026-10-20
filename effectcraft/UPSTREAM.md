@@ -17,12 +17,12 @@ The repository's `index.html` adds recovery UI that appears after a long load or
 
 ### GPU handling (local change)
 
-EffectCraft's canvas requires WebGPU or WebGL2 — v0.11.1 has **no CPU canvas path**. Investigation of the v0.11.1 and current `main` source shows the app never reads the `?webgl`/`?cpu` flags documented in the upstream hosting README (empirically, `?cpu` still starts on the `BrowserWebGpu` backend), and the app already falls back WebGPU → WebGL2 on its own, rendering on the CPU internally when only WebGL2 exists. So browsers without WebGPU but with WebGL2 (Firefox, Safari without WebGPU, GPU-blocklisted machines) already work without a GPU.
+EffectCraft's canvas requires WebGPU or WebGL2 — v0.11.1 has **no CPU canvas path**. Investigation of the v0.11.1 and current `main` source shows the app never reads the `?webgl`/`?cpu` flags documented in the upstream hosting README (empirically, `?cpu` still starts on the `BrowserWebGpu` backend), and the app already falls back WebGPU → WebGL2 on its own, rendering on the CPU internally when only WebGL2 exists. So browsers without WebGPU but with WebGL2 (including machines where WebGL2 is software-implemented) already run the app, though the canvas still requires a WebGL2 or WebGPU context — a browser with neither cannot run it at all.
 
 What the local entry page adds for the remaining case — a browser with neither WebGPU nor WebGL2, where upstream fails after the full download with a raw wgpu surface error:
 
 1. Before downloading the ~63 MB application, the page probes for a WebGPU adapter (4-second timeout that resolves to null, so no promise is left unhandled) and, if none, for a working WebGL2 context.
-2. If the browser has neither, the page skips the download and startup entirely and explains immediately that EffectCraft needs WebGL2 or WebGPU, with a reload link in case the detection is wrong. An explicit `?webgl` or `?cpu` choice is always respected and never overridden.
+2. If the browser has neither, the page skips the download and startup entirely and explains immediately that EffectCraft needs WebGL2 or WebGPU, with a reload link in case the detection is wrong. Because the `?webgl`/`?cpu` flags are no-ops, they are not treated as choices: a bookmark containing them gets the same upfront explanation instead of a doomed download.
 3. If startup fails with a GPU present, the page shows the error with a reload link and collapsible technical details.
 
 The application JavaScript and WebAssembly are untouched; the module import only happens after the probe.
