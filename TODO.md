@@ -298,11 +298,32 @@ QA'd + pushed.
   panel (DOM tree, picking, highlight, editable styles, computed,
   box model) + Console (JS eval). Input isolation: swallow keys while
   open, clear movement keys, exclude own DOM.
-- [ ] M6: all-app integration — script tag in editable apps
-  (unitycraft, robloxcraft, planecraft, airplanecraft) + injection via
-  assistant/widget.js for catalog crafts (bump assistant/sw.js cache
-  name), QA on every app, Ctrl+Shift+I best-effort + visible button
-  fallback (browser may reserve the shortcut).
+- [x] M6 (this commit): all-app integration — inspector everywhere:
+  direct script tags in the root hub, unitycraft, robloxcraft and
+  airplanecraft (single tag; owner-supplied code untouched); catalog
+  crafts + launcher get it injected by assistant/widget.js (DOM
+  contract preserved — npm test 64/64 + python suite OK; assistant
+  sw.js cache bumped v12 -> v13); planecraft covered via its existing
+  widget tag. QA: inspector-present checks on hub, launcher, figcraft,
+  wordcraft, unitycraft, planecraft, airplanecraft + hub open/close
+  smoke — 92 checks total. README gained an honest Page inspector
+  section (limits disclosed). Visual check: inspector coexists with
+  the figcraft editor + chat widget.
+
+### v2 upgrade COMPLETE (M1-M6, commits 8441bf0..41e62b7)
+
+Next 3 actions for the next AI:
+1. Run `npm test`, `python3 -m unittest discover -s assistant/tests
+   -p 'test_*.py'`, `node qa/reconstructions-qa.mjs` (92 checks) —
+   all must be green before any further push.
+2. RobloxCraft v2 candidates: emotes wheel (3D keyframe poses), NPC
+   friends that walk the world, per-experience leaderboards, obby
+   stage 2 (new geometry), more marketplace items (color packs,
+   trails). Keep every milestone QA'd + pushed + TODO updated.
+3. Inspector candidates: sourcemap-less stack traces in Console,
+   localStorage editor pane, element screenshots, performance panel
+   (long-task observer). Keep the honesty notes — no browser-level
+   network/debugging claims.
 
 ### Notes / constraints
 
