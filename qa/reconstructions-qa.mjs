@@ -655,6 +655,8 @@ try {
   await page.goto(BASE + "/planecraft/", { waitUntil: "domcontentloaded", timeout: 30000 });
   await page.waitForTimeout(1200);
   check("planecraft: home renders project cards", (await page.locator(".proj-card").count()) >= 3);
+  check("planecraft: inspector present (via assistant widget)",
+    await page.evaluate(() => typeof window.ArtCraftInspector) === "object");
   await zeroErrors("planecraft");
 } catch (e) { check("planecraft: suite ran", false, String(e).slice(0, 160)); }
 
@@ -662,11 +664,35 @@ try {
   await page.goto(BASE + "/airplanecraft/", { waitUntil: "domcontentloaded", timeout: 45000 });
   await page.waitForTimeout(4000);
   check("airplanecraft: main menu appears", await page.locator("#mainMenuOverlay").isVisible().catch(() => false));
+  check("airplanecraft: inspector present",
+    await page.evaluate(() => typeof window.ArtCraftInspector) === "object");
   // ignore transient CDN resource failures for the owner-supplied file; only real JS errors fail
   const real = errors.filter((e) => !e.includes("Failed to load resource"));
   errors.length = 0;
   check("airplanecraft: no JS errors", real.length === 0, real.slice(0, 3).join(" | "));
 } catch (e) { check("airplanecraft: suite ran", false, String(e).slice(0, 160)); }
+
+/* Inspector coverage across the remaining apps: hub, launcher, catalog
+   crafts (via the assistant widget) and unitycraft (direct tag). */
+try {
+  const apps = [["/", "hub"], ["/launcher/", "launcher"], ["/figcraft/", "figcraft"], ["/wordcraft/", "wordcraft"], ["/unitycraft/", "unitycraft"]];
+  for (const [path, label] of apps) {
+    await page.goto(BASE + path, { waitUntil: "domcontentloaded", timeout: 45000 });
+    await page.waitForTimeout(2500);
+    const ok = await page.evaluate(() => typeof window.ArtCraftInspector) === "object";
+    check("inspector present: " + label, ok);
+  }
+  // smoke: open + console eval + close on the hub
+  await page.goto(BASE + "/", { waitUntil: "domcontentloaded", timeout: 30000 });
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => window.ArtCraftInspector.open());
+  await page.waitForTimeout(300);
+  const hubOpen = await page.evaluate(() => window.ArtCraftInspector.isOpen());
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(200);
+  const hubClosed = await page.evaluate(() => !window.ArtCraftInspector.isOpen());
+  check("inspector: hub open + Escape close", hubOpen && hubClosed);
+} catch (e) { check("inspector coverage suite ran", false, String(e).slice(0, 160)); }
 
 await browser.close();
 const failed = results.filter((r) => !r.ok);

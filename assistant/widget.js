@@ -56,4 +56,12 @@
     if(event.origin===base.origin&&event.source===frame?.contentWindow&&event.data?.type==="artcraft-chat-minimize")toggle(false);
   });
   root.append(style,panel,tab);document.body.append(host);
+  // Shared DevTools-style page inspector (Ctrl+Shift+I) for every craft.
+  // Idempotent on the inspector side; fails soft if the file is missing.
+  try{
+    const s=document.createElement("script");
+    s.src=new URL("../inspector/inspector.js",base).href;
+    s.defer=true;
+    document.head.appendChild(s);
+  }catch(e){}
 })();
