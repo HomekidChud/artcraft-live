@@ -17,7 +17,10 @@ READMEs must stay honest (these are reconstructions, not real Unity/Roblox).
 - Repeatable QA: `qa/reconstructions-qa.mjs` (run `node qa/reconstructions-qa.mjs`
   with Playwright installed; needs a local static server on port 8123, or pass a
   BASE_URL env var). Always run `npm test` before pushing.
-- Landing page: `index.html` APPS array at the repo root lists both apps.
+- Landing page: `index.html` APPS array at the repo root lists the apps. Sister apps
+  built the same way: `planecraft/` (Plane PM reconstruction) and
+  `airplanecraft/` (owner-supplied flight-sim HTML, v17.2, branding-only
+  changes — do not refactor its code without the owner's ask).
 
 ## UnityCraft — status
 
@@ -117,3 +120,7 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
 ## Verification log (append per push)
 
 - 2026-10-20 commit 1: `npm test` 64 pass; TODO baseline only, no app changes.
+- 2026-10-20 airplanecraft push: owner's flight-sim HTML added as
+  `airplanecraft/index.html` (title/menu rebrand only), README + landing
+  registration. QA: main menu → Sandbox starts, plane on runway with HUD,
+  0 console errors. `npm test` 64 pass.
