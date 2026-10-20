@@ -7,7 +7,7 @@
 - Official browser package: [`effectcraft-web-0.11.1.zip`](https://github.com/storytold/effectcraft/releases/download/v0.11.1/effectcraft-web-0.11.1.zip)
 - Release-package SHA-256: `8675e595d876408ce23d868d8530f17466029650da727d742028484cbde8a207`
 
-The core mirrored runtime files `effectcraft_web.js`, `effectcraft_web_bg.wasm`, `worker.js`, and `audio-worklet.js` were compared with the checksum-verified v0.11.1 package and are byte-for-byte identical. The app JS and WebAssembly were not changed or needlessly replaced. The local `sw.js` cache version has a `-local-recovery3` suffix so returning offline installs fetch the updated `index.html`; the app's entry page also contains local recovery UI. A source archive can be built from the tagged upstream checkout with `git archive`; web development builds use `cargo xtask web` and the upstream Rust 1.95 toolchain requirement.
+The core mirrored runtime files `effectcraft_web.js`, `effectcraft_web_bg.wasm`, `worker.js`, and `audio-worklet.js` were compared with the checksum-verified v0.11.1 package and are byte-for-byte identical. The app JS and WebAssembly were not changed or needlessly replaced. The local `sw.js` cache version has a `-local-recovery4` suffix so returning offline installs fetch the updated `index.html`; the app's entry page also contains local recovery UI. A source archive can be built from the tagged upstream checkout with `git archive`; web development builds use `cargo xtask web` and the upstream Rust 1.95 toolchain requirement.
 
 ## Startup recovery
 
@@ -38,7 +38,7 @@ On 20 October 2026, after deploying the capability probe, the live page was re-v
 - No WebGPU and no WebGL2: the page skipped the ~63 MB download and showed the explanation with a reload link (no application load attempted).
 - No WebGPU with WebGL2: the app started normally on the GL backend in about 2.9 seconds; the probe did not interfere.
 - Full GPU: the app started normally in about 0.5 seconds (cached).
-- Explicit `?cpu` with no GPU: the choice was respected (no override); the application attempted to start, failed with the wgpu surface error, and the recovery UI showed the error with a reload link.
+- A `?cpu` bookmark with no GPU: the probe no longer treats the no-op flags as a choice — the page gives the same upfront explanation without downloading or starting the application (this replaces the earlier revision, which respected the flag, attempted startup and failed with the wgpu surface error).
 
-Also verified that day: `?cpu` with a GPU present starts on the `BrowserWebGpu` backend — the documented `?webgl`/`?cpu` flags are not implemented in v0.11.1. These checks confirm the entry-page behavior in that test browser; they do not establish compatibility with every device or GPU.
+Also verified that day: `?cpu` with a GPU present starts on the `BrowserWebGpu` backend — the documented `?webgl`/`?cpu` flags are not implemented in v0.11.1. The production service-worker path was checked from the same origin: the worker is registered at the EffectCraft scope, the only EffectCraft cache present is `effectcraft-5d08653e92558abf-local-recovery4`, and its cached `index.html` contains the capability probe — evidence the new entry page is installed and serving, not a demonstrated migration of every older installation. These checks confirm the entry-page behavior in that test browser; they do not establish compatibility with every device or GPU.
 
