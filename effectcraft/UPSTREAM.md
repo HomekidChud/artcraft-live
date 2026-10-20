@@ -30,3 +30,6 @@ The application JavaScript and WebAssembly are untouched; the module import is o
 On 19 October 2026, the live GitHub Pages copy returned the WebAssembly asset with HTTP 200 and `Content-Type: application/wasm`. In the sandbox Chromium test, EffectCraft loaded successfully in about 2.9 seconds with WebGPU available and `crossOriginIsolated` false. This confirms that the current deployment loads in that test browser; it does not establish compatibility with every device or GPU. If it remains stuck on another device, use the recovery options and share the first console error.
 
 Sources: [upstream README](https://github.com/storytold/effectcraft/blob/v0.11.1/README.md), [web hosting guide](https://github.com/storytold/effectcraft/blob/v0.11.1/packaging/web/README.md), [v0.11.1 release](https://github.com/storytold/effectcraft/releases/tag/v0.11.1).
+
+On 20 October 2026, after deploying the automatic fallback, the live page was re-verified: the default load started the app with WebGPU in about 3.5 seconds (`wasmMs` 3231, `readyMs` 3456), the no-GPU probe path (simulated with WebGPU and WebGL2 unavailable) returned `cpu-forced` and rewrote the page URL to `?cpu`, and a forced `?cpu` load started the app in about 2.9 seconds. This confirms the fallback logic in that test browser; it does not establish compatibility with every device or GPU.
+
