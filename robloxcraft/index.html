@@ -546,10 +546,14 @@
 </div>
 
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
 </script>
 <script type="module">
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 /* ============================================================
    RobloxCraft — clean-room browser reconstruction of the Roblox
@@ -562,7 +566,8 @@ import * as THREE from 'three';
 const $ = (s) => document.querySelector(s);
 
 /* ---------------- Avatar (persisted) ---------------- */
-const AVATAR = { skin: '#f5cd30', shirt: '#2a5fd4', pants: '#37a34a', face: 'smile' };
+const AVATAR = { skin: '#f5cd30', shirt: '#2a5fd4', pants: '#37a34a', face: 'smile', hat: null };
+function limbColor(part) { return AVATAR.limbs && AVATAR.limbs[part] ? AVATAR.limbs[part] : (part[0] === 'a' ? AVATAR.skin : AVATAR.pants); }
 function loadAvatar() { try { Object.assign(AVATAR, JSON.parse(localStorage.getItem('robloxcraft-avatar')) || {}); } catch (e) {} }
 function saveAvatar() { try { localStorage.setItem('robloxcraft-avatar', JSON.stringify(AVATAR)); } catch (e) {} }
 
@@ -787,6 +792,7 @@ const state = {
   invincibleUntil: 0,
   jumpBuffer: 0, // physics-step countdown; survives frame gaps under throttling
   jumpCount: 0,
+  walkPhase: 0,
   maxY: 3,
   checkpoint: 0,
   checkpointPos: null,
@@ -811,35 +817,63 @@ function makeStudTexture(base = '#9d9ea1', stud = '#8e8f92', size = 256, cells =
 }
 
 function makeFaceTexture() {
-  const c = document.createElement('canvas'); c.width = c.height = 128;
+  // 256px canvas: eyes with highlights, brows, 6 expressions
+  const S = 256;
+  const c = document.createElement('canvas'); c.width = c.height = S;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = AVATAR.skin; ctx.fillRect(0, 0, 128, 128);
-  const ink = '#3c3c3c';
-  ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineWidth = 7; ctx.lineCap = 'round';
-  const eyes = (wink) => {
-    ctx.beginPath(); ctx.arc(42, 52, 8, 0, Math.PI * 2); ctx.fill();
-    if (wink) { ctx.beginPath(); ctx.moveTo(78, 52); ctx.lineTo(94, 52); ctx.stroke(); }
-    else { ctx.beginPath(); ctx.arc(86, 52, 8, 0, Math.PI * 2); ctx.fill(); }
-  };
-  if (AVATAR.face === 'cool') {
-    ctx.fillStyle = '#222';
-    ctx.fillRect(24, 44, 34, 14); ctx.fillRect(70, 44, 34, 14);
-    ctx.fillRect(56, 48, 16, 5);
-    ctx.beginPath(); ctx.moveTo(40, 86); ctx.lineTo(88, 86); ctx.stroke();
-  } else if (AVATAR.face === 'happy') {
-    eyes();
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.ellipse(64, 78, 22, 15, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = AVATAR.skin; ctx.fillRect(0, 0, S, S);
+  const ink = '#33322e';
+  const cx = (v) => v * S / 128;
+  ctx.fillStyle = ink; ctx.strokeStyle = ink; ctx.lineWidth = cx(7); ctx.lineCap = 'round';
+  const eye = (x, y, r = 8) => {
+    ctx.beginPath(); ctx.arc(cx(x), cx(y), cx(r), 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    ctx.beginPath(); ctx.arc(cx(x) + cx(r) * 0.32, cx(y) - cx(r) * 0.32, cx(r) * 0.3, 0, Math.PI * 2); ctx.fill();
     ctx.fillStyle = ink;
-    ctx.beginPath(); ctx.ellipse(64, 84, 14, 8, 0, 0, Math.PI * 2); ctx.fill();
-  } else if (AVATAR.face === 'wink') {
-    eyes(true);
-    ctx.beginPath(); ctx.arc(64, 68, 20, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
-  } else { // smile (default)
-    eyes();
-    ctx.beginPath(); ctx.arc(64, 68, 20, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+  };
+  const brows = (dy = 0, tilt = 0) => {
+    ctx.lineWidth = cx(6);
+    ctx.beginPath(); ctx.moveTo(cx(34), cx(38 + dy) + tilt); ctx.lineTo(cx(50), cx(37 + dy) - tilt); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx(78), cx(37 + dy) + tilt); ctx.lineTo(cx(94), cx(38 + dy) - tilt); ctx.stroke();
+    ctx.lineWidth = cx(7);
+  };
+  const smile = () => { ctx.beginPath(); ctx.arc(cx(64), cx(66), cx(20), 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke(); };
+  switch (AVATAR.face) {
+    case 'cool':
+      ctx.fillStyle = '#1c1c1e';
+      ctx.fillRect(cx(22), cx(42), cx(38), cx(16)); ctx.fillRect(cx(68), cx(42), cx(38), cx(16));
+      ctx.fillRect(cx(58), cx(46), cx(12), cx(5));
+      ctx.lineWidth = cx(7); ctx.beginPath(); ctx.moveTo(cx(40), cx(88)); ctx.lineTo(cx(88), cx(88)); ctx.stroke();
+      break;
+    case 'happy':
+      brows(-1); eye(42, 54); eye(86, 54);
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.ellipse(cx(64), cx(80), cx(22), cx(15), 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = ink;
+      ctx.beginPath(); ctx.ellipse(cx(64), cx(86), cx(13), cx(8), 0, 0, Math.PI * 2); ctx.fill();
+      break;
+    case 'wink':
+      brows(); eye(42, 52);
+      ctx.lineWidth = cx(7); ctx.beginPath(); ctx.moveTo(cx(76), cx(52)); ctx.lineTo(cx(96), cx(52)); ctx.stroke();
+      smile();
+      break;
+    case 'skeptical':
+      brows(2, 6); eye(42, 54); eye(86, 54);
+      ctx.lineWidth = cx(7);
+      ctx.beginPath(); ctx.moveTo(cx(48), cx(84)); ctx.lineTo(cx(82), cx(80)); ctx.stroke();
+      break;
+    case 'mad':
+      brows(4, -5); eye(42, 56, 7); eye(86, 56, 7);
+      ctx.lineWidth = cx(7);
+      ctx.beginPath(); ctx.arc(cx(64), cx(96), cx(18), 1.15 * Math.PI, 1.85 * Math.PI); ctx.stroke();
+      break;
+    default: // smile
+      brows(); eye(42, 52); eye(86, 52);
+      smile();
   }
-  return new THREE.CanvasTexture(c);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  return tex;
 }
 
 function makeNametag(name) {
@@ -856,36 +890,58 @@ function makeNametag(name) {
   return sp;
 }
 
-function buildR6() {
-  // Classic blocky character proportions (public R6 spec): 2x2x1 torso,
-  // 1x1x1 head, 1x2x1 limbs. Colors: classic starter colors.
+/* Rig factory — one reusable builder for the gameplay character and the
+   avatar-editor preview. Returns { root, parts, nametag, dispose() } and
+   does NOT touch globals, so multiple instances can coexist.
+   Proportions stay R6 (2x2x1 torso, 1.2 head, 1x2x1 limbs) so physics
+   (feet = center - 3, half-width 0.9) is unchanged. */
+function createRig(avatar = AVATAR) {
+  const prev = { ...AVATAR }; // face texture reads AVATAR; preview passes its own
+  Object.assign(AVATAR, avatar);
   const g = new THREE.Group();
-  const skin = new THREE.Color(AVATAR.skin).getHex(), shirt = new THREE.Color(AVATAR.shirt).getHex(), pants = new THREE.Color(AVATAR.pants).getHex();
-  const box = (w, h, d, m, x, y, z) => {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m);
-    mesh.position.set(x, y, z); return mesh;
-  };
-  const skinMat = (hex) => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.85, metalness: 0 });
-  const headMats = [skinMat(skin), skinMat(skin), skinMat(skin), skinMat(skin), new THREE.MeshStandardMaterial({ map: makeFaceTexture(), roughness: 0.85 }), skinMat(skin)];
-  const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), headMats); head.name = 'Head';
-  const torso = box(2, 2, 1, skinMat(shirt), 0, 0, 0); torso.name = 'Torso';
-  const armL = box(1, 2, 1, skinMat(skin), 0, 0, 0); armL.name = 'LeftArm';
-  const armR = box(1, 2, 1, skinMat(skin), 0, 0, 0); armR.name = 'RightArm';
-  const legL = box(1, 2, 1, skinMat(pants), 0, 0, 0); legL.name = 'LeftLeg';
-  const legR = box(1, 2, 1, skinMat(pants), 0, 0, 0); legR.name = 'RightLeg';
-  // pivots for limb swing
+  const partMat = (hex) => new THREE.MeshStandardMaterial({ color: hex, roughness: 0.55, metalness: 0 });
+  const rounded = (w, h, d, m) => new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 2, 0.07), m);
+  const headMats = [partMat(avatar.skin), partMat(avatar.skin), partMat(avatar.skin), partMat(avatar.skin),
+    new THREE.MeshStandardMaterial({ map: makeFaceTexture(), roughness: 0.55 }), partMat(avatar.skin)];
+  const head = new THREE.Mesh(new RoundedBoxGeometry(1.2, 1.2, 1.2, 3, 0.16), headMats);
+  head.name = 'Head'; head.position.y = 1.6;
+  const torso = rounded(2, 2, 1, partMat(avatar.shirt)); torso.name = 'Torso';
+  const armL = rounded(1, 2, 1, partMat(limbColor('armL'))); armL.name = 'LeftArm';
+  const armR = rounded(1, 2, 1, partMat(limbColor('armR'))); armR.name = 'RightArm';
+  const legL = rounded(1, 2, 1, partMat(limbColor('legL'))); legL.name = 'LeftLeg';
+  const legR = rounded(1, 2, 1, partMat(limbColor('legR'))); legR.name = 'RightLeg';
+  // shoulder/hip pivots for limb swing
   armL.geometry.translate(0, -1 + 0.15, 0); armL.position.set(-1.5, 1.4, 0);
   armR.geometry.translate(0, -1 + 0.15, 0); armR.position.set(1.5, 1.4, 0);
   legL.geometry.translate(0, -1 + 0.1, 0); legL.position.set(-0.5, -1.1, 0);
   legR.geometry.translate(0, -1 + 0.1, 0); legR.position.set(0.5, -1.1, 0);
-  head.position.y = 1.6;
   torso.position.y = 0;
   g.add(head, torso, armL, armR, legL, legR);
-  playerParts = { head, torso, armL, armR, legL, legR };
-  nametag = makeNametag('You');
+  const nametag = makeNametag('You');
   nametag.position.y = 3.1;
   g.add(nametag);
-  return g;
+  Object.assign(AVATAR, prev); // restore global avatar state
+  return {
+    root: g,
+    parts: { head, torso, armL, armR, legL, legR },
+    nametag,
+    dispose() {
+      g.traverse((o) => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+          if (m.map) m.map.dispose();
+          m.dispose();
+        });
+      });
+      if (g.parent) g.parent.remove(g);
+    },
+  };
+}
+function buildPlayerRig() {
+  const rig = createRig();
+  playerParts = rig.parts;
+  nametag = rig.nametag;
+  return rig.root;
 }
 
 function addPart(w, h, d, x, y, z, color, opts = {}) {
@@ -960,6 +1016,8 @@ function buildWorld() {
   renderer.setSize(innerWidth, innerHeight);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.06;
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x9fd0f5);
   scene.fog = new THREE.Fog(0x9fd0f5, 220, 640);
@@ -998,7 +1056,7 @@ function buildWorld() {
 
   buildLevel(); // shared level builder (per-experience)
 
-  playerRig = buildR6();
+  playerRig = buildPlayerRig();
   scene.add(playerRig);
   resetPlayer();
 
@@ -1276,17 +1334,26 @@ function renderShop() {
   }
 }
 function stepVisuals(dt) {
-  playerRig.position.copy(state.pos);
-  playerRig.rotation.y = state.yaw;
-  // walk cycle
-  const moving = state.onGround && (Math.abs(state.vel.x) > 0.5 || Math.abs(state.vel.z) > 0.5);
+  // walk cycle: phase advances with actual speed, rotations are damped
+  // toward targets so starts/stops blend instead of snapping
+  const speedNow = Math.hypot(state.vel.x, state.vel.z);
+  const moving = state.onGround && speedNow > 0.5;
+  state.walkPhase += dt * (4 + Math.min(speedNow, 26) * 0.55);
+  const swingTarget = moving ? 0.72 : 0;
+  state._swingAmp = (state._swingAmp ?? 0) + (swingTarget - (state._swingAmp ?? 0)) * Math.min(1, dt * 10);
+  const swing = Math.sin(state.walkPhase) * state._swingAmp;
+  const damp = (obj, ax, val) => { obj.rotation[ax] += (val - obj.rotation[ax]) * Math.min(1, dt * 14); };
+  damp(playerParts.armL, 'x', swing);
+  damp(playerParts.armR, 'x', -swing);
+  damp(playerParts.legL, 'x', -swing * 0.95);
+  damp(playerParts.legR, 'x', swing * 0.95);
+  // idle breathing + walk bob on the torso/head
   const t = performance.now() / 1000;
-  const amp = moving ? 0.7 : 0;
-  const swing = Math.sin(t * 10) * amp;
-  playerParts.armL.rotation.x = swing;
-  playerParts.armR.rotation.x = -swing;
-  playerParts.legL.rotation.x = -swing * 0.9;
-  playerParts.legR.rotation.x = swing * 0.9;
+  const bob = moving ? Math.abs(Math.sin(state.walkPhase)) * 0.07 : Math.sin(t * 1.6) * 0.015;
+  playerRig.position.set(state.pos.x, state.pos.y + bob, state.pos.z);
+  playerRig.rotation.y = state.yaw;
+  // subtle head counter-sway
+  damp(playerParts.head, 'z', moving ? Math.sin(state.walkPhase) * 0.03 : 0);
   if (!state.onGround) {
     playerParts.armL.rotation.x = -2.6; playerParts.armR.rotation.x = -2.6;
   }
@@ -1491,8 +1558,13 @@ function enterExperience() {
   }
   state.coins = WALLET.coins; // wallet persists across sessions
   // rebuild the rig so the persisted avatar (colors/face) applies on every entry
-  if (playerRig) scene.remove(playerRig);
-  playerRig = buildR6();
+  if (playerRig && playerRig.userData.dispose) playerRig.userData.dispose();
+  else if (playerRig) scene.remove(playerRig);
+  const rig = createRig();
+  playerRig = rig.root;
+  playerRig.userData.dispose = rig.dispose;
+  playerParts = rig.parts;
+  nametag = rig.nametag;
   scene.add(playerRig);
   $('#backpack').classList.add('hidden'); // joining resets panel UI to default
   updateBoard();

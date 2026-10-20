@@ -182,3 +182,60 @@ Files: `robloxcraft/index.html` (single file, ~1185 lines). Key globals: `state`
   test` 64 pass. Bugs found & fixed during QA: buildWorld carried a stale
   inline level copy (showcase entered with the baseplate layout —
   mesh-count check caught it).
+
+## RobloxCraft v2 upgrade — active task (2026-10-20)
+
+User request: go big on RobloxCraft — services, rig/character visual
+upgrade, avatar-creation upgrade, marketplace, and a custom Inspect
+Element (Ctrl+Shift+I) for ALL apps. Advisor plan: 6 milestones, each
+QA'd + pushed.
+
+### Milestones
+
+- [x] M1 (this commit): rig factory + character upgrade — `createRig()`
+  reusable factory (gameplay + future preview, returns
+  {root,parts,nametag,dispose()}, does NOT touch globals;
+  `buildPlayerRig()` adapter sets them). RoundedBoxGeometry limbs/head
+  (three/addons importmap), 256px face texture with highlights/brows
+  and 6 expressions (smile/cool/happy/wink/skeptical/mad — editor UI
+  for the 2 new ones comes in M2), per-limb colors via `AVATAR.limbs`
+  (`limbColor()`), ACES filmic tone mapping, damped walk cycle with
+  speed-driven phase (`state.walkPhase`, `_swingAmp` blend), idle
+  breathing bob + walk bob + head counter-sway. QA: 59/59 still green,
+  armRX damps -0.66 (walk) → 0 (idle), front-view screenshot verified.
+- [ ] M2: avatar editor upgrade — 3D rotating preview (own renderer,
+  own rig instance, disposed when hidden), per-limb color pickers,
+  hat accessories (meshes: top hat, cap, halo, headphones), 6 faces in
+  the UI, save migration (old skin/shirt/pants/face saves keep
+  working).
+- [ ] M3: marketplace — launcher tab, item catalog (hats, faces, gear,
+  color packs) with one wallet/ownership model (stable IDs), equip
+  from marketplace + avatar editor, insufficient-funds and repeat-
+  purchase handling, applies without reload.
+- [ ] M4: services explorer — in-experience panel with WORKING local
+  services: Workspace (scene objects), Players (local player),
+  Lighting (live controls), Simulation (pause/step the fixed-step
+  loop), Persistence (local save management, labeled local-only).
+- [ ] M5: shared inspector core — `inspector/inspector.js`, Elements
+  panel (DOM tree, picking, highlight, editable styles, computed,
+  box model) + Console (JS eval). Input isolation: swallow keys while
+  open, clear movement keys, exclude own DOM.
+- [ ] M6: all-app integration — script tag in editable apps
+  (unitycraft, robloxcraft, planecraft, airplanecraft) + injection via
+  assistant/widget.js for catalog crafts (bump assistant/sw.js cache
+  name), QA on every app, Ctrl+Shift+I best-effort + visible button
+  fallback (browser may reserve the shortcut).
+
+### Notes / constraints
+
+- Entry index.html files of catalog crafts are GENERATED — never edit;
+  the assistant widget is the sanctioned injection point for them
+  (bump sw.js cache when it changes). Editable: unitycraft,
+  robloxcraft, planecraft, airplanecraft (owner sanctioned inspector
+  for all).
+- "1:1 DevTools copy" boundary: in-page inspector can do Elements/
+  Styles/Console faithfully; browser-level network/debugging and
+  cross-origin stylesheet access have real limits — disclose in README,
+  don't ship dead tabs.
+- AirplaneCraft code stays untouched apart from the inspector script
+  tag (owner sanctioned).
