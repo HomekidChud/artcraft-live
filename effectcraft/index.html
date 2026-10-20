@@ -71,23 +71,67 @@
       // no CPU canvas path (the ?webgl/?cpu flags in the upstream hosting README
       // are not read by the app, so they are no-ops and are not treated as
       // choices). When the browser has neither, do not download and start the
-      // app at all: explain immediately instead.
+      // app at all: explain immediately instead. WebGPU is also exercised with a
+      // real device and a tiny workload before the app starts: some machines
+      // have WebGPU that is broken (driver reset: "the graphics device was
+      // lost"), which previously killed the app after startup — if the check
+      // fails, navigator.gpu is hidden so the app's own fallback picks WebGL2.
+      // ?webgl2 (or ?webgl) in the URL forces the WebGL2 path.
+      const timeout = (p, ms) => Promise.race([p, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
+      const stubGpu = () => {
+        try { Object.defineProperty(Navigator.prototype, "gpu", { configurable: true, get() { return undefined; } }); } catch (e) {}
+      };
       window.effectcraftRendererProbe = (async () => {
+        const params = new URLSearchParams(location.search);
+        const forced = params.has("webgl2") || params.has("webgl");
         let webgpu = false;
-        if (navigator.gpu) {
+        if (navigator.gpu && !forced) {
           // Resolve (never reject) after the timeout, and only create it when an
           // adapter request is actually raced, so no promise is left unhandled.
           let timer;
-          const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(null), 4000); });
+          const to = new Promise((resolve) => { timer = setTimeout(() => resolve(null), 4000); });
           try {
-            webgpu = !!(await Promise.race([navigator.gpu.requestAdapter(), timeout]));
+            const adapter = await Promise.race([navigator.gpu.requestAdapter(), to]);
+            webgpu = !!adapter;
+            if (webgpu) {
+              // Exercise the device: request it, run a tiny workload and watch
+              // its `lost` promise before letting the app start.
+              try {
+                const device = await timeout(adapter.requestDevice(), 2500);
+                if (!device) { webgpu = false; }
+                else {
+                  let lost = false;
+                  try { if (device.lost) device.lost.then(() => { lost = true; }); } catch (e) {}
+                  try {
+                    device.pushErrorScope("validation");
+                    const src = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_SRC });
+                    const dst = device.createBuffer({ size: 16, usage: GPUBufferUsage.COPY_DST });
+                    const enc = device.createCommandEncoder();
+                    enc.copyBufferToBuffer(src, 0, dst, 0, 16);
+                    device.queue.submit([enc.finish()]);
+                    const err = await timeout(device.popErrorScope(), 2000);
+                    const done = await timeout(device.queue.onSubmittedWorkDone(), 2000);
+                    if (err || done === null || done === undefined) webgpu = false;
+                  } catch (e) { webgpu = false; }
+                  await new Promise((r) => setTimeout(r, 300));
+                  if (lost) webgpu = false;
+                  try { device.destroy(); } catch (e) {}
+                }
+              } catch (e) { webgpu = false; }
+            }
           } catch { webgpu = false; }
           clearTimeout(timer);
         }
         if (!webgpu) {
+          // WebGPU is absent or failed its startup check. Verify WebGL2 and hide
+          // navigator.gpu when it exists, so the app falls back to WebGL2 rather
+          // than dying on a lost device after startup.
           let webgl2 = false;
           try { webgl2 = !!document.createElement("canvas").getContext("webgl2"); } catch { webgl2 = false; }
           if (!webgl2) { window.effectcraftNoGpu = true; return "none"; }
+          if (navigator.gpu) stubGpu();
+          window.effectcraftWebgpuFallback = true;
+          return "webgl2";
         }
       })();
       const timer = setTimeout(() => { recovery.hidden = false; }, 12000);
@@ -112,6 +156,10 @@
       if (p) p.textContent = "The app was not downloaded because it cannot run in this browser. If you think this is wrong, reload:";
       recovery.hidden = false;
     } else {
+    if (window.effectcraftWebgpuFallback) {
+      const status = document.getElementById("status");
+      if (status) status.textContent = "WebGPU failed its startup check on this machine — starting on WebGL2…";
+    }
     const ec = await import("./effectcraft_web.js");
     const init = ec.default;
     const t0 = performance.now();
