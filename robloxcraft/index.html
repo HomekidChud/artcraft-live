@@ -285,9 +285,22 @@
   .av-preview #av-3d { display: block; border-radius: 14px; max-width: 100%; background: radial-gradient(120% 90% at 50% 0%, #26313f 0%, #131721 75%); cursor: grab; touch-action: none; }
   .av-preview #av-3d:active { cursor: grabbing; }
   .hats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .mk-wallet { color: var(--rbx-accent); font-weight: 800; margin-bottom: 14px; }
+  .mk-sub { color: var(--rbx-muted); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; margin: 18px 0 8px; }
+  .mk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .mk-card { border: 1px solid var(--rbx-border); border-radius: 14px; padding: 12px; background: var(--rbx-surface); display: flex; flex-direction: column; gap: 8px; }
+  .mk-card canvas { width: 56px; height: 56px; border-radius: 10px; background: #131721; }
+  .mk-card .mk-name { font-weight: 800; font-size: 13px; }
+  .mk-card .mk-price { color: var(--rbx-muted); font-size: 12px; }
+  .mk-card .mk-btn { border: none; border-radius: 10px; padding: 8px 10px; font-weight: 800; cursor: pointer; background: var(--rbx-accent); color: #06231a; }
+  .mk-card .mk-btn.owned { background: transparent; border: 1px solid var(--rbx-border); color: var(--rbx-text); }
+  .mk-card .mk-btn.equipped { border-color: var(--rbx-accent); color: var(--rbx-accent); }
+  .mk-card .mk-btn:disabled { opacity: .7; cursor: not-allowed; background: var(--rbx-border); color: var(--rbx-muted); }
   .hat-btn { border: 2px solid var(--rbx-border); background: var(--rbx-surface); border-radius: 12px; padding: 7px 12px; font-weight: 700; font-size: 12px; color: var(--rbx-text); cursor: pointer; }
   .hat-btn:hover { border-color: var(--rbx-accent); }
   .hat-btn.selected { border-color: var(--rbx-accent); box-shadow: 0 0 0 1px var(--rbx-accent); color: var(--rbx-accent); }
+  .hat-btn.locked, .face-btn.locked { opacity: .45; border-style: dashed; }
+  .hat-btn.locked::after, .face-btn.locked::after { content: ' · Market'; font-size: 10px; color: var(--rbx-muted); }
   .av-preview .av-sub { color: var(--rbx-muted); font-size: 12px; margin-top: 2px; }
   .av-controls { flex: 1; min-width: 280px; }
   .av-group { margin-bottom: 20px; }
@@ -355,6 +368,7 @@
     <nav class="lx-nav" aria-label="Main">
       <button type="button" data-lxnav="discover" class="active">Discover</button>
       <button type="button" data-lxnav="avatar">Avatar</button>
+      <button type="button" data-lxnav="market">Market</button>
       <button type="button" data-lxnav="friends">Friends</button>
     </nav>
     <div class="lx-user" title="Guest">G</div>
@@ -435,6 +449,16 @@
           <div class="av-group"><h4>Hat</h4><div class="hats" id="hat-choices"></div></div>
         </div>
       </div>
+    </div>
+
+    <div id="lx-market" class="lx-view">
+      <h2 class="lx-section-title">Marketplace</h2>
+      <div class="mk-wallet"><span id="market-coins">0</span> coins — collect coins in experiences to spend here</div>
+      <div class="mk-grid" id="mk-hats"></div>
+      <h3 class="mk-sub">Faces</h3>
+      <div class="mk-grid" id="mk-faces"></div>
+      <h3 class="mk-sub">Gear</h3>
+      <div class="mk-grid" id="mk-gear"></div>
     </div>
 
     <div id="lx-friends" class="lx-view">
@@ -585,6 +609,49 @@ const GEAR = [
   { id: 'gravity', name: 'Gravity Coil', price: 15, color: '#00b06f', desc: '×1.35 jump power' },
   { id: 'fusion', name: 'Fusion Coil', price: 25, color: '#f5c518', desc: 'speed + jump' },
 ];
+/* One marketplace catalog: gear + cosmetics. Free (price 0) items are
+   owned by default; premium items use namespaced ids in WALLET.owned. */
+const MARKET_HATS = [
+  { id: 'hat:tophat', name: 'Top Hat', price: 0 },
+  { id: 'hat:cap', name: 'Cap', price: 0 },
+  { id: 'hat:halo', name: 'Halo', price: 0 },
+  { id: 'hat:headphones', name: 'Headphones', price: 0 },
+  { id: 'hat:crown', name: 'Crown', price: 40 },
+  { id: 'hat:propeller', name: 'Propeller Cap', price: 50 },
+];
+const MARKET_FACES = [
+  { id: 'face:smile', name: 'Smile', price: 0 },
+  { id: 'face:cool', name: 'Cool', price: 0 },
+  { id: 'face:happy', name: 'Happy', price: 0 },
+  { id: 'face:wink', name: 'Wink', price: 0 },
+  { id: 'face:skeptical', name: 'Skeptical', price: 0 },
+  { id: 'face:mad', name: 'Mad', price: 0 },
+  { id: 'face:stars', name: 'Star Eyes', price: 35 },
+];
+function marketItem(id) { return MARKET_HATS.concat(MARKET_FACES, GEAR.map((g) => ({ ...g, id: g.id }))).find((i) => i.id === id); }
+function itemOwned(id) { const it = marketItem(id); return !it || it.price === 0 || WALLET.owned.includes(id); }
+function gearOwnedIds() { return WALLET.owned.filter((id) => gearById(id)); }
+/* single purchase path: wallet check, debit, persist, refresh every view */
+function buyItem(id) {
+  const it = marketItem(id);
+  if (!it || itemOwned(id) || WALLET.coins < it.price) return false;
+  WALLET.coins -= it.price;
+  WALLET.owned.push(id);
+  saveWallet();
+  addChat('sys', `Purchased ${it.name}!`);
+  renderMarket(); renderAvatarEditor(); renderShop(); updateBackpackUI(); updateBoard();
+  return true;
+}
+/* equip a cosmetic: hats/faces write into the avatar save (free+owned only) */
+function equipCosmetic(kind, id) {
+  const marketId = kind + ':' + id;
+  if (!itemOwned(marketId)) return false;
+  if (kind === 'hat') AVATAR.hat = AVATAR.hat === id ? null : id;
+  if (kind === 'face') AVATAR.face = id;
+  saveAvatar();
+  renderAvatarEditor(); renderMarket();
+  return true;
+}
 
 /* ---------------- Audio (procedural, Web Audio) ---------------- */
 let audioCtx = null, masterGain = null, volume = 0.6;
@@ -630,13 +697,15 @@ document.querySelectorAll('[data-lxnav]').forEach((btn) => {
 
 /* ---------------- Avatar editor UI ---------------- */
 const SWATCHES = ['#f5cd30', '#e8b98a', '#c98850', '#8a5a2b', '#f2f2f2', '#d05656', '#e07b39', '#f5c518', '#37a34a', '#2a5fd4', '#7b5cff', '#335fff', '#23b5a3', '#8a8f96', '#313234'];
-const FACES = ['smile', 'cool', 'happy', 'wink', 'skeptical', 'mad'];
+const FACES = ['smile', 'cool', 'happy', 'wink', 'skeptical', 'mad', 'stars'];
 const HATS = [
   { id: null, name: 'None' },
   { id: 'tophat', name: 'Top Hat' },
   { id: 'cap', name: 'Cap' },
   { id: 'halo', name: 'Halo' },
   { id: 'headphones', name: 'Headphones' },
+  { id: 'crown', name: 'Crown' },
+  { id: 'propeller', name: 'Propeller Cap' },
 ];
 function buildHat(id) {
   if (!id) return null;
@@ -662,6 +731,31 @@ function buildHat(id) {
     h.rotation.x = Math.PI / 2;
     g.add(h);
     g.position.y = 1.05;
+  } else if (id === 'crown') {
+    const gold = () => new THREE.MeshStandardMaterial({ color: 0xf5c518, roughness: 0.35, metalness: 0.6 });
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.28, 20), gold());
+    g.add(base);
+    for (let i = 0; i < 5; i++) {
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.3, 8), gold());
+      const a = (i / 5) * Math.PI * 2;
+      spike.position.set(Math.cos(a) * 0.5, 0.28, Math.sin(a) * 0.5);
+      g.add(spike);
+    }
+    const jewel = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8),
+      new THREE.MeshStandardMaterial({ color: 0xd05656, emissive: 0x550f0f, roughness: 0.2 }));
+    jewel.position.y = 0.18; g.add(jewel);
+    g.position.y = 0.76;
+  } else if (id === 'propeller') {
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.62, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), std('#d05656'));
+    g.add(dome);
+    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.09, 0.5), std('#e07b39'));
+    brim.position.set(0, 0.04, 0.72); g.add(brim);
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.22, 8), std('#313234'));
+    stick.position.y = 0.72; g.add(stick);
+    const prop = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.05, 0.14), std('#f2f2f2'));
+    prop.name = 'Propeller';
+    prop.position.y = 0.85; g.add(prop);
+    g.position.y = 0.6;
   } else if (id === 'headphones') {
     const band = new THREE.Mesh(new THREE.TorusGeometry(0.64, 0.06, 8, 24, Math.PI), std('#313234'));
     g.add(band);
@@ -708,7 +802,14 @@ function renderAvatarEditor() {
     drawFacePreview(cv, f);
     b.appendChild(cv);
     b.title = f;
-    b.addEventListener('click', () => { AVATAR.face = f; saveAvatar(); renderAvatarEditor(); });
+    const lockedF = !itemOwned('face:' + f);
+    if (lockedF) {
+      b.classList.add('locked');
+      b.title = 'Buy in the Market';
+      b.addEventListener('click', () => { document.querySelector('[data-lxnav="market"]').click(); });
+    } else {
+      b.addEventListener('click', () => { AVATAR.face = f; saveAvatar(); renderAvatarEditor(); });
+    }
     fw.appendChild(b);
   }
   const hw = $('#hat-choices');
@@ -718,11 +819,109 @@ function renderAvatarEditor() {
     b.type = 'button';
     b.className = 'hat-btn' + ((AVATAR.hat || null) === h.id ? ' selected' : '');
     b.textContent = h.name;
-    b.addEventListener('click', () => { AVATAR.hat = h.id; saveAvatar(); renderAvatarEditor(); });
+    const locked = h.id && !itemOwned('hat:' + h.id);
+    if (locked) {
+      b.classList.add('locked');
+      b.title = 'Buy in the Market';
+      b.addEventListener('click', () => { document.querySelector('[data-lxnav="market"]').click(); });
+    } else {
+      b.addEventListener('click', () => { AVATAR.hat = h.id; saveAvatar(); renderAvatarEditor(); });
+    }
     hw.appendChild(b);
   }
   refreshAvatarPreview();
 }
+/* marketplace tab */
+function drawHatIcon(canvas, id) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.fillStyle = '#131721'; ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = '#f2f2f2'; ctx.fillStyle = '#f2f2f2';
+  const cx = w / 2;
+  if (id === 'tophat') {
+    ctx.fillRect(cx - 14, 10, 28, 24); ctx.fillRect(cx - 22, 32, 44, 6);
+  } else if (id === 'cap') {
+    ctx.beginPath(); ctx.arc(cx, 26, 14, Math.PI, 0); ctx.fill();
+    ctx.fillRect(cx - 4, 26, 24, 5);
+  } else if (id === 'halo') {
+    ctx.strokeStyle = '#f5c518'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.ellipse(cx, 20, 13, 6, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#e8b98a'; ctx.fillRect(cx - 8, 28, 16, 16);
+  } else if (id === 'headphones') {
+    ctx.strokeStyle = '#8a8f96'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(cx, 26, 13, Math.PI, 0); ctx.stroke();
+    ctx.fillRect(cx - 18, 24, 8, 12); ctx.fillRect(cx + 10, 24, 8, 12);
+  } else if (id === 'crown') {
+    ctx.fillStyle = '#f5c518';
+    ctx.beginPath(); ctx.moveTo(cx - 15, 34); ctx.lineTo(cx - 15, 16); ctx.lineTo(cx - 7, 24);
+    ctx.lineTo(cx, 12); ctx.lineTo(cx + 7, 24); ctx.lineTo(cx + 15, 16); ctx.lineTo(cx + 15, 34);
+    ctx.closePath(); ctx.fill();
+  } else if (id === 'propeller') {
+    ctx.fillStyle = '#d05656';
+    ctx.beginPath(); ctx.arc(cx, 28, 12, Math.PI, 0); ctx.fill();
+    ctx.fillStyle = '#f2f2f2'; ctx.fillRect(cx - 20, 12, 40, 4); ctx.fillRect(cx - 2, 8, 4, 10);
+  }
+}
+function renderMarket() {
+  const coinsEl = $('#market-coins');
+  if (!coinsEl) return;
+  coinsEl.textContent = WALLET.coins;
+  const mkCard = (item, iconFn, equipFn, equippedFn) => {
+    const card = document.createElement('div');
+    card.className = 'mk-card';
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    iconFn(cv, item);
+    card.appendChild(cv);
+    const nm = document.createElement('div');
+    nm.className = 'mk-name'; nm.textContent = item.name;
+    card.appendChild(nm);
+    const btn = document.createElement('button');
+    btn.className = 'mk-btn';
+    if (itemOwned(item.id)) {
+      btn.classList.add('owned');
+      if (equippedFn()) { btn.classList.add('equipped'); btn.textContent = 'Equipped'; }
+      else btn.textContent = item.price === 0 && item.id.startsWith('hat:') && !AVATAR.hat ? 'Wear' : 'Equip';
+      btn.addEventListener('click', () => { equipFn(); sfxClick(); });
+    } else {
+      const price = document.createElement('div');
+      price.className = 'mk-price'; price.textContent = item.price + ' coins';
+      card.appendChild(price);
+      btn.textContent = 'Buy';
+      btn.disabled = WALLET.coins < item.price;
+      btn.addEventListener('click', () => { if (buyItem(item.id) && equipFn) equipFn(); sfxClick(); });
+    }
+    card.appendChild(btn);
+    return card;
+  };
+  $('#mk-hats').innerHTML = '';
+  for (const it of MARKET_HATS) {
+    const hatId = it.id.slice(4);
+    $('#mk-hats').appendChild(mkCard(it,
+      (cv) => drawHatIcon(cv, hatId),
+      () => equipCosmetic('hat', hatId),
+      () => AVATAR.hat === hatId));
+  }
+  $('#mk-faces').innerHTML = '';
+  for (const it of MARKET_FACES) {
+    const faceId = it.id.slice(5);
+    $('#mk-faces').appendChild(mkCard(it,
+      (cv) => drawFacePreview(cv, faceId),
+      () => equipCosmetic('face', faceId),
+      () => AVATAR.face === faceId));
+  }
+  $('#mk-gear').innerHTML = '';
+  for (const g of GEAR) {
+    $('#mk-gear').appendChild(mkCard({ ...g, id: g.id },
+      (cv) => { const c = cv.getContext('2d'); c.fillStyle = '#131721'; c.fillRect(0, 0, 64, 64); c.fillStyle = g.color; c.beginPath(); c.arc(32, 32, 16, 0, Math.PI * 2); c.fill(); },
+      () => equipGear(g.id),
+      () => WALLET.equipped === g.id));
+  }
+}
+document.querySelectorAll('[data-lxnav]').forEach((btn) => {
+  btn.addEventListener('click', () => { if (btn.dataset.lxnav === 'market') renderMarket(); });
+});
+
 /* 3D live preview — its own renderer, scene and rig instance; only
    renders frames while the avatar view is active, and rebuilds the
    rig on every avatar change. */
@@ -819,6 +1018,18 @@ function drawFacePreview(canvas, face) {
     ctx.beginPath(); ctx.moveTo(ex2 - er * 1.1, ey - er * 2.2); ctx.lineTo(ex2 + er * 1.4, ey - er * 1.7); ctx.stroke();
     ctx.lineWidth = Math.max(2, w / 16);
     ctx.beginPath(); ctx.moveTo(w * 0.38, h * 0.66); ctx.lineTo(w * 0.64, h * 0.63); ctx.stroke();
+  } else if (face === 'stars') {
+    const star = (x, y, r) => {
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = (Math.PI / 5) * i - Math.PI / 2;
+        const rr = i % 2 ? r * 0.45 : r;
+        ctx.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
+      }
+      ctx.closePath(); ctx.fill();
+    };
+    star(ex, ey, w * 0.11); star(ex2, ey, w * 0.11);
+    ctx.beginPath(); ctx.arc(w / 2, h * 0.52, w * 0.16, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
   } else if (face === 'mad') {
     eye(ex); eye(ex2);
     ctx.lineWidth = Math.max(2, w / 22);
@@ -831,8 +1042,10 @@ function drawFacePreview(canvas, face) {
     ctx.beginPath(); ctx.arc(w / 2, h * 0.52, w * 0.16, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
   }
 }
+loadWallet(); // authoritative wallet hydrated at boot, before any view renders
 loadAvatar();
 renderAvatarEditor();
+renderMarket();
 // lazily spin up the 3D preview the first time the avatar tab is opened
 document.querySelectorAll('[data-lxnav]').forEach((btn) => {
   btn.addEventListener('click', () => {
@@ -1005,6 +1218,20 @@ function makeFaceTexture(avatar = AVATAR) {
       ctx.lineWidth = cx(7);
       ctx.beginPath(); ctx.moveTo(cx(48), cx(84)); ctx.lineTo(cx(82), cx(80)); ctx.stroke();
       break;
+    case 'stars': {
+      const star = (x, y, r) => {
+        ctx.beginPath();
+        for (let i = 0; i < 10; i++) {
+          const a = (Math.PI / 5) * i - Math.PI / 2;
+          const rr = i % 2 ? r * 0.45 : r;
+          ctx.lineTo(cx(x) + Math.cos(a) * rr, cx(y) + Math.sin(a) * rr);
+        }
+        ctx.closePath(); ctx.fill();
+      };
+      star(42, 54, cx(11)); star(86, 54, cx(11));
+      smile();
+      break;
+    }
     case 'mad':
       brows(4, -5); eye(42, 56, 7); eye(86, 56, 7);
       ctx.lineWidth = cx(7);
@@ -1245,7 +1472,8 @@ function bindInput() {
     if (e.code === 'Escape') toggleEscMenu();
     if (e.code === 'Slash' && !escOpen()) { e.preventDefault(); focusChat(); }
     const digit = /^Digit([1-9])$/.exec(e.code);
-    if (digit && WALLET.owned[+digit[1] - 1]) equipGear(WALLET.owned[+digit[1] - 1]);
+    const gearList = gearOwnedIds();
+    if (digit && gearList[+digit[1] - 1]) equipGear(gearList[+digit[1] - 1]);
   };
   const ku = (e) => { state.keys[e.code] = false; };
   addEventListener('keydown', kd); addEventListener('keyup', ku);
@@ -1412,9 +1640,11 @@ let gearMesh = null;
 function gearById(id) { return GEAR.find((g) => g.id === id); }
 function buyGear(id) {
   const g = gearById(id);
-  if (!g || WALLET.owned.includes(id) || state.coins < g.price) return false;
-  state.coins -= g.price;
-  WALLET.coins = state.coins;
+  if (!g || itemOwned(id)) return false;
+  WALLET.coins = state.coins; // in-experience shop: sync live coins first
+  if (WALLET.coins < g.price) return false;
+  WALLET.coins -= g.price;
+  state.coins = WALLET.coins; // keep the live counter in step with the wallet
   WALLET.owned.push(id);
   saveWallet();
   addChat('sys', `Purchased ${g.name}! Equip it from the backpack (or press ${WALLET.owned.length}).`);
@@ -1423,7 +1653,7 @@ function buyGear(id) {
   return true;
 }
 function equipGear(id) {
-  if (id !== null && !WALLET.owned.includes(id)) return;
+  if (id !== null && (!WALLET.owned.includes(id) || !gearById(id))) return;
   WALLET.equipped = WALLET.equipped === id ? null : id;
   saveWallet();
   const g = gearById(WALLET.equipped);
@@ -1445,13 +1675,14 @@ function updateGearVisual() {
 function updateBackpackUI() {
   const rows = $('#bp-rows');
   if (!rows) return;
-  $('#bp-count').textContent = WALLET.owned.length;
-  if (!WALLET.owned.length) {
+  const gearList = gearOwnedIds();
+  $('#bp-count').textContent = gearList.length;
+  if (!gearList.length) {
     rows.innerHTML = '<div class="bp-empty">Backpack empty — buy gear from the menu Shop (Esc).</div>';
     return;
   }
   rows.innerHTML = '';
-  WALLET.owned.forEach((id, i) => {
+  gearList.forEach((id, i) => {
     const g = gearById(id);
     const row = document.createElement('div');
     row.className = 'bp-row' + (WALLET.equipped === id ? ' equipped' : '');
@@ -1507,6 +1738,8 @@ function stepVisuals(dt) {
   playerRig.rotation.y = state.yaw;
   // subtle head counter-sway
   damp(playerParts.head, 'z', moving ? Math.sin(state.walkPhase) * 0.03 : 0);
+  const prop = playerRig && playerRig.getObjectByName && playerRig.getObjectByName('Propeller');
+  if (prop) prop.rotation.y += dt * 7;
   if (!state.onGround) {
     playerParts.armL.rotation.x = -2.6; playerParts.armR.rotation.x = -2.6;
   }

@@ -300,11 +300,11 @@ try {
   check("robloxcraft: avatar view opens",
     await page.evaluate(() => document.getElementById("lx-avatar").classList.contains("active")));
   check("robloxcraft: avatar swatches + faces render",
-    (await page.locator("#sw-skin .swatch").count()) === 15 && (await page.locator(".face-btn").count()) === 6);
+    (await page.locator("#sw-skin .swatch").count()) === 15 && (await page.locator(".face-btn").count()) === 7);
   const limbRowsOk = await page.evaluate(() =>
     ["armL", "armR", "legL", "legR"].every((p) => document.querySelectorAll(`#sw-${p} .swatch`).length === 15));
   check("robloxcraft: per-limb color rows render", limbRowsOk);
-  check("robloxcraft: hat choices render", (await page.locator("#hat-choices .hat-btn").count()) === 5);
+  check("robloxcraft: hat choices render", (await page.locator("#hat-choices .hat-btn").count()) === 7);
   check("robloxcraft: 3D preview canvas present", await page.locator("#av-3d").isVisible());
   await page.locator("#sw-shirt .swatch").nth(8).click();
   await page.locator("#sw-armR .swatch").nth(5).click();
@@ -313,6 +313,48 @@ try {
   const avatarSaved = await page.evaluate(() => JSON.parse(localStorage.getItem("robloxcraft-avatar")));
   check("robloxcraft: avatar picks persist", avatarSaved.shirt === "#37a34a" && avatarSaved.face === "cool"
     && avatarSaved.limbs && avatarSaved.limbs.armR === "#d05656" && avatarSaved.hat === "tophat", JSON.stringify(avatarSaved));
+  // Marketplace: buy from the launcher BEFORE entering any experience
+  await page.evaluate(() => { localStorage.setItem("robloxcraft-save", JSON.stringify({ coins: 100, owned: [], equipped: null })); });
+  await page.reload({ waitUntil: "load", timeout: 45000 });
+  await page.waitForTimeout(1500);
+  await page.locator('[data-lxnav="market"]').click();
+  await page.waitForTimeout(400);
+  const mkCounts = await page.evaluate(() => ({
+    hats: document.querySelectorAll("#mk-hats .mk-card").length,
+    faces: document.querySelectorAll("#mk-faces .mk-card").length,
+    gear: document.querySelectorAll("#mk-gear .mk-card").length,
+    coins: document.querySelector("#market-coins").textContent,
+  }));
+  check("robloxcraft: marketplace renders catalog + coins",
+    mkCounts.hats === 6 && mkCounts.faces === 7 && mkCounts.gear === 3 && mkCounts.coins === "100", JSON.stringify(mkCounts));
+  await page.evaluate(() => {
+    const card = [...document.querySelectorAll("#mk-hats .mk-card")].find((c) => c.textContent.includes("Crown"));
+    card.querySelector(".mk-btn").click();
+  });
+  await page.waitForTimeout(400);
+  const mkBought = await page.evaluate(() => ({
+    wallet: JSON.parse(localStorage.getItem("robloxcraft-save")),
+    avatar: JSON.parse(localStorage.getItem("robloxcraft-avatar")),
+    coins: document.querySelector("#market-coins").textContent,
+  }));
+  check("robloxcraft: launcher purchase debits wallet, owns + equips cosmetic",
+    mkBought.wallet.coins === 60 && mkBought.wallet.owned.includes("hat:crown") && mkBought.avatar.hat === "crown",
+    JSON.stringify(mkBought));
+  // insufficient funds: propeller (50) must be disabled at 10 coins; repeat purchase must not re-debit
+  await page.evaluate(() => { const w = JSON.parse(localStorage.getItem("robloxcraft-save")); w.coins = 10; localStorage.setItem("robloxcraft-save", JSON.stringify(w)); });
+  await page.reload({ waitUntil: "load", timeout: 45000 });
+  await page.waitForTimeout(1500);
+  await page.locator('[data-lxnav="market"]').click();
+  await page.waitForTimeout(400);
+  const mkPoor = await page.evaluate(() => {
+    const card = [...document.querySelectorAll("#mk-hats .mk-card")].find((c) => c.textContent.includes("Propeller"));
+    const crown = [...document.querySelectorAll("#mk-hats .mk-card")].find((c) => c.textContent.includes("Crown"));
+    return { propDisabled: card.querySelector(".mk-btn").disabled, crownBtn: crown.querySelector(".mk-btn").textContent.trim() };
+  });
+  check("robloxcraft: insufficient funds disables buy; owned item shows equip",
+    mkPoor.propDisabled === true && /Equip|Wear|Equipped/.test(mkPoor.crownBtn), JSON.stringify(mkPoor));
+  const mkReload = await page.evaluate(() => JSON.parse(localStorage.getItem("robloxcraft-save")));
+  check("robloxcraft: wallet persists across reload", mkReload.coins === 10 && mkReload.owned.includes("hat:crown"), JSON.stringify(mkReload));
   // Wallet + shop + equip (seed coins, reload, re-enter)
   await page.evaluate(() => { localStorage.setItem("robloxcraft-save", JSON.stringify({ coins: 100, owned: [], equipped: null })); });
   await page.reload({ waitUntil: "load", timeout: 45000 });

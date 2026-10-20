@@ -228,10 +228,25 @@ QA'd + pushed.
   document.hidden). QA +2 behavioral checks (old-format save ->
   default limbs/no hat; new-format save -> limb colors + hat on the
   actual gameplay rig), 64 total.
-- [ ] M3: marketplace — launcher tab, item catalog (hats, faces, gear,
-  color packs) with one wallet/ownership model (stable IDs), equip
-  from marketplace + avatar editor, insufficient-funds and repeat-
-  purchase handling, applies without reload.
+- [x] M3 (this commit): marketplace — new Market tab (nav: Discover /
+  Avatar / Market / Friends) with hats (6) / faces (7) / gear (3)
+  cards, canvas icons, coins display. ONE wallet/ownership model:
+  namespaced ids (hat:crown, face:stars) in the existing
+  robloxcraft-save owned[] array; free items (all previously released
+  hats/faces/colors + legacy gear ids) stay free/owned-by-default —
+  nothing existing was invalidated. New premium items: Crown (40),
+  Propeller Cap (50, animated), Star Eyes face (35). Single
+  buyItem() purchase path (funds check, debit, persist, refresh ALL
+  views); buyGear() syncs live gameplay coins then routes through it;
+  equipCosmetic() writes hats/faces into the avatar save; buying a
+  cosmetic auto-equips. Backpack, bp-count and number-key equip now
+  filter owned[] to GEAR only (was raw-indexed — would have broken
+  with cosmetics in owned[]). Wallet hydrated at boot before any
+  view renders; market purchases work from the launcher BEFORE ever
+  entering an experience. QA +4 checks (catalog render, launcher
+  purchase debit+own+equip, insufficient funds + no repeat debit,
+  reload persistence), 68 total; disabled buy button contrast fixed.
+- [ ] M4: services explorer
 - [ ] M4: services explorer — in-experience panel with WORKING local
   services: Workspace (scene objects), Players (local player),
   Lighting (live controls), Simulation (pause/step the fixed-step
