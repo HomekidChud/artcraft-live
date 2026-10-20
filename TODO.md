@@ -212,9 +212,22 @@ QA'd + pushed.
   mad to texture + 2D preview), old saves migrate automatically
   (missing limbs/hat fall back to skin/pants/null). QA: 62 checks
   (added 3D canvas, limb rows, hat row, limb+hat persistence); fixed
-  QA runner focus bug (blocked-storage section left bp in front and
-  throttled main-page rAF -> physics false failures; bringToFront
-  restored).
+  QA runner focus bug (blocked-storage section left bp in front —
+  its context was closed but main-page focus was never restored —
+  throttling the main page's rAF and causing physics false-failures;
+  an explicit bringToFront after that section fixed the rerun).
+- [x] M2.5 (this commit, advisor corrective review): createRig threads
+  the avatar explicitly (makeFaceTexture(avatar), local limb color
+  resolution — no global AVATAR swap; two differently-configured rigs
+  coexist); buildPlayerRig attaches the dispose handle consistently
+  (initial rig no longer leaks on first rebuild; rebuildPlayerRig()
+  used for every rebuild); top-hat brim now rests ON the head (was
+  inside it), cap raised; preview camera frames the full bounding
+  box (feet were clipped), verified at desktop + 375px; preview truly
+  lazy (renderer created on first avatar-tab open, loop also gates on
+  document.hidden). QA +2 behavioral checks (old-format save ->
+  default limbs/no hat; new-format save -> limb colors + hat on the
+  actual gameplay rig), 64 total.
 - [ ] M3: marketplace — launcher tab, item catalog (hats, faces, gear,
   color packs) with one wallet/ownership model (stable IDs), equip
   from marketplace + avatar editor, insufficient-funds and repeat-
