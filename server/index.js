@@ -10,6 +10,7 @@ const path = require('path');
 const PORT = Number(process.env.PORT || 3000);
 const MAX_BUILDS = 500;
 const MAX_DOC_BYTES = 2 * 1024 * 1024; // 2 MB per build document
+const API_KEY = process.env.API_KEY || ''; // optional shared secret for writes/deletes
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_FILE = path.join(DATA_DIR, 'builds.json');
 
@@ -49,14 +50,19 @@ function listBuilds() {
 
 function send(res, code, obj) {
   const body = JSON.stringify(obj);
-  res.writeHead(code, {
+  const headers = {
     'Content-Type': 'application/json; charset=utf-8',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type,X-API-Key',
     'Cache-Control': 'no-store'
-  });
+  };
+  res.writeHead(code, headers);
   res.end(body);
+}
+function authorized(req) {
+  if (!API_KEY) return true; // no key configured: open access (set API_KEY to lock writes)
+  return req.headers['x-api-key'] === API_KEY;
 }
 
 function readBody(req) {
@@ -89,6 +95,7 @@ const server = http.createServer(async (req, res) => {
       if (req.method === 'GET' && !parts[2]) return send(res, 200, listBuilds());
 
       if (req.method === 'POST' && !parts[2]) {
+        if (!authorized(req)) return send(res, 401, { error: 'Unauthorized' });
         const raw = await readBody(req);
         const body = JSON.parse(raw);
         if (!body || typeof body !== 'object') return send(res, 400, { error: 'Invalid JSON body' });
@@ -97,11 +104,8 @@ const server = http.createServer(async (req, res) => {
         const data = body.data;
         if (!data || typeof data !== 'object') return send(res, 400, { error: 'Missing build data' });
         if (raw.length > MAX_DOC_BYTES) return send(res, 413, { error: 'Build document too large' });
-        if (Object.keys(store.builds).length >= MAX_BUILDS) {
-          // drop the oldest to make room
-          const oldest = listBuilds().pop();
-          if (oldest) delete store.builds[oldest.id];
-        }
+        // capacity is an error, never a silent deletion of someone's saved build
+        if (Object.keys(store.builds).length >= MAX_BUILDS) return send(res, 507, { error: 'Server full (' + MAX_BUILDS + ' builds) — delete a build first' });
         const id = newId();
         const now = Date.now();
         store.builds[id] = { id, name, kind, data, createdAt: now, updatedAt: now };
@@ -113,6 +117,7 @@ const server = http.createServer(async (req, res) => {
         const doc = store.builds[parts[2]];
         if (req.method === 'GET' && doc) return send(res, 200, doc);
         if (req.method === 'DELETE') {
+          if (!authorized(req)) return send(res, 401, { error: 'Unauthorized' });
           if (!doc) return send(res, 404, { error: 'Build not found' });
           delete store.builds[parts[2]];
           persist();

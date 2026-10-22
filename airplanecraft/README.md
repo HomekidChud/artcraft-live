@@ -6,7 +6,7 @@ A single-file browser flight simulator: design an airframe in the workshop, tune
 - Momentum-based flight model, persistent workshop, navigation and systems tuning, responsive UI (desktop and touch), and a damage model.
 - **Realistic systems**: electrical (battery → bus → circuit breakers → loads with ground return), fuel (tank → strainer → pump → engine), hydraulic (pump → reservoir → actuator) and water lines; the build notebook checks each loop live.
 - **Working lights**: navigation (port red / starboard green / tail white), strobes, beacons and landing lights are real fixtures with actual point-light illumination, powered by the electrical system.
-- **Cloud build sync**: every workshop build is a JSON document that can be saved to and loaded from the Flight World server (`server/` in this repo, deployed on Render). Presets are built ground-up in the workshop and published as build documents — nothing is hard-coded.
+- **Cloud build sync**: every workshop build is a JSON document that can be saved to and loaded from the Flight World server (`server/` in this repo, deployed on Render). Build-mode presets are authored as workshop builds (ground-up parts + wiring) and published as `flightworld-build` JSON documents. The sandbox quickbar fleet remains a separate parametric set of procedurally-assembled reference aircraft.
 - Runs in the browser; the only external dependency is Three.js from a CDN.
 
 ## Provenance
@@ -15,7 +15,10 @@ Originally a user-supplied HTML file (`FlightWorldTest17.2_Responsive_UI_Damage.
 
 ## Cloud server
 
-`server/` implements the `/api/builds` contract (zero-dependency Node; deployed on Render). Builds and presets are stored as JSON; MongoDB can be attached later via `MONGODB_URI` without client changes.
+`server/` implements the `/api/builds` contract (zero-dependency Node; deployed on
+Render). Builds and presets are stored as JSON. **MongoDB is not wired up yet** —
+the `MONGODB_URI` env var is reserved for a future storage adapter; today the
+server persists to a JSON file (ephemeral across Render free redeploys).
 
 ## Run
 

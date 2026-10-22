@@ -1105,11 +1105,11 @@ function createWorkshopVisual(THREE,core,d,ghost=false){
     const r=Math.min(w,h)*.5;
     mesh(new THREE.CylinderGeometry(r,r,l*.62,14),metal,[0,0,0],[Math.PI/2,0,0]);
     ellipsoid([w*.94,h*.94,l*.44],[0,0,l*.46],material(d.color,{emissive:d.color,emissiveIntensity:1.8,roughness:.15,metalness:0}));
-    const lamp=new THREE.PointLight(d.color,d.lightIntensity??2.2,d.lightDistance??6,2);
+    const lamp=d.spot?new THREE.SpotLight(d.color,d.lightIntensity??5,d.lightDistance??16,.42,.5,1.6):new THREE.PointLight(d.color,d.lightIntensity??2.2,d.lightDistance??6,2);
     lamp.position.set(0,0,l*.62);lamp.userData.fwLight=true;lamp.userData.baseIntensity=d.lightIntensity??2.2;
     if(d.strobe)lamp.userData.fwStrobe=true;
     if(d.beacon)lamp.userData.fwBeacon=true;
-    if(!ghost)root.add(lamp);
+    if(!ghost){root.add(lamp);if(d.spot){const tid='ltp-'+Math.random().toString(36).slice(2,9);lamp.target.position.set(0,0,l*.62+7);lamp.userData.fwTargetId=tid;lamp.target.userData.fwLightTargetId=tid;root.add(lamp.target);}}
   }
   else if(['battery','electronics','panel'].includes(d.shape)){
     block([w,h*.84,l],[0,-h*.08,0]);block([w*.82,h*.08,l*.72],[0,h*.38,0],dark);for(const side of [-1,1])block([w*.12,h*.16,l*.12],[side*w*.32,h*.44,l*.28],metal);
@@ -2212,9 +2212,31 @@ function setAircraftLights(on){
  S.lights=!!on;
  aircraftPointLights.forEach(l=>l.visible=S.lights);
  aircraftLampMeshes.forEach(m=>m.visible=S.lights);
- // custom workshop builds carry real PointLights cloned with the airframe
- try{const model=fleetModelSlot&&fleetModelSlot.children[0];if(model)model.traverse(o=>{if(o.isPointLight&&o.userData.fwLight)o.visible=S.lights;});}catch(e){}
+ fwSyncCustomLights();
  $('lights').textContent='Lights: '+(S.lights?'ON':'OFF');
+}
+/* Custom workshop builds carry real lights cloned with the airframe. Each one
+   switches with the pilot's Lights control AND its own electrical power state —
+   an unpowered fixture stays dark even when the master switch is on. */
+function fwSyncCustomLights(){
+ try{
+  const model=fleetModelSlot&&fleetModelSlot.children[0];if(!model)return;
+  model.traverse(o=>{
+   if(!(o.isPointLight||o.isSpotLight)||!o.userData.fwLight)return;
+   const pid=o.parent&&o.parent.userData&&o.parent.userData.partId;
+   const powered=!Electrics.active||!pid||!!Electrics.powered[pid];
+   o.visible=S.lights&&powered;
+  });
+ }catch(e){}
+}
+/* THREE's clone() keeps SpotLight.target pointing at the ORIGINAL target object,
+   so cloned flight models need their beams re-linked to the cloned targets. */
+function fwRelinkLightTargets(root){
+ try{
+  const targets=new Map();
+  root.traverse(o=>{if(o.userData&&o.userData.fwLightTargetId)targets.set(o.userData.fwLightTargetId,o);});
+  root.traverse(o=>{if(o.isSpotLight&&o.userData.fwTargetId&&targets.has(o.userData.fwTargetId))o.target=targets.get(o.userData.fwTargetId);});
+ }catch(e){}
 }
 
 /* Multi-aircraft fleet: common coordinate convention is nose +Z, starboard +X, up +Y.
@@ -2969,7 +2991,7 @@ const WORKSHOP_PARTS={
  navLight:{name:'Navigation light',category:'electronics',icon:'●',size:[.14,.12,.14],mass:.08,color:'#e34d49',shape:'light',lightIntensity:2.2,lightDistance:6,electrical:{volts:12,ports:2,role:'Lighting'},detail:'Wingtip navigation light — port (left) RED, starboard (right) GREEN, tail WHITE. Wire from the bus through a circuit breaker.'},
  strobeLight:{name:'Anti-collision strobe',category:'electronics',icon:'✳',size:[.13,.11,.13],mass:.07,color:'#ffffff',shape:'light',lightIntensity:3,lightDistance:7,strobe:true,electrical:{volts:14,ports:2,role:'Lighting'},detail:'High-intensity white strobe, ~60 flashes/min. Wingtip or tailcone position; flashes when powered.'},
  beaconLight:{name:'Rotating beacon',category:'electronics',icon:'◎',size:[.16,.14,.16],mass:.09,color:'#ff5a3c',shape:'light',lightIntensity:2,lightDistance:5,beacon:true,electrical:{volts:14,ports:2,role:'Lighting'},detail:'Red anti-collision beacon — fuselage top or bottom, visible from all directions; pulses when powered.'},
- landingLight:{name:'Landing light',category:'electronics',icon:'⌁',size:[.2,.16,.2],mass:.14,color:'#fff2c8',shape:'light',lightIntensity:5,lightDistance:14,electrical:{volts:14,ports:2,role:'Lighting'},detail:'High-power forward beam for takeoff and landing. Mount on the wing leading edge or a gear strut.'},
+ landingLight:{name:'Landing light',category:'electronics',icon:'⌁',size:[.2,.16,.2],mass:.14,color:'#fff2c8',shape:'light',lightIntensity:5,lightDistance:16,spot:true,electrical:{volts:14,ports:2,role:'Lighting'},detail:'High-power forward beam for takeoff and landing — a focused spotlight pointing along the flight direction. Mount on the wing leading edge or a gear strut.'},
  fuelTank:{name:'Fuel tank',category:'systems',icon:'▰',size:[.52,.44,1.0],mass:18,color:'#9caaac',shape:'tank',fuel:120,detail:'Vented fuel tank — connect fuel lines to the strainer, pump and engine. High-wing aircraft can gravity feed; low-wing designs need a pump.'},
  wheel:{name:'Landing wheel',category:'gear',icon:'◉',size:[.24,.72,.72],mass:5.2,color:'#24282a',shape:'wheel',detail:'Tyre and hub; place near a strut.'},
  gearStrut:{name:'Landing-gear strut',category:'gear',icon:'╽',size:[.14,1.0,.14],mass:3.4,color:'#aebbc0',shape:'strut',detail:'Landing-gear leg / shock strut.'},
@@ -3106,13 +3128,23 @@ function workshopTemplate(name){
  const addPart=(type,position,scale=[1,1,1],rotation=[0,0,0])=>workshopAddPart(type,null,true,{position:{x:position[0],y:position[1],z:position[2]},scale:{x:scale[0],y:scale[1],z:scale[2]},rotation:{x:rotation[0],y:rotation[1],z:rotation[2]}});
  if(name==='templateGlider'){
   addPart('bodyBlock',[0,.86,0],[.72,.72,2]);addPart('longWing',[0,1.10,.1]);addPart('tailplane',[0,.92,-3.0],[.9,.8,.85]);addPart('fin',[0,1.38,-3.05],[1,.85,.85]);addPart('skid',[0,.525,-.2],[1,1,4.8]);addPart('canopy',[0,1.29,1.2],[.75,1,1.35]);
+  // flight controls — a glider still needs roll, pitch and yaw authority
+  addPart('aileron',[-3,1.05,-.55]);addPart('aileron',[3,1.05,-.55]);
+  addPart('elevator',[-.5,.92,-3.35]);addPart('elevator',[.5,.92,-3.35]);
+  addPart('rudder',[0,1.35,-3.5]);
   // gliders still need lights at night: battery → bus → nav lights, with a ground return
   const battery=addPart('battery',[0,.98,-.9]),bus=addPart('powerBus',[0,1.0,-.6]),cb=addPart('circuitBreaker',[.1,1.0,-.5]);
   const navL=addPart('navLight',[-4.05,1.16,.1]),navR=addPart('navLight',[4.05,1.16,.1]);paintWorkshopPart(navR,'#3ddc55');
   const navT=addPart('navLight',[0,1.5,-3.05]);paintWorkshopPart(navT,'#ffffff');
   const beacon=addPart('beaconLight',[0,1.98,-3.1]);
   const wire=(a,b,kind)=>({from:a.userData.partId,to:b.userData.partId,kind});
-  workshopWires=[wire(battery,bus,'power'),wire(battery,bus,'ground'),wire(bus,cb,'power'),wire(cb,navL,'power'),wire(cb,navR,'power'),wire(cb,navT,'power'),wire(cb,beacon,'power')];
+  workshopWires=[
+   // ground-return network to the battery negative
+   wire(battery,bus,'ground'),wire(bus,cb,'ground'),wire(bus,navL,'ground'),wire(bus,navR,'ground'),wire(bus,navT,'ground'),wire(bus,beacon,'ground'),
+   // power distribution: battery → bus → loads through the breaker
+   wire(battery,bus,'power'),wire(bus,cb,'power'),
+   wire(cb,navL,'power'),wire(cb,navR,'power'),wire(cb,navT,'power'),wire(cb,beacon,'power')
+  ];
  }else{
   const twin=name==='templateTwin';
   addPart('bodyBlock',[0,1.14,0],[1,1,1.35]);addPart('cabinBlock',[0,1.46,.45],[1,.85,1]);addPart('noseCone',[0,1.14,-2.45],[.75,.8,1.1],[0,Math.PI,0]);addPart(twin?'longWing':'wingPanel',[0,twin?1.25:1.96,.05]);addPart('tailplane',[0,1.25,-2.30]);addPart('fin',[0,1.76,-2.4]);
@@ -3120,6 +3152,12 @@ function workshopTemplate(name){
   for(const x of twin?[-2,2]:[0]){const engine=addPart('pistonEngine',[x,twin?1.175:1.32,twin?.65:2.55]);engines.push(engine);const shaft=AeroCore.transformPoint(workshopPartState(engine),[0,0,WORKSHOP_PARTS.pistonEngine.size[2]/2]);addPart('prop2',[shaft[0],shaft[1],shaft[2]+WORKSHOP_PARTS.prop2.size[2]*.38-.006]);}
   for(const x of [-.60,.60]){addPart('gearStrut',[x,.72,-.35],[1,.72,1]);addPart('wheel',[x,.36,-.35]);}
   addPart('gearStrut',[0,.666,1.9],[.8,.828,.8]);addPart('wheel',[0,.252,1.9],[.7,.7,.7]);
+  /* flight controls: ailerons, elevators and rudder — without them the
+     airframe has no roll/pitch/yaw authority */
+  const ailX=twin?2.2:1.8,ailZ=twin?-.6:-.68,ailY=twin?1.2:1.9;
+  const ailL=addPart('aileron',[-ailX,ailY,ailZ]),ailR=addPart('aileron',[ailX,ailY,ailZ]);
+  const elevL=addPart('elevator',[-.6,1.25,-2.72]),elevR=addPart('elevator',[.6,1.25,-2.72]);
+  const rud=addPart('rudder',[0,1.7,-2.85]);
   /* --- Electrical: battery behind the firewall feeds the power bus; the engine-driven
      alternator carries the bus in flight; loads hang off the bus through a circuit breaker;
      the ground wire returns to battery negative (Cessna 172-style architecture). --- */
@@ -3137,16 +3175,29 @@ function workshopTemplate(name){
      --- Hydraulics (twin): pump → reservoir → gear actuator loop. --- */
   const tank=addPart('fuelTank',[0,.88,-.9]),strainer=addPart('fuelStrainer',[0,.8,-.15]),pump=addPart('fuelPump',[0,.84,.4]);
   const wire=(a,b,kind)=>({from:a.userData.partId,to:b.userData.partId,kind});
+  /* Ground-return network: every electrical component needs a path back to the
+     battery negative — chained ground wires keep the harness tidy. */
   workshopWires=[
-   wire(battery,bus,'power'),wire(alt,bus,'power'),wire(bus,cb,'power'),wire(battery,bus,'ground'),
-   wire(cb,panel,'power'),wire(cb,computer,'power'),wire(cb,navL,'power'),wire(cb,navR,'power'),wire(cb,navT,'power'),wire(cb,beacon,'power'),wire(cb,landL,'power'),wire(cb,landR,'power'),
-   wire(computer,servo,'signal'),
-   wire(tank,strainer,'fuel'),wire(strainer,pump,'fuel')
+   wire(battery,bus,'ground'),wire(bus,cb,'ground'),wire(bus,alt,'ground'),wire(cb,computer,'ground'),wire(computer,servo,'ground'),
+   wire(bus,panel,'ground'),wire(bus,pump,'ground'),wire(bus,navL,'ground'),wire(bus,navR,'ground'),wire(bus,navT,'ground'),
+   wire(bus,beacon,'ground'),wire(bus,landL,'ground'),wire(bus,landR,'ground')
   ];
+  /* Power: battery and engine-driven alternator feed the bus; loads hang off
+     the bus through the circuit breaker. The servo is a 5V device — it must be
+     fed from the flight computer rail, never straight off the bus. */
+  workshopWires.push(
+   wire(battery,bus,'power'),wire(alt,bus,'power'),wire(bus,cb,'power'),
+   wire(cb,panel,'power'),wire(cb,computer,'power'),wire(cb,pump,'power'),
+   wire(cb,navL,'power'),wire(cb,navR,'power'),wire(cb,navT,'power'),wire(cb,beacon,'power'),wire(cb,landL,'power'),wire(cb,landR,'power'),
+   wire(computer,servo,'power'),wire(computer,servo,'signal')
+  );
+  workshopWires.push(wire(tank,strainer,'fuel'),wire(strainer,pump,'fuel'));
   for(const eng of engines)workshopWires.push(wire(pump,eng,'fuel'));
   if(twin){
    const hydPump=addPart('hydraulicPump',[.32,1.08,-.62]),hydRes=addPart('hydraulicReservoir',[.32,1.08,-.88]),hydAct=addPart('hydraulicActuator',[.6,.86,-.35]);
-   workshopWires.push(wire(cb,hydPump,'power'),wire(hydPump,hydRes,'hydraulic'),wire(hydRes,hydAct,'hydraulic'));
+   // hydraulic pump is a main-power load; pressure side pump → reservoir → actuator,
+   // plus the return line back to the pump
+   workshopWires.push(wire(cb,hydPump,'power'),wire(bus,hydPump,'ground'),wire(hydPump,hydRes,'hydraulic'),wire(hydRes,hydAct,'hydraulic'),wire(hydAct,hydPump,'hydraulic'));
   }
  }
  workshopLoading=false;workshopSelectPart(workshopParts[0]?.userData.partId||null);workshopRebuildWires();workshopUpdateStats();workshopUpdateEmptyHint();workshopSetTool('select');workshopSetStatus('Starter ready · all dimensions are metres; X right, Y up, Z forward');
@@ -3235,7 +3286,7 @@ function workshopFly(){if(workshopParts.length===0){workshopSetStatus('Add compo
  let wingArea=Math.max(.1,engineering.area);
  let mass=workshopParts.reduce((s,p)=>s+workshopPartMass(p),0);mass=Math.max(1,mass);const propulsion=AeroCore.propulsion(workshopParts.map(workshopPartState),WORKSHOP_PARTS),thrust=propulsion.maxThrustN;let engineType=propulsion.units.length?propulsion.units[0].type:'glider';const isElectric=engineType==='electric';if(isElectric)engineType='piston';const sizeX=Math.max(isRocketBuild?2:.1,engineering.span),length=Math.max(2,dims.z),height=Math.max(.8,dims.y);const name=$('workshopName').value.trim()||'Scratch-built aircraft';
  const cfg={id:'scratch-build',electric:isElectric,name,role:'User-built aircraft',wingspan:sizeX,length,height,bodyWidth:Math.max(.35,Math.min(5,sizeX*.13)),bodyHeight:Math.max(.35,Math.min(6,height*.40)),wingArea,massKg:mass,maxThrustN:thrust,maxSpeedKts:isRocketBuild?15000:THREE.MathUtils.clamp(65+(thrust/Math.max(100,mass))*48,65,650),clMax:1.42,flapClMax:workshopParts.some(p=>p.userData.type==='flap')?.18:0,rpmIdle:engineType==='glider'?0:650,rpmMax:(engineType==='jet'||engineType==='rocket')?10000:2700,engineType,engineCount:engines.length,propBlades:props.reduce((s,p)=>s+WORKSHOP_PARTS[p.userData.type].propBlades,0)||0,wingPlacement:'mid',sweep:0,tailType:workshopParts.some(p=>p.userData.type==='vTail')?'vtail':'conventional',gear:gears.some(p=>p.userData.type==='wheel')?'Fixed tricycle':'Fixed skid',paint:'#e4e7e1',stripe:'#3e7d94',windowCount:0,customSeatCount:workshopParts.filter(p=>p.userData.type==='cockpitSeat').length,customFuelTanks:workshopParts.filter(p=>p.userData.type==='fuelTank').length,canopy:false,winglets:workshopParts.some(p=>p.userData.type==='winglet'),dryMassKg:mass,waterKg:workshopParts.filter(p=>p.userData.type==='waterTank').length*400};
- cfg.controlAuth=isRocketBuild?{roll:1,pitch:1,yaw:1}:{roll:workshopParts.some(p=>p.userData.type==='aileron')?1:0,pitch:workshopParts.some(p=>p.userData.type==='elevator')?1:0,yaw:workshopParts.some(p=>p.userData.type==='rudder')?1:.05};if(isRocketBuild){cfg.rocketNoWings=engineering.area<.05;cfg.rocketDragArea=Math.PI*Math.pow(Math.min(dims.x,dims.y)/2,2);}cfg.massProperties=engineering.inertia;cfg.propulsion=propulsion.units.map(u=>({...u,position:u.position.map((n,i)=>n-[engineering.cg.x,engineering.cg.y,engineering.cg.z][i])}));cfg.engineCount=propulsion.units.length;cfg.cgLiftOffset=engineering.wingZ-engineering.cg.z;const flightRoot=workshopBuildRoot.clone(true);flightRoot.userData.customControls=flightRoot.children.filter(p=>['aileron','flap','elevator','rudder','prop2','prop4'].includes(p.userData.type)).map(part=>({part,base:part.rotation.clone(),type:part.userData.type,powered:propulsion.units.some(u=>u.propId===part.userData.partId)}));markDetachedFlightParts(flightRoot);const flightWires=workshopWireRoot.clone(true);flightRoot.add(flightWires);customPristineModel=flightRoot.clone(true);customPristineCfg={...cfg};flightRoot.position.set(-center.x,-center.y,-center.z);S.customAircraft=cfg;S.workshopGroundCorners=corners;S.aircraftId='c172';$('aircraftType').value='c172';fleetModelSlot.clear();fleetModelSlot.add(flightRoot);fleetModelSlot.visible=true;exterior.visible=false;S.camera='chase';$('camera').value='chase';buildWasPaused=false;closeBuildMode();resetFlight();S.paused=false;detachUnweldedParts();$('pause').textContent='Pause';refreshAircraftSpecs();showAircraftMassModel();updateCamera(.8);drawMinimap(true);workshopSetStatus('Custom aircraft loaded into the flight scene');}
+ cfg.controlAuth=isRocketBuild?{roll:1,pitch:1,yaw:1}:{roll:workshopParts.some(p=>p.userData.type==='aileron')?1:0,pitch:workshopParts.some(p=>p.userData.type==='elevator')?1:0,yaw:workshopParts.some(p=>p.userData.type==='rudder')?1:.05};if(isRocketBuild){cfg.rocketNoWings=engineering.area<.05;cfg.rocketDragArea=Math.PI*Math.pow(Math.min(dims.x,dims.y)/2,2);}cfg.massProperties=engineering.inertia;cfg.propulsion=propulsion.units.map(u=>({...u,position:u.position.map((n,i)=>n-[engineering.cg.x,engineering.cg.y,engineering.cg.z][i])}));cfg.engineCount=propulsion.units.length;cfg.cgLiftOffset=engineering.wingZ-engineering.cg.z;const flightRoot=workshopBuildRoot.clone(true);flightRoot.userData.customControls=flightRoot.children.filter(p=>['aileron','flap','elevator','rudder','prop2','prop4'].includes(p.userData.type)).map(part=>({part,base:part.rotation.clone(),type:part.userData.type,powered:propulsion.units.some(u=>u.propId===part.userData.partId)}));markDetachedFlightParts(flightRoot);fwRelinkLightTargets(flightRoot);const flightWires=workshopWireRoot.clone(true);flightRoot.add(flightWires);customPristineModel=flightRoot.clone(true);fwRelinkLightTargets(customPristineModel);customPristineCfg={...cfg};flightRoot.position.set(-center.x,-center.y,-center.z);S.customAircraft=cfg;S.workshopGroundCorners=corners;S.aircraftId='c172';$('aircraftType').value='c172';fleetModelSlot.clear();fleetModelSlot.add(flightRoot);fwSyncCustomLights();fleetModelSlot.visible=true;exterior.visible=false;S.camera='chase';$('camera').value='chase';buildWasPaused=false;closeBuildMode();resetFlight();S.paused=false;detachUnweldedParts();$('pause').textContent='Pause';refreshAircraftSpecs();showAircraftMassModel();updateCamera(.8);drawMinimap(true);workshopSetStatus('Custom aircraft loaded into the flight scene');}
 function workshopBeginPlacement(e){const d=WORKSHOP_PARTS[workshopPendingType];if(!d)return;const p=workshopIntersectPlane(e,0);if(!p)return;const pos={x:workshopSnap(p.x),y:workshopPlacementHeight(workshopPendingType),z:workshopSnap(p.z)};workshopPushUndo();const g=workshopCreateMirroredPair(workshopPendingType,pos);if(!g)return;workshopSetStatus(`Placed ${d.name}${workshopMirrorMate(g)?' with mirrored counterpart':''} · centreline symmetry ${workshopSymmetryEnabled?'ON':'OFF'}`);}
 function workshopCreateGhost(type){if(workshopGhost){workshopScene.remove(workshopGhost);workshopGhost=null;}if(workshopGhostMirror){workshopScene.remove(workshopGhostMirror);workshopGhostMirror=null;}if(!type||!WORKSHOP_PARTS[type])return;workshopGhost=workshopMakeVisual(type,true);workshopScene.add(workshopGhost);workshopGhostMirror=workshopMakeVisual(type,true);workshopScene.add(workshopGhostMirror);workshopGhostMirror.visible=false;}
 function workshopUpdateGhost(e){if(workshopTool!=='place'||!workshopGhost||!workshopPendingType)return;const d=WORKSHOP_PARTS[workshopPendingType],p=workshopIntersectPlane(e,0);if(!p)return;const x=workshopSnap(p.x),z=workshopSnap(p.z);workshopGhost.position.set(x,workshopPlacementHeight(workshopPendingType),z);if(workshopGhostMirror){workshopGhostMirror.visible=workshopShouldMirror(workshopPendingType,x);workshopGhostMirror.position.set(-x,workshopPlacementHeight(workshopPendingType),z);}}
@@ -5393,7 +5444,7 @@ updateUI=function(){originalUI();const now=performance.now();if(now-lastDeckUpda
 };
 
 // Workshop: every edit is represented in the saved design and history.
-function paintWorkshopPart(part,color){part.userData.paintColor=color;part.traverse(o=>{if(o.isMesh&&o.material){o.material=o.material.clone();o.material.color.set(color);}});}
+function paintWorkshopPart(part,color){part.userData.paintColor=color;part.traverse(o=>{if(o.isMesh&&o.material){o.material=o.material.clone();o.material.color.set(color);if(o.material.emissive&&o.material.emissiveIntensity>=.5)o.material.emissive.set(color);}if((o.isPointLight||o.isSpotLight)&&o.userData.fwLight){o.color.set(color);}});}
 const inspectorExtra=document.createElement('div');inspectorExtra.innerHTML=`<div class="workshop-inspector-section-title">ATTITUDE · degrees</div><div class="workshop-number-grid"><label>Pitch<input id="workshopPitchRotation" type="number" step="5" aria-label="Component pitch rotation"></label><label>Roll<input id="workshopRollRotation" type="number" step="5" aria-label="Component roll rotation"></label><label>Locked<input id="workshopPartLocked" type="checkbox" aria-label="Lock component"></label></div><label class="workshop-color-row">Material color<input id="workshopPartColor" type="color" value="#bfc8ca"></label>`;$('workshopInspectorFields').appendChild(inspectorExtra);
 const assemblyExtra=document.createElement('div');assemblyExtra.id='workshopEngineering';assemblyExtra.className='workshop-engineering';document.querySelector('.workshop-inspector').appendChild(assemblyExtra);
 const sceneTree=document.createElement('div');sceneTree.className='workshop-scene-tree';sceneTree.id='workshopSceneTree';sceneTree.setAttribute('aria-label','Aircraft components');document.querySelector('.workshop-library').appendChild(sceneTree);
@@ -7408,8 +7459,9 @@ const Electrics={
     this.computerOK=entries.some(([id,p])=>p.type==='flightComputer'&&this.powered[id]);
     this.navOK=entries.some(([id,p])=>FW_LIGHT_TYPES.includes(p.type)&&this.powered[id]);
     if(D.hasLights){
-      const want=S.lights&&this.navOK;
-      if(this._lights!==want){this._lights=want;setAircraftLights(want);}
+      const want=this.navOK;
+      // sync only the power-gating of custom lights — never overwrite the pilot's switch
+      if(this._lights!==want){this._lights=want;fwSyncCustomLights();}
     }
   },
   apply(){
@@ -7505,7 +7557,7 @@ const Hydraulics={
     this.active=hasPump&&hasRes&&lines.length>0;
     this.pressure=this.active?Math.max(this.pressure,0):0;this.fluid=100;this.leaking=false;this._warned={};
     // actuators: gear struts / flaps / wheels reached by hydraulic lines
-    cfg.hydraulicActuators=workshopParts.filter(p=>['gearStrut','flap','wheel'].includes(p.userData.type)&&workshopWires.some(w=>w.kind==='hydraulic'&&((w.from===p.userData.partId&&hydIds.has(w.to))||(w.to===p.userData.partId&&hydIds.has(w.from))))).length;
+    cfg.hydraulicActuators=workshopParts.filter(p=>['gearStrut','flap','wheel','hydraulicActuator'].includes(p.userData.type)&&workshopWires.some(w=>w.kind==='hydraulic'&&((w.from===p.userData.partId&&hydIds.has(w.to))||(w.to===p.userData.partId&&hydIds.has(w.from))))).length;
   },
   pumpPowered(){
     if(!this.active)return false;
@@ -9962,8 +10014,25 @@ updateSimpleChecks=function(){
     ['Ground return','Ground wire back to the battery',workshopWires.some(w=>w.kind==='ground')]
   ];
   if(lightIds.size)reqs.push(['Lights wired','A light fed by a power wire',workshopWires.some(w=>w.kind==='power'&&(lightIds.has(w.from)||lightIds.has(w.to)))]);
-  if(types.includes('fuelTank'))reqs.push(['Fuel plumbing','Tank → strainer → pump → engine',workshopWires.some(w=>w.kind==='fuel')&&workshopWires.some(w=>w.kind==='fuel'&&workshopParts.some(p=>engineTypes.includes(p.userData.type)&&(p.userData.partId===w.from||p.userData.partId===w.to)))]);
-  if(types.includes('hydraulicPump'))reqs.push(['Hydraulics loop','Pump → reservoir → actuator',workshopWires.some(w=>w.kind==='hydraulic')]);
+  // path checks: fuel must actually REACH an engine, hydraulics must reach an actuator
+  const partType=id=>{const p=workshopParts.find(q=>q.userData.partId===id);return p?p.userData.type:null;};
+  const reachable=(startType,kind)=>{ // all part ids reachable from any part of startType over `kind` wires
+    const out=new Set();const q=workshopParts.filter(p=>p.userData.type===startType).map(p=>p.userData.partId);
+    q.forEach(id=>out.add(id));
+    while(q.length){const id=q.pop();for(const w of workshopWires){if(w.kind!==kind)continue;let next=null;if(w.from===id&&!out.has(w.to))next=w.to;else if(w.to===id&&!out.has(w.from))next=w.from;if(next){out.add(next);q.push(next);}}}
+    return out;
+  };
+  if(types.includes('fuelTank')){
+    const fed=reachable('fuelTank','fuel');
+    const engineFed=[...fed].some(id=>engineTypes.includes(partType(id)));
+    reqs.push(['Fuel plumbing','Tank → strainer → pump → engine',workshopWires.some(w=>w.kind==='fuel')&&engineFed]);
+  }
+  if(types.includes('hydraulicPump')){
+    const press=reachable('hydraulicPump','hydraulic');
+    const actuatorTypes=['gearStrut','flap','wheel','hydraulicActuator'];
+    const actFed=[...press].some(id=>actuatorTypes.includes(partType(id)));
+    reqs.push(['Hydraulics loop','Pump → reservoir → actuator',types.includes('hydraulicReservoir')&&actFed]);
+  }
   const done=reqs.filter(r=>r[2]).length;
   $('nbChecks').innerHTML=reqs.map(([name,hint,ok])=>'<div class="nb-row '+(ok?'ok':'miss')+'"><input type="checkbox" '+(ok?'checked':'')+' tabindex="-1"><span class="nb-name">'+name+'<span class="nb-hint">'+hint+'</span></span></div>').join('');
   $('nbCount').textContent=done+'/'+reqs.length;
@@ -10437,7 +10506,7 @@ updateSimpleChecks();
    FLIGHT WORLD · BUILD UI v2 — one coherent editor theme
    (replaces the stacked lime/graphite/cream skins)
    ============================================================ */
-#buildModeOverlay{--v2bg:#0d1013;--v2panel:#15181d;--v2panel2:#191d23;--v2line:#262c34;--v2ink:#e7eaee;--v2mut:#8b939c;--v2acc:#e8a33d;--v2ok:#7fc95e;--v2bad:#e0604d;
+#buildModeOverlay{--v2bg:#0d1013;--v2panel:#15181d;--v2panel2:#191d23;--v2line:#262c34;--v2ink:#e7eaee;--v2mut:#9aa4ae;--v2acc:#e8a33d;--v2ok:#7fc95e;--v2bad:#e0604d;
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,'Helvetica Neue',sans-serif}
 #buildModeOverlay .workshop-overlay,#buildModeOverlay.workshop-overlay{background:#0d1013f2!important}
 #buildModeOverlay .workshop-topbar{background:#12151a!important;border-bottom:1px solid var(--v2line)!important;height:54px!important;gap:10px!important;padding:0 12px!important}
@@ -10474,7 +10543,7 @@ updateSimpleChecks();
 #buildModeOverlay .workshop-category-tab{background:transparent!important;border:1px solid transparent!important;color:var(--v2mut)!important;font-size:10.5px!important;font-weight:650!important;padding:5px 9px!important;border-radius:99px!important;white-space:nowrap}
 #buildModeOverlay .workshop-category-tab:hover{color:var(--v2ink)!important;background:#1e232a!important}
 #buildModeOverlay .workshop-category-tab.active{background:#252b34!important;color:var(--v2acc)!important;border-color:#3a4250!important}
-#buildModeOverlay .workshop-parts-list{padding:2px 10px 10px!important}
+#buildModeOverlay .workshop-parts-list{padding:2px 10px 18px!important}
 #buildModeOverlay .workshop-palette-item{background:#1a1e24!important;border:1px solid var(--v2line)!important;border-radius:9px!important;padding:8px 9px!important;margin-bottom:5px!important;transition:border-color .12s,background .12s}
 #buildModeOverlay .workshop-palette-item:hover{border-color:#414a56!important;background:#20252c!important}
 #buildModeOverlay .workshop-palette-item.active{border-color:var(--v2acc)!important;background:#2a2415!important}
@@ -10558,7 +10627,7 @@ updateSimpleChecks();
 #builderNotebook[data-open="false"] .nb-body{display:none}
 .nb-count{background:#2a2415;border:1px solid #4a3b1e;color:var(--v2acc,#e8a33d);border-radius:99px;padding:2px 8px;font-size:9.5px;letter-spacing:.06em}
 .nb-body{padding:9px 10px 10px 22px}
-.nb-note{font-size:9.5px;color:#8b939c;margin:0 0 7px;line-height:1.4}
+.nb-note{font-size:9.5px;color:#9aa4ae;margin:0 0 7px;line-height:1.4}
 .nb-row{display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:11px;color:#c3cad2;cursor:default}
 .nb-row input[type=checkbox]{appearance:none;width:14px;height:14px;min-width:14px;border:1.5px solid #4a525c;border-radius:4px;background:#12151a;cursor:default;position:relative;flex:0 0 auto}
 .nb-row input[type=checkbox]:checked{background:var(--v2acc,#e8a33d);border-color:var(--v2acc,#e8a33d)}
