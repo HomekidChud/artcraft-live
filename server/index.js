@@ -113,9 +113,12 @@ function validateBuildData(data) {
   }
   if (data.groups != null) {
     if (!Array.isArray(data.groups)) throw new Error('Invalid groups list');
+    // group membership may reference parts OR other groups (nested hierarchy)
+    const groupIds = new Set(data.groups.map(g => g && g.id).filter(Boolean));
+    const partIds = new Set(data.parts.map(p => p.id));
     for (const g of data.groups) {
       if (!g || typeof g !== 'object' || typeof g.name !== 'string' || !Array.isArray(g.parts)) throw new Error('Invalid group');
-      for (const id of g.parts) if (!ids.has(id)) throw new Error('Group references unknown component');
+      for (const id of g.parts) if (!partIds.has(id) && !groupIds.has(id)) throw new Error('Group references unknown component');
     }
   }
   if (data.snapIncrement != null && ![0, .25, .5, 1, 2].includes(data.snapIncrement)) throw new Error('Invalid grid snap');

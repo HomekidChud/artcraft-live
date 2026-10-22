@@ -1,14 +1,18 @@
 'use strict';
-/* Flight World build-sync server tests: validation, CRUD, CORS, rate limit. */
+/* Flight World build-sync server tests: validation, CRUD, CORS, rate limit.
+ * Storage is isolated: DATA_DIR must point at a temp dir BEFORE index.js is
+ * loaded (the server captures it at module init). */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
-const { createServer, initStore, validateBuildData } = require('../index.js');
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'fw-test-'));
+
+const { createServer, initStore, validateBuildData } = require('../index.js');
+
 const PORT = 0; // random port
 let server, baseUrl;
 
@@ -72,6 +76,28 @@ test('end-to-end: save → server → reload returns identical snapshot', async 
   assert.equal(del.status, 200);
   const gone = await api('GET', '/api/builds/' + save.json.id);
   assert.equal(gone.status, 404);
+});
+
+test('nested groups: a group may contain parts and other groups', async () => {
+  // the workshop Explorer allows Ctrl+G groups inside groups — the server must accept them
+  const nested = snapshot({
+    parts: [
+      { id: 'part-1', type: 'cockpitSeat', name: 'Seat', position: { x: 0, y: 1, z: 0 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      { id: 'part-2', type: 'instrumentPanel', name: 'Panel', position: { x: 0, y: 1, z: 1 }, rotation: { x: 0, y: 0, z: 0 }, scale: { x: 1, y: 1, z: 1 } }
+    ],
+    groups: [
+      { id: 'grp-cockpit', name: 'Cockpit', parts: ['part-1', 'part-2', 'grp-seats'] },
+      { id: 'grp-seats', name: 'Seats', parts: ['part-1'] }
+    ]
+  });
+  const r = await api('POST', '/api/builds', { name: 'Nested', kind: 'build', data: nested });
+  assert.equal(r.status, 201);
+  const back = await api('GET', '/api/builds/' + r.json.id);
+  assert.deepEqual(back.json.data.groups, nested.groups);
+  // but a group referencing a totally unknown id is still rejected
+  const bad = snapshot({ groups: [{ id: 'g', name: 'G', parts: ['part-1', 'ghost'] }] });
+  const r2 = await api('POST', '/api/builds', { name: 'BadNested', kind: 'build', data: bad });
+  assert.equal(r2.status, 400);
 });
 
 test('validation rejects malformed builds the same way the client does', async () => {

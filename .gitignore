@@ -4,3 +4,4 @@ __pycache__/
 assistant/training/local-approved.jsonl
 assistant/training/.worker.lock
 assistant/training/*.log
+server/data/

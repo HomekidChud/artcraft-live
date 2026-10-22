@@ -512,7 +512,7 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
         <button type="button" id="menuSurvival" class="menu-action"><strong>Flight training</strong><span>Takeoff, navigation and landing challenges</span></button>
       </div>
       <div id="survivalNotice" class="survival-notice" hidden><strong>Survival mode is in development</strong><p>For now, use Sandbox to build aircraft and explore the full flight world.</p><div class="actions"><button id="survivalBack" type="button">Back</button><button id="survivalSandbox" type="button" class="primary">Enter Sandbox</button></div></div>
-      <div class="menu-foot"><span>28 AIRCRAFT · PERSISTENT WORKSHOP</span><span>ULTIMATE / 02</span></div>
+      <div class="menu-foot"><span id="menuFleetCount">28 AIRCRAFT · PERSISTENT WORKSHOP</span><span>ULTIMATE / 02</span></div>
     </div>
   </div>
 
@@ -3176,10 +3176,13 @@ function cloudRestoreUrl(){try{const m=/fwCloud=([^;]+)/.exec(document.cookie||'
 cloudRestoreUrl();
 function cloudApi(path,opt={}){const base=cloudGetUrl();if(!base)return Promise.reject(new Error('No server URL set'));return fetch(base+path,{...opt,headers:{'Content-Type':'application/json',...(opt.headers||{})}}).then(async r=>{const t=await r.text();let j;try{j=JSON.parse(t);}catch(e){j=t;}if(!r.ok)throw new Error((j&&j.error)||('HTTP '+r.status));return j;});}
 function workshopCloudLog(msg){const el=$('workshopCloudList');if(el)el.innerHTML='<span class="workshop-muted">'+String(msg).replace(/[<>&]/g,'')+'</span>';}
+let workshopCloudListToken=0; // last-writer-wins guard: a late cloud refresh must not overwrite the local pack list
 async function workshopCloudRefresh(){
  const list=$('workshopCloudList');if(!cloudGetUrl()){workshopCloudLog('No server set yet.');return;}
+ const token=++workshopCloudListToken;
  try{
   const items=await cloudApi('/api/builds');
+  if(token!==workshopCloudListToken)return; // a newer list action already rendered
   if(!items||!items.length){workshopCloudLog('Server reachable · no saved builds yet.');return;}
   list.innerHTML=items.map(it=>'<div class="workshop-cloud-row"><span class="workshop-cloud-kind">'+(it.kind==='preset'?'PRESET':'BUILD')+'</span><span class="workshop-cloud-name">'+String(it.name).replace(/[<>&]/g,'')+'</span><button data-cloud-load="'+it.id+'" type="button">Load</button><button data-cloud-del="'+it.id+'" type="button" title="Delete">×</button></div>').join('');
  }catch(e){workshopCloudLog('⚠ '+e.message);}
@@ -3206,11 +3209,13 @@ $('workshopCloudPreset').addEventListener('click',async()=>{try{const snap=works
    validateDesign -> workshopRestoreSnapshot. */
 $('workshopCloudLocal').addEventListener('click',async()=>{
  const list=$('workshopCloudList');
+ const token=++workshopCloudListToken; // cancels any in-flight cloud refresh from overwriting this list
  try{
   list.innerHTML='<span class="workshop-muted">Loading local fleet presets…</span>';
   const res=await fetch('presets-fleet.json?v=17.10.2',{cache:'no-store'});
   if(!res.ok)throw new Error('preset pack not found (HTTP '+res.status+')');
   const docs=await res.json();
+  if(token!==workshopCloudListToken)return; // superseded by a newer list action
   if(!Array.isArray(docs)||!docs.length)throw new Error('empty preset pack');
   list.innerHTML='<span class="workshop-muted">Offline fleet pack — '+docs.length+' workshop designs. Loading one restores it as an editable build.</span>'+docs.map((d,i)=>'<div class="workshop-cloud-row"><span class="workshop-cloud-kind">FLEET</span><span class="workshop-cloud-name">'+String((d.data&&d.data.name)||d.name||'').replace(/[<>&]/g,'')+'</span><button data-local-load="'+i+'" type="button">Load</button></div>').join('');
   list.querySelectorAll('[data-local-load]').forEach(btn=>btn.addEventListener('click',()=>{
@@ -10221,6 +10226,7 @@ if(new URLSearchParams(location.search).has('debug'))window.__fwPhysics={
 'use strict';
 /* ---------- 1. Title & cloud defaults ---------- */
 document.title='Flight World 17.10 · Systems, lights & cloud builds';
+const mfc=$('menuFleetCount');if(mfc)mfc.textContent=Object.keys(AIRCRAFT_FLEET).length+' AIRCRAFT · PERSISTENT WORKSHOP'; // keep the menu label honest with the real fleet table
 const FW_DEFAULT_CLOUD_URL='https://flightworld-api.onrender.com';
 if(!cloudGetUrl())cloudSetUrl(FW_DEFAULT_CLOUD_URL);
 const cloudSub=document.querySelector('#workshopCloud .workshop-cloud-sub');
