@@ -10123,8 +10123,9 @@ setBuilderStep=function(step){
   welcome.hidden=step!=='choose';
   builderHint.hidden=step!=='build';
   builderHint.textContent='Click a part to add it · drag a part to move it · drag empty space to look around';
-  // the notebook tucks away while the starter picker is up so it never covers it
-  nb.dataset.open=step==='choose'?'false':'true';
+  // the notebook tucks away while the starter picker is up, and stays tucked
+  // once parts exist (the header with its progress badge stays visible)
+  nb.dataset.open=(step==='choose'||workshopParts.length)?'false':'true';
   $('nbToggle').setAttribute('aria-expanded',nb.dataset.open!=='false');
   easySteps.querySelectorAll('[data-build-step]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.buildStep===step)));
   $('workshopSearch').placeholder=workshopAdvanced?'Search all components…':'Find a part…';
@@ -10751,6 +10752,7 @@ fwRefreshExplorerNow();
 #buildModeOverlay .workshop-category-tab:hover{color:var(--v2ink)!important;background:#1e232a!important}
 #buildModeOverlay .workshop-category-tab.active{background:#252b34!important;color:var(--v2acc)!important;border-color:#3a4250!important}
 #buildModeOverlay .workshop-parts-list{padding:2px 10px 18px!important}
+#buildModeOverlay .workshop-palette-item{padding:9px 9px 11px!important;min-height:58px}
 #buildModeOverlay .workshop-palette-item{background:#1a1e24!important;border:1px solid var(--v2line)!important;border-radius:9px!important;padding:8px 9px!important;margin-bottom:5px!important;transition:border-color .12s,background .12s}
 #buildModeOverlay .workshop-palette-item:hover{border-color:#414a56!important;background:#20252c!important}
 #buildModeOverlay .workshop-palette-item.active{border-color:var(--v2acc)!important;background:#2a2415!important}
