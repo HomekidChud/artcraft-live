@@ -126,7 +126,7 @@ function designFor(cfg) {
     const propR = cfg.propBlades >= 4 ? .9 : .775; // prop2/prop4 disk radius
     const e = b.add(engineType, jet ? [0, H * .45, -L * .36] : [0, Math.max(H * .55, propR + .15), L * .4], { name: 'Engine', ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
     engines.push(e);
-    if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [e.position.x, e.position.y, e.position.z + .38], { name: 'Propeller' });
+    if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [e.position.x, e.position.y, e.position.z + .44], { name: 'Propeller' });
   } else if (cfg.engineCount > 1) {
     const n = cfg.engineCount;
     const propR = cfg.propBlades >= 4 ? .9 : .775;
@@ -138,7 +138,7 @@ function designFor(cfg) {
       const x = side * (half * (.45 + rank * .25));
       const e = b.add(engineType, [x, engineY, jet ? .9 : .6], { name: 'Engine ' + (i + 1), ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
       engines.push(e);
-      if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [x, e.position.y, e.position.z + .38], { name: 'Propeller ' + (i + 1) });
+      if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [x, e.position.y, e.position.z + .44], { name: 'Propeller ' + (i + 1) });
     }
   }
 
@@ -301,6 +301,29 @@ function contactOk(snap, catalog) {
   return bad;
 }
 
+/* prop pairing: every non-jet engine needs a prop within the client's shaft
+   window (axial in [-0.025, propDepth/2+0.10], radial <= 0.035, same axis) or
+   AeroCore.propulsion drops the engine ("fit a propeller to the forward
+   shaft") and the design gets zero thrust. Simplified for unrotated parts. */
+function propPairingOk(snap, catalog) {
+  const bad = [];
+  const props = snap.parts.filter(p => catalog[p.type] && catalog[p.type].propBlades);
+  for (const e of snap.parts) {
+    const d = catalog[e.type];
+    if (!d || !d.engineType || ['jet', 'rocket'].includes(d.engineType)) continue;
+    const es = e.scale || { x: 1, y: 1, z: 1 };
+    const shaftZ = e.position.z + (d.size[2] / 2) * (es.z || 1);
+    const ok = props.some(p => {
+      const axial = p.position.z - shaftZ;
+      const radial = Math.hypot(p.position.x - e.position.x, p.position.y - e.position.y);
+      const depth = catalog[p.type].size[2] * ((p.scale || {}).z || 1);
+      return axial >= -0.025 && axial <= depth / 2 + 0.10 && radial <= 0.035 * Math.max(es.x, es.y);
+    });
+    if (!ok) bad.push(e.name + ' (no prop in shaft window)');
+  }
+  return bad;
+}
+
 /* ---------- client-style validation (mirrors validateDesign) ---------- */
 // replicate the client's cockpit-clearance rule: no fuel segment may cross the
 // crewed zone (bounding box of seats/panel/canopy/cabin, expanded 0.35 m)
@@ -366,6 +389,8 @@ function validate(snap) {
   if (clear !== true) throw new Error('fuel routing: ' + clear);
   const loose = contactOk(snap, WORKSHOP_PARTS);
   if (loose.length) throw new Error('floating parts (no physical contact): ' + loose.join(', '));
+  const unpaired = propPairingOk(snap, WORKSHOP_PARTS);
+  if (unpaired.length) throw new Error('engines without a shaft-window prop: ' + unpaired.join(', '));
 }
 
 /* ---------- main (CLI only, not on import) ---------- */
