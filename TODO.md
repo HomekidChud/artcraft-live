@@ -367,3 +367,110 @@ Owner-directed upgrade from the v17.2 snapshot to the owner-supplied
   (GET/POST/DELETE, CORS, 2 MB/500-doc caps, JSON-file storage, MongoDB via
   MONGODB_URI later). Deployed on Render; the client ships that URL as its
   default cloud server.
+
+## AirplaneCraft — 17.10.2 session (2026-10-22, later same day)
+
+Continuation of the outstanding-work brief. Committed on top of the above
+(heads `b3c2e4b`..`b901d85` in order). Everything below was verified in-session;
+items marked PENDING were not done and are the next AI's queue.
+
+### Completed this session (verified)
+
+- **Cleanup:** removed the injected `data-pplx-inline-edit` script block
+  (lines 10412–10852 of the old file); title/version labels aligned to
+  `17.10.1` (static title, runtime title, debug-export version). Both inline
+  scripts parse (`node --check` on extracted module code).
+- **Server hardening** (`server/index.js`, rewritten but same contract):
+  server-side validation mirroring the client's `validateDesign` (part IDs,
+  positions, scales, wire kinds/endpoints, group membership, both preset
+  envelopes), per-IP token-bucket rate limiting on writes/deletes
+  (`RATE_LIMIT`/`RATE_WINDOW_MS`), CORS restricted by default to the game
+  origin + local dev ports (`CORS_ORIGINS` env, `*` to reopen), optional
+  `API_KEY` write protection, `render.yaml` (rootDir server, health check),
+  README rewrite, and a `node --test` suite (7 tests: validation parity,
+  CRUD, CORS, rate limit, save→reload e2e round-trip, seed) — all passing.
+- **Research docs** (all with citations):
+  - `docs/systems-research.md` — fuel (GA high/low wing, airliner
+    transfer/crossfeed), hydraulics (reservoir above pump, independent
+    systems), electrical, lights conventions; mapped to concrete sim rules
+    and an audit checklist.
+  - `docs/build-ui-research.md` — Roblox Studio / KSP VAB / Space Engineers /
+    Trailmakers / Aviassembly survey and the one-design-system plan.
+  - `docs/game-engine-research.md` — Unity DOTS/SRP, Unreal modules, Godot
+    scene-tree, Rapier determinism; mapped to a 5-step upgrade roadmap.
+- **Ground-up workshop presets:** `tools/seed-presets/generate.mjs` builds a
+  real workshop design (catalog parts + routed wires + named groups incl.
+  Cockpit hierarchy + research-consistent light fixtures) for **all 24
+  AIRCRAFT_FLEET entries** (the brief said 28 — the table has 24 at HEAD;
+  the other 4 cloud presets are the starter pack). Each design passes the
+  same validation rules as `validateDesign`; `--api` POSTs them as
+  `kind:'preset'` (verified against a local server: 4 starters + 24 fleet
+  docs). `--out` writes `airplanecraft/presets-fleet.json` (committed) as
+  the offline fallback pack.
+- **Offline preset loading:** Cloud panel gained a "Fleet presets (local)"
+  button that fetches `presets-fleet.json` and loads any preset through the
+  same path as a user build (validateDesign → workshopRestoreSnapshot).
+  Works with no server at all (GitHub Pages serves the pack).
+- **Systems routing audit:** new `workshopSystemsAudit()` in the client:
+  fuel path tank → strainer → (pump when tanks sit below the engine) →
+  engine; fuel lines must not cross the cockpit bounding volume; hydraulic
+  actuators must be reachable from a pump through a reservoir; nav light
+  colours (port red / stbd green / aft white). Wired into Test Fly (blocks
+  on errors) and the Engineering panel (new SYSTEMS ROUTING section).
+
+### PENDING — next AI queue (in priority order)
+
+1. **Preset parity + fleet-path removal.** The procedural fleet path
+   (`buildFleetAircraft`, `AIRCRAFT_FLEET` models) is STILL the default in
+   the main menu. The workshop presets exist and load, but visual/perf
+   parity has NOT been demonstrated (no Test Fly of the generated designs
+   in a browser, no side-by-side). Do that first: load each local preset,
+   Test Fly it, compare mass/stall/looks with the procedural twin. Only
+   then switch the menu to prefer workshop presets and delete the
+   procedural path. Also: the generated presets use generic part scaling —
+   they will need per-class tuning (engine placement, wing chord, tail
+   moment) before they fly like the fleet.
+2. **Lights, further.** Fixture models exist for workshop builds but the
+   remaining fleet-model lamps are still spheres; landing/taxi ground
+   illumination at night is not verified. Convert fleet models to the same
+   fixture parts (can come free once item 1 lands).
+3. **Build Mode UI overhaul.** The six CSS skins are still stacked (the
+   17.10.1 patch added a v2 block; the old skins remain). Follow
+   `docs/build-ui-research.md`: ONE token-based design system, ribbon,
+   Toolbox with search + drag ghost preview, floating transform toolbar,
+   view cube, snap controls, Explorer drag-reparent/eye/lock/rename/
+   multi-select, keyboard overlay, context menu, undo/redo history list,
+   empty states, responsive 44px targets, SVG icon set (no emoji).
+4. **Routed wires that follow structure.** Wires are still straight
+   part-to-part lines. Encode spars/longerons/belly paths as polylines
+   (see systems-research.md §6 rules 1–3, 5) so the cockpit-clearance check
+   can use real geometry instead of the straight-segment approximation now
+   in `workshopSystemsAudit`.
+5. **Server deploy follow-through.** `render.yaml` + README are ready; the
+   live Render service still needs the new code pushed and `CORS_ORIGINS`
+  / `MONGODB_URI` set in the dashboard. Add a CI step (`npm --prefix server
+   test`) to the repo workflow if one is added.
+6. **Deterministic regression harness.** Rapier is locally deterministic —
+  build a fixed-timestep headless QA (extend `qa/reconstructions-qa.mjs`
+   pattern) asserting flight state + damage cells for a scripted crash and
+   a scripted landing, plus a workshop flow (open → add part → group →
+   Test Fly → cloud save against a local server).
+
+### Session regression results
+
+- `node --check` on both inline scripts: PASS after every edit.
+- Server tests: 7/7 PASS (validation parity, CRUD, CORS, rate limit, e2e
+  save→reload, seed presets).
+- Seed e2e: local server + `--api`: 24/24 fleet presets accepted, list shows
+  28 presets.
+- NOT verified in a browser this session (no headless browser run): flight,
+  crash/damage, workshop interaction, grouping, cloud panel from the live
+  page, mobile layout. The client edits are parse-checked only — run the
+  browser QA from item 6 before trusting Test Fly.
+
+### Constraints that still stand
+
+- Atoms/air molecules never visible. Damage cells stay clipped original
+  geometry. No hard-coded preset geometry once the build-from-parts path is
+  live (it is live — the generator is the only allowed source of preset
+  geometry, driven by the fleet table). Cite research for every routing rule.
