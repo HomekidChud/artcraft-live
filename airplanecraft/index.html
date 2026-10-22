@@ -352,7 +352,7 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
 @media(max-width:760px){.workshop-inspector{transform:none!important;top:auto!important;bottom:28px!important;max-height:33%;width:200px;right:8px;border:1px solid #49606b;border-radius:8px;opacity:.98}.workshop-name-label{display:flex!important}.workshop-save-state{display:none}.workshop-topbar{height:auto!important}.workshop-layout{min-height:0}.workshop-inspector-empty{display:none}.workshop-inspector .workshop-sidebar-head{padding-bottom:4px}.workshop-inspector .workshop-sidebar-head h2{font-size:12px}.workshop-top-actions{margin-left:0!important}.workshop-top-actions button{font-size:8px!important}.workshop-brand{display:none}}
 
 .builder-steps{display:flex;gap:8px;padding:10px 14px;background:#142832;border-bottom:1px solid #36545d;flex-wrap:wrap}.builder-steps button{padding:9px 13px;border:1px solid #47616c;border-radius:8px;background:#1c3541;color:#d7e8eb;cursor:pointer}.builder-steps [aria-current=true]{background:#c2ed9d;color:#182a23}.builder-steps #builderAdvanced{margin-left:auto}.builder-kicker{font-size:11px;letter-spacing:2px;color:#b5eb96}#builderWelcome,#builderChecklist{position:absolute;inset:8%;padding:28px;background:#10252bf5;border:1px solid #658076;border-radius:16px;overflow:auto;z-index:5;color:#e4f0eb;box-shadow:0 16px 60px #0006}#builderWelcome h2,#builderChecklist h2{font-size:25px;margin:12px 0}#builderWelcome p{color:#adc4c6;line-height:1.6}.starter-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:24px 0}.starter-cards button{padding:24px 12px;display:grid;gap:12px;text-align:left;background:#25434c;color:#e8f7ed;border:1px solid #5c7b80;border-radius:12px;cursor:pointer}.starter-cards b{font-size:17px}.starter-cards span{font-size:12px;color:#c0d5d8}#blankBuild,#builderChecklist button{padding:12px 18px;background:#c2ed9d;color:#172d22;border:0;border-radius:8px;margin:8px;cursor:pointer}#builderChecklist button:disabled{opacity:.4;cursor:not-allowed}.check-ok{color:#c3ef9f}.check-missing{color:#ffd39f}#builderHint{position:absolute;bottom:12px;left:12px;right:12px;text-align:center;padding:9px;background:#10252bdf;color:#cfdfda;border-radius:8px;pointer-events:none;font-size:12px}#simpleMove{padding:12px}#simpleMove h3{margin:0 0 8px;font-size:16px}#simpleMove p{font-size:12px;color:#9eb4c0}.nudge-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.nudge-grid button,.simple-actions button{padding:9px 4px;background:#294450;border:1px solid #506875;border-radius:5px;color:#e1eeee;cursor:pointer}.simple-actions{display:flex;gap:5px;margin-top:12px}.advanced-builder #simpleMove{display:none}
-#buildModeOverlay:not(.advanced-builder) #workshopInspectorFields>:not(#simpleMove):not(#partDimensions):not(#partAttachment):not(.workshop-field-label):not(.workshop-part-meta){display:none}#buildModeOverlay:not(.advanced-builder) #workshopInspectorFields>.workshop-field-label:has(#workshopRotation){display:none}#buildModeOverlay:not(.advanced-builder) :is(.workshop-connections-section,.workshop-assembly-report,.workshop-assembly-metrics,#workshopWireTool,#workshopWireType,#workshopMirrorSelected,#workshopSnapSize,#workshopGridToggle,#workshopImportBtn,#workshopExport,.workshop-live-dot){display:none}#buildModeOverlay[data-step=choose] .workshop-empty-hint{display:none}#buildModeOverlay [hidden]{display:none!important}.cockpit-view #pfd{display:none!important}.world-diagnostics{display:grid;gap:10px;font-size:12px}.world-diagnostics small{color:#9db2bd;line-height:1.5}#aircraftSpecialty{font-size:12px;color:#bdd1ce;line-height:1.5}
+#buildModeOverlay:not(.advanced-builder) #workshopInspectorFields>:not(#simpleMove):not(#partDimensions):not(#partAttachment):not(.workshop-field-label):not(.workshop-part-meta):not(.fw-prop-section){display:none}#buildModeOverlay:not(.advanced-builder) #workshopInspectorFields>.workshop-field-label:has(#workshopRotation){display:none}#buildModeOverlay:not(.advanced-builder) :is(.workshop-connections-section,.fw-prop-eng,.workshop-assembly-report,.workshop-assembly-metrics,#workshopWireTool,#workshopWireType,#workshopMirrorSelected,#workshopSnapSize,#workshopGridToggle,#workshopImportBtn,#workshopExport,.workshop-live-dot){display:none}#buildModeOverlay[data-step=choose] .workshop-empty-hint{display:none}#buildModeOverlay [hidden]{display:none!important}.cockpit-view #pfd{display:none!important}.world-diagnostics{display:grid;gap:10px;font-size:12px}.world-diagnostics small{color:#9db2bd;line-height:1.5}#aircraftSpecialty{font-size:12px;color:#bdd1ce;line-height:1.5}
 @media(max-width:760px){.builder-steps{gap:4px;padding:6px}.builder-steps button{padding:8px 5px;font-size:10px}.builder-steps #builderAdvanced{margin-left:0}#builderWelcome,#builderChecklist{inset:4%;padding:16px}.starter-cards{grid-template-columns:1fr;gap:8px;margin:12px 0}.starter-cards button{padding:12px;gap:5px}#builderWelcome h2{font-size:20px}#builderHint{font-size:10px}.workshop-layout{min-height:0}.workshop-inspector{top:auto!important;max-height:36vh;overflow:auto}.workshop-top-actions{flex-wrap:wrap}.workshop-brand{min-width:70px!important}.workshop-brand small{display:none}}
 #buildModeOverlay:not(.advanced-builder) #workshopInspectorFields>:is(#partDimensions,#partAttachment){display:block}#partDimensions,#partAttachment{padding:12px;border-bottom:1px solid #314b57}#partDimensions h3{margin:0 0 10px;font-size:15px}#partDimensions>label{display:flex;flex-direction:column;gap:4px;font-size:10px;color:#b8ced1;margin:10px 0 0}#partDimensions>label input{width:100%;box-sizing:border-box;padding:8px 4px;color:#e1f2ec;border:1px solid #456570;border-radius:5px;background:#10242c}.dimension-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}.dimension-fields label{font-size:10px;color:#b8ced1}.dimension-fields input{width:100%;box-sizing:border-box;padding:8px 4px;color:#e1f2ec;border:1px solid #456570;border-radius:5px;background:#10242c}.keep-proportions{display:flex;gap:7px;align-items:center;margin:10px 0;font-size:12px}#partSizeHint,#attachmentHint{font-size:11px;color:#a9c3cc;line-height:1.5}#fitPropeller{padding:10px;border:1px solid #759b87;background:#254e3b;color:#d9f9c1;border-radius:7px;cursor:pointer}#assemblyIssues{padding:10px 12px;color:#ffce91;font-size:11px;line-height:1.5}.assembly-ok{color:#c2eb9f}#partAttachment[hidden]{display:none!important}
 
@@ -526,47 +526,54 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
         <div id="workshopCloudList" class="workshop-cloud-list"><span class="workshop-muted">No server set yet.</span></div>
       </div>
     </div>
-    <div class="workshop-topbar">
-      <div class="workshop-brand"><span class="workshop-brand-mark">FW</span><div><strong>WORKSHOP</strong><small>Scratch aircraft editor</small></div></div>
-      <label class="workshop-name-label">DESIGN NAME <input id="workshopName" value="Untitled aircraft" maxlength="60" /></label>
-      <div class="workshop-top-actions">
-        <button id="workshopUndo" type="button" title="Undo (Ctrl+Z)" disabled>↶ Undo</button>
-        <button id="workshopRedo" type="button" title="Redo (Ctrl+Y)" disabled>↷ Redo</button>
+    <div id="fwRibbon">
+      <div class="fw-ribbon-group"><div class="fw-ribbon-btns">
+        <button id="fwStartersBtn" type="button" title="Choose a starter aircraft">✈ Starters</button>
+        <button id="builderAdvanced" type="button" aria-pressed="false">⚙ Advanced</button>
+      </div><span class="fw-ribbon-label">Start</span></div>
+      <div class="fw-ribbon-sep"></div>
+      <div class="fw-ribbon-group"><div class="fw-ribbon-btns">
+        <button id="workshopUndo" type="button" title="Undo (Ctrl+Z)" disabled>↶</button>
+        <button id="workshopRedo" type="button" title="Redo (Ctrl+Y)" disabled>↷</button>
+        <button id="workshopMirrorSelected" type="button" title="Create a mirrored counterpart of the selected part" disabled>⧉ Mirror</button>
         <button id="workshopImportBtn" type="button">Import</button>
-        <button id="workshopExport" type="button">Export JSON</button>
-        <button id="workshopCloudBtn" type="button" title="Sync builds and presets with your server (Render + MongoDB)">☁ Cloud</button>
-        <button id="workshopFly" type="button" class="primary">Test Fly ↗</button>
+        <button id="workshopExport" type="button">Export</button>
+        <button id="workshopCloudBtn" type="button" title="Sync builds and presets with your cloud server">☁ Cloud</button>
+      </div><span class="fw-ribbon-label">File</span></div>
+      <div class="fw-ribbon-sep"></div>
+      <div class="fw-ribbon-group"><div class="fw-ribbon-btns">
+        <button id="workshopSelectTool" type="button" class="active" title="Select / move">↖</button>
+        <button id="workshopWireTool" type="button" title="Wire mode">⌁</button>
+        <select id="workshopWireType" aria-label="Wire type"><option value="power">Power</option><option value="ground">Ground</option><option value="signal">Signal</option><option value="data">Data</option><option value="fuel">Fuel</option><option value="hydraulic">Hydraulic</option><option value="water">Water</option></select>
+        <button id="gizmoMoveBtn" type="button" class="active" title="Move gizmo (1)">✥</button>
+        <button id="gizmoRotateBtn" type="button" title="Rotate gizmo (2)">⟳</button>
+        <button id="gizmoScaleBtn" type="button" title="Scale gizmo (3)">⤢</button>
+      </div><span class="fw-ribbon-label">Tools</span></div>
+      <div class="fw-ribbon-sep"></div>
+      <div class="fw-ribbon-group"><div class="fw-ribbon-btns">
+        <button id="workshopSymmetryToggle" type="button" class="symmetry-on active" aria-pressed="true" title="Mirror new off-centre parts across the aircraft centreline X=0">⇋ Symmetry</button>
+        <select id="workshopSnapSize" title="Grid snap increment" aria-label="Grid snap increment"><option value="0.25">Snap 0.25 m</option><option value="0.5">Snap 0.5 m</option><option value="1">Snap 1 m</option><option value="2">Snap 2 m</option><option value="0">Snap OFF</option></select>
+        <button id="workshopGridToggle" type="button" class="active" title="Toggle grid"># Grid</button>
+        <button id="workshopTopView" type="button" title="Top view">⊤ Top</button>
+        <button id="workshopResetView" type="button" title="Frame build">⛶ Frame</button>
+      </div><span class="fw-ribbon-label">Options</span></div>
+      <div class="fw-ribbon-spacer"></div>
+      <div class="fw-ribbon-group fw-ribbon-right"><div class="fw-ribbon-btns">
+        <input id="workshopName" value="Untitled aircraft" maxlength="60" aria-label="Design name" />
+        <button id="workshopFly" type="button" class="primary" title="Test fly this aircraft">▶ Test Fly</button>
         <button id="buildClose" class="build-close" type="button" title="Exit workshop" aria-label="Exit workshop">×</button>
-      </div>
+      </div><span class="fw-ribbon-label">Design</span></div>
       <input type="file" id="workshopImportFile" accept="application/json,.json" hidden />
     </div>
     <div class="workshop-layout">
       <aside class="workshop-sidebar workshop-library">
-        <div class="workshop-sidebar-head"><div><span class="workshop-eyebrow">PARTS LIBRARY</span><h2>Build from scratch</h2></div><span class="workshop-live-dot">LIVE</span></div>
+        <div class="workshop-sidebar-head"><div><span class="workshop-eyebrow">TOOLBOX</span><h2>Insert parts</h2></div><span class="workshop-live-dot">LIVE</span></div>
         <input id="workshopSearch" class="workshop-search" type="search" placeholder="Search components…" aria-label="Search components" />
         <div id="workshopCategoryTabs" class="workshop-category-tabs" role="tablist" aria-label="Component categories"></div>
         <div id="workshopPartsList" class="workshop-parts-list"></div>
         <div class="workshop-library-foot"><button type="button" id="workshopClear" class="workshop-danger">Clear build</button><span>1 grid unit = 1 m</span></div>
       </aside>
       <main class="workshop-stage">
-        <div class="workshop-stagebar">
-          <div class="workshop-tools">
-            <button id="workshopSelectTool" type="button" class="active">↖ Select / move</button>
-            <button id="workshopWireTool" type="button">⌁ Wire</button>
-            <button id="gizmoMoveBtn" type="button" class="active" title="Move gizmo (1)">✥ Move</button>
-            <button id="gizmoRotateBtn" type="button" title="Rotate gizmo (2)">⟳ Rotate</button>
-            <button id="gizmoScaleBtn" type="button" title="Scale gizmo (3)">⤢ Scale</button>
-            <select id="workshopWireType" aria-label="Wire type"><option value="power">Power · red</option><option value="ground">Ground · green</option><option value="signal">Signal · blue</option><option value="data">Data bus · amber</option><option value="fuel">Fuel line · amber-brown</option><option value="hydraulic">Hydraulic · orange</option><option value="water">Water / waste · blue</option></select>
-            <button id="workshopSymmetryToggle" type="button" class="symmetry-on active" aria-pressed="true" title="Mirror new off-centre parts across aircraft centreline X=0">Symmetry: ON</button>
-            <button id="workshopMirrorSelected" type="button" title="Create a mirrored counterpart of the selected part" disabled>Mirror selected</button>
-            <select id="workshopSnapSize" title="Grid snap increment" aria-label="Grid snap increment"><option value="0.25">Snap 0.25 m</option><option value="0.5">Snap 0.5 m</option><option value="1">Snap 1 m</option><option value="2">Snap 2 m</option><option value="0">Snap OFF</option></select>
-          </div>
-          <div class="workshop-tools">
-            <button id="workshopGridToggle" type="button" class="active">Grid: ON</button>
-            <button id="workshopTopView" type="button">Top view</button>
-            <button id="workshopResetView" type="button">Frame build</button>
-          </div>
-        </div>
         <div class="workshop-canvas-wrap" id="workshopCanvasWrap">
           <canvas id="workshopCanvas" aria-label="3D aircraft construction workspace"></canvas>
           <div id="workshopEmptyHint" class="workshop-empty-hint"><span>＋</span><strong>EMPTY AIRFRAME</strong><small>Pick a component on the left and click the grid to place it.</small><small>Drag to orbit · scroll to zoom · drag a part to move · 1/2/3 gizmos</small></div>
@@ -576,26 +583,44 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
         </div>
         <div class="workshop-statusbar"><span id="workshopStatus">Ready · select a part to begin</span><span id="workshopBuildStats">0 PARTS · 0 kg · 0 WIRES</span><span>METRES · LOCAL BUILD AXES</span></div>
       </main>
-      <aside class="workshop-sidebar workshop-inspector">
-        <div class="workshop-sidebar-head"><div><span class="workshop-eyebrow">COMPONENT DATA</span><h2>Inspector</h2></div><button id="workshopDuplicate" type="button" title="Duplicate selected component" disabled>⧉</button></div>
-        <div id="workshopInspectorEmpty" class="workshop-inspector-empty"><div class="workshop-inspector-icon">◇</div><strong>No component selected</strong><span>Choose a part in the workspace or place a new one from the library.</span></div>
-        <div id="workshopInspectorFields" hidden>
-          <div class="workshop-selected-type" id="workshopSelectedType">COMPONENT</div>
-          <label class="workshop-field-label">Component name<input id="workshopPartName" type="text" maxlength="60" /></label>
-          <div class="workshop-inspector-section-title">POSITION · m</div>
-          <div class="workshop-number-grid"><label>X<input id="workshopPosX" type="number" step="0.1" /></label><label>Y<input id="workshopPosY" type="number" step="0.1" /></label><label>Z<input id="workshopPosZ" type="number" step="0.1" /></label></div>
-          <div class="workshop-inspector-section-title">SCALE · MULTIPLIER</div>
-          <div class="workshop-number-grid"><label>X<input id="workshopScaleX" type="number" min="0.1" max="20" step="0.1" /></label><label>Y<input id="workshopScaleY" type="number" min="0.1" max="20" step="0.1" /></label><label>Z<input id="workshopScaleZ" type="number" min="0.1" max="20" step="0.1" /></label></div>
-          <label class="workshop-field-label">Yaw rotation · degrees<input id="workshopRotation" type="number" step="5" /></label>
-          <div class="workshop-part-meta"><div><span>ESTIMATED MASS</span><strong id="workshopPartMass">0 kg</strong></div><div><span>COMPONENT TYPE</span><strong id="workshopPartCategory">Structure</strong></div></div>
-          <div class="workshop-inspector-section-title">ELECTRICAL / MECHANICAL</div>
-          <div id="workshopPartDetails" class="workshop-part-details">No special component properties.</div>
-          <div class="workshop-inspector-actions"><button id="workshopRotateLeft" type="button">↶ Rotate 15°</button><button id="workshopRotateRight" type="button">↷ Rotate 15°</button><button id="workshopWeld" type="button" title="Attach this part — welded parts fly with the aircraft">🔗 Weld</button><button id="workshopUnweld" type="button" title="Unwelded parts break off and fall during flight">⛓ Unweld</button><button id="workshopDelete" type="button" class="workshop-danger">Delete part</button></div>
-        </div>
-        <div class="workshop-connections-section"><div class="workshop-inspector-section-title">WIRING CONNECTIONS <span id="workshopConnectionCount">0</span></div><div id="workshopConnectionsList" class="workshop-connections-list"><span class="workshop-muted">No wires connected yet.</span></div></div>
-        <div class="workshop-inspector-foot"><span>BUILD CHECK</span><strong id="workshopBuildCheck">Waiting for components</strong></div>
-        <div id="workshopAssemblyReport" class="workshop-assembly-report" aria-live="polite"><div class="workshop-check-row"><span class="dot">●</span><span>Add a fuselage, wing, tail and landing gear to begin assembly checks.</span></div></div><div class="workshop-assembly-metrics"><div><small>ESTIMATED CG · X / Z</small><b id="workshopCGReadout">—</b></div><div><small>WING LOADING</small><b id="workshopWingLoading">—</b></div><div><small>LEFT / RIGHT MASS</small><b id="workshopLateralBalance">—</b></div><div><small>SYMMETRY PAIRS</small><b id="workshopSymmetryPairs">0</b></div></div>
-      </aside>
+      <div id="fwRightDock">
+        <section id="fwExplorer" class="fw-dock-panel">
+          <div class="fw-dock-head"><span class="workshop-eyebrow">EXPLORER</span><input id="fwExplorerFilter" type="search" placeholder="Filter parts…" aria-label="Filter parts" /></div>
+          <div id="fwExplorerTree"></div>
+        </section>
+        <aside class="workshop-sidebar workshop-inspector fw-dock-panel" id="fwProperties">
+          <div class="workshop-sidebar-head"><div><span class="workshop-eyebrow">PROPERTIES</span><h2>Selected part</h2></div><button id="workshopDuplicate" type="button" title="Duplicate selected component" disabled>⧉</button></div>
+          <div id="workshopInspectorEmpty" class="workshop-inspector-empty"><div class="workshop-inspector-icon">◇</div><strong>No component selected</strong><span>Choose a part in the Explorer, the 3D view or the Toolbox.</span></div>
+          <div id="workshopInspectorFields" hidden>
+            <div class="fw-prop-section" data-open="true"><div class="fw-prop-title">Data</div><div class="fw-prop-body">
+              <div class="workshop-selected-type" id="workshopSelectedType">COMPONENT</div>
+              <label class="fw-prop-row">Name<input id="workshopPartName" type="text" maxlength="60" /></label>
+              <div class="workshop-part-meta"><div><span>MASS</span><strong id="workshopPartMass">0 kg</strong></div><div><span>CATEGORY</span><strong id="workshopPartCategory">Structure</strong></div></div>
+            </div></div>
+            <div class="fw-prop-section" data-open="true"><div class="fw-prop-title">Transform</div><div class="fw-prop-body">
+              <div class="fw-prop-sub">Position · m</div>
+              <div class="workshop-number-grid"><label>X<input id="workshopPosX" type="number" step="0.1" /></label><label>Y<input id="workshopPosY" type="number" step="0.1" /></label><label>Z<input id="workshopPosZ" type="number" step="0.1" /></label></div>
+              <div class="fw-prop-sub">Scale · multiplier</div>
+              <div class="workshop-number-grid"><label>X<input id="workshopScaleX" type="number" min="0.1" max="20" step="0.1" /></label><label>Y<input id="workshopScaleY" type="number" min="0.1" max="20" step="0.1" /></label><label>Z<input id="workshopScaleZ" type="number" min="0.1" max="20" step="0.1" /></label></div>
+              <label class="fw-prop-row">Yaw · degrees<input id="workshopRotation" type="number" step="5" /></label>
+              <div class="workshop-inspector-actions"><button id="workshopRotateLeft" type="button" title="Rotate 15° left">↶ 15°</button><button id="workshopRotateRight" type="button" title="Rotate 15° right">↷ 15°</button></div>
+            </div></div>
+            <div class="fw-prop-section" data-open="true"><div class="fw-prop-title">Appearance</div><div class="fw-prop-body">
+              <label class="fw-prop-row">Paint<input id="workshopPaintColor" type="color" value="#bfc8ca" /></label>
+            </div></div>
+            <div class="fw-prop-section" data-open="true"><div class="fw-prop-title">Systems</div><div class="fw-prop-body">
+              <div id="workshopPartDetails" class="workshop-part-details">No special component properties.</div>
+              <div class="workshop-inspector-actions"><button id="workshopWeld" type="button" title="Attach this part — welded parts fly with the aircraft">🔗 Weld</button><button id="workshopUnweld" type="button" title="Unwelded parts break off and fall during flight">⛓ Unweld</button><button id="workshopDelete" type="button" class="workshop-danger">Delete</button></div>
+            </div></div>
+          </div>
+          <div class="fw-prop-section workshop-connections-section" data-open="true"><div class="fw-prop-title">Connections <span id="workshopConnectionCount">0</span></div><div class="fw-prop-body"><div id="workshopConnectionsList" class="workshop-connections-list"><span class="workshop-muted">No wires connected yet.</span></div></div></div>
+          <div class="fw-prop-section fw-prop-eng" data-open="false"><div class="fw-prop-title">Engineering</div><div class="fw-prop-body">
+            <div class="workshop-inspector-foot"><span>BUILD CHECK</span><strong id="workshopBuildCheck">Waiting for components</strong></div>
+            <div id="workshopAssemblyReport" class="workshop-assembly-report" aria-live="polite"><div class="workshop-check-row"><span class="dot">●</span><span>Add a fuselage, wing, tail and landing gear to begin assembly checks.</span></div></div>
+            <div class="workshop-assembly-metrics"><div><small>ESTIMATED CG · X / Z</small><b id="workshopCGReadout">—</b></div><div><small>WING LOADING</small><b id="workshopWingLoading">—</b></div><div><small>LEFT / RIGHT MASS</small><b id="workshopLateralBalance">—</b></div><div><small>SYMMETRY PAIRS</small><b id="workshopSymmetryPairs">0</b></div></div>
+          </div></div>
+        </aside>
+      </div>
     </div>
   </div>
 
@@ -755,6 +780,115 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
 </main>
 <footer>Procedural 3D flight world with component-mass/inertia-based control response and a mouse-interactive 3-D cockpit. Simplified model; not an approved flight-training device.</footer>
 </div>
+
+<style id="fwStudioSkin">
+/* ============================================================
+   FLIGHT WORLD · STUDIO LAYOUT v3 (Roblox Studio-inspired)
+   ribbon top bar · Toolbox left · Explorer + Properties right
+   ============================================================ */
+#buildModeOverlay{--sbg:#191c1f;--spanel:#1f2327;--shead:#24282d;--sline:#2e3338;--sink:#d6dade;--smut:#8f979e;--sacc:#4fb3ff}
+/* --- hide the old chrome --- */
+#buildModeOverlay .builder-steps{display:none!important}
+/* --- ribbon --- */
+#buildModeOverlay #fwRibbon{flex:none;display:flex;align-items:stretch;gap:2px;background:var(--shead);border-bottom:1px solid var(--sline);padding:4px 6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+#fwRibbon .fw-ribbon-group{display:flex;flex-direction:column;align-items:center;gap:2px;padding:2px 6px;border-radius:6px}
+#fwRibbon .fw-ribbon-group:hover{background:#ffffff08}
+#fwRibbon .fw-ribbon-btns{display:flex;align-items:center;gap:3px;flex-wrap:nowrap}
+#fwRibbon .fw-ribbon-label{font-size:8px;letter-spacing:.14em;color:var(--smut);text-transform:uppercase;white-space:nowrap}
+#fwRibbon .fw-ribbon-sep{width:1px;background:var(--sline);margin:2px 3px;flex:none}
+#fwRibbon .fw-ribbon-spacer{flex:1;min-width:8px}
+#fwRibbon .fw-ribbon-right{margin-left:auto}
+#fwRibbon .fw-ribbon-right input{width:170px}
+#fwRibbon button,#fwRibbon select{background:#2b3136;border:1px solid #3a4147;color:var(--sink);border-radius:5px;font-size:10.5px;font-weight:600;padding:5px 8px;white-space:nowrap;cursor:pointer;height:26px;box-shadow:none;transition:background .1s,border-color .1s}
+#fwRibbon button:hover{background:#353c42;color:#fff}
+#fwRibbon button.active{background:#1d3a52;border-color:var(--sacc);color:var(--sacc)}
+#fwRibbon button:disabled{opacity:.4}
+#fwRibbon button.symmetry-on{border-color:#3d5c35;color:#7fc95e}
+#fwRibbon button.primary{background:var(--sacc);border-color:var(--sacc);color:#08283f;font-weight:750}
+#fwRibbon button.primary:hover{background:#6cc3ff}
+#fwRibbon select{background:#23282c}
+#fwRibbon input{background:#23282c;border:1px solid #3a4147;color:var(--sink);border-radius:5px;padding:4px 8px;font-size:11px;height:26px}
+#fwRibbon .build-close{background:transparent;border-color:transparent;color:var(--smut);font-size:17px}
+#fwRibbon .build-close:hover{color:#e0604d;background:#2a1d1b}
+/* --- layout columns --- */
+#buildModeOverlay .workshop-layout{grid-template-columns:252px minmax(0,1fr) 292px}
+#buildModeOverlay .workshop-sidebar{background:var(--spanel);border-color:var(--sline)}
+#buildModeOverlay .workshop-sidebar-head{background:var(--shead);border-bottom:1px solid var(--sline)}
+#buildModeOverlay .workshop-sidebar-head h2{color:var(--sink)}
+#buildModeOverlay .workshop-eyebrow{color:var(--sacc)}
+#buildModeOverlay .workshop-live-dot{background:#20302a;color:#7fc95e;border-color:#35502f}
+#buildModeOverlay #workshopSearch{background:#181b1e;border-color:var(--sline);color:var(--sink)}
+#buildModeOverlay .workshop-category-tab{background:transparent!important;border:1px solid transparent!important;color:var(--smut)!important}
+#buildModeOverlay .workshop-category-tab.active{background:#2b3136!important;color:var(--sacc)!important;border-color:#3a4147!important}
+#buildModeOverlay .workshop-palette-item{background:#23272b!important;border:1px solid var(--sline)!important}
+#buildModeOverlay .workshop-palette-item:hover{border-color:#4a525a!important;background:#282d32!important}
+#buildModeOverlay .workshop-palette-item.active{border-color:var(--sacc)!important;background:#1d3a52!important}
+#buildModeOverlay .workshop-palette-item strong{color:var(--sink)!important}
+#buildModeOverlay .workshop-part-icon{background:#1a1e22!important;border-color:#33383d!important;color:var(--sacc)!important}
+#buildModeOverlay .workshop-palette-item small{color:#9aa4ad!important}
+#buildModeOverlay .workshop-palette-item .workshop-mass-pill{color:#a8b0b9!important}
+#buildModeOverlay .workshop-library-foot{border-color:var(--sline);color:var(--smut)}
+#buildModeOverlay .workshop-stage{background:#14171a}
+#buildModeOverlay .workshop-statusbar{background:var(--shead);border-top:1px solid var(--sline);color:var(--smut)}
+#buildModeOverlay .workshop-statusbar span:first-child{color:var(--sink)}
+/* --- right dock: Explorer + Properties --- */
+#buildModeOverlay #fwRightDock{display:flex;flex-direction:column;min-width:0;min-height:0;border-left:1px solid var(--sline);background:var(--spanel)}
+#buildModeOverlay .fw-dock-panel{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#buildModeOverlay #fwExplorer{flex:0 0 40%;border-bottom:1px solid var(--sline)}
+#buildModeOverlay #fwProperties{flex:1;border:0;border-radius:0}
+#buildModeOverlay #fwProperties{overflow-y:auto;overflow-x:hidden}
+#buildModeOverlay #fwProperties .workshop-inspector-empty{padding:18px 14px}
+#buildModeOverlay .fw-dock-head{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;background:var(--shead);border-bottom:1px solid var(--sline)}
+#buildModeOverlay .fw-dock-head input{background:#181b1e;border:1px solid var(--sline);color:var(--sink);border-radius:5px;padding:4px 8px;font-size:10px;width:110px}
+#buildModeOverlay #fwExplorerTree{overflow:auto;flex:1;padding:4px 0}
+#fwExplorerTree .fw-tree-root{display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:11px;color:var(--sink);cursor:pointer}
+#fwExplorerTree .fw-tree-root small{color:var(--smut);font-size:9px}
+#fwExplorerTree .fw-tree-cat{display:flex;align-items:center;gap:5px;padding:4px 10px 4px 8px;font-size:10.5px;font-weight:650;color:#b9c1c8;cursor:pointer;user-select:none}
+#fwExplorerTree .fw-tree-cat:hover{background:#ffffff07}
+#fwExplorerTree .fw-tree-caret{width:12px;color:var(--smut);font-size:9px}
+#fwExplorerTree .fw-tree-cat small{color:var(--smut);font-weight:400;font-size:9px}
+#fwExplorerTree .fw-tree-item{display:flex;align-items:center;gap:6px;padding:3.5px 10px 3.5px 30px;font-size:10.5px;color:#aeb6bd;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fwExplorerTree .fw-tree-item:hover{background:#ffffff07;color:var(--sink)}
+#fwExplorerTree .fw-tree-item.fw-sel{background:#1d3a52;color:var(--sacc)}
+#fwExplorerTree .fw-tree-item.fw-wire{color:#9aa4ad}
+#fwExplorerTree .fw-tree-item small{margin-left:auto;color:var(--smut);font-size:9px}
+/* --- properties sections --- */
+#buildModeOverlay .fw-prop-section{border-bottom:1px solid var(--sline)}
+#buildModeOverlay .fw-prop-title{display:flex;align-items:center;gap:6px;padding:7px 12px;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#b9c1c8;cursor:pointer;user-select:none}
+#buildModeOverlay .fw-prop-title:hover{color:var(--sink)}
+#buildModeOverlay .fw-prop-title:before{content:'▾';color:var(--smut);font-size:8px;transition:transform .12s}
+#buildModeOverlay .fw-prop-section[data-open="false"] .fw-prop-title:before{transform:rotate(-90deg)}
+#buildModeOverlay .fw-prop-section[data-open="false"] .fw-prop-body{display:none}
+#buildModeOverlay .fw-prop-body{padding:2px 12px 10px}
+#buildModeOverlay .fw-prop-sub{font-size:8.5px;letter-spacing:.12em;color:var(--smut);margin:7px 0 3px}
+#buildModeOverlay .fw-prop-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:5px 0;font-size:11px;color:#b9c1c8}
+#buildModeOverlay .fw-prop-row input{background:#181b1e;border:1px solid var(--sline);color:var(--sink);border-radius:5px;padding:4px 7px;font-size:11px;width:60%;font-variant-numeric:tabular-nums}
+#buildModeOverlay .fw-prop-row input[type=color]{width:34px;height:24px;padding:1px;cursor:pointer}
+#buildModeOverlay .workshop-number-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+#buildModeOverlay .workshop-number-grid label{display:flex;align-items:center;gap:4px;font-size:9.5px;color:var(--smut)}
+#buildModeOverlay .workshop-number-grid input{width:100%;min-width:0;background:#181b1e;border:1px solid var(--sline);color:var(--sink);border-radius:5px;padding:4px 5px;font-size:10.5px}
+#buildModeOverlay .workshop-selected-type{font-size:8.5px;letter-spacing:.12em;color:var(--sacc);margin:2px 0 4px}
+#buildModeOverlay .workshop-part-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:7px 0}
+#buildModeOverlay .workshop-part-meta span{display:block;font-size:8px;letter-spacing:.1em;color:var(--smut)}
+#buildModeOverlay .workshop-part-meta strong{font-size:11px;color:var(--sink)}
+#buildModeOverlay .workshop-inspector-actions{display:flex;gap:5px;flex-wrap:wrap;margin:8px 0 0}
+#buildModeOverlay .workshop-inspector-actions button{background:#2b3136;border:1px solid #3a4147;color:var(--sink);border-radius:5px;font-size:10px;padding:5px 9px;cursor:pointer;box-shadow:none}
+#buildModeOverlay .workshop-inspector-actions button:hover{background:#353c42}
+#buildModeOverlay .workshop-part-details{font-size:10.5px;line-height:1.5;color:#aeb6bd}
+#buildModeOverlay .workshop-connection-row{display:flex;align-items:center;gap:5px}
+#buildModeOverlay .workshop-inspector-foot{display:flex;justify-content:space-between;gap:8px;font-size:9px;letter-spacing:.1em;color:var(--smut);margin:4px 0}
+#buildModeOverlay .workshop-inspector-foot strong{color:#7fc95e}
+#buildModeOverlay .workshop-assembly-report{font-size:10px;color:#aeb6bd;border:0}
+#buildModeOverlay .workshop-check-row .dot{color:var(--sacc)}
+#buildModeOverlay .workshop-assembly-metrics{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+#buildModeOverlay .workshop-assembly-metrics small{color:var(--smut);font-size:8px;letter-spacing:.08em}
+#buildModeOverlay .workshop-assembly-metrics b{display:block;color:var(--sink);font-size:11px;font-variant-numeric:tabular-nums}
+#buildModeOverlay .workshop-inspector-empty{color:var(--smut)}
+#buildModeOverlay .workshop-danger{background:#2a1d1b!important;border-color:#5c332c!important;color:#e88a7a!important}
+/* explorer hidden on small screens; properties overlay stays */
+@media(max-width:900px){#buildModeOverlay #fwExplorer{display:none}#buildModeOverlay .workshop-layout{grid-template-columns:170px minmax(0,1fr) 220px}#fwRibbon .fw-ribbon-right input{width:110px}}
+@media(max-width:600px){#buildModeOverlay .workshop-layout{grid-template-columns:120px minmax(0,1fr) 190px}#fwRibbon button{font-size:9px;padding:4px 6px}}
+</style>
 
 <script type="module">
 import * as THREE from 'https://unpkg.com/three@0.166.1/build/three.module.js';
@@ -5448,7 +5582,7 @@ function paintWorkshopPart(part,color){part.userData.paintColor=color;part.trave
 const inspectorExtra=document.createElement('div');inspectorExtra.innerHTML=`<div class="workshop-inspector-section-title">ATTITUDE · degrees</div><div class="workshop-number-grid"><label>Pitch<input id="workshopPitchRotation" type="number" step="5" aria-label="Component pitch rotation"></label><label>Roll<input id="workshopRollRotation" type="number" step="5" aria-label="Component roll rotation"></label><label>Locked<input id="workshopPartLocked" type="checkbox" aria-label="Lock component"></label></div><label class="workshop-color-row">Material color<input id="workshopPartColor" type="color" value="#bfc8ca"></label>`;$('workshopInspectorFields').appendChild(inspectorExtra);
 const assemblyExtra=document.createElement('div');assemblyExtra.id='workshopEngineering';assemblyExtra.className='workshop-engineering';document.querySelector('.workshop-inspector').appendChild(assemblyExtra);
 const sceneTree=document.createElement('div');sceneTree.className='workshop-scene-tree';sceneTree.id='workshopSceneTree';sceneTree.setAttribute('aria-label','Aircraft components');document.querySelector('.workshop-library').appendChild(sceneTree);
-const saveStatus=document.createElement('span');saveStatus.className='workshop-save-state';saveStatus.id='workshopSaveStatus';saveStatus.textContent='AUTOSAVE READY';document.querySelector('.workshop-top-actions').prepend(saveStatus);
+const saveStatus=document.createElement('span');saveStatus.className='workshop-save-state';saveStatus.id='workshopSaveStatus';saveStatus.textContent='AUTOSAVE READY';document.querySelector('#fwRibbon .fw-ribbon-right .fw-ribbon-btns')?.prepend(saveStatus);
 const viewSelect=document.createElement('select');viewSelect.className='workshop-view-select';viewSelect.id='workshopViewPreset';viewSelect.setAttribute('aria-label','Workshop view preset');viewSelect.innerHTML='<option value="perspective">Perspective</option><option value="top">Top</option><option value="front">Front</option><option value="side">Side</option>';$('workshopResetView').after(viewSelect);
 viewSelect.onchange=e=>{const views={perspective:[.82,.58],top:[0,Math.PI/2-.001],front:[0,.02],side:[Math.PI/2,.02]};[workshopYaw,workshopPitch]=views[e.target.value];workshopMoveCamera();};
 $('workshopResetView').addEventListener('click',()=>{const bbox=new THREE.Box3().setFromObject(workshopBuildRoot);if(!bbox.isEmpty()){bbox.getCenter(workshopTarget);workshopDistance=clamp(bbox.getSize(new THREE.Vector3()).length()*1.5,4,180);}workshopMoveCamera();});
@@ -6552,7 +6686,7 @@ updateControlSurfaces=function(){oldRefinedSurfaces();};
 
 // Simple mode exposes only decisions needed for assembling an aircraft.
 let workshopAdvanced=false,workshopStep='choose';
-const easySteps=document.createElement('nav');easySteps.className='builder-steps';easySteps.setAttribute('aria-label','Build steps');easySteps.innerHTML='<button data-build-step="choose">1 · Choose a starter</button><button data-build-step="build">2 · Add & arrange</button><button data-build-step="check">3 · Check & fly</button><button id="builderAdvanced" aria-pressed="false">Advanced tools</button>';document.querySelector('.workshop-topbar').after(easySteps);
+const easySteps=document.createElement('nav');easySteps.className='builder-steps';easySteps.setAttribute('aria-label','Build steps');easySteps.innerHTML='<button data-build-step="choose">1 · Choose a starter</button><button data-build-step="build">2 · Add & arrange</button><button data-build-step="check">3 · Check & fly</button><button id="builderAdvanced" aria-pressed="false">Advanced tools</button>';document.querySelector('#fwRibbon').after(easySteps);
 const welcome=document.createElement('div');welcome.id='builderWelcome';welcome.innerHTML='<span class="builder-kicker">YOUR FIRST AIRCRAFT</span><h2>Start with something that flies.</h2><p>Choose a starter, then change its parts. Your work saves automatically.</p><div class="starter-cards"><button data-starter="templateTrainer"><b>Trainer</b><span>Easy to fly · one engine</span></button><button data-starter="templateTwin"><b>Twin engine</b><span>Two engines · wider wings</span></button><button data-starter="templateGlider"><b>Glider</b><span>No engine · long wings</span></button></div><button id="blankBuild">Continue with your design</button>';$('workshopCanvasWrap').appendChild(welcome);
 const builderHint=document.createElement('div');builderHint.id='builderHint';$('workshopCanvasWrap').appendChild(builderHint);
 const simpleMove=document.createElement('div');simpleMove.id='simpleMove';simpleMove.innerHTML='<h3>Move selected part</h3><p>Drag it on the grid, or use these buttons.</p><div class="nudge-grid"><button data-nudge="y,1">Up</button><button data-nudge="z,1">Forward</button><button data-nudge="y,-1">Down</button><button data-nudge="x,-1">Left</button><button data-nudge="z,-1">Back</button><button data-nudge="x,1">Right</button></div><div class="simple-actions"><button id="easyRotate">Rotate 15°</button><button id="easyDuplicate">Duplicate</button><button id="easyWeld">Weld</button><button id="easyUnweld">Unweld</button><button id="easyDelete">Remove</button></div>';$('workshopInspectorFields').prepend(simpleMove);
@@ -8753,7 +8887,7 @@ function gravityAtAltitude(altitudeM){const radius=6371000;return 9.80665*(radiu
   function showTour(){tourIndex=0;renderTour();tour.hidden=false;}
   tour.addEventListener('click',e=>{const action=e.target.closest('[data-tour]')?.dataset.tour;if(!action)return;if(action==='back')tourIndex=Math.max(0,tourIndex-1);else if(action==='next'){if(tourIndex<tourSteps.length-1)tourIndex++;else tour.hidden=true;}else tour.hidden=true;renderTour();});
   const tourButton=document.createElement('button');tourButton.type='button';tourButton.textContent='Build tutorial';tourButton.title='Open the short build-mode tutorial';
-  document.querySelector('#buildModeOverlay .workshop-topbar')?.appendChild(tourButton);tourButton.addEventListener('click',showTour);
+  document.querySelector('#fwRibbon')?.appendChild(tourButton);tourButton.addEventListener('click',showTour);
   const baseOpenBuild= openBuildMode;
   // the tutorial no longer auto-opens: the starter cards + build notebook lead the flow.
   // It stays available from the "Build tutorial" button in the top bar.
@@ -10058,6 +10192,79 @@ updateSimpleChecks();
   });
 })();
 })();
+
+
+
+/* ============================================================
+   FLIGHT WORLD · STUDIO LAYOUT v3 — Explorer + Properties wiring
+   ============================================================ */
+(function(){
+'use strict';
+/* Starters button on the ribbon opens the starter picker */
+$('fwStartersBtn').onclick=()=>setBuilderStep('choose');
+
+/* ---------- Explorer tree ---------- */
+const FW_EXPLORER_CATS=[['structure','Structure'],['wings','Wings'],['controls','Controls'],['tail','Tail'],['propulsion','Propulsion'],['gear','Landing gear'],['electronics','Electronics'],['systems','Systems'],['cockpit','Cockpit'],['decor','Decor']];
+const fwExplorerOpen=new Set(FW_EXPLORER_CATS.map(c=>c[0]));fwExplorerOpen.add('wires');
+const esc=x=>String(x==null?'':x).replace(/[<>&"]/g,c=>({'<':'\u003C','>':'\u003E','&':'\u0026','"':'\u0022'}[c]));
+let fwExplorerTimer=null;
+function fwRefreshExplorerNow(){
+  const tree=$('fwExplorerTree');if(!tree)return;
+  const filter=(($('fwExplorerFilter').value||'')).toLowerCase();
+  const rootName=($('workshopName').value||'Aircraft').trim()||'Aircraft';
+  let html='<div class="fw-tree-root'+(workshopSelectedId?'':' fw-sel')+'" data-fw-xp="root">✈ <b>'+esc(rootName)+'</b><small>'+workshopParts.length+' parts · '+workshopWires.length+' lines</small></div>';
+  for(const [cat,label] of FW_EXPLORER_CATS){
+    let parts=workshopParts.filter(p=>((WORKSHOP_PARTS[p.userData.type]||{}).category)===cat);
+    if(filter)parts=parts.filter(p=>(p.userData.name||'').toLowerCase().includes(filter)||p.userData.type.toLowerCase().includes(filter));
+    if(!parts.length)continue;
+    const open=fwExplorerOpen.has(cat);
+    html+='<div class="fw-tree-cat" data-fw-cat="'+cat+'"><span class="fw-tree-caret">'+(open?'▾':'▸')+'</span>'+esc(label)+' <small>'+parts.length+'</small></div>';
+    if(open)for(const p of parts)html+='<div class="fw-tree-item'+(workshopSelectedId===p.userData.partId?' fw-sel':'')+'" data-fw-part="'+p.userData.partId+'" title="'+esc(p.userData.name)+'">'+(p.userData.locked?'🔒 ':'')+(p.userData.unwelded?'⛓ ':'')+esc(p.userData.name)+'</div>';
+  }
+  const byKind={};for(const w of workshopWires)(byKind[w.kind]=byKind[w.kind]||[]).push(w);
+  const kinds=Object.keys(byKind);
+  if(kinds.length||filter===''||true){
+    const open=fwExplorerOpen.has('wires');
+    html+='<div class="fw-tree-cat" data-fw-cat="wires"><span class="fw-tree-caret">'+(open?'▾':'▸')+'</span>Wiring <small>'+workshopWires.length+'</small></div>';
+    if(open){
+      const labels={power:'Power',ground:'Ground',signal:'Signal',data:'Data',fuel:'Fuel',hydraulic:'Hydraulic',water:'Water / waste'};
+      for(const k of kinds)html+='<div class="fw-tree-item fw-wire" data-fw-kind="'+k+'">━ '+labels[k]+' lines <small>'+byKind[k].length+'</small></div>';
+      if(!kinds.length)html+='<div class="fw-tree-item fw-wire" style="opacity:.5">No lines yet</div>';
+    }
+  }
+  tree.innerHTML=html;
+}
+function fwRefreshExplorer(){clearTimeout(fwExplorerTimer);fwExplorerTimer=setTimeout(fwRefreshExplorerNow,120);}
+$('fwExplorerFilter').addEventListener('input',fwRefreshExplorerNow);
+$('fwExplorerTree').addEventListener('click',e=>{
+  const cat=e.target.closest('[data-fw-cat]');
+  if(cat){const c=cat.dataset.fwCat;if(fwExplorerOpen.has(c))fwExplorerOpen.delete(c);else fwExplorerOpen.add(c);fwRefreshExplorerNow();return;}
+  const item=e.target.closest('[data-fw-part]');
+  if(item){workshopSelectPart(item.dataset.fwPart);return;}
+  if(e.target.closest('[data-fw-xp="root"]')){workshopSelectPart(null);}
+});
+/* keep the tree in sync with every build change (debounced) */
+const fwBaseUpdateStats=workshopUpdateStats;
+workshopUpdateStats=function(){const r=fwBaseUpdateStats.apply(this,arguments);fwRefreshExplorer();return r;};
+const fwBaseSelectPart=workshopSelectPart;
+workshopSelectPart=function(){const r=fwBaseSelectPart.apply(this,arguments);fwRefreshExplorer();return r;};
+
+/* ---------- Properties: collapsible sections + paint ---------- */
+$('fwProperties').addEventListener('click',e=>{
+  const t=e.target.closest('.fw-prop-title');
+  if(!t||!t.parentElement.classList.contains('fw-prop-section'))return;
+  const sec=t.parentElement;sec.dataset.open=sec.dataset.open==='true'?'false':'true';
+});
+$('workshopPaintColor').addEventListener('input',e=>{
+  const part=workshopGetPart(workshopSelectedId);
+  if(part)paintWorkshopPart(part,e.target.value);
+});
+/* keep the paint swatch in sync with the selection */
+const fwBaseRenderInspector=workshopRenderInspector;
+workshopRenderInspector=function(){const r=fwBaseRenderInspector.apply(this,arguments);try{const p=workshopGetPart(workshopSelectedId),inp=$('workshopPaintColor');if(p&&inp)inp.value=p.userData.paintColor||((WORKSHOP_PARTS[p.userData.type]||{}).color||'#bfc8ca');}catch(_e){}return r;};
+fwRefreshExplorerNow();
+})();
+
 
 </script>
 <script data-pplx-inline-edit>
