@@ -3212,7 +3212,7 @@ $('workshopCloudLocal').addEventListener('click',async()=>{
   if(!res.ok)throw new Error('preset pack not found (HTTP '+res.status+')');
   const docs=await res.json();
   if(!Array.isArray(docs)||!docs.length)throw new Error('empty preset pack');
-  list.innerHTML=docs.map((d,i)=>'<div class="workshop-cloud-row"><span class="workshop-cloud-kind">FLEET</span><span class="workshop-cloud-name">'+String((d.data&&d.data.name)||d.name||'').replace(/[<>&]/g,'')+'</span><button data-local-load="'+i+'" type="button">Load</button></div>').join('');
+  list.innerHTML='<span class="workshop-muted">Offline fleet pack — '+docs.length+' workshop designs. Loading one restores it as an editable build.</span>'+docs.map((d,i)=>'<div class="workshop-cloud-row"><span class="workshop-cloud-kind">FLEET</span><span class="workshop-cloud-name">'+String((d.data&&d.data.name)||d.name||'').replace(/[<>&]/g,'')+'</span><button data-local-load="'+i+'" type="button">Load</button></div>').join('');
   list.querySelectorAll('[data-local-load]').forEach(btn=>btn.addEventListener('click',()=>{
    const d=docs[Number(btn.dataset.localLoad)],build=d.data&&d.data.build;
    if(!build){workshopCloudLog('⚠ No workshop build in that preset');return;}
@@ -3220,7 +3220,6 @@ $('workshopCloudLocal').addEventListener('click',async()=>{
    openBuildMode();workshopRestoreSnapshot(build);$('workshopName').value=build.name||'Fleet preset';saveWorkshop();
    workshopCloudLog('Loaded fleet preset "'+((d.data&&d.data.name)||'')+'" as an editable build');
   }));
-  workshopCloudLog('Loaded '+docs.length+' local fleet presets (offline pack)');
  }catch(e){workshopCloudLog('⚠ '+e.message);}
 });
 $('workshopCloudList').addEventListener('click',async e=>{
