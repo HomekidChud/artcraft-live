@@ -230,7 +230,10 @@
   .hitem:hover { background: #2a2a2a; }
   .hitem.selected { background: var(--ed-blue); color: #fff; }
   .hitem .icon { font-size: 11px; width: 14px; text-align: center; color: #8f8f8f; }
-  .hitem.selected .icon { color: #d6e4f5; }
+  .hitem.drop-target { outline: 1px dashed #4f8cff; outline-offset: -1px; }
+  .pw-x { margin-left: auto; background: none; border: none; color: #8f8f8f; font-size: 11px; cursor: pointer; padding: 0 3px; border-radius: 3px; }
+  .pw-x:hover { color: #ff6b6b; background: #2a2a2a; }
+  .pw-x.pw-ren:hover { color: #d6e4f5; }
   .hitem .caret { width: 12px; font-size: 9px; color: #777; }
 
   /* Scene view */
@@ -481,6 +484,7 @@
         <button data-act="create" data-type="light">Light ▸ Directional Light</button>
         <button data-act="create" data-type="pointlight">Light ▸ Point Light</button>
         <button data-act="create" data-type="camera">Camera</button>
+        <button data-act="create" data-type="spawn">Spawn Point</button>
       </div>
     </div>
     <div class="ed-menu" data-menu="component"><button>Component</button>
@@ -872,6 +876,16 @@ const GEOM = {
   icosahedron: () => new THREE.IcosahedronGeometry(0.5, 0),
   empty: () => null,
 };
+const objById = id => ed.objects.find(x => x.userData.id === id);
+// is `a` a descendant of (or equal to) `b` in the hierarchy? blocks reparent cycles
+function isDescendant(a, b) {
+  let cur = a;
+  while (cur) {
+    if (cur === b) return true;
+    cur = cur.userData.parentId == null ? null : objById(cur.userData.parentId);
+  }
+  return false;
+}
 function scenePivotSpawn() {
   // Unity: new 3D objects instantiate at the Scene pivot (in front of the Scene view camera)
   const dir = new THREE.Vector3();
@@ -903,6 +917,16 @@ function makeObject(type, opts = {}) {
     scene.add(helper); obj.userData.helper = helper;
   } else if (type === 'empty') {
     obj = new THREE.Object3D();
+  } else if (type === 'spawn') {
+    // Spawn Point: editor-only marker (ring + cone). Never a collider, never casts shadows.
+    obj = new THREE.Group();
+    const mat = new THREE.MeshBasicMaterial({ color: 0x35d07f });
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.06, 8, 32), mat);
+    ring.rotation.x = Math.PI / 2; ring.position.y = 0.02;
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.55, 16), mat);
+    cone.position.y = 0.32;
+    obj.add(ring, cone);
+    obj.position.y = 0;
   } else {
     const geo = GEOM[type]();
     if (type === 'plane') { geo.rotateX(-Math.PI / 2); }
@@ -920,14 +944,14 @@ function makeObject(type, opts = {}) {
   obj.userData.id = ed.idSeq++;
   obj.userData.type = type;
   obj.userData.name = opts.name || defaultName(type);
-  obj.userData.components = { meshRenderer: type !== 'empty', collider: type !== 'plane' && type !== 'empty', script: null, ...opts.components };
+  obj.userData.components = { meshRenderer: type !== 'empty', collider: type !== 'plane' && type !== 'empty' && type !== 'spawn', script: null, ...opts.components };
   obj.userData.scriptParams = { speed: 90, amp: 0.5, playerSpeed: 6 };
   scene.add(obj);
   ed.objects.push(obj);
   return obj;
 }
 function defaultName(type) {
-  const names = { cube: 'Cube', sphere: 'Sphere', cylinder: 'Cylinder', capsule: 'Capsule', plane: 'Plane', cone: 'Cone', torus: 'Torus', torusknot: 'TorusKnot', ring: 'Ring', icosahedron: 'Icosphere', empty: 'GameObject', light: 'Directional Light', pointlight: 'Point Light', camera: 'Camera' };
+  const names = { cube: 'Cube', sphere: 'Sphere', cylinder: 'Cylinder', capsule: 'Capsule', plane: 'Plane', cone: 'Cone', torus: 'Torus', torusknot: 'TorusKnot', ring: 'Ring', icosahedron: 'Icosphere', empty: 'GameObject', light: 'Directional Light', pointlight: 'Point Light', camera: 'Camera', spawn: 'Spawn Point' };
   const base = names[type];
   const n = ed.objects.filter(o => o.userData.name.startsWith(base)).length;
   return n ? `${base} (${n + 1})` : base;
@@ -1019,10 +1043,11 @@ function select(obj) {
 }
 
 /* ---- hierarchy ---- */
-const ICONS = { cube: '▪', sphere: '●', cylinder: '▮', capsule: '⬮', plane: '▬', cone: '▲', torus: '◯', torusknot: '❋', ring: '○', icosahedron: '⬡', empty: '▫', light: '☀', pointlight: '💡', camera: '🎥' };
+const ICONS = { cube: '▪', sphere: '●', cylinder: '▮', capsule: '⬮', plane: '▬', cone: '▲', torus: '◯', torusknot: '❋', ring: '○', icosahedron: '⬡', empty: '▫', light: '☀', pointlight: '💡', camera: '🎥', spawn: '⏻' };
 function renderHierarchy() {
   const h = $('#hierarchy');
   h.innerHTML = '';
+  ed.collapsedIds = ed.collapsedIds || new Set();
   const q = (ed.hierFilter || '').trim().toLowerCase();
   const list = q ? ed.objects.filter(o => o.userData.name.toLowerCase().includes(q) || (o.userData.type || '').includes(q)) : ed.objects;
   if (q) {
@@ -1038,9 +1063,10 @@ function renderHierarchy() {
     h.appendChild(none);
     return;
   }
-  list.forEach(o => {
+  const mkRow = (o, depth) => {
     const row = document.createElement('div');
     row.className = 'hitem' + (o === ed.selected ? ' selected' : '');
+    row.style.paddingLeft = (6 + depth * 13) + 'px';
     row.innerHTML = `<span class="icon">${ICONS[o.userData.type] || '▪'}</span>${o.userData.name}`;
     row.onclick = () => select(o);
     row.ondblclick = () => {
@@ -1049,7 +1075,81 @@ function renderHierarchy() {
     };
     row.oncontextmenu = e => { e.preventDefault(); select(o); };
     h.appendChild(row);
-  });
+  };
+  if (q) { list.forEach(o => mkRow(o, 0)); return; }
+  // nested tree: children keyed by parentId, rendered depth-first with indents.
+  // Reparenting is logical (world positions are kept) so gizmos/picking stay intact.
+  const byParent = new Map();
+  for (const o of ed.objects) {
+    const key = o.userData.parentId == null ? null : o.userData.id;
+    // skip objects whose parent is missing (dangling) — they render at root
+    if (o.userData.parentId != null && !objById(o.userData.parentId)) o.userData.parentId = null;
+    const pk = o.userData.parentId == null ? null : o.userData.parentId;
+    if (!byParent.has(pk)) byParent.set(pk, []);
+    byParent.get(pk).push(o);
+  }
+  const append = (parentId, depth) => {
+    for (const o of (byParent.get(parentId) || [])) {
+      const kids = byParent.get(o.userData.id) || [];
+      const collapsed = ed.collapsedIds.has(o.userData.id);
+      const row = document.createElement('div');
+      row.className = 'hitem' + (o === ed.selected ? ' selected' : '') + (ed.dragOverId === o.userData.id ? ' drop-target' : '');
+      row.style.paddingLeft = (6 + depth * 13) + 'px';
+      row.draggable = true;
+      row.innerHTML = `<span class="caret" style="cursor:pointer;width:12px;font-size:9px;color:#777">${kids.length ? (collapsed ? '▸' : '▾') : ''}</span><span class="icon">${ICONS[o.userData.type] || '▪'}</span>${o.userData.name}`;
+      row.onclick = () => select(o);
+      row.ondblclick = () => {
+        const n = prompt('Rename object', o.userData.name);
+        if (n) { o.userData.name = n; renderHierarchy(); renderInspector(); }
+      };
+      row.oncontextmenu = e => { e.preventDefault(); select(o); };
+      const caret = row.querySelector('.caret');
+      if (kids.length) caret.onclick = e => {
+        e.stopPropagation();
+        if (collapsed) ed.collapsedIds.delete(o.userData.id); else ed.collapsedIds.add(o.userData.id);
+        renderHierarchy();
+      };
+      // drag-to-reparent: drop ON a row = make child; drop on empty list area = unparent
+      row.ondragstart = e => { ed.dragId = o.userData.id; e.dataTransfer.effectAllowed = 'move'; };
+      row.ondragover = e => {
+        if (ed.dragId == null || ed.dragId === o.userData.id) return;
+        const drag = objById(ed.dragId);
+        if (!drag || isDescendant(o, drag)) return; // no cycles
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        ed.dragOverId = o.userData.id; row.classList.add('drop-target');
+      };
+      row.ondragleave = () => { if (ed.dragOverId === o.userData.id) { ed.dragOverId = null; row.classList.remove('drop-target'); } };
+      row.ondrop = e => {
+        e.preventDefault(); e.stopPropagation();
+        row.classList.remove('drop-target');
+        const drag = ed.dragId != null ? objById(ed.dragId) : null;
+        ed.dragOverId = null; ed.dragId = null;
+        if (drag && drag !== o && !isDescendant(o, drag)) {
+          pushHistory();
+          drag.userData.parentId = o.userData.id;
+          renderHierarchy();
+          log('sys', `${drag.userData.name} is now a child of ${o.userData.name}`);
+        }
+      };
+      h.appendChild(row);
+      if (kids.length && !collapsed) append(o.userData.id, depth + 1);
+    }
+  };
+  append(null, 0);
+  // dropping on the empty area below the tree unpairs the object to the root
+  h.ondragover = e => { if (ed.dragId != null) e.preventDefault(); };
+  h.ondrop = e => {
+    if (ed.dragId == null) return;
+    e.preventDefault();
+    const drag = objById(ed.dragId);
+    ed.dragId = null;
+    if (drag && drag.userData.parentId != null) {
+      pushHistory();
+      drag.userData.parentId = null;
+      renderHierarchy();
+      log('sys', `${drag.userData.name} moved to the scene root`);
+    }
+  };
 }
 
 /* ---- inspector ---- */
@@ -1196,10 +1296,10 @@ function renderProjectWindow() {
     ['Ground.mat', '🎨'], ['Player.mat', '🎨'], ['Sprites', '🖼️'],
   ];
   const sceneRows = Object.keys(scenes).map((n) =>
-    `<div class="asset" data-scene="${escAttr(n)}"><span class="ico">🗂️</span>${escAttr(n)}<span class="pw-hint">click to open</span></div>`).join('')
+    `<div class="asset" data-scene="${escAttr(n)}"><span class="ico">🗂️</span>${escAttr(n)}<span class="pw-hint">click to open</span><button class="pw-x" data-del-scene="${escAttr(n)}" title="Delete scene">✕</button></div>`).join('')
     || '<div class="pw-empty">No saved scenes — File ▸ Save Scene As…</div>';
   const prefabRows = Object.keys(ed.prefabs).map((n) =>
-    `<div class="asset" data-prefab="${escAttr(n)}"><span class="ico">📦</span>${escAttr(n)}<span class="pw-hint">click to instantiate</span></div>`).join('')
+    `<div class="asset" data-prefab="${escAttr(n)}"><span class="ico">📦</span>${escAttr(n)}<span class="pw-hint">click to instantiate</span><button class="pw-x pw-ren" data-ren-prefab="${escAttr(n)}" title="Rename prefab">✎</button><button class="pw-x" data-del-prefab="${escAttr(n)}" title="Delete prefab">✕</button></div>`).join('')
     || '<div class="pw-empty">No prefabs — Assets ▸ Create ▸ Prefab From Selection</div>';
   b.innerHTML = `<div class="assets">
     <div class="pw-section">Scenes</div>${sceneRows}
@@ -1210,6 +1310,33 @@ function renderProjectWindow() {
     if (a.dataset.scene) { openSavedScene(a.dataset.scene); return; }
     if (a.dataset.prefab) { instantiatePrefab(a.dataset.prefab); return; }
     status(`Asset selected: ${a.textContent.trim()}`);
+  });
+  // project management: delete scenes, delete + rename prefabs
+  b.querySelectorAll('[data-del-scene]').forEach(btn => btn.onclick = e => {
+    e.stopPropagation();
+    const n = btn.dataset.delScene;
+    if (!confirm(`Delete scene "${n}"? This cannot be undone.`)) return;
+    const map = loadScenesMap(); delete map[n];
+    store.setItem('unitycraft-scenes', JSON.stringify(map));
+    if (ed.sceneName === n) { ed.sceneName = 'UntitledScene'; $('#hier-tab').textContent = 'Hierarchy — ' + ed.sceneName; }
+    renderProjectWindow(); log('warn', `Deleted scene ${n}`);
+  });
+  b.querySelectorAll('[data-del-prefab]').forEach(btn => btn.onclick = e => {
+    e.stopPropagation();
+    const n = btn.dataset.delPrefab;
+    if (!confirm(`Delete prefab "${n}"? This cannot be undone.`)) return;
+    delete ed.prefabs[n];
+    store.setItem('unitycraft-prefabs', JSON.stringify(ed.prefabs));
+    renderProjectWindow(); log('warn', `Deleted prefab ${n}`);
+  });
+  b.querySelectorAll('[data-ren-prefab]').forEach(btn => btn.onclick = e => {
+    e.stopPropagation();
+    const n = btn.dataset.renPrefab;
+    const nn = (prompt('Rename prefab', n) || '').trim();
+    if (!nn || nn === n || ed.prefabs[nn]) return;
+    ed.prefabs[nn] = ed.prefabs[n]; delete ed.prefabs[n];
+    store.setItem('unitycraft-prefabs', JSON.stringify(ed.prefabs));
+    renderProjectWindow(); log('sys', `Renamed prefab ${n} → ${nn}`);
   });
 }
 function openSavedScene(name) {
@@ -1227,6 +1354,7 @@ function instantiatePrefab(name) {
   pushHistory();
   const o = makeObject(spec.type, { name: spec.name });
   restoreObject(o, spec);
+  o.userData.id = ed.idSeq++; o.userData.parentId = null; // prefab instances start at the root
   o.position.x += 1.5;
   select(o);
   log('sys', `Instantiated prefab ${name}`);
@@ -1342,7 +1470,7 @@ function bindMenus() {
 /* full-state serialization shared by save/load and play-mode snapshots */
 function serializeObject(o) {
   const u = o.userData;
-  const d = { name: u.name, type: u.type, p: o.position.toArray(), r: [o.rotation.x, o.rotation.y, o.rotation.z], s: o.scale.toArray(), comps: { ...u.components }, params: { ...u.scriptParams } };
+  const d = { name: u.name, type: u.type, id: u.id, parent: u.parentId ?? null, p: o.position.toArray(), r: [o.rotation.x, o.rotation.y, o.rotation.z], s: o.scale.toArray(), comps: { ...u.components }, params: { ...u.scriptParams } };
   if (u.type === 'light' || u.type === 'pointlight') { d.color = '#' + o.color.getHexString(); d.intensity = o.intensity; }
   if (u.type === 'camera') { d.fov = o.fov; d.near = o.near; }
   if (o.material) d.mat = { color: '#' + o.material.color.getHexString(), roughness: o.material.roughness, metalness: o.material.metalness, emissive: '#' + o.material.emissive.getHexString() };
@@ -1353,6 +1481,8 @@ function restoreObject(o, d) {
   o.position.fromArray(d.p); o.scale.fromArray(d.s);
   o.rotation.set(d.r[0], d.r[1], d.r[2]);
   o.userData.name = d.name;
+  if (d.id !== undefined) o.userData.id = d.id;
+  o.userData.parentId = d.parent ?? null; // nesting survives save/load
   if (d.comps) Object.assign(o.userData.components, d.comps);
   if (d.params) Object.assign(o.userData.scriptParams, d.params);
   if (d.mat && o.material) { o.material.color.set(d.mat.color); o.material.roughness = d.mat.roughness; o.material.metalness = d.mat.metalness ?? 0.05; o.material.emissive.set(d.mat.emissive || '#000000'); }
@@ -1382,6 +1512,7 @@ function handleAction(d) {
     const spec = { ...ed.clipboard, name: ed.clipboard.name };
     const o = makeObject(spec.type, { name: spec.name });
     restoreObject(o, spec);
+    o.userData.id = ed.idSeq++; o.userData.parentId = null; // pasted copies start at the root
     o.position.x += 1.5;
     select(o); log('sys', `Pasted ${o.userData.name}`);
   }
@@ -1465,6 +1596,9 @@ function newScene() {
 function deleteSelected() {
   const o = ed.selected; if (!o) return;
   pushHistory(); // snapshot before mutation
+  // children of the deleted object move up to its parent (never orphaned)
+  const pid = o.userData.parentId ?? null;
+  ed.objects.forEach(x => { if (x.userData.parentId === o.userData.id) x.userData.parentId = pid; });
   removeHelper(o); scene.remove(o);
   ed.objects = ed.objects.filter(x => x !== o);
   ed.selected = null; tcontrols.detach();
@@ -1489,6 +1623,14 @@ function togglePlay() {
     document.querySelector('[data-act="play"]').classList.add('active');
     status('Play mode — press Stop to return to editing');
     log('sys', 'Entered Play Mode');
+    // Spawn Point: the player starts at the marker if the scene has one
+    const spawn = ed.objects.find(o => o.userData.type === 'spawn');
+    const pc = ed.objects.find(o => o.userData.components.script === 'PlayerController');
+    if (spawn && pc) {
+      pc.position.set(spawn.position.x, spawn.position.y + 0.1, spawn.position.z);
+      if (pc.userData.pcVel !== undefined) pc.userData.pcVel = 0;
+      log('sys', `Player spawned at ${spawn.userData.name}`);
+    }
     if (ed.objects.some((o) => o.userData.components.script === 'PlayerController'))
       log('sys', 'PlayerController active — WASD to move, Space to jump (Game view)');
   } else {
@@ -1603,7 +1745,28 @@ function advancePlay(dt) {
   stepPlayerControllers(dt);
 }
 /* PlayerController: WASD movement + gravity/jump in Play mode (Game view gets a
-   third-person follow camera). Collisions are vertical AABB (ground) only. */
+   third-person follow camera). Collisions are AABB: vertical ground landing
+   plus horizontal wall blocking with slide and a 0.3 step allowance. */
+// horizontal collision probe: would the player's capsule at (px,pz) overlap a solid
+// box? AABB-only (documented limitation), with a 0.3 step allowance so low
+// ledges can still be walked onto from the ground code.
+function blockedAt(o, px, pz) {
+  const bb = o.geometry.boundingBox;
+  const halfH = bb.max.y * o.scale.y;
+  const bottom = o.position.y - halfH, top = bottom + 1.7; // player capsule span
+  const r = 0.5; // player half-extent
+  for (const c of ed.objects) {
+    if (c === o || !c.isMesh) continue;
+    if (c.userData.components.collider === false) continue;
+    if (c.userData.type === 'spawn') continue;
+    const cbb = c.geometry.boundingBox;
+    const hx = ((cbb.max.x - cbb.min.x) / 2) * c.scale.x, hz = ((cbb.max.z - cbb.min.z) / 2) * c.scale.z;
+    const cBottom = c.position.y + cbb.min.y * c.scale.y, cTop = c.position.y + cbb.max.y * c.scale.y;
+    if (top <= cBottom + 0.001 || bottom + 0.3 >= cTop) continue; // above/below, or a step you can climb
+    if (Math.abs(px - c.position.x) < hx + r && Math.abs(pz - c.position.z) < hz + r) return true;
+  }
+  return false;
+}
 function groundTopFor(o) {
   let best = -Infinity;
   const r = 0.5; // player half-extent
@@ -1639,8 +1802,10 @@ function stepPlayerControllers(dt) {
       const rx = -fz, rz = fx;
       let mx = fx * fwd + rx * strafe, mz = fz * fwd + rz * strafe;
       const ml = Math.hypot(mx, mz) || 1; mx /= ml; mz /= ml;
-      o.position.x += mx * speed * dt;
-      o.position.z += mz * speed * dt;
+      // axis-separated movement: walls block horizontally, so you slide along them
+      const stepX = mx * speed * dt, stepZ = mz * speed * dt;
+      if (!blockedAt(o, o.position.x + stepX, o.position.z)) o.position.x += stepX;
+      if (!blockedAt(o, o.position.x, o.position.z + stepZ)) o.position.z += stepZ;
       o.rotation.y = Math.atan2(mx, mz);
     }
     // gravity + jump
