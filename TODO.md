@@ -515,6 +515,56 @@ are grouped".
 - Fleet label in the landing menu is now computed from the real fleet
   table (was a stale hard-coded "28").
 
+## AirplaneCraft — 17.10.4 (preset pack v4: flight-time connectivity)
+
+- **CRITICAL discovery — the flight-time structural rule:** at Test Fly the
+  client REPLACES `markDetachedFlightParts` (search the second definition, ~line
+  10089) with a stricter version using `physicalPartsTouch` = RAPIER convex-hull
+  contact within 25 mm — NOT bounding-box overlap. Any part that fails it gets
+  `flightDetached`, breaks off at flight start (`detachUnweldedParts`), and is
+  REMOVED from the aero model — thrust/mass/wings are then recomputed WITHOUT it
+  (`refreshCustomFlightStats`), so a lost prop/strainer reads as "thrust 0 N".
+  This is what zeroed every earlier preset roll test (the flight log line
+  "5 unwelded part(s) broke off and fell away · Airframe now 433 kg · thrust 0 N"
+  was the smoking gun). Symptom: RPM shows full, speed stays exactly 0.00.
+- **Generator now self-verifies contact** for all 24 designs: every part's raw
+  catalog-size box must overlap another part's box (conservative — raw overlap
+  always satisfies the 25 mm hull rule). Build fails with `[aircraft name]` +
+  the floating part list. Also self-verifies the fuel-routing cockpit-clearance
+  rule (mirrors `workshopSystemsAudit`).
+- **Layout fixes so every part touches structure:** prop hub now overlaps the
+  engine face (z +0.38, was +0.55 — the old prop was 1 cm short of contact);
+  fuel strainer embedded low INSIDE the aft fuselage block; boost pump embedded
+  low inside the forward fuselage (fuel line runs under the floor and climbs
+  ahead of the firewall — audit-clean AND contact-safe); landing lights embedded
+  in the wing-root region of the fuselage (the old wing-root gap never touched
+  the wing or the fuselage); gear actuators pulled inboard (±W·0.35, was ±W·0.8
+  which sat outside the hull); rudder flush with the fin (−L·0.4); top beacon
+  dropped to H·0.8 (the tail cone's hull only spans y 0.1H–0.9H — the beacon at
+  0.98H floated in the gap); cockpit height clamped so the roof stays INSIDE the
+  fuselage (F-16's bubble-cabin roof used to poke out the top).
+- **Delta designs (Concorde):** tanks, engines, nav/strobe lights now carried on
+  the delta slab itself (y = H·0.42) instead of the low-wing height, where they
+  floated in space under the slab. Concorde now correctly gets JET engines
+  (its fleet engineType is `supersonic`, which the old `=== 'jet'` check missed).
+- **Multi-engine layout:** engine pairs at ±half·(0.45 + rank·0.25), z = 0.9
+  (jets) / 0.6 (pistons) so nacelles overlap the wing slab — engines at L·0.18
+  on long aircraft floated ahead of the wing's z-extent.
+- **Pack cache-bust bumped to `?v=17.10.4`** (the CDN caches per-URL ~10 min;
+  bump this EVERY time the pack is regenerated, or the browser keeps serving the
+  old pack and you will chase ghost bugs).
+- Preset test procedure (validated): build mode → Cloud panel → Local pack →
+  load preset → **CLOSE the Cloud panel** (a Test Fly click under the open
+  modal is swallowed — the sim stays paused in build mode and speed reads 0 —
+  this invalidated several earlier test runs) → Test Fly → verify
+  `buildModeOverlay.hidden === true` → throttle 100 + Engines ON via input
+  events (throttle/mixture are 0–100 scales) → wait ~10 s of REAL time → read
+  `JSON.parse(window.render_game_to_text()).speedKts`. Debug handles:
+  `window.__flightWorld` exposes `state`, `systems`, `plane`, `tick`,
+  `workshop.propulsion()`, `workshop.camera()` (→ the workshop scene via
+  `.parent`). The flight log (`flightLog` list) reports breakaways + recomputed
+  thrust — read it FIRST when a preset won't move.
+
 ## UnityCraft — pass 3 (owner follow-up)
 
 - **Nested hierarchy with drag-to-reparent:** children keyed by parentId,
