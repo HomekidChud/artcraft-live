@@ -338,3 +338,32 @@ Next 3 actions for the next AI:
   don't ship dead tabs.
 - AirplaneCraft code stays untouched apart from the inspector script
   tag (owner sanctioned).
+
+## AirplaneCraft — v17.10 upgrade (2026-10-22)
+
+Owner-directed upgrade from the v17.2 snapshot to the owner-supplied
+`Flight-World-17.10.html`, plus code changes requested in the same session.
+`npm test` passes (64/64) and headless-browser QA was run before pushing.
+
+- Build mode UI: one coherent editor theme (patch `fwBuildUiV2` style block at the
+  end of the module script) replacing the stacked lime/graphite/cream skins;
+  steps bar is now Starters · Build · Notebook · Advanced; the auto-opening
+  "Quick build lesson" tour no longer auto-shows (button only).
+- Build checklist → **Build Notebook**: small collapsible bottom-left widget with
+  live checkboxes (structure, power source, power wiring, ground return, lights,
+  fuel plumbing, hydraulics). Advisory only — Test Flight is always available.
+- Wiring realism: added `fuel` and `water` wire kinds (plus existing hydraulic);
+  new parts `fuelPump`, `fuelStrainer`, `strobeLight`, `beaconLight`,
+  `landingLight`; snapshot validation accepts the new kinds; starter templates
+  are wired ground-up (battery → bus → CB → loads, ground return, tank →
+  strainer → pump → engine, twin gets a hydraulic loop).
+- Lights: `shape:'light'` parts are now fixtures (housing + lens + real
+  THREE.PointLight, strobe/beacon animated); flight clones carry the lights;
+  `setAircraftLights` toggles them; Electrics gates them on power.
+- Presets: cloud "Publish build as preset" stores a `flightworld-build` document
+  (the workshop snapshot itself — nothing hard-coded); loading restores it as an
+  editable build. Legacy `flightworld-preset` fleet docs still load.
+- Server: `server/` (zero-dep Node) implements `/api/builds` + `/api/health`
+  (GET/POST/DELETE, CORS, 2 MB/500-doc caps, JSON-file storage, MongoDB via
+  MONGODB_URI later). Deployed on Render; the client ships that URL as its
+  default cloud server.
