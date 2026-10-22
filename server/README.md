@@ -3,33 +3,58 @@
 Cloud storage for Flight World aircraft builds and presets. Implements the
 `/api/builds` contract the workshop Cloud panel speaks:
 
-- `GET /api/health` — service status and storage backend
+- `GET /api/health` — service status, storage backend, document count
 - `GET /api/builds` — list saved documents (id, name, kind, timestamps)
 - `POST /api/builds` — save `{ name, kind: 'build' | 'preset', data }` as JSON
 - `GET /api/builds/:id` — fetch one document
 - `DELETE /api/builds/:id` — remove a document
 
-Zero dependencies (plain Node `http`), CORS open for static hosts such as
-GitHub Pages. Persistence is a JSON file when the filesystem is writable —
-**MongoDB is not implemented yet**: the `MONGODB_URI` env var is reserved for
-a future adapter, and on Render's free plan the file store is ephemeral across
-redeploys (saved builds survive restarts but not new deploys until MongoDB is
-attached). Documents are capped at 2 MB and 500 stored builds — when full the
-server returns an error rather than deleting anything.
+## Hardening
 
-Optional write protection: set `API_KEY` in the environment and writes/deletes
-require the `X-API-Key` header (reads stay open). Without it the API is open —
-suitable for personal use, not for public shared storage.
+- **Server-side validation** — every POST is validated against the same schema
+  the client's `validateDesign` enforces (part IDs, positions, wire kinds and
+  endpoints, group membership, size caps). Malformed builds are rejected with 400.
+- **Rate limiting** — per-IP token bucket on writes and deletes
+  (`RATE_LIMIT` writes per `RATE_WINDOW_MS`, defaults 30/min). 429 when exceeded.
+- **CORS** — restricted by default to the game origin (GitHub Pages) and local
+  dev ports. Set `CORS_ORIGINS` (comma-separated) to change; use `*` to allow all.
+- **Size caps** — 2 MB per document, 500 stored builds; the server errors rather
+  than silently deleting anything when full.
+- **Optional write protection** — set `API_KEY` and writes/deletes require the
+  `X-API-Key` header (reads stay open).
 
-## MongoDB (later)
+## Storage adapters
 
-When a MongoDB database is attached (Render dashboard → your database →
-connection string in `MONGODB_URI`), the storage adapter in `index.js` should be
-swapped for a Mongo collection with the same `{ id, name, kind, data }` shape —
-no client change is needed.
+`MONGODB_URI` set → MongoDB collection (driver loaded lazily, seeded when empty).
+Otherwise → JSON file when the filesystem is writable; in-memory as a last resort.
+Render free disks are ephemeral across redeploys — attach MongoDB (below) for
+durable storage. Bundled starter presets in `seed/presets.json` are loaded
+automatically whenever the store starts empty.
 
-## Run
+## Deploy on Render
 
-    node index.js
+1. Push this repo to GitHub (the `server/` folder is the service root).
+2. Render dashboard → **New → Web Service** → connect the repo.
+3. Root directory `server`, build `npm install`, start `npm start`
+   (or just deploy with `render.yaml` via **New → Blueprint**).
+4. Health check path: `/api/health`.
+5. Env vars: `CORS_ORIGINS=https://homekidchud.github.io`
+   (`MONGODB_URI`, `API_KEY` optional — set in the dashboard, never commit them).
 
-Listens on `PORT` (default 3000).
+To attach MongoDB: Render dashboard → your database → copy the connection
+string into the service's `MONGODB_URI`. No code change is needed — the
+adapter switches automatically and seeds the presets when the collection is empty.
+
+## Run and test locally
+
+    npm start          # listens on PORT (default 3000)
+    npm test           # validation, CRUD, CORS, rate-limit and round-trip tests
+
+The test suite covers an end-to-end save → server → reload round trip using a
+workshop snapshot fixture.
+
+## Seeding workshop presets
+
+`../tools/seed-presets` (repo root) rebuilds the fleet as ground-up workshop
+designs and POSTs them to a running server with `kind: 'preset'`. See that
+folder's README.

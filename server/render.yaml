@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: flightworld-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 20.11.1
+      - key: CORS_ORIGINS
+        value: https://homekidchud.github.io
+      - key: MONGODB_URI
+        sync: false # set in the Render dashboard when a database is attached
+      - key: API_KEY
+        sync: false # optional shared secret for writes/deletes

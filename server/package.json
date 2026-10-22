@@ -5,7 +5,8 @@
   "description": "Cloud build sync for Flight World - stores aircraft builds and presets as JSON (Render + MongoDB-ready).",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test test/"
   },
   "engines": {
     "node": ">=18"
