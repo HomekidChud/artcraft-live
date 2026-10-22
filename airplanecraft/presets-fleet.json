@@ -342,7 +342,7 @@
       "name": "Main strut",
       "position": {
        "x": -4.88,
-       "y": 1.764,
+       "y": 0.5,
        "z": 3.052
       },
       "rotation": {
@@ -367,7 +367,7 @@
       "name": "Main wheel",
       "position": {
        "x": -4.88,
-       "y": 0.63,
+       "y": 0.5,
        "z": 3.052
       },
       "rotation": {
@@ -392,7 +392,7 @@
       "name": "Main strut",
       "position": {
        "x": 4.88,
-       "y": 1.764,
+       "y": 0.5,
        "z": 3.052
       },
       "rotation": {
@@ -417,7 +417,7 @@
       "name": "Main wheel",
       "position": {
        "x": 4.88,
-       "y": 0.63,
+       "y": 0.5,
        "z": 3.052
       },
       "rotation": {
@@ -442,7 +442,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 1.89,
+       "y": 0.425,
        "z": 22.89
       },
       "rotation": {
@@ -467,7 +467,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.756,
+       "y": 0.425,
        "z": 22.89
       },
       "rotation": {
@@ -1883,7 +1883,7 @@
       "name": "Main strut",
       "position": {
        "x": -0.944,
-       "y": 0.358,
+       "y": 0.5,
        "z": 0.331
       },
       "rotation": {
@@ -1908,7 +1908,7 @@
       "name": "Main wheel",
       "position": {
        "x": -0.944,
-       "y": 0.128,
+       "y": 0.5,
        "z": 0.331
       },
       "rotation": {
@@ -1933,7 +1933,7 @@
       "name": "Main strut",
       "position": {
        "x": 0.944,
-       "y": 0.358,
+       "y": 0.5,
        "z": 0.331
       },
       "rotation": {
@@ -1958,7 +1958,7 @@
       "name": "Main wheel",
       "position": {
        "x": 0.944,
-       "y": 0.128,
+       "y": 0.5,
        "z": 0.331
       },
       "rotation": {
@@ -1983,7 +1983,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.384,
+       "y": 0.425,
        "z": 2.484
       },
       "rotation": {
@@ -2008,7 +2008,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.154,
+       "y": 0.425,
        "z": 2.484
       },
       "rotation": {
@@ -3206,7 +3206,7 @@
       "name": "Main strut",
       "position": {
        "x": -0.896,
-       "y": 0.347,
+       "y": 0.5,
        "z": 0.293
       },
       "rotation": {
@@ -3231,7 +3231,7 @@
       "name": "Main wheel",
       "position": {
        "x": -0.896,
-       "y": 0.124,
+       "y": 0.5,
        "z": 0.293
       },
       "rotation": {
@@ -3256,7 +3256,7 @@
       "name": "Main strut",
       "position": {
        "x": 0.896,
-       "y": 0.347,
+       "y": 0.5,
        "z": 0.293
       },
       "rotation": {
@@ -3281,7 +3281,7 @@
       "name": "Main wheel",
       "position": {
        "x": 0.896,
-       "y": 0.124,
+       "y": 0.5,
        "z": 0.293
       },
       "rotation": {
@@ -3306,7 +3306,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.372,
+       "y": 0.425,
        "z": 2.196
       },
       "rotation": {
@@ -3331,7 +3331,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.149,
+       "y": 0.425,
        "z": 2.196
       },
       "rotation": {
@@ -4570,7 +4570,7 @@
       "name": "Main strut",
       "position": {
        "x": -0.976,
-       "y": 0.375,
+       "y": 0.5,
        "z": 0.317
       },
       "rotation": {
@@ -4595,7 +4595,7 @@
       "name": "Main wheel",
       "position": {
        "x": -0.976,
-       "y": 0.134,
+       "y": 0.5,
        "z": 0.317
       },
       "rotation": {
@@ -4620,7 +4620,7 @@
       "name": "Main strut",
       "position": {
        "x": 0.976,
-       "y": 0.375,
+       "y": 0.5,
        "z": 0.317
       },
       "rotation": {
@@ -4645,7 +4645,7 @@
       "name": "Main wheel",
       "position": {
        "x": 0.976,
-       "y": 0.134,
+       "y": 0.5,
        "z": 0.317
       },
       "rotation": {
@@ -4670,7 +4670,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.402,
+       "y": 0.425,
        "z": 2.376
       },
       "rotation": {
@@ -4695,7 +4695,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.161,
+       "y": 0.425,
        "z": 2.376
       },
       "rotation": {
@@ -5934,7 +5934,7 @@
       "name": "Main strut",
       "position": {
        "x": -1.016,
-       "y": 0.398,
+       "y": 0.5,
        "z": 0.335
       },
       "rotation": {
@@ -5959,7 +5959,7 @@
       "name": "Main wheel",
       "position": {
        "x": -1.016,
-       "y": 0.142,
+       "y": 0.5,
        "z": 0.335
       },
       "rotation": {
@@ -5984,7 +5984,7 @@
       "name": "Main strut",
       "position": {
        "x": 1.016,
-       "y": 0.398,
+       "y": 0.5,
        "z": 0.335
       },
       "rotation": {
@@ -6009,7 +6009,7 @@
       "name": "Main wheel",
       "position": {
        "x": 1.016,
-       "y": 0.142,
+       "y": 0.5,
        "z": 0.335
       },
       "rotation": {
@@ -6034,7 +6034,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.426,
+       "y": 0.425,
        "z": 2.514
       },
       "rotation": {
@@ -6059,7 +6059,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.17,
+       "y": 0.425,
        "z": 2.514
       },
       "rotation": {
@@ -7348,7 +7348,7 @@
       "name": "Main strut",
       "position": {
        "x": -0.976,
-       "y": 0.37,
+       "y": 0.5,
        "z": 0.342
       },
       "rotation": {
@@ -7373,7 +7373,7 @@
       "name": "Main wheel",
       "position": {
        "x": -0.976,
-       "y": 0.132,
+       "y": 0.5,
        "z": 0.342
       },
       "rotation": {
@@ -7398,7 +7398,7 @@
       "name": "Main strut",
       "position": {
        "x": 0.976,
-       "y": 0.37,
+       "y": 0.5,
        "z": 0.342
       },
       "rotation": {
@@ -7423,7 +7423,7 @@
       "name": "Main wheel",
       "position": {
        "x": 0.976,
-       "y": 0.132,
+       "y": 0.5,
        "z": 0.342
       },
       "rotation": {
@@ -7448,7 +7448,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.396,
+       "y": 0.425,
        "z": 2.568
       },
       "rotation": {
@@ -7473,7 +7473,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.158,
+       "y": 0.425,
        "z": 2.568
       },
       "rotation": {
@@ -8718,7 +8718,7 @@
       "name": "Main strut",
       "position": {
        "x": -0.8,
-       "y": 0.308,
+       "y": 0.5,
        "z": 0.266
       },
       "rotation": {
@@ -8743,7 +8743,7 @@
       "name": "Main wheel",
       "position": {
        "x": -0.8,
-       "y": 0.11,
+       "y": 0.5,
        "z": 0.266
       },
       "rotation": {
@@ -8768,7 +8768,7 @@
       "name": "Main strut",
       "position": {
        "x": 0.8,
-       "y": 0.308,
+       "y": 0.5,
        "z": 0.266
       },
       "rotation": {
@@ -8793,7 +8793,7 @@
       "name": "Main wheel",
       "position": {
        "x": 0.8,
-       "y": 0.11,
+       "y": 0.5,
        "z": 0.266
       },
       "rotation": {
@@ -8818,7 +8818,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.33,
+       "y": 0.425,
        "z": 1.995
       },
       "rotation": {
@@ -8843,7 +8843,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.132,
+       "y": 0.425,
        "z": 1.995
       },
       "rotation": {
@@ -10082,7 +10082,7 @@
       "name": "Main strut",
       "position": {
        "x": -1.024,
-       "y": 0.392,
+       "y": 0.5,
        "z": 0.365
       },
       "rotation": {
@@ -10107,7 +10107,7 @@
       "name": "Main wheel",
       "position": {
        "x": -1.024,
-       "y": 0.14,
+       "y": 0.5,
        "z": 0.365
       },
       "rotation": {
@@ -10132,7 +10132,7 @@
       "name": "Main strut",
       "position": {
        "x": 1.024,
-       "y": 0.392,
+       "y": 0.5,
        "z": 0.365
       },
       "rotation": {
@@ -10157,7 +10157,7 @@
       "name": "Main wheel",
       "position": {
        "x": 1.024,
-       "y": 0.14,
+       "y": 0.5,
        "z": 0.365
       },
       "rotation": {
@@ -10182,7 +10182,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.42,
+       "y": 0.425,
        "z": 2.736
       },
       "rotation": {
@@ -10207,7 +10207,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.168,
+       "y": 0.425,
        "z": 2.736
       },
       "rotation": {
@@ -11396,7 +11396,7 @@
       "name": "Main strut",
       "position": {
        "x": -0.48,
-       "y": 0.23,
+       "y": 0.5,
        "z": 0.334
       },
       "rotation": {
@@ -11421,7 +11421,7 @@
       "name": "Main wheel",
       "position": {
        "x": -0.48,
-       "y": 0.082,
+       "y": 0.5,
        "z": 0.334
       },
       "rotation": {
@@ -11446,7 +11446,7 @@
       "name": "Main strut",
       "position": {
        "x": 0.48,
-       "y": 0.23,
+       "y": 0.5,
        "z": 0.334
       },
       "rotation": {
@@ -11471,7 +11471,7 @@
       "name": "Main wheel",
       "position": {
        "x": 0.48,
-       "y": 0.082,
+       "y": 0.5,
        "z": 0.334
       },
       "rotation": {
@@ -11496,7 +11496,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.246,
+       "y": 0.425,
        "z": 2.505
       },
       "rotation": {
@@ -11521,7 +11521,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.098,
+       "y": 0.425,
        "z": 2.505
       },
       "rotation": {
@@ -12676,7 +12676,7 @@
       "name": "Main strut",
       "position": {
        "x": -1.44,
-       "y": 0.574,
+       "y": 0.5,
        "z": 0.576
       },
       "rotation": {
@@ -12701,7 +12701,7 @@
       "name": "Main wheel",
       "position": {
        "x": -1.44,
-       "y": 0.205,
+       "y": 0.5,
        "z": 0.576
       },
       "rotation": {
@@ -12726,7 +12726,7 @@
       "name": "Main strut",
       "position": {
        "x": 1.44,
-       "y": 0.574,
+       "y": 0.5,
        "z": 0.576
       },
       "rotation": {
@@ -12751,7 +12751,7 @@
       "name": "Main wheel",
       "position": {
        "x": 1.44,
-       "y": 0.205,
+       "y": 0.5,
        "z": 0.576
       },
       "rotation": {
@@ -12776,7 +12776,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.615,
+       "y": 0.425,
        "z": 4.32
       },
       "rotation": {
@@ -12801,7 +12801,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.246,
+       "y": 0.425,
        "z": 4.32
       },
       "rotation": {
@@ -14049,7 +14049,7 @@
       "name": "Main strut",
       "position": {
        "x": -1.424,
-       "y": 0.56,
+       "y": 0.5,
        "z": 0.569
       },
       "rotation": {
@@ -14074,7 +14074,7 @@
       "name": "Main wheel",
       "position": {
        "x": -1.424,
-       "y": 0.2,
+       "y": 0.5,
        "z": 0.569
       },
       "rotation": {
@@ -14099,7 +14099,7 @@
       "name": "Main strut",
       "position": {
        "x": 1.424,
-       "y": 0.56,
+       "y": 0.5,
        "z": 0.569
       },
       "rotation": {
@@ -14124,7 +14124,7 @@
       "name": "Main wheel",
       "position": {
        "x": 1.424,
-       "y": 0.2,
+       "y": 0.5,
        "z": 0.569
       },
       "rotation": {
@@ -14149,7 +14149,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.6,
+       "y": 0.425,
        "z": 4.266
       },
       "rotation": {
@@ -14174,7 +14174,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.24,
+       "y": 0.425,
        "z": 4.266
       },
       "rotation": {
@@ -15419,7 +15419,7 @@
       "name": "Main strut",
       "position": {
        "x": -1.264,
-       "y": 0.487,
+       "y": 0.5,
        "z": 0.622
       },
       "rotation": {
@@ -15444,7 +15444,7 @@
       "name": "Main wheel",
       "position": {
        "x": -1.264,
-       "y": 0.174,
+       "y": 0.5,
        "z": 0.622
       },
       "rotation": {
@@ -15469,7 +15469,7 @@
       "name": "Main strut",
       "position": {
        "x": 1.264,
-       "y": 0.487,
+       "y": 0.5,
        "z": 0.622
       },
       "rotation": {
@@ -15494,7 +15494,7 @@
       "name": "Main wheel",
       "position": {
        "x": 1.264,
-       "y": 0.174,
+       "y": 0.5,
        "z": 0.622
       },
       "rotation": {
@@ -15519,7 +15519,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.522,
+       "y": 0.425,
        "z": 4.662
       },
       "rotation": {
@@ -15544,7 +15544,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.209,
+       "y": 0.425,
        "z": 4.662
       },
       "rotation": {
@@ -16783,7 +16783,7 @@
       "name": "Main strut",
       "position": {
        "x": -3.16,
-       "y": 1.106,
+       "y": 0.5,
        "z": 1.503
       },
       "rotation": {
@@ -16808,7 +16808,7 @@
       "name": "Main wheel",
       "position": {
        "x": -3.16,
-       "y": 0.395,
+       "y": 0.5,
        "z": 1.503
       },
       "rotation": {
@@ -16833,7 +16833,7 @@
       "name": "Main strut",
       "position": {
        "x": 3.16,
-       "y": 1.106,
+       "y": 0.5,
        "z": 1.503
       },
       "rotation": {
@@ -16858,7 +16858,7 @@
       "name": "Main wheel",
       "position": {
        "x": 3.16,
-       "y": 0.395,
+       "y": 0.5,
        "z": 1.503
       },
       "rotation": {
@@ -16883,7 +16883,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 1.185,
+       "y": 0.425,
        "z": 11.271
       },
       "rotation": {
@@ -16908,7 +16908,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.474,
+       "y": 0.425,
        "z": 11.271
       },
       "rotation": {
@@ -18292,7 +18292,7 @@
       "name": "Main strut",
       "position": {
        "x": -3.008,
-       "y": 1.053,
+       "y": 0.5,
        "z": 1.58
       },
       "rotation": {
@@ -18317,7 +18317,7 @@
       "name": "Main wheel",
       "position": {
        "x": -3.008,
-       "y": 0.376,
+       "y": 0.5,
        "z": 1.58
       },
       "rotation": {
@@ -18342,7 +18342,7 @@
       "name": "Main strut",
       "position": {
        "x": 3.008,
-       "y": 1.053,
+       "y": 0.5,
        "z": 1.58
       },
       "rotation": {
@@ -18367,7 +18367,7 @@
       "name": "Main wheel",
       "position": {
        "x": 3.008,
-       "y": 0.376,
+       "y": 0.5,
        "z": 1.58
       },
       "rotation": {
@@ -18392,7 +18392,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 1.128,
+       "y": 0.425,
        "z": 11.85
       },
       "rotation": {
@@ -18417,7 +18417,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.451,
+       "y": 0.425,
        "z": 11.85
       },
       "rotation": {
@@ -19926,7 +19926,7 @@
       "name": "Main strut",
       "position": {
        "x": -2.32,
-       "y": 0.742,
+       "y": 0.5,
        "z": 2.466
       },
       "rotation": {
@@ -19951,7 +19951,7 @@
       "name": "Main wheel",
       "position": {
        "x": -2.32,
-       "y": 0.265,
+       "y": 0.5,
        "z": 2.466
       },
       "rotation": {
@@ -19976,7 +19976,7 @@
       "name": "Main strut",
       "position": {
        "x": 2.32,
-       "y": 0.742,
+       "y": 0.5,
        "z": 2.466
       },
       "rotation": {
@@ -20001,7 +20001,7 @@
       "name": "Main wheel",
       "position": {
        "x": 2.32,
-       "y": 0.265,
+       "y": 0.5,
        "z": 2.466
       },
       "rotation": {
@@ -20026,7 +20026,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.795,
+       "y": 0.425,
        "z": 18.498
       },
       "rotation": {
@@ -20051,7 +20051,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.318,
+       "y": 0.425,
        "z": 18.498
       },
       "rotation": {
@@ -21425,7 +21425,7 @@
       "name": "Main strut",
       "position": {
        "x": -0.896,
-       "y": 0.347,
+       "y": 0.5,
        "z": 0.602
       },
       "rotation": {
@@ -21450,7 +21450,7 @@
       "name": "Main wheel",
       "position": {
        "x": -0.896,
-       "y": 0.124,
+       "y": 0.5,
        "z": 0.602
       },
       "rotation": {
@@ -21475,7 +21475,7 @@
       "name": "Main strut",
       "position": {
        "x": 0.896,
-       "y": 0.347,
+       "y": 0.5,
        "z": 0.602
       },
       "rotation": {
@@ -21500,7 +21500,7 @@
       "name": "Main wheel",
       "position": {
        "x": 0.896,
-       "y": 0.124,
+       "y": 0.5,
        "z": 0.602
       },
       "rotation": {
@@ -21525,7 +21525,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.372,
+       "y": 0.425,
        "z": 4.518
       },
       "rotation": {
@@ -21550,7 +21550,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.149,
+       "y": 0.425,
        "z": 4.518
       },
       "rotation": {
@@ -22908,7 +22908,7 @@
       "name": "Main strut",
       "position": {
        "x": -1.24,
-       "y": 0.482,
+       "y": 0.5,
        "z": 0.507
       },
       "rotation": {
@@ -22933,7 +22933,7 @@
       "name": "Main wheel",
       "position": {
        "x": -1.24,
-       "y": 0.172,
+       "y": 0.5,
        "z": 0.507
       },
       "rotation": {
@@ -22958,7 +22958,7 @@
       "name": "Main strut",
       "position": {
        "x": 1.24,
-       "y": 0.482,
+       "y": 0.5,
        "z": 0.507
       },
       "rotation": {
@@ -22983,7 +22983,7 @@
       "name": "Main wheel",
       "position": {
        "x": 1.24,
-       "y": 0.172,
+       "y": 0.5,
        "z": 0.507
       },
       "rotation": {
@@ -23008,7 +23008,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.516,
+       "y": 0.425,
        "z": 3.801
       },
       "rotation": {
@@ -23033,7 +23033,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.206,
+       "y": 0.425,
        "z": 3.801
       },
       "rotation": {
@@ -24231,7 +24231,7 @@
       "name": "Main strut",
       "position": {
        "x": -0.944,
-       "y": 0.364,
+       "y": 0.5,
        "z": 0.393
       },
       "rotation": {
@@ -24256,7 +24256,7 @@
       "name": "Main wheel",
       "position": {
        "x": -0.944,
-       "y": 0.13,
+       "y": 0.5,
        "z": 0.393
       },
       "rotation": {
@@ -24281,7 +24281,7 @@
       "name": "Main strut",
       "position": {
        "x": 0.944,
-       "y": 0.364,
+       "y": 0.5,
        "z": 0.393
       },
       "rotation": {
@@ -24306,7 +24306,7 @@
       "name": "Main wheel",
       "position": {
        "x": 0.944,
-       "y": 0.13,
+       "y": 0.5,
        "z": 0.393
       },
       "rotation": {
@@ -24331,7 +24331,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.39,
+       "y": 0.425,
        "z": 2.949
       },
       "rotation": {
@@ -24356,7 +24356,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.156,
+       "y": 0.425,
        "z": 2.949
       },
       "rotation": {
@@ -25745,7 +25745,7 @@
       "name": "Main strut",
       "position": {
        "x": -2.72,
-       "y": 0.966,
+       "y": 0.5,
        "z": 1.192
       },
       "rotation": {
@@ -25770,7 +25770,7 @@
       "name": "Main wheel",
       "position": {
        "x": -2.72,
-       "y": 0.345,
+       "y": 0.5,
        "z": 1.192
       },
       "rotation": {
@@ -25795,7 +25795,7 @@
       "name": "Main strut",
       "position": {
        "x": 2.72,
-       "y": 0.966,
+       "y": 0.5,
        "z": 1.192
       },
       "rotation": {
@@ -25820,7 +25820,7 @@
       "name": "Main wheel",
       "position": {
        "x": 2.72,
-       "y": 0.345,
+       "y": 0.5,
        "z": 1.192
       },
       "rotation": {
@@ -25845,7 +25845,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 1.035,
+       "y": 0.425,
        "z": 8.937
       },
       "rotation": {
@@ -25870,7 +25870,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.414,
+       "y": 0.425,
        "z": 8.937
       },
       "rotation": {
@@ -27205,7 +27205,7 @@
       "name": "Main strut",
       "position": {
        "x": -1.304,
-       "y": 0.454,
+       "y": 0.5,
        "z": 0.707
       },
       "rotation": {
@@ -27230,7 +27230,7 @@
       "name": "Main wheel",
       "position": {
        "x": -1.304,
-       "y": 0.162,
+       "y": 0.5,
        "z": 0.707
       },
       "rotation": {
@@ -27255,7 +27255,7 @@
       "name": "Main strut",
       "position": {
        "x": 1.304,
-       "y": 0.454,
+       "y": 0.5,
        "z": 0.707
       },
       "rotation": {
@@ -27280,7 +27280,7 @@
       "name": "Main wheel",
       "position": {
        "x": 1.304,
-       "y": 0.162,
+       "y": 0.5,
        "z": 0.707
       },
       "rotation": {
@@ -27305,7 +27305,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 0.486,
+       "y": 0.425,
        "z": 5.304
       },
       "rotation": {
@@ -27330,7 +27330,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.194,
+       "y": 0.425,
        "z": 5.304
       },
       "rotation": {
@@ -28714,7 +28714,7 @@
       "name": "Main strut",
       "position": {
        "x": -4.616,
-       "y": 1.574,
+       "y": 0.5,
        "z": 2.512
       },
       "rotation": {
@@ -28739,7 +28739,7 @@
       "name": "Main wheel",
       "position": {
        "x": -4.616,
-       "y": 0.562,
+       "y": 0.5,
        "z": 2.512
       },
       "rotation": {
@@ -28764,7 +28764,7 @@
       "name": "Main strut",
       "position": {
        "x": 4.616,
-       "y": 1.574,
+       "y": 0.5,
        "z": 2.512
       },
       "rotation": {
@@ -28789,7 +28789,7 @@
       "name": "Main wheel",
       "position": {
        "x": 4.616,
-       "y": 0.562,
+       "y": 0.5,
        "z": 2.512
       },
       "rotation": {
@@ -28814,7 +28814,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 1.686,
+       "y": 0.425,
        "z": 18.843
       },
       "rotation": {
@@ -28839,7 +28839,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.674,
+       "y": 0.425,
        "z": 18.843
       },
       "rotation": {
@@ -30223,7 +30223,7 @@
       "name": "Main strut",
       "position": {
        "x": -4.768,
-       "y": 1.618,
+       "y": 0.5,
        "z": 2.672
       },
       "rotation": {
@@ -30248,7 +30248,7 @@
       "name": "Main wheel",
       "position": {
        "x": -4.768,
-       "y": 0.578,
+       "y": 0.5,
        "z": 2.672
       },
       "rotation": {
@@ -30273,7 +30273,7 @@
       "name": "Main strut",
       "position": {
        "x": 4.768,
-       "y": 1.618,
+       "y": 0.5,
        "z": 2.672
       },
       "rotation": {
@@ -30298,7 +30298,7 @@
       "name": "Main wheel",
       "position": {
        "x": 4.768,
-       "y": 0.578,
+       "y": 0.5,
        "z": 2.672
       },
       "rotation": {
@@ -30323,7 +30323,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 1.734,
+       "y": 0.425,
        "z": 20.04
       },
       "rotation": {
@@ -30348,7 +30348,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.694,
+       "y": 0.425,
        "z": 20.04
       },
       "rotation": {
@@ -31732,7 +31732,7 @@
       "name": "Main strut",
       "position": {
        "x": -4.96,
-       "y": 1.694,
+       "y": 0.5,
        "z": 2.956
       },
       "rotation": {
@@ -31757,7 +31757,7 @@
       "name": "Main wheel",
       "position": {
        "x": -4.96,
-       "y": 0.605,
+       "y": 0.5,
        "z": 2.956
       },
       "rotation": {
@@ -31782,7 +31782,7 @@
       "name": "Main strut",
       "position": {
        "x": 4.96,
-       "y": 1.694,
+       "y": 0.5,
        "z": 2.956
       },
       "rotation": {
@@ -31807,7 +31807,7 @@
       "name": "Main wheel",
       "position": {
        "x": 4.96,
-       "y": 0.605,
+       "y": 0.5,
        "z": 2.956
       },
       "rotation": {
@@ -31832,7 +31832,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 1.815,
+       "y": 0.425,
        "z": 22.17
       },
       "rotation": {
@@ -31857,7 +31857,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.726,
+       "y": 0.425,
        "z": 22.17
       },
       "rotation": {
@@ -33291,7 +33291,7 @@
       "name": "Main strut",
       "position": {
        "x": -5.712,
-       "y": 2.002,
+       "y": 0.5,
        "z": 2.909
       },
       "rotation": {
@@ -33316,7 +33316,7 @@
       "name": "Main wheel",
       "position": {
        "x": -5.712,
-       "y": 0.715,
+       "y": 0.5,
        "z": 2.909
       },
       "rotation": {
@@ -33341,7 +33341,7 @@
       "name": "Main strut",
       "position": {
        "x": 5.712,
-       "y": 2.002,
+       "y": 0.5,
        "z": 2.909
       },
       "rotation": {
@@ -33366,7 +33366,7 @@
       "name": "Main wheel",
       "position": {
        "x": 5.712,
-       "y": 0.715,
+       "y": 0.5,
        "z": 2.909
       },
       "rotation": {
@@ -33391,7 +33391,7 @@
       "name": "Nose strut",
       "position": {
        "x": 0,
-       "y": 2.145,
+       "y": 0.425,
        "z": 21.816
       },
       "rotation": {
@@ -33416,7 +33416,7 @@
       "name": "Nose wheel",
       "position": {
        "x": 0,
-       "y": 0.858,
+       "y": 0.425,
        "z": 21.816
       },
       "rotation": {
