@@ -231,10 +231,11 @@ function designFor(cfg) {
   const strobeT = b.add('strobeLight', [0, fin.position.y + .1, -L * .44], { name: 'Strobe (tailcone)' });
   const beaconTop = b.add('beaconLight', [0, H * .8, -L * .38], { name: 'Beacon (top)' });
   const beaconBot = b.add('beaconLight', [0, H * .18, -L * .3], { name: 'Beacon (bottom)' });
-  // landing lights embedded in the wing-root region of the fuselage block —
-  // physically overlapping the block so they stay attached in flight
-  const landL = b.add('landingLight', [-W * .3, H * .5, L * .15], { name: 'Landing light (port)' });
-  const landR = b.add('landingLight', [W * .3, H * .5, L * .15], { name: 'Landing light (stbd)' });
+  // landing lights half-embedded in the fuselage sides (wing-root region):
+  // the inner half overlaps the block (flight-time attachment), the outer
+  // half protrudes so the light is visible and can illuminate
+  const landL = b.add('landingLight', [-W * .5, H * .5, L * .15], { name: 'Landing light (port)' });
+  const landR = b.add('landingLight', [W * .5, H * .5, L * .15], { name: 'Landing light (stbd)' });
   const lightParts = [navL, navR, navT, strobeL, strobeR, strobeT, beaconTop, beaconBot, landL, landR];
   for (const lp of lightParts) { b.wire(cb, lp, 'power'); b.wire(bus, lp, 'ground'); }
   // jet engines have FADEC electronics: they need the main power circuit + ground return
@@ -270,10 +271,12 @@ function partsOf(b, re) {
   return b.parts.filter(p => re.test(p.name));
 }
 
-/* every part must physically overlap another part (raw bounding boxes, no
-   tolerance): the flight model detaches any part that does not touch the main
-   structure (client rule: 25 mm hull contact, which raw overlap always
-   satisfies). A part failing this breaks off at flight start and is lost. */
+/* preliminary contact check: every part's raw catalog box must overlap
+   another part's box. This is an APPROXIMATION of the flight-time rule
+   (RAPIER convex-hull contact within 25 mm) — box overlap does NOT strictly
+   guarantee hull contact for tapered geometry (cones), so the runtime
+   pipeline is the final arbiter; treat a pass here as necessary, not
+   sufficient. A part failing this certainly breaks off at flight start. */
 function contactOk(snap, catalog) {
   const bad = [];
   for (const p of snap.parts) {

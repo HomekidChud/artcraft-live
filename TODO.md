@@ -528,10 +528,12 @@ are grouped".
   "5 unwelded part(s) broke off and fell away · Airframe now 433 kg · thrust 0 N"
   was the smoking gun). Symptom: RPM shows full, speed stays exactly 0.00.
 - **Generator now self-verifies contact** for all 24 designs: every part's raw
-  catalog-size box must overlap another part's box (conservative — raw overlap
-  always satisfies the 25 mm hull rule). Build fails with `[aircraft name]` +
-  the floating part list. Also self-verifies the fuel-routing cockpit-clearance
-  rule (mirrors `workshopSystemsAudit`).
+  catalog-size box must overlap another part's box. This is a PRELIMINARY,
+  conservative approximation — necessary but NOT sufficient (box overlap does
+  not strictly guarantee 25 mm convex-hull contact on tapered geometry like
+  cones; the runtime pipeline is the final arbiter). Build fails with
+  `[aircraft name]` + the floating part list. Also self-verifies the
+  fuel-routing cockpit-clearance rule (mirrors `workshopSystemsAudit`).
 - **Layout fixes so every part touches structure:** prop hub now overlaps the
   engine face (z +0.38, was +0.55 — the old prop was 1 cm short of contact);
   fuel strainer embedded low INSIDE the aft fuselage block; boost pump embedded
@@ -561,9 +563,20 @@ are grouped".
   events (throttle/mixture are 0–100 scales) → wait ~10 s of REAL time → read
   `JSON.parse(window.render_game_to_text()).speedKts`. Debug handles:
   `window.__flightWorld` exposes `state`, `systems`, `plane`, `tick`,
-  `workshop.propulsion()`, `workshop.camera()` (→ the workshop scene via
-  `.parent`). The flight log (`flightLog` list) reports breakaways + recomputed
-  thrust — read it FIRST when a preset won't move.
+  `workshop.propulsion()` (the workshop scene is NOT reachable via
+  `workshop.camera().parent` — that returned null; reach parts via
+  `workshop.create()` + `.parent.traverse`). The flight log (`flightLog` list)
+  reports breakaways + recomputed thrust — read it FIRST when a preset won't
+  move. NOTE: `flightLog` history persists across page reloads (localStorage),
+  so old "Ready: …" lines from a previous preset can appear — judge by the
+  physics state (thrust/speed), not the log alone.
+- Runtime verification so far: C172 (single piston, high wing) — rolled,
+  rotated, 126 kt at 421 m; 747 (4-engine jet) — rolling at 164 kt with
+  936 kN total thrust; both with zero breakaways. The other 22 designs pass
+  the generator checks but are NOT individually flight-tested — next AI
+  should runtime-verify a small twin piston, the Concorde (delta + tapered
+  cones — riskiest for hull contact) and a glider before declaring the pack
+  fully flight-verified.
 
 ## UnityCraft — pass 3 (owner follow-up)
 
