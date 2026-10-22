@@ -180,12 +180,13 @@ function designFor(cfg) {
   if (engines.length) {
   tankL = b.add('fuelTank', [-half * .35, wingY + .1, 0], { name: 'Port tank' });
   tankR = b.add('fuelTank', [half * .35, wingY + .1, 0], { name: 'Starboard tank' });
-  // gascolator + pump on the PORT cabin side, low: real GA fuel lines run along the
-  // side/belly (never through the crewed zone), so the audit's cockpit-clearance
-  // rule passes and the routing matches real installations
+  // gascolator + boost pump: strainer low on the PORT side aft of the cockpit,
+  // pump low under the floor FORWARD of the cockpit (real GA: the line runs under
+  // the cabin floor and climbs to the engine ahead of the firewall) — so every
+  // fuel segment clears the cockpit box the audit enforces
   const fuelX = -Math.max(.6, W * .75);
-  strainer = b.add('fuelStrainer', [fuelX, Math.max(.15, H * .22), -L * .02], { name: 'Fuel strainer (port side, low point)' });
-  pump = cfg.wingPlacement === 'high' && !jet ? null : b.add('fuelPump', [fuelX, Math.max(.17, H * .24), -L * .05], { name: 'Boost pump' });
+  strainer = b.add('fuelStrainer', [fuelX, .18, -L * .02], { name: 'Fuel strainer (port side, low point)' });
+  pump = b.add('fuelPump', [0, .22, L * .4], { name: 'Boost pump (under floor, fwd)' });
   b.wire(tankL, strainer, 'fuel'); b.wire(tankR, strainer, 'fuel');
   if (pump) b.wire(strainer, pump, 'fuel');
   const fuelTo = pump || strainer;
@@ -264,6 +265,36 @@ function partsOf(b, re) {
 }
 
 /* ---------- client-style validation (mirrors validateDesign) ---------- */
+// replicate the client's cockpit-clearance rule: no fuel segment may cross the
+// crewed zone (bounding box of seats/panel/canopy/cabin, expanded 0.35 m)
+function cockpitClearOk(snap) {
+  const parts = snap.parts;
+  const boxParts = parts.filter(p => ['cockpitSeat', 'instrumentPanel', 'canopy', 'cabinBlock'].includes(p.type));
+  if (!boxParts.length) return true;
+  let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+  for (const p of boxParts) for (const a of ['x', 'y', 'z']) {
+    const v = p.position[a];
+    if (a === 'x') { minX = Math.min(minX, v); maxX = Math.max(maxX, v); }
+    if (a === 'y') { minY = Math.min(minY, v); maxY = Math.max(maxY, v); }
+    if (a === 'z') { minZ = Math.min(minZ, v); maxZ = Math.max(maxZ, v); }
+  }
+  minX -= .35; minY -= .35; minZ -= .35; maxX += .35; maxY += .35; maxZ += .35;
+  const inside = (x, y, z) => x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
+  const byId = new Map(parts.map(p => [p.id, p]));
+  for (const w of snap.wires) {
+    if (w.kind !== 'fuel') continue;
+    const a = byId.get(w.from), b = byId.get(w.to);
+    if (!a || !b) continue;
+    for (let i = 0; i <= 12; i++) {
+      const t = i / 12;
+      if (inside(a.position.x + (b.position.x - a.position.x) * t,
+                 a.position.y + (b.position.y - a.position.y) * t,
+                 a.position.z + (b.position.z - a.position.z) * t))
+        return `${a.name} → ${b.name} crosses the cockpit box`;
+    }
+  }
+  return true;
+}
 function validate(snap) {
   if (snap.parts.length > 600) throw new Error('too many parts');
   const ids = new Set();
@@ -294,6 +325,8 @@ function validate(snap) {
     seen.add(key);
   }
   for (const g of snap.groups) for (const id of g.parts) if (!ids.has(id)) throw new Error('group dangling part');
+  const clear = cockpitClearOk(snap);
+  if (clear !== true) throw new Error('fuel routing: ' + clear);
 }
 
 /* ---------- main (CLI only, not on import) ---------- */

@@ -817,7 +817,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -4.575,
-       "y": 1.386,
+       "y": 0.18,
        "z": -1.526
       },
       "rotation": {
@@ -839,11 +839,11 @@
      {
       "id": "part-34",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -4.575,
-       "y": 1.512,
-       "z": -3.815
+       "x": 0,
+       "y": 0.22,
+       "z": 30.52
       },
       "rotation": {
        "x": 0,
@@ -2513,7 +2513,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -0.885,
-       "y": 0.282,
+       "y": 0.18,
        "z": -0.166
       },
       "rotation": {
@@ -2534,6 +2534,31 @@
      },
      {
       "id": "part-33",
+      "type": "fuelPump",
+      "name": "Boost pump (under floor, fwd)",
+      "position": {
+       "x": 0,
+       "y": 0.22,
+       "z": 3.312
+      },
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "color": null,
+      "locked": false,
+      "symmetryPairId": null,
+      "symmetrySide": 0,
+      "rotationY": 0
+     },
+     {
+      "id": "part-34",
       "type": "battery",
       "name": "Battery",
       "position": {
@@ -2558,7 +2583,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-34",
+      "id": "part-35",
       "type": "powerBus",
       "name": "Main bus",
       "position": {
@@ -2583,7 +2608,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-35",
+      "id": "part-36",
       "type": "circuitBreaker",
       "name": "Breaker panel",
       "position": {
@@ -2608,7 +2633,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-36",
+      "id": "part-37",
       "type": "alternator",
       "name": "Alternator",
       "position": {
@@ -2633,7 +2658,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-37",
+      "id": "part-38",
       "type": "navLight",
       "name": "Nav light (port, red)",
       "position": {
@@ -2658,7 +2683,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-38",
+      "id": "part-39",
       "type": "navLight",
       "name": "Nav light (stbd, green)",
       "position": {
@@ -2683,7 +2708,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-39",
+      "id": "part-40",
       "type": "navLight",
       "name": "Nav light (tail, white)",
       "position": {
@@ -2708,7 +2733,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-40",
+      "id": "part-41",
       "type": "strobeLight",
       "name": "Strobe (port wingtip)",
       "position": {
@@ -2733,7 +2758,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-41",
+      "id": "part-42",
       "type": "strobeLight",
       "name": "Strobe (stbd wingtip)",
       "position": {
@@ -2758,7 +2783,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-42",
+      "id": "part-43",
       "type": "strobeLight",
       "name": "Strobe (tailcone)",
       "position": {
@@ -2783,7 +2808,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-43",
+      "id": "part-44",
       "type": "beaconLight",
       "name": "Beacon (top)",
       "position": {
@@ -2808,7 +2833,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-44",
+      "id": "part-45",
       "type": "beaconLight",
       "name": "Beacon (bottom)",
       "position": {
@@ -2833,7 +2858,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-45",
+      "id": "part-46",
       "type": "landingLight",
       "name": "Landing light (port)",
       "position": {
@@ -2858,7 +2883,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-46",
+      "id": "part-47",
       "type": "landingLight",
       "name": "Landing light (stbd)",
       "position": {
@@ -2896,28 +2921,13 @@
      },
      {
       "from": "part-32",
-      "to": "part-10",
+      "to": "part-33",
       "kind": "fuel"
      },
      {
       "from": "part-33",
-      "to": "part-34",
-      "kind": "power"
-     },
-     {
-      "from": "part-33",
-      "to": "part-34",
-      "kind": "ground"
-     },
-     {
-      "from": "part-36",
-      "to": "part-34",
-      "kind": "power"
-     },
-     {
-      "from": "part-36",
-      "to": "part-34",
-      "kind": "ground"
+      "to": "part-10",
+      "kind": "fuel"
      },
      {
       "from": "part-34",
@@ -2930,117 +2940,137 @@
       "kind": "ground"
      },
      {
-      "from": "part-35",
-      "to": "part-37",
+      "from": "part-37",
+      "to": "part-35",
       "kind": "power"
      },
      {
-      "from": "part-34",
-      "to": "part-37",
+      "from": "part-37",
+      "to": "part-35",
       "kind": "ground"
      },
      {
       "from": "part-35",
+      "to": "part-36",
+      "kind": "power"
+     },
+     {
+      "from": "part-35",
+      "to": "part-36",
+      "kind": "ground"
+     },
+     {
+      "from": "part-36",
       "to": "part-38",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-38",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-39",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-39",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-40",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-40",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-41",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-41",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-42",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-42",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-43",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-43",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-44",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-44",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-45",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-45",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-46",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-46",
       "kind": "ground"
      },
      {
+      "from": "part-36",
+      "to": "part-47",
+      "kind": "power"
+     },
+     {
       "from": "part-35",
+      "to": "part-47",
+      "kind": "ground"
+     },
+     {
+      "from": "part-36",
       "to": "part-26",
       "kind": "power"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-27",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-26",
       "kind": "ground"
      },
@@ -3065,7 +3095,7 @@
       "kind": "signal"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-27",
       "kind": "ground"
      },
@@ -3077,6 +3107,16 @@
      {
       "from": "part-27",
       "to": "part-29",
+      "kind": "ground"
+     },
+     {
+      "from": "part-36",
+      "to": "part-33",
+      "kind": "power"
+     },
+     {
+      "from": "part-35",
+      "to": "part-33",
       "kind": "ground"
      }
     ],
@@ -3138,24 +3178,24 @@
       "parts": [
        "part-30",
        "part-31",
-       "part-32"
+       "part-32",
+       "part-33"
       ]
      },
      {
       "id": "grp-6",
       "name": "Electrics",
       "parts": [
-       "part-33",
        "part-34",
        "part-35",
-       "part-36"
+       "part-36",
+       "part-37"
       ]
      },
      {
       "id": "grp-7",
       "name": "Lights",
       "parts": [
-       "part-37",
        "part-38",
        "part-39",
        "part-40",
@@ -3164,7 +3204,8 @@
        "part-43",
        "part-44",
        "part-45",
-       "part-46"
+       "part-46",
+       "part-47"
       ]
      }
     ],
@@ -3966,7 +4007,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -0.84,
-       "y": 0.273,
+       "y": 0.18,
        "z": -0.146
       },
       "rotation": {
@@ -3988,11 +4029,11 @@
      {
       "id": "part-33",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -0.84,
-       "y": 0.298,
-       "z": -0.366
+       "x": 0,
+       "y": 0.22,
+       "z": 2.928
       },
       "rotation": {
        "x": 0,
@@ -5460,7 +5501,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -0.915,
-       "y": 0.295,
+       "y": 0.18,
        "z": -0.158
       },
       "rotation": {
@@ -5482,11 +5523,11 @@
      {
       "id": "part-33",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -0.915,
-       "y": 0.322,
-       "z": -0.396
+       "x": 0,
+       "y": 0.22,
+       "z": 3.168
       },
       "rotation": {
        "x": 0,
@@ -6954,7 +6995,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -0.952,
-       "y": 0.312,
+       "y": 0.18,
        "z": -0.168
       },
       "rotation": {
@@ -6976,11 +7017,11 @@
      {
       "id": "part-33",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -0.952,
-       "y": 0.341,
-       "z": -0.419
+       "x": 0,
+       "y": 0.22,
+       "z": 3.352
       },
       "rotation": {
        "x": 0,
@@ -8498,7 +8539,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -0.915,
-       "y": 0.29,
+       "y": 0.18,
        "z": -0.171
       },
       "rotation": {
@@ -8520,11 +8561,11 @@
      {
       "id": "part-35",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -0.915,
-       "y": 0.317,
-       "z": -0.428
+       "x": 0,
+       "y": 0.22,
+       "z": 3.424
       },
       "rotation": {
        "x": 0,
@@ -9998,7 +10039,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -0.75,
-       "y": 0.242,
+       "y": 0.18,
        "z": -0.133
       },
       "rotation": {
@@ -10020,11 +10061,11 @@
      {
       "id": "part-33",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -0.75,
-       "y": 0.264,
-       "z": -0.332
+       "x": 0,
+       "y": 0.22,
+       "z": 2.66
       },
       "rotation": {
        "x": 0,
@@ -11492,7 +11533,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -0.96,
-       "y": 0.308,
+       "y": 0.18,
        "z": -0.182
       },
       "rotation": {
@@ -11514,11 +11555,11 @@
      {
       "id": "part-33",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -0.96,
-       "y": 0.336,
-       "z": -0.456
+       "x": 0,
+       "y": 0.22,
+       "z": 3.648
       },
       "rotation": {
        "x": 0,
@@ -14252,7 +14293,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -1.35,
-       "y": 0.451,
+       "y": 0.18,
        "z": -0.288
       },
       "rotation": {
@@ -14273,6 +14314,31 @@
      },
      {
       "id": "part-33",
+      "type": "fuelPump",
+      "name": "Boost pump (under floor, fwd)",
+      "position": {
+       "x": 0,
+       "y": 0.22,
+       "z": 5.76
+      },
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "color": null,
+      "locked": false,
+      "symmetryPairId": null,
+      "symmetrySide": 0,
+      "rotationY": 0
+     },
+     {
+      "id": "part-34",
       "type": "battery",
       "name": "Battery",
       "position": {
@@ -14297,7 +14363,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-34",
+      "id": "part-35",
       "type": "powerBus",
       "name": "Main bus",
       "position": {
@@ -14322,7 +14388,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-35",
+      "id": "part-36",
       "type": "circuitBreaker",
       "name": "Breaker panel",
       "position": {
@@ -14347,7 +14413,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-36",
+      "id": "part-37",
       "type": "alternator",
       "name": "Alternator",
       "position": {
@@ -14372,7 +14438,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-37",
+      "id": "part-38",
       "type": "navLight",
       "name": "Nav light (port, red)",
       "position": {
@@ -14397,7 +14463,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-38",
+      "id": "part-39",
       "type": "navLight",
       "name": "Nav light (stbd, green)",
       "position": {
@@ -14422,7 +14488,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-39",
+      "id": "part-40",
       "type": "navLight",
       "name": "Nav light (tail, white)",
       "position": {
@@ -14447,7 +14513,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-40",
+      "id": "part-41",
       "type": "strobeLight",
       "name": "Strobe (port wingtip)",
       "position": {
@@ -14472,7 +14538,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-41",
+      "id": "part-42",
       "type": "strobeLight",
       "name": "Strobe (stbd wingtip)",
       "position": {
@@ -14497,7 +14563,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-42",
+      "id": "part-43",
       "type": "strobeLight",
       "name": "Strobe (tailcone)",
       "position": {
@@ -14522,7 +14588,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-43",
+      "id": "part-44",
       "type": "beaconLight",
       "name": "Beacon (top)",
       "position": {
@@ -14547,7 +14613,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-44",
+      "id": "part-45",
       "type": "beaconLight",
       "name": "Beacon (bottom)",
       "position": {
@@ -14572,7 +14638,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-45",
+      "id": "part-46",
       "type": "landingLight",
       "name": "Landing light (port)",
       "position": {
@@ -14597,7 +14663,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-46",
+      "id": "part-47",
       "type": "landingLight",
       "name": "Landing light (stbd)",
       "position": {
@@ -14635,28 +14701,13 @@
      },
      {
       "from": "part-32",
-      "to": "part-10",
+      "to": "part-33",
       "kind": "fuel"
      },
      {
       "from": "part-33",
-      "to": "part-34",
-      "kind": "power"
-     },
-     {
-      "from": "part-33",
-      "to": "part-34",
-      "kind": "ground"
-     },
-     {
-      "from": "part-36",
-      "to": "part-34",
-      "kind": "power"
-     },
-     {
-      "from": "part-36",
-      "to": "part-34",
-      "kind": "ground"
+      "to": "part-10",
+      "kind": "fuel"
      },
      {
       "from": "part-34",
@@ -14669,117 +14720,137 @@
       "kind": "ground"
      },
      {
-      "from": "part-35",
-      "to": "part-37",
+      "from": "part-37",
+      "to": "part-35",
       "kind": "power"
      },
      {
-      "from": "part-34",
-      "to": "part-37",
+      "from": "part-37",
+      "to": "part-35",
       "kind": "ground"
      },
      {
       "from": "part-35",
+      "to": "part-36",
+      "kind": "power"
+     },
+     {
+      "from": "part-35",
+      "to": "part-36",
+      "kind": "ground"
+     },
+     {
+      "from": "part-36",
       "to": "part-38",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-38",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-39",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-39",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-40",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-40",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-41",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-41",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-42",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-42",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-43",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-43",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-44",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-44",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-45",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-45",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-46",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-46",
       "kind": "ground"
      },
      {
+      "from": "part-36",
+      "to": "part-47",
+      "kind": "power"
+     },
+     {
       "from": "part-35",
+      "to": "part-47",
+      "kind": "ground"
+     },
+     {
+      "from": "part-36",
       "to": "part-26",
       "kind": "power"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-27",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-26",
       "kind": "ground"
      },
@@ -14804,7 +14875,7 @@
       "kind": "signal"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-27",
       "kind": "ground"
      },
@@ -14816,6 +14887,16 @@
      {
       "from": "part-27",
       "to": "part-29",
+      "kind": "ground"
+     },
+     {
+      "from": "part-36",
+      "to": "part-33",
+      "kind": "power"
+     },
+     {
+      "from": "part-35",
+      "to": "part-33",
       "kind": "ground"
      }
     ],
@@ -14877,24 +14958,24 @@
       "parts": [
        "part-30",
        "part-31",
-       "part-32"
+       "part-32",
+       "part-33"
       ]
      },
      {
       "id": "grp-6",
       "name": "Electrics",
       "parts": [
-       "part-33",
        "part-34",
        "part-35",
-       "part-36"
+       "part-36",
+       "part-37"
       ]
      },
      {
       "id": "grp-7",
       "name": "Lights",
       "parts": [
-       "part-37",
        "part-38",
        "part-39",
        "part-40",
@@ -14903,7 +14984,8 @@
        "part-43",
        "part-44",
        "part-45",
-       "part-46"
+       "part-46",
+       "part-47"
       ]
      }
     ],
@@ -15755,7 +15837,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -1.335,
-       "y": 0.44,
+       "y": 0.18,
        "z": -0.284
       },
       "rotation": {
@@ -15777,11 +15859,11 @@
      {
       "id": "part-35",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -1.335,
-       "y": 0.48,
-       "z": -0.711
+       "x": 0,
+       "y": 0.22,
+       "z": 5.688
       },
       "rotation": {
        "x": 0,
@@ -17230,7 +17312,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -1.185,
-       "y": 0.383,
+       "y": 0.18,
        "z": -0.311
       },
       "rotation": {
@@ -17252,11 +17334,11 @@
      {
       "id": "part-32",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -1.185,
-       "y": 0.418,
-       "z": -0.777
+       "x": 0,
+       "y": 0.22,
+       "z": 6.216
       },
       "rotation": {
        "x": 0,
@@ -18724,7 +18806,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -2.963,
-       "y": 0.869,
+       "y": 0.18,
        "z": -0.751
       },
       "rotation": {
@@ -18746,11 +18828,11 @@
      {
       "id": "part-32",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -2.963,
-       "y": 0.948,
-       "z": -1.878
+       "x": 0,
+       "y": 0.22,
+       "z": 15.028
       },
       "rotation": {
        "x": 0,
@@ -20363,7 +20445,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -2.82,
-       "y": 0.827,
+       "y": 0.18,
        "z": -0.79
       },
       "rotation": {
@@ -20385,11 +20467,11 @@
      {
       "id": "part-32",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -2.82,
-       "y": 0.902,
-       "z": -1.975
+       "x": 0,
+       "y": 0.22,
+       "z": 15.8
       },
       "rotation": {
        "x": 0,
@@ -22127,7 +22209,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -2.175,
-       "y": 0.583,
+       "y": 0.18,
        "z": -1.233
       },
       "rotation": {
@@ -22149,11 +22231,11 @@
      {
       "id": "part-37",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -2.175,
-       "y": 0.636,
-       "z": -3.083
+       "x": 0,
+       "y": 0.22,
+       "z": 24.664
       },
       "rotation": {
        "x": 0,
@@ -23756,7 +23838,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -0.84,
-       "y": 0.273,
+       "y": 0.18,
        "z": -0.301
       },
       "rotation": {
@@ -23778,11 +23860,11 @@
      {
       "id": "part-32",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -0.84,
-       "y": 0.298,
-       "z": -0.753
+       "x": 0,
+       "y": 0.22,
+       "z": 6.024
       },
       "rotation": {
        "x": 0,
@@ -25394,7 +25476,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -1.162,
-       "y": 0.378,
+       "y": 0.18,
        "z": -0.253
       },
       "rotation": {
@@ -25415,6 +25497,31 @@
      },
      {
       "id": "part-33",
+      "type": "fuelPump",
+      "name": "Boost pump (under floor, fwd)",
+      "position": {
+       "x": 0,
+       "y": 0.22,
+       "z": 5.068
+      },
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "color": null,
+      "locked": false,
+      "symmetryPairId": null,
+      "symmetrySide": 0,
+      "rotationY": 0
+     },
+     {
+      "id": "part-34",
       "type": "battery",
       "name": "Battery",
       "position": {
@@ -25439,7 +25546,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-34",
+      "id": "part-35",
       "type": "powerBus",
       "name": "Main bus",
       "position": {
@@ -25464,7 +25571,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-35",
+      "id": "part-36",
       "type": "circuitBreaker",
       "name": "Breaker panel",
       "position": {
@@ -25489,7 +25596,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-36",
+      "id": "part-37",
       "type": "alternator",
       "name": "Alternator",
       "position": {
@@ -25514,7 +25621,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-37",
+      "id": "part-38",
       "type": "navLight",
       "name": "Nav light (port, red)",
       "position": {
@@ -25539,7 +25646,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-38",
+      "id": "part-39",
       "type": "navLight",
       "name": "Nav light (stbd, green)",
       "position": {
@@ -25564,7 +25671,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-39",
+      "id": "part-40",
       "type": "navLight",
       "name": "Nav light (tail, white)",
       "position": {
@@ -25589,7 +25696,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-40",
+      "id": "part-41",
       "type": "strobeLight",
       "name": "Strobe (port wingtip)",
       "position": {
@@ -25614,7 +25721,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-41",
+      "id": "part-42",
       "type": "strobeLight",
       "name": "Strobe (stbd wingtip)",
       "position": {
@@ -25639,7 +25746,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-42",
+      "id": "part-43",
       "type": "strobeLight",
       "name": "Strobe (tailcone)",
       "position": {
@@ -25664,7 +25771,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-43",
+      "id": "part-44",
       "type": "beaconLight",
       "name": "Beacon (top)",
       "position": {
@@ -25689,7 +25796,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-44",
+      "id": "part-45",
       "type": "beaconLight",
       "name": "Beacon (bottom)",
       "position": {
@@ -25714,7 +25821,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-45",
+      "id": "part-46",
       "type": "landingLight",
       "name": "Landing light (port)",
       "position": {
@@ -25739,7 +25846,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-46",
+      "id": "part-47",
       "type": "landingLight",
       "name": "Landing light (stbd)",
       "position": {
@@ -25777,28 +25884,13 @@
      },
      {
       "from": "part-32",
-      "to": "part-10",
+      "to": "part-33",
       "kind": "fuel"
      },
      {
       "from": "part-33",
-      "to": "part-34",
-      "kind": "power"
-     },
-     {
-      "from": "part-33",
-      "to": "part-34",
-      "kind": "ground"
-     },
-     {
-      "from": "part-36",
-      "to": "part-34",
-      "kind": "power"
-     },
-     {
-      "from": "part-36",
-      "to": "part-34",
-      "kind": "ground"
+      "to": "part-10",
+      "kind": "fuel"
      },
      {
       "from": "part-34",
@@ -25811,117 +25903,137 @@
       "kind": "ground"
      },
      {
-      "from": "part-35",
-      "to": "part-37",
+      "from": "part-37",
+      "to": "part-35",
       "kind": "power"
      },
      {
-      "from": "part-34",
-      "to": "part-37",
+      "from": "part-37",
+      "to": "part-35",
       "kind": "ground"
      },
      {
       "from": "part-35",
+      "to": "part-36",
+      "kind": "power"
+     },
+     {
+      "from": "part-35",
+      "to": "part-36",
+      "kind": "ground"
+     },
+     {
+      "from": "part-36",
       "to": "part-38",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-38",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-39",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-39",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-40",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-40",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-41",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-41",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-42",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-42",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-43",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-43",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-44",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-44",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-45",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-45",
       "kind": "ground"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-46",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-46",
       "kind": "ground"
      },
      {
+      "from": "part-36",
+      "to": "part-47",
+      "kind": "power"
+     },
+     {
       "from": "part-35",
+      "to": "part-47",
+      "kind": "ground"
+     },
+     {
+      "from": "part-36",
       "to": "part-26",
       "kind": "power"
      },
      {
-      "from": "part-35",
+      "from": "part-36",
       "to": "part-27",
       "kind": "power"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-26",
       "kind": "ground"
      },
@@ -25946,7 +26058,7 @@
       "kind": "signal"
      },
      {
-      "from": "part-34",
+      "from": "part-35",
       "to": "part-27",
       "kind": "ground"
      },
@@ -25958,6 +26070,16 @@
      {
       "from": "part-27",
       "to": "part-29",
+      "kind": "ground"
+     },
+     {
+      "from": "part-36",
+      "to": "part-33",
+      "kind": "power"
+     },
+     {
+      "from": "part-35",
+      "to": "part-33",
       "kind": "ground"
      }
     ],
@@ -26019,24 +26141,24 @@
       "parts": [
        "part-30",
        "part-31",
-       "part-32"
+       "part-32",
+       "part-33"
       ]
      },
      {
       "id": "grp-6",
       "name": "Electrics",
       "parts": [
-       "part-33",
        "part-34",
        "part-35",
-       "part-36"
+       "part-36",
+       "part-37"
       ]
      },
      {
       "id": "grp-7",
       "name": "Lights",
       "parts": [
-       "part-37",
        "part-38",
        "part-39",
        "part-40",
@@ -26045,7 +26167,8 @@
        "part-43",
        "part-44",
        "part-45",
-       "part-46"
+       "part-46",
+       "part-47"
       ]
      }
     ],
@@ -26847,7 +26970,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -0.885,
-       "y": 0.286,
+       "y": 0.18,
        "z": -0.197
       },
       "rotation": {
@@ -26869,11 +26992,11 @@
      {
       "id": "part-33",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -0.885,
-       "y": 0.312,
-       "z": -0.492
+       "x": 0,
+       "y": 0.22,
+       "z": 3.932
       },
       "rotation": {
        "x": 0,
@@ -28466,7 +28589,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -2.55,
-       "y": 0.759,
+       "y": 0.18,
        "z": -0.596
       },
       "rotation": {
@@ -28487,6 +28610,31 @@
      },
      {
       "id": "part-38",
+      "type": "fuelPump",
+      "name": "Boost pump (under floor, fwd)",
+      "position": {
+       "x": 0,
+       "y": 0.22,
+       "z": 11.916
+      },
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "color": null,
+      "locked": false,
+      "symmetryPairId": null,
+      "symmetrySide": 0,
+      "rotationY": 0
+     },
+     {
+      "id": "part-39",
       "type": "battery",
       "name": "Battery",
       "position": {
@@ -28511,7 +28659,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-39",
+      "id": "part-40",
       "type": "powerBus",
       "name": "Main bus",
       "position": {
@@ -28536,7 +28684,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-40",
+      "id": "part-41",
       "type": "circuitBreaker",
       "name": "Breaker panel",
       "position": {
@@ -28561,7 +28709,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-41",
+      "id": "part-42",
       "type": "alternator",
       "name": "Alternator",
       "position": {
@@ -28586,7 +28734,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-42",
+      "id": "part-43",
       "type": "hydraulicPump",
       "name": "Hydraulic pump",
       "position": {
@@ -28611,7 +28759,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-43",
+      "id": "part-44",
       "type": "hydraulicReservoir",
       "name": "Hydraulic reservoir",
       "position": {
@@ -28636,7 +28784,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-44",
+      "id": "part-45",
       "type": "hydraulicActuator",
       "name": "Gear actuator (port main)",
       "position": {
@@ -28661,7 +28809,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-45",
+      "id": "part-46",
       "type": "hydraulicActuator",
       "name": "Gear actuator (stbd main)",
       "position": {
@@ -28686,7 +28834,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-46",
+      "id": "part-47",
       "type": "navLight",
       "name": "Nav light (port, red)",
       "position": {
@@ -28711,7 +28859,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-47",
+      "id": "part-48",
       "type": "navLight",
       "name": "Nav light (stbd, green)",
       "position": {
@@ -28736,7 +28884,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-48",
+      "id": "part-49",
       "type": "navLight",
       "name": "Nav light (tail, white)",
       "position": {
@@ -28761,7 +28909,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-49",
+      "id": "part-50",
       "type": "strobeLight",
       "name": "Strobe (port wingtip)",
       "position": {
@@ -28786,7 +28934,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-50",
+      "id": "part-51",
       "type": "strobeLight",
       "name": "Strobe (stbd wingtip)",
       "position": {
@@ -28811,7 +28959,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-51",
+      "id": "part-52",
       "type": "strobeLight",
       "name": "Strobe (tailcone)",
       "position": {
@@ -28836,7 +28984,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-52",
+      "id": "part-53",
       "type": "beaconLight",
       "name": "Beacon (top)",
       "position": {
@@ -28861,7 +29009,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-53",
+      "id": "part-54",
       "type": "beaconLight",
       "name": "Beacon (bottom)",
       "position": {
@@ -28886,7 +29034,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-54",
+      "id": "part-55",
       "type": "landingLight",
       "name": "Landing light (port)",
       "position": {
@@ -28911,7 +29059,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-55",
+      "id": "part-56",
       "type": "landingLight",
       "name": "Landing light (stbd)",
       "position": {
@@ -28949,43 +29097,28 @@
      },
      {
       "from": "part-37",
+      "to": "part-38",
+      "kind": "fuel"
+     },
+     {
+      "from": "part-38",
       "to": "part-10",
       "kind": "fuel"
      },
      {
-      "from": "part-37",
+      "from": "part-38",
       "to": "part-12",
       "kind": "fuel"
      },
      {
-      "from": "part-37",
+      "from": "part-38",
       "to": "part-14",
       "kind": "fuel"
      },
      {
-      "from": "part-37",
+      "from": "part-38",
       "to": "part-16",
       "kind": "fuel"
-     },
-     {
-      "from": "part-38",
-      "to": "part-39",
-      "kind": "power"
-     },
-     {
-      "from": "part-38",
-      "to": "part-39",
-      "kind": "ground"
-     },
-     {
-      "from": "part-41",
-      "to": "part-39",
-      "kind": "power"
-     },
-     {
-      "from": "part-41",
-      "to": "part-39",
-      "kind": "ground"
      },
      {
       "from": "part-39",
@@ -28999,8 +29132,23 @@
      },
      {
       "from": "part-42",
-      "to": "part-43",
-      "kind": "hydraulic"
+      "to": "part-40",
+      "kind": "power"
+     },
+     {
+      "from": "part-42",
+      "to": "part-40",
+      "kind": "ground"
+     },
+     {
+      "from": "part-40",
+      "to": "part-41",
+      "kind": "power"
+     },
+     {
+      "from": "part-40",
+      "to": "part-41",
+      "kind": "ground"
      },
      {
       "from": "part-43",
@@ -29008,142 +29156,147 @@
       "kind": "hydraulic"
      },
      {
-      "from": "part-43",
+      "from": "part-44",
       "to": "part-45",
       "kind": "hydraulic"
      },
      {
       "from": "part-44",
-      "to": "part-42",
+      "to": "part-46",
       "kind": "hydraulic"
      },
      {
       "from": "part-45",
-      "to": "part-42",
+      "to": "part-43",
       "kind": "hydraulic"
      },
      {
-      "from": "part-40",
-      "to": "part-42",
+      "from": "part-46",
+      "to": "part-43",
+      "kind": "hydraulic"
+     },
+     {
+      "from": "part-41",
+      "to": "part-43",
       "kind": "power"
      },
      {
-      "from": "part-39",
-      "to": "part-42",
+      "from": "part-40",
+      "to": "part-43",
       "kind": "ground"
      },
      {
-      "from": "part-40",
-      "to": "part-46",
-      "kind": "power"
-     },
-     {
-      "from": "part-39",
-      "to": "part-46",
-      "kind": "ground"
-     },
-     {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-47",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-47",
       "kind": "ground"
      },
      {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-48",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-48",
       "kind": "ground"
      },
      {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-49",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-49",
       "kind": "ground"
      },
      {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-50",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-50",
       "kind": "ground"
      },
      {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-51",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-51",
       "kind": "ground"
      },
      {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-52",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-52",
       "kind": "ground"
      },
      {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-53",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-53",
       "kind": "ground"
      },
      {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-54",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-54",
       "kind": "ground"
      },
      {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-55",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-55",
       "kind": "ground"
      },
      {
+      "from": "part-41",
+      "to": "part-56",
+      "kind": "power"
+     },
+     {
       "from": "part-40",
+      "to": "part-56",
+      "kind": "ground"
+     },
+     {
+      "from": "part-41",
       "to": "part-31",
       "kind": "power"
      },
      {
-      "from": "part-40",
+      "from": "part-41",
       "to": "part-32",
       "kind": "power"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-31",
       "kind": "ground"
      },
@@ -29168,7 +29321,7 @@
       "kind": "signal"
      },
      {
-      "from": "part-39",
+      "from": "part-40",
       "to": "part-32",
       "kind": "ground"
      },
@@ -29180,6 +29333,16 @@
      {
       "from": "part-32",
       "to": "part-34",
+      "kind": "ground"
+     },
+     {
+      "from": "part-41",
+      "to": "part-38",
+      "kind": "power"
+     },
+     {
+      "from": "part-40",
+      "to": "part-38",
       "kind": "ground"
      }
     ],
@@ -29243,34 +29406,34 @@
       "parts": [
        "part-35",
        "part-36",
-       "part-37"
+       "part-37",
+       "part-38"
       ]
      },
      {
       "id": "grp-6",
       "name": "Electrics",
       "parts": [
-       "part-38",
        "part-39",
        "part-40",
-       "part-41"
+       "part-41",
+       "part-42"
       ]
      },
      {
       "id": "grp-7",
       "name": "Hydraulics",
       "parts": [
-       "part-42",
        "part-43",
        "part-44",
-       "part-45"
+       "part-45",
+       "part-46"
       ]
      },
      {
       "id": "grp-8",
       "name": "Lights",
       "parts": [
-       "part-46",
        "part-47",
        "part-48",
        "part-49",
@@ -29279,7 +29442,8 @@
        "part-52",
        "part-53",
        "part-54",
-       "part-55"
+       "part-55",
+       "part-56"
       ]
      }
     ],
@@ -30056,7 +30220,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -1.222,
-       "y": 0.356,
+       "y": 0.18,
        "z": -0.354
       },
       "rotation": {
@@ -30078,11 +30242,11 @@
      {
       "id": "part-32",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -1.222,
-       "y": 0.389,
-       "z": -0.884
+       "x": 0,
+       "y": 0.22,
+       "z": 7.072
       },
       "rotation": {
        "x": 0,
@@ -31695,7 +31859,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -4.327,
-       "y": 1.236,
+       "y": 0.18,
        "z": -1.256
       },
       "rotation": {
@@ -31717,11 +31881,11 @@
      {
       "id": "part-32",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -4.327,
-       "y": 1.349,
-       "z": -3.141
+       "x": 0,
+       "y": 0.22,
+       "z": 25.124
       },
       "rotation": {
        "x": 0,
@@ -33334,7 +33498,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -4.47,
-       "y": 1.272,
+       "y": 0.18,
        "z": -1.336
       },
       "rotation": {
@@ -33356,11 +33520,11 @@
      {
       "id": "part-32",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -4.47,
-       "y": 1.387,
-       "z": -3.34
+       "x": 0,
+       "y": 0.22,
+       "z": 26.72
       },
       "rotation": {
        "x": 0,
@@ -34973,7 +35137,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -4.65,
-       "y": 1.331,
+       "y": 0.18,
        "z": -1.478
       },
       "rotation": {
@@ -34995,11 +35159,11 @@
      {
       "id": "part-32",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -4.65,
-       "y": 1.452,
-       "z": -3.695
+       "x": 0,
+       "y": 0.22,
+       "z": 29.56
       },
       "rotation": {
        "x": 0,
@@ -36662,7 +36826,7 @@
       "name": "Fuel strainer (port side, low point)",
       "position": {
        "x": -5.355,
-       "y": 1.573,
+       "y": 0.18,
        "z": -1.454
       },
       "rotation": {
@@ -36684,11 +36848,11 @@
      {
       "id": "part-34",
       "type": "fuelPump",
-      "name": "Boost pump",
+      "name": "Boost pump (under floor, fwd)",
       "position": {
-       "x": -5.355,
-       "y": 1.716,
-       "z": -3.636
+       "x": 0,
+       "y": 0.22,
+       "z": 29.088
       },
       "rotation": {
        "x": 0,
