@@ -160,6 +160,7 @@ function designFor(cfg) {
   const strainer = b.add('fuelStrainer', [0, H * .3, L * .1], { name: 'Fuel strainer (low point)' });
   const pump = cfg.wingPlacement === 'high' && !jet ? null : b.add('fuelPump', [0, H * .32, L * .18], { name: 'Boost pump' });
   b.wire(tankL, strainer, 'fuel'); b.wire(tankR, strainer, 'fuel');
+  if (pump) b.wire(strainer, pump, 'fuel');
   const fuelTo = pump || strainer;
   for (const e of engines) b.wire(fuelTo, e, 'fuel');
 
