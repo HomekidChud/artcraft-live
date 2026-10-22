@@ -201,6 +201,8 @@ function designFor(cfg) {
   const landR = b.add('landingLight', [half * .3, wingY - .04, L * .1], { name: 'Landing light (stbd)' });
   const lightParts = [navL, navR, navT, strobeL, strobeR, strobeT, beaconTop, beaconBot, landL, landR];
   for (const lp of lightParts) { b.wire(cb, lp, 'power'); b.wire(bus, lp, 'ground'); }
+  // jet engines have FADEC electronics: they need the main power circuit + ground return
+  for (const e of engines) if (jet) { b.wire(cb, e, 'power'); b.wire(bus, e, 'ground'); }
   // powered loads: panel, computer, pump; 5V devices (servo, receiver) feed from the computer rail
   b.wire(cb, panel, 'power'); b.wire(cb, computer, 'power');
   b.wire(bus, panel, 'ground');
