@@ -463,10 +463,33 @@ items marked PENDING were not done and are the next AI's queue.
   save→reload, seed presets).
 - Seed e2e: local server + `--api`: 24/24 fleet presets accepted, list shows
   28 presets.
-- NOT verified in a browser this session (no headless browser run): flight,
-  crash/damage, workshop interaction, grouping, cloud panel from the live
-  page, mobile layout. The client edits are parse-checked only — run the
-  browser QA from item 6 before trusting Test Fly.
+- Browser regression (cloud browser against the live GitHub Pages deploy,
+  commit 3ba70db): landing menu loads; Sandbox flight mode runs (c172,
+  unpaused); Build Mode opens (ribbon, notebook, starters, toolbox,
+  explorer); Cloud panel loads; "Fleet presets (local)" fetches the offline
+  pack (24 rows); loading the 747-8 preset restores it as an editable
+  build named correctly with 47 parts / 60 wires; ELECTRICAL audit passes
+  ("All circuits valid — test flight approved"); SYSTEMS ROUTING panel
+  renders ("✓ Routing follows real aircraft practice"); Test Fly passes the
+  gates and enters flight mode with the scratch-build; engines spool to
+  full RPM with throttle 100.
+- NOT verified: actual takeoff roll / flight / crash-damage in the browser
+  — speed stayed 0 kt even for the built-in trainer starter under the same
+  automated steps (throttle 100, engines ON, brakes off, master on), so
+  this looks like an environment limitation of the headless cloud browser
+  (synthetic-input physics gate), not a preset defect. The deterministic
+  harness (item 6 below) must settle it. Mobile layout also not checked.
+- CDN note: GitHub Pages caches `presets-fleet.json` per-URL (~10 min); the
+  client fetches it with `?v=17.10.2` + `cache:'no-store'` — bump the
+  version query whenever the pack is regenerated.
+
+### Post-test fixes (already committed)
+
+- Local preset list: the log no longer replaces the Load rows.
+- Preset wiring: jet FADEC loads wired to the main power circuit with
+  ground returns; fuel chain wired tank → strainer → pump → engine.
+- Preset gear: wheels hang below the belly line so builds rest on wheels
+  (visual check pending the flight-verification item above).
 
 ### Constraints that still stand
 
