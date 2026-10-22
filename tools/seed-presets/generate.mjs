@@ -117,16 +117,20 @@ function designFor(cfg) {
   // aircraft get proportionally bigger engines: real airliners run T/W ≈ 0.25–0.3
   const jetScale = jet ? Math.min(3, 1 + Math.max(0, (cfg.massKg || 0) - 5000) / 40000 * 2) : 1;
   if (cfg.engineCount === 1 && !isGlider) {
-    const e = b.add(engineType, jet ? [0, H * .45, -L * .36] : [0, H * .55, L * .4], { name: 'Engine', ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
+    const propR = cfg.propBlades >= 4 ? .9 : .775; // prop2/prop4 disk radius
+    const e = b.add(engineType, jet ? [0, H * .45, -L * .36] : [0, Math.max(H * .55, propR + .15), L * .4], { name: 'Engine', ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
     engines.push(e);
     if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [e.position.x, e.position.y, e.position.z + .55], { name: 'Propeller' });
   } else if (cfg.engineCount > 1) {
     const n = cfg.engineCount;
+    const propR = cfg.propBlades >= 4 ? .9 : .775;
+    // keep the prop disk and the scaled nacelles clear of the ground plane (y=0)
+    const engineY = jet ? Math.max(wingY - .1, .36 * jetScale + .3) : Math.max(wingY - .1, propR + .15);
     for (let i = 0; i < n; i++) {
       const side = i % 2 === 0 ? 1 : -1;
       const rank = Math.floor(i / 2);
       const x = side * (half * (.35 + rank * .25));
-      const e = b.add(engineType, [x, wingY - .1, jet ? L * .18 : L * .05], { name: 'Engine ' + (i + 1), ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
+      const e = b.add(engineType, [x, engineY, jet ? L * .18 : L * .05], { name: 'Engine ' + (i + 1), ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
       engines.push(e);
       if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [x, e.position.y, e.position.z + .55], { name: 'Propeller ' + (i + 1) });
     }
@@ -145,18 +149,29 @@ function designFor(cfg) {
   const nw = b.add('wheel', [0, .15, L * .3], { name: 'Nose wheel', scale: { x: .7, y: .7, z: .7 } });
   gear.push(ns, nw);
 
-  /* --- cockpit (named group so the cockpit is a group hierarchy) --- */
+  /* --- cockpit: NEVER a single block — a group of many small parts:
+         floor, side walls, roof, rear bulkhead, glazing, seats, panel and
+         electronics, all grouped under "Cockpit" --- */
   const cockpit = [];
-  cockpit.push(b.add('cockpitSeat', [-W * .25, H * .62, L * .16], { name: 'Pilot seat' }));
-  cockpit.push(b.add('cockpitSeat', [W * .25, H * .62, L * .16], { name: 'Copilot seat' }));
-  const panel = b.add('instrumentPanel', [0, H * .72, L * .24], { name: 'Instrument panel', scale: { x: Math.min(2, W / .92) } });
+  const cz0 = L * .05, cz1 = L * .32;                 // cockpit z range
+  const czMid = (cz0 + cz1) / 2, ckLen = cz1 - cz0;
+  const chY = Math.max(.35, H * .42);                 // cockpit floor height
+  const chH = Math.min(1.35, Math.max(.8, H * .55));  // cabin height
+  cockpit.push(b.add('skinPanel', [0, chY, czMid], { name: 'Cockpit floor', scale: { x: Math.min(6, W * 1.15 / 1.2), y: 1, z: Math.min(8, ckLen / .72) } }));
+  for (const side of [-1, 1])
+    cockpit.push(b.add('skinPanel', [side * W * .55, chY + chH / 2, czMid], { name: side < 0 ? 'Cockpit wall (port)' : 'Cockpit wall (stbd)', rotation: { z: Math.PI / 2 }, scale: { x: Math.min(3, chH / 1.2), y: 1, z: Math.min(8, ckLen / .72) } }));
+  cockpit.push(b.add('skinPanel', [0, chY + chH, czMid], { name: 'Cockpit roof', scale: { x: Math.min(6, W * 1.15 / 1.2), y: 1, z: Math.min(8, ckLen * .85 / .72) } }));
+  cockpit.push(b.add('bulkhead', [0, chY + chH / 2, cz0], { name: 'Cockpit rear bulkhead', scale: { x: Math.min(5, W * 1.0), y: Math.min(3, chH / .85), z: 1 } }));
+  if (L < 15) cockpit.push(b.add('canopy', [0, chY + chH + .18, L * .24], { name: 'Windshield / canopy', scale: { x: Math.min(3, W / 1.05) } }));
+  cockpit.push(b.add('cockpitSeat', [-W * .25, chY + .25, L * .18], { name: 'Pilot seat' }));
+  cockpit.push(b.add('cockpitSeat', [W * .25, chY + .25, L * .18], { name: 'Copilot seat' }));
+  const panel = b.add('instrumentPanel', [0, chY + chH * .55, L * .27], { name: 'Instrument panel', scale: { x: Math.min(2, W / .92) } });
   cockpit.push(panel);
-  if (L < 15) cockpit.push(b.add('canopy', [0, H * .95, L * .2], { name: 'Canopy', scale: { x: W / 1.05 } }));
-  const computer = b.add('flightComputer', [0, H * .5, L * .05], { name: 'Flight computer' });
+  const computer = b.add('flightComputer', [0, chY + .18, L * .08], { name: 'Flight computer' });
   cockpit.push(computer);
-  const servo = b.add('servo', [W * .3, H * .5, L * .02], { name: 'Servo' });
+  const servo = b.add('servo', [W * .3, chY + .2, L * .07], { name: 'Servo' });
   cockpit.push(servo);
-  const receiver = b.add('receiver', [-W * .3, H * .55, -L * .05], { name: 'Receiver' });
+  const receiver = b.add('receiver', [-W * .3, chY + .25, -L * .02], { name: 'Receiver' });
   cockpit.push(receiver);
 
   /* --- fuel system: wing tanks -> strainer -> (pump) -> engines.
@@ -165,8 +180,10 @@ function designFor(cfg) {
   if (engines.length) {
   tankL = b.add('fuelTank', [-half * .35, wingY + .1, 0], { name: 'Port tank' });
   tankR = b.add('fuelTank', [half * .35, wingY + .1, 0], { name: 'Starboard tank' });
-  strainer = b.add('fuelStrainer', [0, H * .3, L * .1], { name: 'Fuel strainer (low point)' });
-  pump = cfg.wingPlacement === 'high' && !jet ? null : b.add('fuelPump', [0, H * .32, L * .18], { name: 'Boost pump' });
+  // gascolator at the low point under the cabin floor, aft of the cockpit — real
+  // GA aircraft drain the strainer from the belly, never inside the cabin
+  strainer = b.add('fuelStrainer', [0, Math.max(.15, H * .22), -L * .02], { name: 'Fuel strainer (belly low point)' });
+  pump = cfg.wingPlacement === 'high' && !jet ? null : b.add('fuelPump', [0, Math.max(.17, H * .24), -L * .05], { name: 'Boost pump' });
   b.wire(tankL, strainer, 'fuel'); b.wire(tankR, strainer, 'fuel');
   if (pump) b.wire(strainer, pump, 'fuel');
   const fuelTo = pump || strainer;
