@@ -129,17 +129,17 @@ function designFor(cfg) {
     }
   }
 
-  /* --- landing gear: wheels hang BELOW the fuselage so the belly clears the
-         ground and the aircraft rolls on its wheels, not its skin --- */
+  /* --- landing gear: wheels hang BELOW the fuselage (their bottoms dip under
+         y=0 where the belly sits) so the build rolls on its wheels --- */
   const gear = [];
-  const wheelY = .5; // wheel half-height ~.36 at scale 1 → bottom clears y=0
+  const wheelY = .2; // wheel half-height ~.36 at scale 1 → bottom ≈ −0.16, below the belly
   for (const x of [-W * .8, W * .8]) {
-    const s = b.add('gearStrut', [x, wheelY, L * .04], { name: 'Main strut' });
+    const s = b.add('gearStrut', [x, .55, L * .04], { name: 'Main strut', scale: { y: 1.1 } });
     const w = b.add('wheel', [x, wheelY, L * .04], { name: 'Main wheel' });
     gear.push(s, w);
   }
-  const ns = b.add('gearStrut', [0, wheelY * .85, L * .3], { name: 'Nose strut', scale: { y: .8 } });
-  const nw = b.add('wheel', [0, wheelY * .85, L * .3], { name: 'Nose wheel', scale: { x: .7, y: .7, z: .7 } });
+  const ns = b.add('gearStrut', [0, .5, L * .3], { name: 'Nose strut', scale: { y: .9 } });
+  const nw = b.add('wheel', [0, .15, L * .3], { name: 'Nose wheel', scale: { x: .7, y: .7, z: .7 } });
   gear.push(ns, nw);
 
   /* --- cockpit (named group so the cockpit is a group hierarchy) --- */
