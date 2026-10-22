@@ -3212,7 +3212,7 @@ $('workshopCloudLocal').addEventListener('click',async()=>{
  const token=++workshopCloudListToken; // cancels any in-flight cloud refresh from overwriting this list
  try{
   list.innerHTML='<span class="workshop-muted">Loading local fleet presets…</span>';
-  const res=await fetch('presets-fleet.json?v=17.10.3',{cache:'no-store'});
+  const res=await fetch('presets-fleet.json?v=17.10.4',{cache:'no-store'});
   if(!res.ok)throw new Error('preset pack not found (HTTP '+res.status+')');
   const docs=await res.json();
   if(token!==workshopCloudListToken)return; // superseded by a newer list action

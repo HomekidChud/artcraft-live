@@ -79,9 +79,11 @@ function designFor(cfg) {
   const half = cfg.wingspan / 2;
   const wingY = cfg.wingPlacement === 'high' ? H * .78 : H * .18;
   const isDelta = /delta/i.test(cfg.role) || cfg.id === 'concorde';
+  // delta designs carry everything on the delta slab itself (y = H·.42)
+  const surfY = isDelta ? H * .42 : wingY;
   const isGlider = cfg.engineType === 'glider' || cfg.engineCount === 0;
   const heavy = (cfg.massKg || 0) > 8000;
-  const jet = cfg.engineType === 'jet';
+  const jet = ['jet', 'supersonic', 'fighter'].includes(cfg.engineType);
 
   /* --- structure: fuselage, wing, tail --- */
   const body = b.add('bodyBlock', [0, H * .5, 0], {
@@ -108,7 +110,7 @@ function designFor(cfg) {
   const elevR = b.add('tailplane', [hTail / 2, H * .5, -L * .4], { name: 'Starboard stabiliser', scale: { x: hTail / 2.25 } });
   b.mirror('mirror-2', elevL, elevR);
   const fin = b.add('fin', [0, H + cfg.height * .18, -L * .4], { name: 'Vertical fin', scale: { y: cfg.height / 1.2 } });
-  b.add('rudder', [0, H + cfg.height * .18, -L * .43], { name: 'Rudder' });
+  b.add('rudder', [0, H + cfg.height * .18, -L * .4], { name: 'Rudder' });
 
   /* --- propulsion --- */
   const engines = [];
@@ -120,19 +122,19 @@ function designFor(cfg) {
     const propR = cfg.propBlades >= 4 ? .9 : .775; // prop2/prop4 disk radius
     const e = b.add(engineType, jet ? [0, H * .45, -L * .36] : [0, Math.max(H * .55, propR + .15), L * .4], { name: 'Engine', ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
     engines.push(e);
-    if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [e.position.x, e.position.y, e.position.z + .55], { name: 'Propeller' });
+    if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [e.position.x, e.position.y, e.position.z + .38], { name: 'Propeller' });
   } else if (cfg.engineCount > 1) {
     const n = cfg.engineCount;
     const propR = cfg.propBlades >= 4 ? .9 : .775;
     // keep the prop disk and the scaled nacelles clear of the ground plane (y=0)
-    const engineY = jet ? Math.max(wingY - .1, .36 * jetScale + .3) : Math.max(wingY - .1, propR + .15);
+    const engineY = isDelta ? H * .42 : (jet ? Math.max(wingY - .1, .36 * jetScale + .3) : Math.max(wingY - .1, propR + .15));
     for (let i = 0; i < n; i++) {
       const side = i % 2 === 0 ? 1 : -1;
       const rank = Math.floor(i / 2);
-      const x = side * (half * (.35 + rank * .25));
-      const e = b.add(engineType, [x, engineY, jet ? L * .18 : L * .05], { name: 'Engine ' + (i + 1), ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
+      const x = side * (half * (.45 + rank * .25));
+      const e = b.add(engineType, [x, engineY, jet ? .9 : .6], { name: 'Engine ' + (i + 1), ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
       engines.push(e);
-      if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [x, e.position.y, e.position.z + .55], { name: 'Propeller ' + (i + 1) });
+      if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [x, e.position.y, e.position.z + .38], { name: 'Propeller ' + (i + 1) });
     }
   }
 
@@ -156,16 +158,18 @@ function designFor(cfg) {
   const cz0 = L * .05, cz1 = L * .32;                 // cockpit z range
   const czMid = (cz0 + cz1) / 2, ckLen = cz1 - cz0;
   const chY = Math.max(.35, H * .42);                 // cockpit floor height
-  const chH = Math.min(1.35, Math.max(.8, H * .55));  // cabin height
+  // cabin height — clamped so the cockpit (roof included) stays INSIDE the
+  // fuselage block: a roof poking out the top is a floating part at flight time
+  const chH = Math.min(1.35, Math.max(.8, H * .55), (H - chY) * .8);  // cabin height
   cockpit.push(b.add('skinPanel', [0, chY, czMid], { name: 'Cockpit floor', scale: { x: Math.min(6, W * 1.15 / 1.2), y: 1, z: Math.min(8, ckLen / .72) } }));
   for (const side of [-1, 1])
     cockpit.push(b.add('skinPanel', [side * W * .55, chY + chH / 2, czMid], { name: side < 0 ? 'Cockpit wall (port)' : 'Cockpit wall (stbd)', rotation: { z: Math.PI / 2 }, scale: { x: Math.min(3, chH / 1.2), y: 1, z: Math.min(8, ckLen / .72) } }));
   cockpit.push(b.add('skinPanel', [0, chY + chH, czMid], { name: 'Cockpit roof', scale: { x: Math.min(6, W * 1.15 / 1.2), y: 1, z: Math.min(8, ckLen * .85 / .72) } }));
   cockpit.push(b.add('bulkhead', [0, chY + chH / 2, cz0], { name: 'Cockpit rear bulkhead', scale: { x: Math.min(5, W * 1.0), y: Math.min(3, chH / .85), z: 1 } }));
-  if (L < 15) cockpit.push(b.add('canopy', [0, chY + chH + .18, L * .24], { name: 'Windshield / canopy', scale: { x: Math.min(3, W / 1.05) } }));
+  if (L < 15) cockpit.push(b.add('canopy', [0, chY + chH + .18, L * .22], { name: 'Windshield / canopy', scale: { x: Math.min(3, W / 1.05) } }));
   cockpit.push(b.add('cockpitSeat', [-W * .25, chY + .25, L * .18], { name: 'Pilot seat' }));
   cockpit.push(b.add('cockpitSeat', [W * .25, chY + .25, L * .18], { name: 'Copilot seat' }));
-  const panel = b.add('instrumentPanel', [0, chY + chH * .55, L * .27], { name: 'Instrument panel', scale: { x: Math.min(2, W / .92) } });
+  const panel = b.add('instrumentPanel', [0, chY + chH * .55, L * .22], { name: 'Instrument panel', scale: { x: Math.min(2, W / .92) } });
   cockpit.push(panel);
   const computer = b.add('flightComputer', [0, chY + .18, L * .08], { name: 'Flight computer' });
   cockpit.push(computer);
@@ -178,15 +182,15 @@ function designFor(cfg) {
          Gliders have no engines — no fuel system at all. --- */
   let tankL = null, tankR = null, strainer = null, pump = null;
   if (engines.length) {
-  tankL = b.add('fuelTank', [-half * .35, wingY + .1, 0], { name: 'Port tank' });
-  tankR = b.add('fuelTank', [half * .35, wingY + .1, 0], { name: 'Starboard tank' });
-  // gascolator + boost pump: strainer low on the PORT side aft of the cockpit,
-  // pump low under the floor FORWARD of the cockpit (real GA: the line runs under
-  // the cabin floor and climbs to the engine ahead of the firewall) — so every
-  // fuel segment clears the cockpit box the audit enforces
-  const fuelX = -Math.max(.6, W * .75);
-  strainer = b.add('fuelStrainer', [fuelX, .18, -L * .02], { name: 'Fuel strainer (port side, low point)' });
-  pump = b.add('fuelPump', [0, .22, L * .4], { name: 'Boost pump (under floor, fwd)' });
+  tankL = b.add('fuelTank', [-half * .35, surfY, 0], { name: 'Port tank' });
+  tankR = b.add('fuelTank', [half * .35, surfY, 0], { name: 'Starboard tank' });
+  // gascolator + boost pump: strainer embedded low INSIDE the aft fuselage,
+  // pump embedded low inside the forward fuselage — the fuel line runs under the
+  // cabin floor and climbs to the engine ahead of the firewall (real GA routing),
+  // and both parts physically overlap the fuselage block so they can never
+  // detach as floating fragments at flight start
+  strainer = b.add('fuelStrainer', [-W * .25, .18, -L * .05], { name: 'Fuel strainer (belly, aft)' });
+  pump = b.add('fuelPump', [0, .3, Math.min(L * .27 + .4, L * .31 - .05)], { name: 'Boost pump (under floor, fwd)' });
   b.wire(tankL, strainer, 'fuel'); b.wire(tankR, strainer, 'fuel');
   if (pump) b.wire(strainer, pump, 'fuel');
   const fuelTo = pump || strainer;
@@ -209,8 +213,8 @@ function designFor(cfg) {
   if (heavy) {
     hydPump = b.add('hydraulicPump', [W * .3, H * .35, -L * .1], { name: 'Hydraulic pump' });
     const hydRes = b.add('hydraulicReservoir', [W * .3, H * .45, -L * .15], { name: 'Hydraulic reservoir' });
-    const act1 = b.add('hydraulicActuator', [-W * .8, H * .28, L * .04], { name: 'Gear actuator (port main)' });
-    const act2 = b.add('hydraulicActuator', [W * .8, H * .28, L * .04], { name: 'Gear actuator (stbd main)' });
+    const act1 = b.add('hydraulicActuator', [-W * .35, H * .28, L * .04], { name: 'Gear actuator (port main)' });
+    const act2 = b.add('hydraulicActuator', [W * .35, H * .28, L * .04], { name: 'Gear actuator (stbd main)' });
     b.wire(hydPump, hydRes, 'hydraulic'); b.wire(hydRes, act1, 'hydraulic'); b.wire(hydRes, act2, 'hydraulic');
     b.wire(act1, hydPump, 'hydraulic'); b.wire(act2, hydPump, 'hydraulic'); // return lines
     b.wire(cb, hydPump, 'power'); b.wire(bus, hydPump, 'ground');
@@ -219,16 +223,18 @@ function designFor(cfg) {
   /* --- lights: port red, starboard green, aft white; strobes wingtips+tail;
          beacon top and bottom; landing lights on the wing --- */
   const tipX = isDelta ? half * .9 : half;
-  const navL = b.add('navLight', [-tipX, wingY + .06, 0], { name: 'Nav light (port, red)', color: '#ff2d2d' });
-  const navR = b.add('navLight', [tipX, wingY + .06, 0], { name: 'Nav light (stbd, green)', color: '#2dff5a' });
+  const navL = b.add('navLight', [-tipX, surfY + .06, 0], { name: 'Nav light (port, red)', color: '#ff2d2d' });
+  const navR = b.add('navLight', [tipX, surfY + .06, 0], { name: 'Nav light (stbd, green)', color: '#2dff5a' });
   const navT = b.add('navLight', [0, fin.position.y, -L * .44], { name: 'Nav light (tail, white)', color: '#ffffff' });
-  const strobeL = b.add('strobeLight', [-tipX * .98, wingY + .06, .05], { name: 'Strobe (port wingtip)' });
-  const strobeR = b.add('strobeLight', [tipX * .98, wingY + .06, .05], { name: 'Strobe (stbd wingtip)' });
+  const strobeL = b.add('strobeLight', [-tipX * .98, surfY + .06, .05], { name: 'Strobe (port wingtip)' });
+  const strobeR = b.add('strobeLight', [tipX * .98, surfY + .06, .05], { name: 'Strobe (stbd wingtip)' });
   const strobeT = b.add('strobeLight', [0, fin.position.y + .1, -L * .44], { name: 'Strobe (tailcone)' });
-  const beaconTop = b.add('beaconLight', [0, H + cfg.height * .25, -L * .38], { name: 'Beacon (top)' });
+  const beaconTop = b.add('beaconLight', [0, H * .8, -L * .38], { name: 'Beacon (top)' });
   const beaconBot = b.add('beaconLight', [0, H * .18, -L * .3], { name: 'Beacon (bottom)' });
-  const landL = b.add('landingLight', [-half * .3, wingY - .04, L * .1], { name: 'Landing light (port)' });
-  const landR = b.add('landingLight', [half * .3, wingY - .04, L * .1], { name: 'Landing light (stbd)' });
+  // landing lights embedded in the wing-root region of the fuselage block —
+  // physically overlapping the block so they stay attached in flight
+  const landL = b.add('landingLight', [-W * .3, H * .5, L * .15], { name: 'Landing light (port)' });
+  const landR = b.add('landingLight', [W * .3, H * .5, L * .15], { name: 'Landing light (stbd)' });
   const lightParts = [navL, navR, navT, strobeL, strobeR, strobeT, beaconTop, beaconBot, landL, landR];
   for (const lp of lightParts) { b.wire(cb, lp, 'power'); b.wire(bus, lp, 'ground'); }
   // jet engines have FADEC electronics: they need the main power circuit + ground return
@@ -262,6 +268,30 @@ function designFor(cfg) {
 }
 function partsOf(b, re) {
   return b.parts.filter(p => re.test(p.name));
+}
+
+/* every part must physically overlap another part (raw bounding boxes, no
+   tolerance): the flight model detaches any part that does not touch the main
+   structure (client rule: 25 mm hull contact, which raw overlap always
+   satisfies). A part failing this breaks off at flight start and is lost. */
+function contactOk(snap, catalog) {
+  const bad = [];
+  for (const p of snap.parts) {
+    const d = catalog[p.type];
+    const s = p.scale || { x: 1, y: 1, z: 1 };
+    const size = (d && d.size) || [0.5, 0.5, 0.5];
+    const c = p.position;
+    const ry = (p.rotation && p.rotation.y) || 0;
+    let hx = size[0] * (s.x || 1) / 2, hz = size[2] * (s.z || 1) / 2;
+    if (Math.abs(Math.abs(ry) - Math.PI / 2) < 0.01) { const t = hx; hx = hz; hz = t; }
+    p._box = { minX: c.x - hx, maxX: c.x + hx, minY: c.y - size[1] * (s.y || 1) / 2, maxY: c.y + size[1] * (s.y || 1) / 2, minZ: c.z - hz, maxZ: c.z + hz };
+  }
+  const inter = (a, b) => !(a.maxX <= b.minX || b.maxX <= a.minX || a.maxY <= b.minY || b.maxY <= a.minY || a.maxZ <= b.minZ || b.maxZ <= a.minZ);
+  for (const p of snap.parts) {
+    if (!snap.parts.some(q => q !== p && inter(p._box, q._box))) bad.push(p.name);
+  }
+  for (const p of snap.parts) delete p._box;
+  return bad;
 }
 
 /* ---------- client-style validation (mirrors validateDesign) ---------- */
@@ -327,6 +357,8 @@ function validate(snap) {
   for (const g of snap.groups) for (const id of g.parts) if (!ids.has(id)) throw new Error('group dangling part');
   const clear = cockpitClearOk(snap);
   if (clear !== true) throw new Error('fuel routing: ' + clear);
+  const loose = contactOk(snap, WORKSHOP_PARTS);
+  if (loose.length) throw new Error('floating parts (no physical contact): ' + loose.join(', '));
 }
 
 /* ---------- main (CLI only, not on import) ---------- */
@@ -340,7 +372,7 @@ function buildAll() {
   for (const cfg of Object.values(AIRCRAFT_FLEET)) {
     const snap = designFor(cfg);
     snap.format = 'FlightWorldWorkshop'; snap.version = 2;
-    validate(snap); // throws on the first invalid design
+    try { validate(snap); } catch (e) { throw new Error('[' + cfg.name + '] ' + e.message); } // throws on the first invalid design
     designs.push({ name: cfg.name, kind: 'preset', data: { schema: 'flightworld-build', version: 1, name: cfg.name, build: snap } });
   }
   return designs;
