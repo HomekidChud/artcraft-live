@@ -77,13 +77,17 @@ function designFor(cfg) {
   const b = makeBuilder();
   const L = cfg.length, W = cfg.bodyWidth, H = cfg.bodyHeight;
   const half = cfg.wingspan / 2;
-  const wingY = cfg.wingPlacement === 'high' ? H * .78 : H * .18;
   const isDelta = /delta/i.test(cfg.role) || cfg.id === 'concorde';
+  const jet = ['jet', 'supersonic', 'fighter'].includes(cfg.engineType);
+  // low-wing piston twins: the wing must sit high enough that the nacelles
+  // (lifted for prop ground-clearance) still overlap the wing slab — otherwise
+  // the engines break off at flight start (DA42 lesson)
+  const pistonMulti = !jet && cfg.engineCount > 1;
+  const wingY = cfg.wingPlacement === 'high' ? H * .78 : (pistonMulti ? Math.max(H * .18, .55) : H * .18);
   // delta designs carry everything on the delta slab itself (y = H·.42)
   const surfY = isDelta ? H * .42 : wingY;
   const isGlider = cfg.engineType === 'glider' || cfg.engineCount === 0;
   const heavy = (cfg.massKg || 0) > 8000;
-  const jet = ['jet', 'supersonic', 'fighter'].includes(cfg.engineType);
 
   /* --- structure: fuselage, wing, tail --- */
   const body = b.add('bodyBlock', [0, H * .5, 0], {
@@ -127,7 +131,7 @@ function designFor(cfg) {
     const n = cfg.engineCount;
     const propR = cfg.propBlades >= 4 ? .9 : .775;
     // keep the prop disk and the scaled nacelles clear of the ground plane (y=0)
-    const engineY = isDelta ? H * .42 : (jet ? Math.max(wingY - .1, .36 * jetScale + .3) : Math.max(wingY - .1, propR + .15));
+    const engineY = isDelta ? H * .42 : (jet ? Math.max(wingY - .1, .36 * jetScale + .3) : (cfg.engineCount > 1 ? wingY + .1 : Math.max(wingY - .1, propR + .15)));
     for (let i = 0; i < n; i++) {
       const side = i % 2 === 0 ? 1 : -1;
       const rank = Math.floor(i / 2);

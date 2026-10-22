@@ -7789,7 +7789,7 @@
       "name": "Port wing",
       "position": {
        "x": -3.355,
-       "y": 0.238,
+       "y": 0.55,
        "z": 0
       },
       "rotation": {
@@ -7814,7 +7814,7 @@
       "name": "Starboard wing",
       "position": {
        "x": 3.355,
-       "y": 0.238,
+       "y": 0.55,
        "z": 0
       },
       "rotation": {
@@ -7939,7 +7939,7 @@
       "name": "Engine 1",
       "position": {
        "x": 3.02,
-       "y": 0.925,
+       "y": 0.65,
        "z": 0.6
       },
       "rotation": {
@@ -7964,7 +7964,7 @@
       "name": "Propeller 1",
       "position": {
        "x": 3.02,
-       "y": 0.925,
+       "y": 0.65,
        "z": 0.98
       },
       "rotation": {
@@ -7989,7 +7989,7 @@
       "name": "Engine 2",
       "position": {
        "x": -3.019,
-       "y": 0.925,
+       "y": 0.65,
        "z": 0.6
       },
       "rotation": {
@@ -8014,7 +8014,7 @@
       "name": "Propeller 2",
       "position": {
        "x": -3.019,
-       "y": 0.925,
+       "y": 0.65,
        "z": 0.98
       },
       "rotation": {
@@ -8489,7 +8489,7 @@
       "name": "Port tank",
       "position": {
        "x": -2.348,
-       "y": 0.238,
+       "y": 0.55,
        "z": 0
       },
       "rotation": {
@@ -8514,7 +8514,7 @@
       "name": "Starboard tank",
       "position": {
        "x": 2.349,
-       "y": 0.238,
+       "y": 0.55,
        "z": 0
       },
       "rotation": {
@@ -8664,7 +8664,7 @@
       "name": "Alternator",
       "position": {
        "x": 3.02,
-       "y": 1.125,
+       "y": 0.85,
        "z": 0.2
       },
       "rotation": {
@@ -8689,7 +8689,7 @@
       "name": "Nav light (port, red)",
       "position": {
        "x": -6.71,
-       "y": 0.298,
+       "y": 0.61,
        "z": 0
       },
       "rotation": {
@@ -8714,7 +8714,7 @@
       "name": "Nav light (stbd, green)",
       "position": {
        "x": 6.71,
-       "y": 0.298,
+       "y": 0.61,
        "z": 0
       },
       "rotation": {
@@ -8764,7 +8764,7 @@
       "name": "Strobe (port wingtip)",
       "position": {
        "x": -6.576,
-       "y": 0.298,
+       "y": 0.61,
        "z": 0.05
       },
       "rotation": {
@@ -8789,7 +8789,7 @@
       "name": "Strobe (stbd wingtip)",
       "position": {
        "x": 6.576,
-       "y": 0.298,
+       "y": 0.61,
        "z": 0.05
       },
       "rotation": {
@@ -15087,7 +15087,7 @@
       "name": "Port wing",
       "position": {
        "x": -4.412,
-       "y": 0.36,
+       "y": 0.55,
        "z": 0
       },
       "rotation": {
@@ -15112,7 +15112,7 @@
       "name": "Starboard wing",
       "position": {
        "x": 4.413,
-       "y": 0.36,
+       "y": 0.55,
        "z": 0
       },
       "rotation": {
@@ -15237,7 +15237,7 @@
       "name": "Engine 1",
       "position": {
        "x": 3.971,
-       "y": 1.05,
+       "y": 0.65,
        "z": 0.6
       },
       "rotation": {
@@ -15262,7 +15262,7 @@
       "name": "Propeller 1",
       "position": {
        "x": 3.971,
-       "y": 1.05,
+       "y": 0.65,
        "z": 0.98
       },
       "rotation": {
@@ -15287,7 +15287,7 @@
       "name": "Engine 2",
       "position": {
        "x": -3.971,
-       "y": 1.05,
+       "y": 0.65,
        "z": 0.6
       },
       "rotation": {
@@ -15312,7 +15312,7 @@
       "name": "Propeller 2",
       "position": {
        "x": -3.971,
-       "y": 1.05,
+       "y": 0.65,
        "z": 0.98
       },
       "rotation": {
@@ -15787,7 +15787,7 @@
       "name": "Port tank",
       "position": {
        "x": -3.089,
-       "y": 0.36,
+       "y": 0.55,
        "z": 0
       },
       "rotation": {
@@ -15812,7 +15812,7 @@
       "name": "Starboard tank",
       "position": {
        "x": 3.089,
-       "y": 0.36,
+       "y": 0.55,
        "z": 0
       },
       "rotation": {
@@ -15962,7 +15962,7 @@
       "name": "Alternator",
       "position": {
        "x": 3.971,
-       "y": 1.25,
+       "y": 0.85,
        "z": 0.2
       },
       "rotation": {
@@ -15987,7 +15987,7 @@
       "name": "Nav light (port, red)",
       "position": {
        "x": -8.825,
-       "y": 0.42,
+       "y": 0.61,
        "z": 0
       },
       "rotation": {
@@ -16012,7 +16012,7 @@
       "name": "Nav light (stbd, green)",
       "position": {
        "x": 8.825,
-       "y": 0.42,
+       "y": 0.61,
        "z": 0
       },
       "rotation": {
@@ -16062,7 +16062,7 @@
       "name": "Strobe (port wingtip)",
       "position": {
        "x": -8.648,
-       "y": 0.42,
+       "y": 0.61,
        "z": 0.05
       },
       "rotation": {
@@ -16087,7 +16087,7 @@
       "name": "Strobe (stbd wingtip)",
       "position": {
        "x": 8.648,
-       "y": 0.42,
+       "y": 0.61,
        "z": 0.05
       },
       "rotation": {
@@ -27839,7 +27839,7 @@
       "name": "Engine 1",
       "position": {
        "x": 9.092,
-       "y": 2.591,
+       "y": 2.791,
        "z": 0.6
       },
       "rotation": {
@@ -27864,7 +27864,7 @@
       "name": "Propeller 1",
       "position": {
        "x": 9.092,
-       "y": 2.591,
+       "y": 2.791,
        "z": 0.98
       },
       "rotation": {
@@ -27889,7 +27889,7 @@
       "name": "Engine 2",
       "position": {
        "x": -9.092,
-       "y": 2.591,
+       "y": 2.791,
        "z": 0.6
       },
       "rotation": {
@@ -27914,7 +27914,7 @@
       "name": "Propeller 2",
       "position": {
        "x": -9.092,
-       "y": 2.591,
+       "y": 2.791,
        "z": 0.98
       },
       "rotation": {
@@ -27939,7 +27939,7 @@
       "name": "Engine 3",
       "position": {
        "x": 14.143,
-       "y": 2.591,
+       "y": 2.791,
        "z": 0.6
       },
       "rotation": {
@@ -27964,7 +27964,7 @@
       "name": "Propeller 3",
       "position": {
        "x": 14.143,
-       "y": 2.591,
+       "y": 2.791,
        "z": 0.98
       },
       "rotation": {
@@ -27989,7 +27989,7 @@
       "name": "Engine 4",
       "position": {
        "x": -14.143,
-       "y": 2.591,
+       "y": 2.791,
        "z": 0.6
       },
       "rotation": {
@@ -28014,7 +28014,7 @@
       "name": "Propeller 4",
       "position": {
        "x": -14.143,
-       "y": 2.591,
+       "y": 2.791,
        "z": 0.98
       },
       "rotation": {
@@ -28639,7 +28639,7 @@
       "name": "Alternator",
       "position": {
        "x": 9.092,
-       "y": 2.791,
+       "y": 2.991,
        "z": 0.2
       },
       "rotation": {
