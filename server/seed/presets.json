@@ -1,0 +1,3271 @@
+[
+ {
+  "name": "Rocket preset",
+  "kind": "preset",
+  "data": {
+   "schema": "flightworld-build",
+   "version": 1,
+   "name": "Rocket preset",
+   "build": {
+    "name": "Rocket preset",
+    "symmetryEnabled": true,
+    "snapIncrement": 0.25,
+    "parts": [
+     {
+      "id": "part-94",
+      "type": "rocketBody",
+      "name": "Rocket core / body",
+      "position": {
+       "x": 0,
+       "y": 1.35,
+       "z": 0
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-95",
+      "type": "noseCone",
+      "name": "Nose cone",
+      "position": {
+       "x": 0,
+       "y": 1.35,
+       "z": 2.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.9,
+       "y": 0.9,
+       "z": 1.15
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-96",
+      "type": "fuelTank",
+      "name": "Fuel tank",
+      "position": {
+       "x": 0,
+       "y": 1.35,
+       "z": -0.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.75,
+       "y": 0.75,
+       "z": 1.6
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-97",
+      "type": "rocketEngine",
+      "name": "Liquid rocket engine",
+      "position": {
+       "x": 0,
+       "y": 1.35,
+       "z": -2.7
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-98",
+      "type": "fin",
+      "name": "Vertical fin",
+      "position": {
+       "x": 0.53,
+       "y": 1.35,
+       "z": -1.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": -0.14
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1.2,
+       "y": 0.72,
+       "z": 0.78
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-99",
+      "type": "fin",
+      "name": "Vertical fin",
+      "position": {
+       "x": -0.53,
+       "y": 1.35,
+       "z": -1.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0.14
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1.2,
+       "y": 0.72,
+       "z": 0.78
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-100",
+      "type": "fin",
+      "name": "Vertical fin",
+      "position": {
+       "x": 0,
+       "y": 1.88,
+       "z": -1.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 1.5707963267948966
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.72,
+       "y": 0.72,
+       "z": 0.78
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-101",
+      "type": "gearStrut",
+      "name": "Landing-gear strut",
+      "position": {
+       "x": 0.45,
+       "y": 0.72,
+       "z": -0.75
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.75,
+       "y": 0.7,
+       "z": 0.75
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-102",
+      "type": "wheel",
+      "name": "Landing wheel",
+      "position": {
+       "x": 0.45,
+       "y": 0.35,
+       "z": -0.75
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.75,
+       "y": 0.75,
+       "z": 0.75
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-103",
+      "type": "gearStrut",
+      "name": "Landing-gear strut",
+      "position": {
+       "x": -0.45,
+       "y": 0.72,
+       "z": -0.75
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.75,
+       "y": 0.7,
+       "z": 0.75
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-104",
+      "type": "wheel",
+      "name": "Landing wheel",
+      "position": {
+       "x": -0.45,
+       "y": 0.35,
+       "z": -0.75
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.75,
+       "y": 0.75,
+       "z": 0.75
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     }
+    ],
+    "wires": []
+   }
+  }
+ },
+ {
+  "name": "Glider preset",
+  "kind": "preset",
+  "data": {
+   "schema": "flightworld-build",
+   "version": 1,
+   "name": "Glider preset",
+   "build": {
+    "name": "Glider preset",
+    "symmetryEnabled": true,
+    "snapIncrement": 0.25,
+    "parts": [
+     {
+      "id": "part-76",
+      "type": "bodyBlock",
+      "name": "Fuselage block",
+      "position": {
+       "x": 0,
+       "y": 0.86,
+       "z": 0
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.72,
+       "y": 0.72,
+       "z": 2
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-77",
+      "type": "longWing",
+      "name": "Long-span wing",
+      "position": {
+       "x": 0,
+       "y": 1.1,
+       "z": 0.1
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-78",
+      "type": "tailplane",
+      "name": "Horizontal stabiliser",
+      "position": {
+       "x": 0,
+       "y": 0.92,
+       "z": -3
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.9,
+       "y": 0.8,
+       "z": 0.85
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-79",
+      "type": "fin",
+      "name": "Vertical fin",
+      "position": {
+       "x": 0,
+       "y": 1.38,
+       "z": -3.05
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 0.85,
+       "z": 0.85
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-80",
+      "type": "skid",
+      "name": "Tail skid",
+      "position": {
+       "x": 0,
+       "y": 0.525,
+       "z": -0.2
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 4.8
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-81",
+      "type": "canopy",
+      "name": "Clear canopy",
+      "position": {
+       "x": 0,
+       "y": 1.29,
+       "z": 1.2
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.75,
+       "y": 1,
+       "z": 1.35
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-82",
+      "type": "aileron",
+      "name": "Aileron",
+      "position": {
+       "x": -3,
+       "y": 1.05,
+       "z": -0.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-83",
+      "type": "aileron",
+      "name": "Aileron",
+      "position": {
+       "x": 3,
+       "y": 1.05,
+       "z": -0.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-84",
+      "type": "elevator",
+      "name": "Elevator",
+      "position": {
+       "x": -0.5,
+       "y": 0.92,
+       "z": -3.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-85",
+      "type": "elevator",
+      "name": "Elevator",
+      "position": {
+       "x": 0.5,
+       "y": 0.92,
+       "z": -3.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-86",
+      "type": "rudder",
+      "name": "Rudder",
+      "position": {
+       "x": 0,
+       "y": 1.35,
+       "z": -3.5
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-87",
+      "type": "battery",
+      "name": "Battery pack",
+      "position": {
+       "x": 0,
+       "y": 0.98,
+       "z": -0.9
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-88",
+      "type": "powerBus",
+      "name": "Power distribution bus",
+      "position": {
+       "x": 0,
+       "y": 1,
+       "z": -0.6
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-89",
+      "type": "circuitBreaker",
+      "name": "Circuit breaker",
+      "position": {
+       "x": 0.1,
+       "y": 1,
+       "z": -0.5
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-90",
+      "type": "navLight",
+      "name": "Navigation light",
+      "position": {
+       "x": -4.05,
+       "y": 1.16,
+       "z": 0.1
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-91",
+      "type": "navLight",
+      "name": "Navigation light",
+      "position": {
+       "x": 4.05,
+       "y": 1.16,
+       "z": 0.1
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": "#3ddc55",
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-92",
+      "type": "navLight",
+      "name": "Navigation light",
+      "position": {
+       "x": 0,
+       "y": 1.5,
+       "z": -3.05
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": "#ffffff",
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-93",
+      "type": "beaconLight",
+      "name": "Rotating beacon",
+      "position": {
+       "x": 0,
+       "y": 1.98,
+       "z": -3.1
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     }
+    ],
+    "wires": [
+     {
+      "from": "part-87",
+      "to": "part-88",
+      "kind": "ground"
+     },
+     {
+      "from": "part-88",
+      "to": "part-89",
+      "kind": "ground"
+     },
+     {
+      "from": "part-88",
+      "to": "part-90",
+      "kind": "ground"
+     },
+     {
+      "from": "part-88",
+      "to": "part-91",
+      "kind": "ground"
+     },
+     {
+      "from": "part-88",
+      "to": "part-92",
+      "kind": "ground"
+     },
+     {
+      "from": "part-88",
+      "to": "part-93",
+      "kind": "ground"
+     },
+     {
+      "from": "part-87",
+      "to": "part-88",
+      "kind": "power"
+     },
+     {
+      "from": "part-88",
+      "to": "part-89",
+      "kind": "power"
+     },
+     {
+      "from": "part-89",
+      "to": "part-90",
+      "kind": "power"
+     },
+     {
+      "from": "part-89",
+      "to": "part-91",
+      "kind": "power"
+     },
+     {
+      "from": "part-89",
+      "to": "part-92",
+      "kind": "power"
+     },
+     {
+      "from": "part-89",
+      "to": "part-93",
+      "kind": "power"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "Twin Engine preset",
+  "kind": "preset",
+  "data": {
+   "schema": "flightworld-build",
+   "version": 1,
+   "name": "Twin Engine preset",
+   "build": {
+    "name": "Twin Engine preset",
+    "symmetryEnabled": true,
+    "snapIncrement": 0.25,
+    "parts": [
+     {
+      "id": "part-36",
+      "type": "bodyBlock",
+      "name": "Fuselage block",
+      "position": {
+       "x": 0,
+       "y": 1.14,
+       "z": 0
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1.35
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-37",
+      "type": "cabinBlock",
+      "name": "Cabin / cockpit block",
+      "position": {
+       "x": 0,
+       "y": 1.46,
+       "z": 0.45
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 0.85,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-38",
+      "type": "noseCone",
+      "name": "Nose cone",
+      "position": {
+       "x": 0,
+       "y": 1.14,
+       "z": -2.45
+      },
+      "rotationY": 3.141592653589793,
+      "rotation": {
+       "x": 0,
+       "y": 3.141592653589793,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.75,
+       "y": 0.8,
+       "z": 1.1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-39",
+      "type": "longWing",
+      "name": "Long-span wing",
+      "position": {
+       "x": 0,
+       "y": 1.25,
+       "z": 0.05
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-40",
+      "type": "tailplane",
+      "name": "Horizontal stabiliser",
+      "position": {
+       "x": 0,
+       "y": 1.25,
+       "z": -2.3
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-41",
+      "type": "fin",
+      "name": "Vertical fin",
+      "position": {
+       "x": 0,
+       "y": 1.76,
+       "z": -2.4
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-42",
+      "type": "pistonEngine",
+      "name": "Piston engine block",
+      "position": {
+       "x": -2,
+       "y": 1.175,
+       "z": 0.65
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-43",
+      "type": "prop2",
+      "name": "2-blade propeller",
+      "position": {
+       "x": -2,
+       "y": 1.175,
+       "z": 1.0996000000000001
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-44",
+      "type": "pistonEngine",
+      "name": "Piston engine block",
+      "position": {
+       "x": 2,
+       "y": 1.175,
+       "z": 0.65
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-45",
+      "type": "prop2",
+      "name": "2-blade propeller",
+      "position": {
+       "x": 2,
+       "y": 1.175,
+       "z": 1.0996000000000001
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-46",
+      "type": "gearStrut",
+      "name": "Landing-gear strut",
+      "position": {
+       "x": -0.6,
+       "y": 0.72,
+       "z": -0.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 0.72,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-47",
+      "type": "wheel",
+      "name": "Landing wheel",
+      "position": {
+       "x": -0.6,
+       "y": 0.36,
+       "z": -0.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-48",
+      "type": "gearStrut",
+      "name": "Landing-gear strut",
+      "position": {
+       "x": 0.6,
+       "y": 0.72,
+       "z": -0.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 0.72,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-49",
+      "type": "wheel",
+      "name": "Landing wheel",
+      "position": {
+       "x": 0.6,
+       "y": 0.36,
+       "z": -0.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-50",
+      "type": "gearStrut",
+      "name": "Landing-gear strut",
+      "position": {
+       "x": 0,
+       "y": 0.666,
+       "z": 1.9
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.8,
+       "y": 0.828,
+       "z": 0.8
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-51",
+      "type": "wheel",
+      "name": "Landing wheel",
+      "position": {
+       "x": 0,
+       "y": 0.252,
+       "z": 1.9
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.7,
+       "y": 0.7,
+       "z": 0.7
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-52",
+      "type": "aileron",
+      "name": "Aileron",
+      "position": {
+       "x": -2.2,
+       "y": 1.2,
+       "z": -0.6
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-53",
+      "type": "aileron",
+      "name": "Aileron",
+      "position": {
+       "x": 2.2,
+       "y": 1.2,
+       "z": -0.6
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-54",
+      "type": "elevator",
+      "name": "Elevator",
+      "position": {
+       "x": -0.6,
+       "y": 1.25,
+       "z": -2.72
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-55",
+      "type": "elevator",
+      "name": "Elevator",
+      "position": {
+       "x": 0.6,
+       "y": 1.25,
+       "z": -2.72
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-56",
+      "type": "rudder",
+      "name": "Rudder",
+      "position": {
+       "x": 0,
+       "y": 1.7,
+       "z": -2.85
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-57",
+      "type": "battery",
+      "name": "Battery pack",
+      "position": {
+       "x": 0,
+       "y": 1,
+       "z": -0.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-58",
+      "type": "powerBus",
+      "name": "Power distribution bus",
+      "position": {
+       "x": 0,
+       "y": 1.04,
+       "z": -0.32
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-59",
+      "type": "circuitBreaker",
+      "name": "Circuit breaker",
+      "position": {
+       "x": 0.13,
+       "y": 1.04,
+       "z": -0.2
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-60",
+      "type": "flightComputer",
+      "name": "Flight computer",
+      "position": {
+       "x": 0.17,
+       "y": 1.02,
+       "z": -0.65
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-61",
+      "type": "servo",
+      "name": "Control servo",
+      "position": {
+       "x": -0.18,
+       "y": 1.02,
+       "z": -0.65
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-62",
+      "type": "instrumentPanel",
+      "name": "Instrument panel",
+      "position": {
+       "x": 0,
+       "y": 1.52,
+       "z": 0.62
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-63",
+      "type": "alternator",
+      "name": "Alternator / generator",
+      "position": {
+       "x": -2,
+       "y": 1.375,
+       "z": 0.09999999999999998
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-64",
+      "type": "navLight",
+      "name": "Navigation light",
+      "position": {
+       "x": -4.05,
+       "y": 1.32,
+       "z": 0.05
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-65",
+      "type": "navLight",
+      "name": "Navigation light",
+      "position": {
+       "x": 4.05,
+       "y": 1.32,
+       "z": 0.05
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": "#3ddc55",
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-66",
+      "type": "navLight",
+      "name": "Navigation light",
+      "position": {
+       "x": 0,
+       "y": 1.88,
+       "z": -2.42
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": "#ffffff",
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-67",
+      "type": "beaconLight",
+      "name": "Rotating beacon",
+      "position": {
+       "x": 0,
+       "y": 2.36,
+       "z": -2.4
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-68",
+      "type": "landingLight",
+      "name": "Landing light",
+      "position": {
+       "x": -1.5,
+       "y": 1.28,
+       "z": 0.7
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-69",
+      "type": "landingLight",
+      "name": "Landing light",
+      "position": {
+       "x": 1.5,
+       "y": 1.28,
+       "z": 0.7
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-70",
+      "type": "fuelTank",
+      "name": "Fuel tank",
+      "position": {
+       "x": 0,
+       "y": 0.88,
+       "z": -0.9
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-71",
+      "type": "fuelStrainer",
+      "name": "Fuel strainer / gascolator",
+      "position": {
+       "x": 0,
+       "y": 0.8,
+       "z": -0.15
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-72",
+      "type": "fuelPump",
+      "name": "Electric fuel pump",
+      "position": {
+       "x": 0,
+       "y": 0.84,
+       "z": 0.4
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-73",
+      "type": "hydraulicPump",
+      "name": "Hydraulic pump",
+      "position": {
+       "x": 0.32,
+       "y": 1.08,
+       "z": -0.62
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-74",
+      "type": "hydraulicReservoir",
+      "name": "Hydraulic reservoir",
+      "position": {
+       "x": 0.32,
+       "y": 1.08,
+       "z": -0.88
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-75",
+      "type": "hydraulicActuator",
+      "name": "Hydraulic actuator",
+      "position": {
+       "x": 0.6,
+       "y": 0.86,
+       "z": -0.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     }
+    ],
+    "wires": [
+     {
+      "from": "part-57",
+      "to": "part-58",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-59",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-63",
+      "kind": "ground"
+     },
+     {
+      "from": "part-59",
+      "to": "part-60",
+      "kind": "ground"
+     },
+     {
+      "from": "part-60",
+      "to": "part-61",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-62",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-72",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-64",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-65",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-66",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-67",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-68",
+      "kind": "ground"
+     },
+     {
+      "from": "part-58",
+      "to": "part-69",
+      "kind": "ground"
+     },
+     {
+      "from": "part-57",
+      "to": "part-58",
+      "kind": "power"
+     },
+     {
+      "from": "part-63",
+      "to": "part-58",
+      "kind": "power"
+     },
+     {
+      "from": "part-58",
+      "to": "part-59",
+      "kind": "power"
+     },
+     {
+      "from": "part-59",
+      "to": "part-62",
+      "kind": "power"
+     },
+     {
+      "from": "part-59",
+      "to": "part-60",
+      "kind": "power"
+     },
+     {
+      "from": "part-59",
+      "to": "part-72",
+      "kind": "power"
+     },
+     {
+      "from": "part-59",
+      "to": "part-64",
+      "kind": "power"
+     },
+     {
+      "from": "part-59",
+      "to": "part-65",
+      "kind": "power"
+     },
+     {
+      "from": "part-59",
+      "to": "part-66",
+      "kind": "power"
+     },
+     {
+      "from": "part-59",
+      "to": "part-67",
+      "kind": "power"
+     },
+     {
+      "from": "part-59",
+      "to": "part-68",
+      "kind": "power"
+     },
+     {
+      "from": "part-59",
+      "to": "part-69",
+      "kind": "power"
+     },
+     {
+      "from": "part-60",
+      "to": "part-61",
+      "kind": "power"
+     },
+     {
+      "from": "part-60",
+      "to": "part-61",
+      "kind": "signal"
+     },
+     {
+      "from": "part-70",
+      "to": "part-71",
+      "kind": "fuel"
+     },
+     {
+      "from": "part-71",
+      "to": "part-72",
+      "kind": "fuel"
+     },
+     {
+      "from": "part-72",
+      "to": "part-42",
+      "kind": "fuel"
+     },
+     {
+      "from": "part-72",
+      "to": "part-44",
+      "kind": "fuel"
+     },
+     {
+      "from": "part-59",
+      "to": "part-73",
+      "kind": "power"
+     },
+     {
+      "from": "part-58",
+      "to": "part-73",
+      "kind": "ground"
+     },
+     {
+      "from": "part-73",
+      "to": "part-74",
+      "kind": "hydraulic"
+     },
+     {
+      "from": "part-74",
+      "to": "part-75",
+      "kind": "hydraulic"
+     },
+     {
+      "from": "part-75",
+      "to": "part-73",
+      "kind": "hydraulic"
+     }
+    ]
+   }
+  }
+ },
+ {
+  "name": "Basic Trainer preset",
+  "kind": "preset",
+  "data": {
+   "schema": "flightworld-build",
+   "version": 1,
+   "name": "Basic Trainer preset",
+   "build": {
+    "name": "Basic Trainer preset",
+    "symmetryEnabled": true,
+    "snapIncrement": 0.25,
+    "parts": [
+     {
+      "id": "part-1",
+      "type": "bodyBlock",
+      "name": "Fuselage block",
+      "position": {
+       "x": 0,
+       "y": 1.14,
+       "z": 0
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1.35
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-2",
+      "type": "cabinBlock",
+      "name": "Cabin / cockpit block",
+      "position": {
+       "x": 0,
+       "y": 1.46,
+       "z": 0.45
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 0.85,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-3",
+      "type": "noseCone",
+      "name": "Nose cone",
+      "position": {
+       "x": 0,
+       "y": 1.14,
+       "z": -2.45
+      },
+      "rotationY": 3.141592653589793,
+      "rotation": {
+       "x": 0,
+       "y": 3.141592653589793,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.75,
+       "y": 0.8,
+       "z": 1.1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-4",
+      "type": "wingPanel",
+      "name": "Main wing panel",
+      "position": {
+       "x": 0,
+       "y": 1.96,
+       "z": 0.05
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-5",
+      "type": "tailplane",
+      "name": "Horizontal stabiliser",
+      "position": {
+       "x": 0,
+       "y": 1.25,
+       "z": -2.3
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-6",
+      "type": "fin",
+      "name": "Vertical fin",
+      "position": {
+       "x": 0,
+       "y": 1.76,
+       "z": -2.4
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-7",
+      "type": "pistonEngine",
+      "name": "Piston engine block",
+      "position": {
+       "x": 0,
+       "y": 1.32,
+       "z": 2.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-8",
+      "type": "prop2",
+      "name": "2-blade propeller",
+      "position": {
+       "x": 0,
+       "y": 1.32,
+       "z": 2.9996
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-9",
+      "type": "gearStrut",
+      "name": "Landing-gear strut",
+      "position": {
+       "x": -0.6,
+       "y": 0.72,
+       "z": -0.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 0.72,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-10",
+      "type": "wheel",
+      "name": "Landing wheel",
+      "position": {
+       "x": -0.6,
+       "y": 0.36,
+       "z": -0.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-11",
+      "type": "gearStrut",
+      "name": "Landing-gear strut",
+      "position": {
+       "x": 0.6,
+       "y": 0.72,
+       "z": -0.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 0.72,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-12",
+      "type": "wheel",
+      "name": "Landing wheel",
+      "position": {
+       "x": 0.6,
+       "y": 0.36,
+       "z": -0.35
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-13",
+      "type": "gearStrut",
+      "name": "Landing-gear strut",
+      "position": {
+       "x": 0,
+       "y": 0.666,
+       "z": 1.9
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.8,
+       "y": 0.828,
+       "z": 0.8
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-14",
+      "type": "wheel",
+      "name": "Landing wheel",
+      "position": {
+       "x": 0,
+       "y": 0.252,
+       "z": 1.9
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 0.7,
+       "y": 0.7,
+       "z": 0.7
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-15",
+      "type": "aileron",
+      "name": "Aileron",
+      "position": {
+       "x": -1.8,
+       "y": 1.9,
+       "z": -0.68
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-16",
+      "type": "aileron",
+      "name": "Aileron",
+      "position": {
+       "x": 1.8,
+       "y": 1.9,
+       "z": -0.68
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-17",
+      "type": "elevator",
+      "name": "Elevator",
+      "position": {
+       "x": -0.6,
+       "y": 1.25,
+       "z": -2.72
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-18",
+      "type": "elevator",
+      "name": "Elevator",
+      "position": {
+       "x": 0.6,
+       "y": 1.25,
+       "z": -2.72
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-19",
+      "type": "rudder",
+      "name": "Rudder",
+      "position": {
+       "x": 0,
+       "y": 1.7,
+       "z": -2.85
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-20",
+      "type": "battery",
+      "name": "Battery pack",
+      "position": {
+       "x": 0,
+       "y": 1,
+       "z": -0.55
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-21",
+      "type": "powerBus",
+      "name": "Power distribution bus",
+      "position": {
+       "x": 0,
+       "y": 1.04,
+       "z": -0.32
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-22",
+      "type": "circuitBreaker",
+      "name": "Circuit breaker",
+      "position": {
+       "x": 0.13,
+       "y": 1.04,
+       "z": -0.2
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-23",
+      "type": "flightComputer",
+      "name": "Flight computer",
+      "position": {
+       "x": 0.17,
+       "y": 1.02,
+       "z": -0.65
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-24",
+      "type": "servo",
+      "name": "Control servo",
+      "position": {
+       "x": -0.18,
+       "y": 1.02,
+       "z": -0.65
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-25",
+      "type": "instrumentPanel",
+      "name": "Instrument panel",
+      "position": {
+       "x": 0,
+       "y": 1.52,
+       "z": 0.62
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-26",
+      "type": "alternator",
+      "name": "Alternator / generator",
+      "position": {
+       "x": 0,
+       "y": 1.52,
+       "z": 1.9999999999999998
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-27",
+      "type": "navLight",
+      "name": "Navigation light",
+      "position": {
+       "x": -3.02,
+       "y": 2.03,
+       "z": 0.05
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-28",
+      "type": "navLight",
+      "name": "Navigation light",
+      "position": {
+       "x": 3.02,
+       "y": 2.03,
+       "z": 0.05
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": "#3ddc55",
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-29",
+      "type": "navLight",
+      "name": "Navigation light",
+      "position": {
+       "x": 0,
+       "y": 1.88,
+       "z": -2.42
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": "#ffffff",
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-30",
+      "type": "beaconLight",
+      "name": "Rotating beacon",
+      "position": {
+       "x": 0,
+       "y": 2.36,
+       "z": -2.4
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-31",
+      "type": "landingLight",
+      "name": "Landing light",
+      "position": {
+       "x": -1.5,
+       "y": 1.9899999999999998,
+       "z": 0.7
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-32",
+      "type": "landingLight",
+      "name": "Landing light",
+      "position": {
+       "x": 1.5,
+       "y": 1.9899999999999998,
+       "z": 0.7
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-33",
+      "type": "fuelTank",
+      "name": "Fuel tank",
+      "position": {
+       "x": 0,
+       "y": 0.88,
+       "z": -0.9
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-34",
+      "type": "fuelStrainer",
+      "name": "Fuel strainer / gascolator",
+      "position": {
+       "x": 0,
+       "y": 0.8,
+       "z": -0.15
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     },
+     {
+      "id": "part-35",
+      "type": "fuelPump",
+      "name": "Electric fuel pump",
+      "position": {
+       "x": 0,
+       "y": 0.84,
+       "z": 0.4
+      },
+      "rotationY": 0,
+      "rotation": {
+       "x": 0,
+       "y": 0,
+       "z": 0
+      },
+      "color": null,
+      "locked": false,
+      "unwelded": false,
+      "massOverride": null,
+      "scale": {
+       "x": 1,
+       "y": 1,
+       "z": 1
+      },
+      "symmetryPairId": null,
+      "symmetrySide": 0
+     }
+    ],
+    "wires": [
+     {
+      "from": "part-20",
+      "to": "part-21",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-22",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-26",
+      "kind": "ground"
+     },
+     {
+      "from": "part-22",
+      "to": "part-23",
+      "kind": "ground"
+     },
+     {
+      "from": "part-23",
+      "to": "part-24",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-25",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-35",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-27",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-28",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-29",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-30",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-31",
+      "kind": "ground"
+     },
+     {
+      "from": "part-21",
+      "to": "part-32",
+      "kind": "ground"
+     },
+     {
+      "from": "part-20",
+      "to": "part-21",
+      "kind": "power"
+     },
+     {
+      "from": "part-26",
+      "to": "part-21",
+      "kind": "power"
+     },
+     {
+      "from": "part-21",
+      "to": "part-22",
+      "kind": "power"
+     },
+     {
+      "from": "part-22",
+      "to": "part-25",
+      "kind": "power"
+     },
+     {
+      "from": "part-22",
+      "to": "part-23",
+      "kind": "power"
+     },
+     {
+      "from": "part-22",
+      "to": "part-35",
+      "kind": "power"
+     },
+     {
+      "from": "part-22",
+      "to": "part-27",
+      "kind": "power"
+     },
+     {
+      "from": "part-22",
+      "to": "part-28",
+      "kind": "power"
+     },
+     {
+      "from": "part-22",
+      "to": "part-29",
+      "kind": "power"
+     },
+     {
+      "from": "part-22",
+      "to": "part-30",
+      "kind": "power"
+     },
+     {
+      "from": "part-22",
+      "to": "part-31",
+      "kind": "power"
+     },
+     {
+      "from": "part-22",
+      "to": "part-32",
+      "kind": "power"
+     },
+     {
+      "from": "part-23",
+      "to": "part-24",
+      "kind": "power"
+     },
+     {
+      "from": "part-23",
+      "to": "part-24",
+      "kind": "signal"
+     },
+     {
+      "from": "part-33",
+      "to": "part-34",
+      "kind": "fuel"
+     },
+     {
+      "from": "part-34",
+      "to": "part-35",
+      "kind": "fuel"
+     },
+     {
+      "from": "part-35",
+      "to": "part-7",
+      "kind": "fuel"
+     }
+    ]
+   }
+  }
+ }
+]

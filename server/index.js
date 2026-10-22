@@ -1,7 +1,10 @@
 /* Flight World cloud build sync — implements the /api/builds contract.
- * Zero-dependency Node server. Persists to a JSON file when the filesystem
- * allows (Render free disks are ephemeral across deploys; MongoDB can be
- * attached later via MONGODB_URI without changing the client).
+ * Node server with a swappable storage adapter:
+ *   - MONGODB_URI set  → MongoDB collection (driver loaded lazily)
+ *   - otherwise        → JSON file when the filesystem is writable
+ *                         (Render free disks are ephemeral across redeploys)
+ * Bundled starter presets in seed/presets.json are loaded automatically when
+ * the store is empty, so redeploys always restore the default preset set.
  */
 const http = require('http');
 const fs = require('fs');
@@ -17,11 +20,50 @@ const DATA_FILE = path.join(DATA_DIR, 'builds.json');
 let store = { builds: {} }; // id -> {id, name, kind, data, createdAt, updatedAt}
 let storageMode = 'memory';
 
-try {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (fs.existsSync(DATA_FILE)) store = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  storageMode = 'file';
-} catch (_) { /* read-only fs: run in-memory */ }
+const SEED_FILE = path.join(__dirname, 'seed', 'presets.json');
+const MONGODB_URI = process.env.MONGODB_URI || '';
+let mongo = null; // set when the MongoDB adapter is active
+
+async function initStore() {
+  if (MONGODB_URI) {
+    try {
+      const { MongoClient } = require('mongodb');
+      const client = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 8000 });
+      await client.connect();
+      mongo = client.db().collection('builds');
+      storageMode = 'mongo';
+      const n = await mongo.countDocuments({});
+      if (n === 0) await seedStore();
+      return;
+    } catch (err) {
+      console.error('MongoDB adapter failed, falling back to file storage:', String(err.message || err));
+    }
+  }
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (fs.existsSync(DATA_FILE)) store = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    storageMode = 'file';
+    if (!Object.keys(store.builds).length) await seedStore();
+  } catch (_) { /* read-only fs: run in-memory */ }
+}
+
+async function seedStore() {
+  try {
+    if (!fs.existsSync(SEED_FILE)) return;
+    const docs = JSON.parse(fs.readFileSync(SEED_FILE, 'utf8'));
+    if (!Array.isArray(docs)) return;
+    for (const d of docs) {
+      if (!d || !d.data) continue;
+      const id = newId();
+      const now = Date.now();
+      const doc = { id, name: sanitize(d.name || 'Preset', 60), kind: d.kind === 'preset' ? 'preset' : 'build', data: d.data, createdAt: now, updatedAt: now, seeded: true };
+      if (mongo) await mongo.insertOne(doc);
+      else store.builds[id] = doc;
+    }
+    persist();
+    console.log('Seeded', docs.length, 'starter presets from seed/presets.json');
+  } catch (_) { /* no seed file: start empty */ }
+}
 
 let saveTimer = null;
 function persist() {
@@ -88,11 +130,15 @@ const server = http.createServer(async (req, res) => {
     if (parts[0] !== 'api') return send(res, 404, { error: 'Not found' });
 
     if (req.method === 'GET' && parts[1] === 'health') {
-      return send(res, 200, { ok: true, storage: storageMode, builds: Object.keys(store.builds).length, version: '1.0.0' });
+      const count = mongo ? await mongo.countDocuments({}) : Object.keys(store.builds).length;
+      return send(res, 200, { ok: true, storage: storageMode, builds: count, version: '1.1.0' });
     }
 
     if (parts[1] === 'builds') {
-      if (req.method === 'GET' && !parts[2]) return send(res, 200, listBuilds());
+      if (req.method === 'GET' && !parts[2]) {
+        if (mongo) return send(res, 200, (await mongo.find({}, { projection: { _id: 0, data: 0 } }).sort({ updatedAt: -1 }).limit(500).toArray()));
+        return send(res, 200, listBuilds());
+      }
 
       if (req.method === 'POST' && !parts[2]) {
         if (!authorized(req)) return send(res, 401, { error: 'Unauthorized' });
@@ -105,22 +151,26 @@ const server = http.createServer(async (req, res) => {
         if (!data || typeof data !== 'object') return send(res, 400, { error: 'Missing build data' });
         if (raw.length > MAX_DOC_BYTES) return send(res, 413, { error: 'Build document too large' });
         // capacity is an error, never a silent deletion of someone's saved build
-        if (Object.keys(store.builds).length >= MAX_BUILDS) return send(res, 507, { error: 'Server full (' + MAX_BUILDS + ' builds) — delete a build first' });
+        const count = mongo ? await mongo.countDocuments({}) : Object.keys(store.builds).length;
+        if (count >= MAX_BUILDS) return send(res, 507, { error: 'Server full (' + MAX_BUILDS + ' builds) — delete a build first' });
         const id = newId();
         const now = Date.now();
-        store.builds[id] = { id, name, kind, data, createdAt: now, updatedAt: now };
-        persist();
+        const doc = { id, name, kind, data, createdAt: now, updatedAt: now };
+        if (mongo) await mongo.insertOne(doc);
+        else { store.builds[id] = doc; persist(); }
         return send(res, 201, { id, name, kind });
       }
 
       if (parts[2]) {
-        const doc = store.builds[parts[2]];
+        let doc = null;
+        if (mongo) doc = await mongo.findOne({ id: parts[2] }, { projection: { _id: 0 } });
+        else doc = store.builds[parts[2]];
         if (req.method === 'GET' && doc) return send(res, 200, doc);
         if (req.method === 'DELETE') {
           if (!authorized(req)) return send(res, 401, { error: 'Unauthorized' });
           if (!doc) return send(res, 404, { error: 'Build not found' });
-          delete store.builds[parts[2]];
-          persist();
+          if (mongo) await mongo.deleteOne({ id: parts[2] });
+          else { delete store.builds[parts[2]]; persist(); }
           return send(res, 200, { ok: true });
         }
       }
@@ -131,4 +181,6 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, () => console.log('Flight World build sync listening on :' + PORT + ' (' + storageMode + ' storage)'));
+initStore().then(() => {
+  server.listen(PORT, () => console.log('Flight World build sync listening on :' + PORT + ' (' + storageMode + ' storage)'));
+}).catch(err => { console.error('Storage init failed:', err); process.exit(1); });

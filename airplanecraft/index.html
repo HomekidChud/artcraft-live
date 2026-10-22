@@ -585,7 +585,7 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
       </main>
       <div id="fwRightDock">
         <section id="fwExplorer" class="fw-dock-panel">
-          <div class="fw-dock-head"><span class="workshop-eyebrow">EXPLORER</span><input id="fwExplorerFilter" type="search" placeholder="Filter parts…" aria-label="Filter parts" /></div>
+          <div class="fw-dock-head"><span class="workshop-eyebrow">EXPLORER</span><div class="fw-xp-tools"><button id="fwGroupBtn" type="button" title="Group the selected parts (Ctrl+G)">⧉</button><button id="fwUngroupBtn" type="button" title="Ungroup (Ctrl+U)">⤫</button><input id="fwExplorerFilter" type="search" placeholder="Filter parts…" aria-label="Filter parts" /></div></div>
           <div id="fwExplorerTree"></div>
         </section>
         <aside class="workshop-sidebar workshop-inspector fw-dock-panel" id="fwProperties">
@@ -841,13 +841,16 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
 #buildModeOverlay .fw-dock-head{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 10px;background:var(--shead);border-bottom:1px solid var(--sline)}
 #buildModeOverlay .fw-dock-head input{background:#181b1e;border:1px solid var(--sline);color:var(--sink);border-radius:5px;padding:4px 8px;font-size:10px;width:110px}
 #buildModeOverlay #fwExplorerTree{overflow:auto;flex:1;padding:4px 0}
-#fwExplorerTree .fw-tree-root{display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:11px;color:var(--sink);cursor:pointer}
-#fwExplorerTree .fw-tree-root small{color:var(--smut);font-size:9px}
-#fwExplorerTree .fw-tree-cat{display:flex;align-items:center;gap:5px;padding:4px 10px 4px 8px;font-size:10.5px;font-weight:650;color:#b9c1c8;cursor:pointer;user-select:none}
-#fwExplorerTree .fw-tree-cat:hover{background:#ffffff07}
-#fwExplorerTree .fw-tree-caret{width:12px;color:var(--smut);font-size:9px}
-#fwExplorerTree .fw-tree-cat small{color:var(--smut);font-weight:400;font-size:9px}
-#fwExplorerTree .fw-tree-item{display:flex;align-items:center;gap:6px;padding:3.5px 10px 3.5px 30px;font-size:10.5px;color:#aeb6bd;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fwExplorerTree .fw-caret{display:inline-block;width:11px;flex:none;color:var(--smut);font-size:9px;line-height:1;cursor:pointer;transition:transform .1s ease}
+#fwExplorerTree .fw-caret.open{transform:rotate(90deg);color:var(--sink)}
+#fwExplorerTree .fw-tree-node{display:flex;align-items:center;gap:5px;padding:4px 8px;font-size:10.5px;color:#b9c1c8;cursor:pointer;user-select:none;white-space:nowrap}
+#fwExplorerTree .fw-tree-node:hover{background:#ffffff07;color:var(--sink)}
+#fwExplorerTree .fw-tree-node small{margin-left:auto;color:var(--smut);font-weight:400;font-size:9px;padding-left:8px}
+#fwExplorerTree .fw-tree-node .fw-tree-ico{flex:none;font-size:11px}
+#fwExplorerTree .fw-tree-root{font-size:11px;color:var(--sink);padding:6px 8px;border-bottom:1px solid #ffffff0d}
+#fwExplorerTree .fw-tree-root b{font-weight:650}
+#fwExplorerTree .fw-tree-group{color:#cfa75a;font-weight:600}
+#fwExplorerTree .fw-tree-item{display:flex;align-items:center;gap:6px;padding:3.5px 8px;font-size:10.5px;color:#aeb6bd;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #fwExplorerTree .fw-tree-item:hover{background:#ffffff07;color:var(--sink)}
 #fwExplorerTree .fw-tree-item.fw-sel{background:#1d3a52;color:var(--sacc)}
 #fwExplorerTree .fw-tree-item.fw-wire{color:#9aa4ad}
@@ -888,6 +891,16 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
 /* explorer hidden on small screens; properties overlay stays */
 @media(max-width:900px){#buildModeOverlay #fwExplorer{display:none}#buildModeOverlay .workshop-layout{grid-template-columns:170px minmax(0,1fr) 220px}#fwRibbon .fw-ribbon-right input{width:110px}}
 @media(max-width:600px){#buildModeOverlay .workshop-layout{grid-template-columns:120px minmax(0,1fr) 190px}#fwRibbon button{font-size:9px;padding:4px 6px}}
+</style>
+
+<style id="fwGroupsCss">
+#buildModeOverlay .fw-xp-tools{display:flex;align-items:center;gap:4px;margin-left:auto}
+#buildModeOverlay .fw-xp-tools button{background:#2b3136;border:1px solid #3a4147;color:var(--sink);border-radius:4px;font-size:10px;width:20px;height:20px;padding:0;cursor:pointer;line-height:1}
+#buildModeOverlay .fw-xp-tools button:hover{background:#353c42;color:#fff}
+#buildModeOverlay .fw-tree-group{color:#cfa75a}
+#buildModeOverlay .fw-tree-group .fw-grp-x{margin-left:auto;background:none;border:none;color:var(--smut);font-size:10px;cursor:pointer;padding:0 3px;border-radius:3px}
+#buildModeOverlay .fw-tree-group .fw-grp-x:hover{color:#e88a7a;background:#2a1d1b}
+#buildModeOverlay .fw-tree-item[data-fw-in-group]{padding-left:44px;border-left:2px solid #4a4231}
 </style>
 
 <script type="module">
@@ -3206,7 +3219,7 @@ $('workshopCloudList').addEventListener('click',async e=>{
   }else if(del){await cloudApi('/api/builds/'+del,{method:'DELETE'});workshopCloudRefresh();}
  }catch(err){workshopCloudLog('⚠ '+err.message);}
 });
-function workshopSnapshot(){return {name:$('workshopName')?.value||'Untitled aircraft',symmetryEnabled:workshopSymmetryEnabled,snapIncrement:workshopSnapIncrement,parts:workshopParts.map(workshopPartState),wires:workshopCloneJSON(workshopWires)};}
+function workshopSnapshot(){return {name:$('workshopName')?.value||'Untitled aircraft',symmetryEnabled:workshopSymmetryEnabled,snapIncrement:workshopSnapIncrement,parts:workshopParts.map(workshopPartState),groups:(workshopGroups||[]).map(g=>({id:g.id,name:g.name,parts:[...g.parts]})),wires:workshopCloneJSON(workshopWires)};}
 function workshopPushUndo(){if(workshopLoading)return;workshopUndoStack.push(workshopSnapshot());if(workshopUndoStack.length>45)workshopUndoStack.shift();workshopRedoStack=[];workshopUpdateHistoryButtons();}
 function workshopUpdateHistoryButtons(){const u=$('workshopUndo'),r=$('workshopRedo');if(u)u.disabled=!workshopUndoStack.length;if(r)r.disabled=!workshopRedoStack.length;}
 function workshopCreateMaterial(color,opts={}){return new THREE.MeshStandardMaterial({color,roughness:opts.roughness??.54,metalness:opts.metalness??.12,transparent:!!opts.transparent,opacity:opts.opacity??1,side:THREE.DoubleSide,depthWrite:opts.depthWrite!==false,emissive:opts.emissive||'#000000',emissiveIntensity:opts.emissiveIntensity||0});}
@@ -3242,7 +3255,7 @@ function workshopUpdateStats(){
 }
 function workshopRenderInspector(){const g=workshopGetPart(workshopSelectedId);$('workshopInspectorEmpty').hidden=!!g;$('workshopInspectorFields').hidden=!g;$('workshopDuplicate').disabled=!g;$('workshopMirrorSelected').disabled=!g||!!workshopMirrorMate(g);if(!g){$('workshopConnectionsList').innerHTML='<span class="workshop-muted">No wires connected yet.</span>';return;}const d=WORKSHOP_PARTS[g.userData.type];$('workshopSelectedType').textContent=(d.category||'component').toUpperCase()+' / '+g.userData.type.toUpperCase();$('workshopPartName').value=g.userData.name;$('workshopPosX').value=g.position.x.toFixed(2);$('workshopPosY').value=g.position.y.toFixed(2);$('workshopPosZ').value=g.position.z.toFixed(2);$('workshopScaleX').value=g.scale.x.toFixed(2);$('workshopScaleY').value=g.scale.y.toFixed(2);$('workshopScaleZ').value=g.scale.z.toFixed(2);$('workshopRotation').value=(g.rotation.y*180/Math.PI).toFixed(1);$('workshopPartMass').textContent=workshopPartMass(g).toFixed(2)+' kg';$('workshopPartCategory').textContent=d.category;$('workshopPartDetails').textContent=d.electrical?`${d.electrical.role} · ${d.electrical.volts} V · ${d.electrical.ports} ports. Connect compatible modules using Wire mode.`:d.engineType?`${d.engineType} propulsion · estimated static thrust ${d.thrustN} N.`:d.detail;const rows=workshopWires.map((w,i)=>({w,i})).filter(({w})=>w.from===g.userData.partId||w.to===g.userData.partId);$('workshopConnectionCount').textContent=String(rows.length);$('workshopConnectionsList').innerHTML=rows.length?rows.map(({w,i})=>`<div class="workshop-connection-row"><span>${escapeHTML(w.kind.toUpperCase())} · ${escapeHTML(workshopGetPart(w.from)?.userData.name||w.from)} → ${escapeHTML(workshopGetPart(w.to)?.userData.name||w.to)}</span><button type="button" data-workshop-wire-delete="${i}" title="Remove wire">×</button></div>`).join(''):'<span class="workshop-muted">No wires attached to this part.</span>';}
 function workshopRebuildWires(){if(!workshopWireRoot)return;while(workshopWireRoot.children.length){const o=workshopWireRoot.children[0];workshopWireRoot.remove(o);if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}const colors={power:'#f06b4f',signal:'#4ea8ff',data:'#e9c76b',ground:'#5dc78c',hydraulic:'#ff9a3c',fuel:'#d9a441',water:'#4fa3e3'};for(const w of workshopWires){const a=workshopGetPart(w.from),b=workshopGetPart(w.to);if(!a||!b)continue;const A=a.position.clone(),B=b.position.clone();A.y+=.1;B.y+=.1;const mid=A.clone().add(B).multiplyScalar(.5);mid.y+=Math.max(.08,A.distanceTo(B)*.035);const curve=new THREE.CatmullRomCurve3([A,mid,B]);const tube=new THREE.Mesh(new THREE.TubeGeometry(curve,18,.018,6,false),new THREE.MeshStandardMaterial({color:colors[w.kind]||colors.power,roughness:.42,metalness:.25,emissive:colors[w.kind]||colors.power,emissiveIntensity:.06}));tube.userData.isWorkshopWire=true;workshopWireRoot.add(tube);}workshopRenderInspector();}
-function workshopRestoreSnapshot(snap){workshopSymmetryEnabled=snap.symmetryEnabled!==false;workshopSnapIncrement=snap.snapIncrement==null?.25:Number(snap.snapIncrement);const stoggle=$('workshopSymmetryToggle');if(stoggle){stoggle.textContent='Symmetry: '+(workshopSymmetryEnabled?'ON':'OFF');stoggle.classList.toggle('symmetry-on',workshopSymmetryEnabled);stoggle.setAttribute('aria-pressed',String(workshopSymmetryEnabled));}const ssnap=$('workshopSnapSize');if(ssnap)ssnap.value=String(workshopSnapIncrement);workshopLoading=true;while(workshopBuildRoot.children.length){const g=workshopBuildRoot.children[0];workshopBuildRoot.remove(g);}workshopParts=[];workshopWires=workshopCloneJSON(snap.wires||[]);workshopWireRoot.clear();let maxImportedId=0;for(const st of snap.parts||[]){const g=workshopCreatePart(st.type,st);if(g){workshopBuildRoot.add(g);workshopParts.push(g);const m=/^part-(\d+)$/.exec(g.userData.partId);if(m)maxImportedId=Math.max(maxImportedId,Number(m[1]));}}workshopNextId=Math.max(workshopNextId,maxImportedId+1);for(const st of (snap.parts||[])){const m=/^mirror-(\d+)$/.exec(st.symmetryPairId||'');if(m)workshopNextSymmetryId=Math.max(workshopNextSymmetryId,Number(m[1])+1);}$('workshopName').value=snap.name||'Untitled aircraft';workshopSelectedId=workshopParts[workshopParts.length-1]?.userData.partId||null;workshopLoading=false;workshopRebuildWires();workshopSelectPart(workshopSelectedId);workshopUpdateStats();workshopUpdateEmptyHint();workshopUpdateHistoryButtons();}
+function workshopRestoreSnapshot(snap){workshopSymmetryEnabled=snap.symmetryEnabled!==false;workshopSnapIncrement=snap.snapIncrement==null?.25:Number(snap.snapIncrement);const stoggle=$('workshopSymmetryToggle');if(stoggle){stoggle.textContent='Symmetry: '+(workshopSymmetryEnabled?'ON':'OFF');stoggle.classList.toggle('symmetry-on',workshopSymmetryEnabled);stoggle.setAttribute('aria-pressed',String(workshopSymmetryEnabled));}const ssnap=$('workshopSnapSize');if(ssnap)ssnap.value=String(workshopSnapIncrement);workshopLoading=true;while(workshopBuildRoot.children.length){const g=workshopBuildRoot.children[0];workshopBuildRoot.remove(g);}workshopParts=[];workshopGroups=(snap.groups||[]).map(g=>({id:g.id||('grp-'+Math.random().toString(36).slice(2,9)),name:g.name||'Group',parts:Array.isArray(g.parts)?[...g.parts]:[]}));workshopWires=workshopCloneJSON(snap.wires||[]);workshopWireRoot.clear();let maxImportedId=0;for(const st of snap.parts||[]){const g=workshopCreatePart(st.type,st);if(g){workshopBuildRoot.add(g);workshopParts.push(g);const m=/^part-(\d+)$/.exec(g.userData.partId);if(m)maxImportedId=Math.max(maxImportedId,Number(m[1]));}}workshopNextId=Math.max(workshopNextId,maxImportedId+1);for(const st of (snap.parts||[])){const m=/^mirror-(\d+)$/.exec(st.symmetryPairId||'');if(m)workshopNextSymmetryId=Math.max(workshopNextSymmetryId,Number(m[1])+1);}$('workshopName').value=snap.name||'Untitled aircraft';workshopSelectedId=workshopParts[workshopParts.length-1]?.userData.partId||null;workshopLoading=false;workshopRebuildWires();workshopSelectPart(workshopSelectedId);workshopUpdateStats();workshopUpdateEmptyHint();workshopUpdateHistoryButtons();}
 function workshopUndo(){if(!workshopUndoStack.length)return;workshopRedoStack.push(workshopSnapshot());const s=workshopUndoStack.pop();workshopRestoreSnapshot(s);}
 function workshopRedo(){if(!workshopRedoStack.length)return;workshopUndoStack.push(workshopSnapshot());const s=workshopRedoStack.pop();workshopRestoreSnapshot(s);}
 function workshopRenderPalette(){const cat=WORKSHOP_CATEGORIES.find(c=>c.id===workshopCategory)||WORKSHOP_CATEGORIES[0];$('workshopCategoryTabs').innerHTML=WORKSHOP_CATEGORIES.map(c=>`<button type="button" class="workshop-category-tab ${c.id===workshopCategory?'active':''}" role="tab" aria-selected="${c.id===workshopCategory}" data-workshop-category="${c.id}">${c.label}</button>`).join('');const q=$('workshopSearch').value.trim().toLowerCase();const items=(cat.items||cat.types.map(type=>({type,...WORKSHOP_PARTS[type]}))).filter(item=>!q||`${item.name} ${item.detail} ${item.type}`.toLowerCase().includes(q));$('workshopPartsList').innerHTML=items.map(item=>{const d=WORKSHOP_PARTS[item.type],special=item.type.startsWith('__wire_')||item.type.startsWith('template');return `<button type="button" class="workshop-palette-item ${workshopPendingType===item.type?'active':''}" data-workshop-type="${item.type}"><span class="workshop-part-icon">${item.icon||'▰'}</span><span><strong>${item.name}</strong><small>${item.detail||d?.detail||''}</small></span><span class="workshop-mass-pill">${special?'TOOL':d?d.mass+' kg':'PART'}</span></button>`;}).join('')||'<span class="workshop-muted">No matching parts.</span>';}
@@ -3425,7 +3438,7 @@ function workshopBeginPlacement(e){const d=WORKSHOP_PARTS[workshopPendingType];i
 function workshopCreateGhost(type){if(workshopGhost){workshopScene.remove(workshopGhost);workshopGhost=null;}if(workshopGhostMirror){workshopScene.remove(workshopGhostMirror);workshopGhostMirror=null;}if(!type||!WORKSHOP_PARTS[type])return;workshopGhost=workshopMakeVisual(type,true);workshopScene.add(workshopGhost);workshopGhostMirror=workshopMakeVisual(type,true);workshopScene.add(workshopGhostMirror);workshopGhostMirror.visible=false;}
 function workshopUpdateGhost(e){if(workshopTool!=='place'||!workshopGhost||!workshopPendingType)return;const d=WORKSHOP_PARTS[workshopPendingType],p=workshopIntersectPlane(e,0);if(!p)return;const x=workshopSnap(p.x),z=workshopSnap(p.z);workshopGhost.position.set(x,workshopPlacementHeight(workshopPendingType),z);if(workshopGhostMirror){workshopGhostMirror.visible=workshopShouldMirror(workshopPendingType,x);workshopGhostMirror.position.set(-x,workshopPlacementHeight(workshopPendingType),z);}}
 function workshopSetPartTool(type){if(type.startsWith('__wire_')){workshopWireKind=type.split('_').pop();workshopSetTool('wire');workshopCategory='wiring';workshopRenderPalette();return;}if(type.startsWith('template')){workshopTemplate(type);return;}if(!WORKSHOP_PARTS[type])return;workshopPendingType=type;workshopTool='place';workshopWireStart=null;$('workshopSelectTool').classList.remove('active');$('workshopWireTool').classList.remove('active');$('workshopWireHint').hidden=true;workshopCreateGhost(type);workshopRenderPalette();workshopSetStatus(`Place ${WORKSHOP_PARTS[type].name} · click the grid to add a component`);}
-function workshopClear(){if(!workshopParts.length&&!workshopWires.length)return;if(!confirm('Clear all components and wiring from this scratch build?'))return;workshopPushUndo();workshopBuildRoot.clear();workshopParts=[];workshopWires=[];workshopWireRoot.clear();workshopSelectedId=null;workshopSelectPart(null);workshopRebuildWires();workshopUpdateStats();workshopUpdateEmptyHint();workshopSetStatus('Empty workshop · ready to build from scratch');}
+function workshopClear(){if(!workshopParts.length&&!workshopWires.length)return;if(!confirm('Clear all components and wiring from this scratch build?'))return;workshopPushUndo();workshopBuildRoot.clear();workshopParts=[];workshopGroups=[];workshopMultiSelect.clear();workshopWires=[];workshopWireRoot.clear();workshopSelectedId=null;workshopSelectPart(null);workshopRebuildWires();workshopUpdateStats();workshopUpdateEmptyHint();workshopSetStatus('Empty workshop · ready to build from scratch');}
 $('menuSandbox').addEventListener('click',()=>{$('mainMenuOverlay').hidden=true;S.paused=false;$('pause').textContent='Pause';});
 $('menuBuild').addEventListener('click',()=>{$('mainMenuOverlay').hidden=true;openBuildMode();});
 $('quickBuild').addEventListener('click',openBuildMode);
@@ -3462,11 +3475,11 @@ $('workshopCanvas').addEventListener('pointerdown',e=>{
  if(gizmoHit&&!e.shiftKey){gizmoBeginDrag(e,gizmoHit);return;}
  if(workshopTool==='place'){workshopDrag={type:'place',x:e.clientX,y:e.clientY};return;}
  if(workshopTool==='wire'){workshopDrag={type:'wire',x:e.clientX,y:e.clientY,partId:hit?.userData.partId||null};return;}
- if(hit){workshopSelectPart(hit.userData.partId);if(hit.userData.locked){workshopDrag=null;return;}const mode=e.shiftKey?'vertical':$('workshopViewPreset').value;
+ if(hit){workshopSelectPart(hit.userData.partId);if(e.ctrlKey||e.metaKey){workshopMultiToggle(hit.userData.partId);workshopUpdateStats();}else if(workshopMultiSelect.size)workshopMultiSelect.clear();if(hit.userData.locked){workshopDrag=null;return;}const mode=e.shiftKey?'vertical':$('workshopViewPreset').value;
   const normal=mode==='front'?new THREE.Vector3(0,0,1):mode==='side'?new THREE.Vector3(1,0,0):mode==='vertical'?workshopCamera.getWorldDirection(new THREE.Vector3()).setY(0).normalize():new THREE.Vector3(0,1,0);
   const plane=new THREE.Plane().setFromNormalAndCoplanarPoint(normal,hit.position),point=new THREE.Vector3();workshopSetNDC(e);workshopRaycaster.ray.intersectPlane(plane,point);
   workshopDrag={type:'move',mode,plane,offset:point.sub(hit.position),start:hit.position.clone(),x:e.clientX,y:e.clientY,partId:hit.userData.partId,moved:false};
- }else{workshopSelectPart(null);workshopDrag={type:'orbit',x:e.clientX,y:e.clientY};}
+ }else{workshopSelectPart(null);if(workshopMultiSelect.size)workshopMultiSelect.clear();workshopDrag={type:'orbit',x:e.clientX,y:e.clientY};}
 });
 $('workshopCanvas').addEventListener('pointermove',e=>{
  workshopUpdateGhost(e);if(gizmoDrag){gizmoDragMove(e);return;}if(!workshopDrag)return;const d=workshopDrag,dx=e.clientX-d.x,dy=e.clientY-d.y;
@@ -3474,14 +3487,24 @@ $('workshopCanvas').addEventListener('pointermove',e=>{
  if(d.type!=='move')return;const g=workshopGetPart(d.partId);if(!g||g.userData.locked)return;
  if(!d.moved&&Math.hypot(dx,dy)>3){workshopPushUndo();d.moved=true;}
  if(d.moved){workshopSetNDC(e);const point=new THREE.Vector3();if(!workshopRaycaster.ray.intersectPlane(d.plane,point))return;point.sub(d.offset);
-  const axes=d.mode==='front'?['x','y']:d.mode==='side'?['y','z']:d.mode==='vertical'?['y']:['x','z'];for(const axis of axes)g.position[axis]=workshopSnap(point[axis]);
-  workshopSyncMirror(g);workshopRenderInspector();workshopSelectionBox?.update();workshopRebuildWires();
+  const axes=d.mode==='front'?['x','y']:d.mode==='side'?['y','z']:d.mode==='vertical'?['y']:['x','z'];
+  const grp=workshopGroupOf(d.partId),grpMembers=(grp&&grp.parts.length>1)?fwDescendantParts(grp).filter(id=>id!==d.partId):[];
+  const mates=grpMembers.map(id=>workshopGetPart(id)).filter(m=>m),before=mates.map(m=>({m,x:m.position.x,y:m.position.y,z:m.position.z}));
+  const prev={x:g.position.x,y:g.position.y,z:g.position.z};
+  for(const axis of axes)g.position[axis]=workshopSnap(point[axis]);
+  const ddx=g.position.x-prev.x,ddy=g.position.y-prev.y,ddz=g.position.z-prev.z;
+  // move the rest of the group by the same delta (their mirror mates sync after)
+  for(const rec of before){rec.m.position.x+=ddx;rec.m.position.y+=ddy;rec.m.position.z+=ddz;}
+  workshopSyncMirror(g);for(const rec of before)workshopSyncMirror(rec.m);
+  workshopRenderInspector();workshopSelectionBox?.update();workshopRebuildWires();
  }
 });
 $('workshopCanvas').addEventListener('pointerup',e=>{if(gizmoDrag){gizmoDrag=null;workshopRenderInspector();workshopUpdateStats();workshopRebuildWires();return;}if(!workshopDrag)return;const d=workshopDrag;workshopDrag=null;if(d.moved){workshopRenderInspector();workshopUpdateStats();return;}if(Math.hypot(e.clientX-d.x,e.clientY-d.y)>5)return;if(d.type==='place')workshopBeginPlacement(e);else if(d.type==='wire'){if(d.partId)workshopPartClickForWire(workshopGetPart(d.partId));else workshopSetStatus('Click a component to begin wiring');}else if(d.type==='move'){workshopRenderInspector();workshopUpdateStats();}});
 $('workshopCanvas').addEventListener('pointercancel',()=>{workshopDrag=null;gizmoDrag=null;workshopUpdateStats();});
 $('workshopCanvas').addEventListener('wheel',e=>{e.preventDefault();workshopDistance=THREE.MathUtils.clamp(workshopDistance+e.deltaY*.025,3,180);workshopMoveCamera();},{passive:false});
-window.addEventListener('keydown',e=>{if(!buildModeOpen)return;if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||e.target.isContentEditable)return;if(e.code==='Escape'){if(workshopTool!=='select'){workshopSetTool('select');return;}closeBuildMode();}if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'){e.preventDefault();workshopUndo();}if((e.ctrlKey||e.metaKey)&&e.code==='KeyY'){e.preventDefault();workshopRedo();}if(e.code==='Delete'||e.code==='Backspace'){if(!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){e.preventDefault();workshopDeleteSelected();}}if(e.code==='KeyR'&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){const g=workshopGetPart(workshopSelectedId);if(g){workshopPushUndo();g.rotation.y+=Math.PI/12;workshopSyncMirror(g);workshopRenderInspector();workshopRebuildWires();}}});
+window.addEventListener('keydown',e=>{if(!buildModeOpen)return;if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||e.target.isContentEditable)return;if(e.code==='Escape'){if(workshopTool!=='select'){workshopSetTool('select');return;}closeBuildMode();}if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'){e.preventDefault();workshopUndo();}if((e.ctrlKey||e.metaKey)&&e.code==='KeyY'){e.preventDefault();workshopRedo();}
+ if((e.ctrlKey||e.metaKey)&&e.code==='KeyG'){e.preventDefault();workshopGroupSelection();}
+ if((e.ctrlKey||e.metaKey)&&e.code==='KeyU'){e.preventDefault();workshopUngroupSelection();}if(e.code==='Delete'||e.code==='Backspace'){if(!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){e.preventDefault();workshopDeleteSelected();}}if(e.code==='KeyR'&&!['INPUT','TEXTAREA'].includes(document.activeElement?.tagName)){const g=workshopGetPart(workshopSelectedId);if(g){workshopPushUndo();g.rotation.y+=Math.PI/12;workshopSyncMirror(g);workshopRenderInspector();workshopRebuildWires();}}});
 /* Physical 3-D cockpit: textured analogue gauges, clickable levers, switches and yoke.
    These controls are meshes in the aircraft coordinate system, not HTML overlays. */
 const cockpitPickables=[];
@@ -7593,9 +7616,9 @@ const Electrics={
     this.computerOK=entries.some(([id,p])=>p.type==='flightComputer'&&this.powered[id]);
     this.navOK=entries.some(([id,p])=>FW_LIGHT_TYPES.includes(p.type)&&this.powered[id]);
     if(D.hasLights){
-      const want=this.navOK;
-      // sync only the power-gating of custom lights — never overwrite the pilot's switch
-      if(this._lights!==want){this._lights=want;fwSyncCustomLights();}
+      // sync the power-gating of every custom fixture individually — never overwrite
+      // the pilot's switch. Runs each solve so a single dead lamp goes dark immediately.
+      this._lights=this.navOK;fwSyncCustomLights();
     }
   },
   apply(){
@@ -10143,10 +10166,18 @@ updateSimpleChecks=function(){
     ['Body','Fuselage or cabin section',types.some(t=>['bodyBlock','bodySegment','cabinBlock'].includes(t))],
     ['Main wings','Lifting surfaces',types.some(t=>['wingPanel','longWing','deltaWing'].includes(t))],
     ['Tail','Fin and stabiliser',types.some(t=>['fin','vTail','tailplane'].includes(t))],
+    ['Flight controls','Ailerons, elevator and rudder',types.some(t=>t==='aileron')&&types.some(t=>t==='elevator')&&types.some(t=>t==='rudder')],
     ['Wheels or skid','Landing gear',types.some(t=>['wheel','skid'].includes(t))],
     ['Power source','Battery or alternator fitted',types.some(t=>['battery','alternator'].includes(t))],
     ['Power wiring','Power wires from source to loads',workshopWires.some(w=>w.kind==='power')],
-    ['Ground return','Ground wire back to the battery',workshopWires.some(w=>w.kind==='ground')]
+    ['Ground return','Every electrical part returns to the battery',(function(){
+      if(!workshopWires.some(w=>w.kind==='ground'))return false;
+      const srcIds=workshopParts.filter(p=>['battery','alternator'].includes(p.userData.type)).map(p=>p.userData.partId);
+      const adj={};for(const w of workshopWires){if(w.kind!=='ground')continue;(adj[w.from]=adj[w.from]||[]).push(w.to);(adj[w.to]=adj[w.to]||[]).push(w.from);}
+      const seen=new Set(srcIds),q=[...srcIds];
+      while(q.length){const n=q.pop();for(const t of (adj[n]||[]))if(!seen.has(t)){seen.add(t);q.push(t);}}
+      return workshopParts.filter(p=>WORKSHOP_PARTS[p.userData.type]&&WORKSHOP_PARTS[p.userData.type].electrical).every(p=>seen.has(p.userData.partId));
+    })()]
   ];
   if(lightIds.size)reqs.push(['Lights wired','A light fed by a power wire',workshopWires.some(w=>w.kind==='power'&&(lightIds.has(w.from)||lightIds.has(w.to)))]);
   // path checks: fuel must actually REACH an engine, hydraulics must reach an actuator
@@ -10163,10 +10194,13 @@ updateSimpleChecks=function(){
     reqs.push(['Fuel plumbing','Tank → strainer → pump → engine',workshopWires.some(w=>w.kind==='fuel')&&engineFed]);
   }
   if(types.includes('hydraulicPump')){
-    const press=reachable('hydraulicPump','hydraulic');
-    const actuatorTypes=['gearStrut','flap','wheel','hydraulicActuator'];
-    const actFed=[...press].some(id=>actuatorTypes.includes(partType(id)));
-    reqs.push(['Hydraulics loop','Pump → reservoir → actuator',types.includes('hydraulicReservoir')&&actFed]);
+    const ids=t=>workshopParts.filter(p=>p.userData.type===t).map(p=>p.userData.partId);
+    const pumpIds=ids('hydraulicPump'),resIds=ids('hydraulicReservoir');
+    const actIds=workshopParts.filter(p=>['gearStrut','flap','wheel','hydraulicActuator'].includes(p.userData.type)).map(p=>p.userData.partId);
+    // directed circuit: pump pressurises the reservoir, the reservoir feeds the actuator
+    const pressurised=workshopWires.some(w=>w.kind==='hydraulic'&&pumpIds.includes(w.from)&&resIds.includes(w.to));
+    const fed=workshopWires.some(w=>w.kind==='hydraulic'&&resIds.includes(w.from)&&actIds.includes(w.to));
+    reqs.push(['Hydraulics loop','Pump → reservoir → actuator',pressurised&&fed]);
   }
   const done=reqs.filter(r=>r[2]).length;
   $('nbChecks').innerHTML=reqs.map(([name,hint,ok])=>'<div class="nb-row '+(ok?'ok':'miss')+'"><input type="checkbox" '+(ok?'checked':'')+' tabindex="-1"><span class="nb-name">'+name+'<span class="nb-hint">'+hint+'</span></span></div>').join('');
@@ -10206,31 +10240,46 @@ $('fwStartersBtn').onclick=()=>setBuilderStep('choose');
 
 /* ---------- Explorer tree ---------- */
 const FW_EXPLORER_CATS=[['structure','Structure'],['wings','Wings'],['controls','Controls'],['tail','Tail'],['propulsion','Propulsion'],['gear','Landing gear'],['electronics','Electronics'],['systems','Systems'],['cockpit','Cockpit'],['decor','Decor']];
-const fwExplorerOpen=new Set(FW_EXPLORER_CATS.map(c=>c[0]));fwExplorerOpen.add('wires');
-const esc=x=>String(x==null?'':x).replace(/[<>&"]/g,c=>({'<':'\u003C','>':'\u003E','&':'\u0026','"':'\u0022'}[c]));
+fwExplorerOpen=new Set(FW_EXPLORER_CATS.map(c=>c[0]));fwExplorerOpen.add('wires');fwExplorerOpen.add('root');
+const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&'+'amp;','<':'&'+'lt;','>':'&'+'gt;','"':'&'+'quot;'}[c]));
 let fwExplorerTimer=null;
 function fwRefreshExplorerNow(){
   const tree=$('fwExplorerTree');if(!tree)return;
+  if(workshopPruneGroups&&workshopPruneGroups())return void setTimeout(fwRefreshExplorerNow,0);
   const filter=(($('fwExplorerFilter').value||'')).toLowerCase();
   const rootName=($('workshopName').value||'Aircraft').trim()||'Aircraft';
-  let html='<div class="fw-tree-root'+(workshopSelectedId?'':' fw-sel')+'" data-fw-xp="root">✈ <b>'+esc(rootName)+'</b><small>'+workshopParts.length+' parts · '+workshopWires.length+' lines</small></div>';
-  for(const [cat,label] of FW_EXPLORER_CATS){
-    let parts=workshopParts.filter(p=>((WORKSHOP_PARTS[p.userData.type]||{}).category)===cat);
-    if(filter)parts=parts.filter(p=>(p.userData.name||'').toLowerCase().includes(filter)||p.userData.type.toLowerCase().includes(filter));
-    if(!parts.length)continue;
-    const open=fwExplorerOpen.has(cat);
-    html+='<div class="fw-tree-cat" data-fw-cat="'+cat+'"><span class="fw-tree-caret">'+(open?'▾':'▸')+'</span>'+esc(label)+' <small>'+parts.length+'</small></div>';
-    if(open)for(const p of parts)html+='<div class="fw-tree-item'+(workshopSelectedId===p.userData.partId?' fw-sel':'')+'" data-fw-part="'+p.userData.partId+'" title="'+esc(p.userData.name)+'">'+(p.userData.locked?'🔒 ':'')+(p.userData.unwelded?'⛓ ':'')+esc(p.userData.name)+'</div>';
-  }
-  const byKind={};for(const w of workshopWires)(byKind[w.kind]=byKind[w.kind]||[]).push(w);
-  const kinds=Object.keys(byKind);
-  if(kinds.length||filter===''||true){
-    const open=fwExplorerOpen.has('wires');
-    html+='<div class="fw-tree-cat" data-fw-cat="wires"><span class="fw-tree-caret">'+(open?'▾':'▸')+'</span>Wiring <small>'+workshopWires.length+'</small></div>';
-    if(open){
+  const grouped=new Set();for(const g of (workshopGroups||[]))for(const id of fwDescendantParts(g))grouped.add(id);
+  let html='';
+  const rootOpen=fwExplorerOpen.has('root');
+  html+='<div class="fw-tree-node fw-tree-root'+(workshopSelectedId?'':' fw-sel')+'" data-fw-xp="root" title="Click to collapse the hierarchy"><span class="fw-caret'+(rootOpen?' open':'')+'">▸</span><span class="fw-tree-ico">✈</span><b>'+esc(rootName)+'</b><small>'+workshopParts.length+' parts · '+workshopWires.length+' wires'+((workshopGroups||[]).length?' · '+workshopGroups.length+' groups':'')+'</small></div>';
+  const matches=p=>!filter||(p.userData.name||'').toLowerCase().includes(filter)||p.userData.type.toLowerCase().includes(filter);
+  const partRow=(p,depth,gid)=>'<div class="fw-tree-item'+(workshopSelectedId===p.userData.partId?' fw-sel':'')+'" data-fw-part="'+p.userData.partId+'"'+(gid?' data-fw-in-group="'+gid+'"':'')+' style="padding-left:'+(10+depth*14)+'px" title="'+esc(p.userData.name)+'">'+(p.userData.locked?'🔒 ':'')+(p.userData.unwelded?'⛓ ':'')+esc(p.userData.name)+'</div>';
+  const groupRow=(g,depth)=>{
+    const kids=g.parts.map(id=>fwIsGroup(id)?{grp:fwGroupById(id)}:{part:workshopGetPart(id)}).filter(k=>k.grp||(k.part&&matches(k.part)));
+    if(filter&&!kids.length)return '';
+    const open=fwExplorerOpen.has(g.id);
+    let h='<div class="fw-tree-node fw-tree-group" data-fw-group="'+g.id+'" style="padding-left:'+(10+depth*14)+'px"><span class="fw-caret'+(open?' open':'')+'">▸</span><span class="fw-tree-ico">📁</span>'+esc(g.name)+' <small>'+fwDescendantParts(g).length+'</small><button class="fw-grp-x" data-fw-ungroup="'+g.id+'" title="Ungroup (Ctrl+U)">⤫</button></div>';
+    if(open)for(const k of kids){if(k.grp)h+=groupRow(k.grp,depth+1);else h+=partRow(k.part,depth+1,g.id);}
+    return h;
+  };
+  if(rootOpen){
+    for(const g of (workshopGroups||[]))if(!fwParentGroup(g.id))html+=groupRow(g,1);
+    for(const [cat,label] of FW_EXPLORER_CATS){
+      let parts=workshopParts.filter(p=>((WORKSHOP_PARTS[p.userData.type]||{}).category)===cat&&!grouped.has(p.userData.partId));
+      if(filter)parts=parts.filter(matches);
+      if(!parts.length)continue;
+      const open=fwExplorerOpen.has(cat);
+      html+='<div class="fw-tree-node fw-tree-cat" data-fw-cat="'+cat+'" style="padding-left:24px"><span class="fw-caret'+(open?' open':'')+'">▸</span>'+esc(label)+' <small>'+parts.length+'</small></div>';
+      if(open)for(const p of parts)html+=partRow(p,2);
+    }
+    const byKind={};for(const w of workshopWires)(byKind[w.kind]=byKind[w.kind]||[]).push(w);
+    const kinds=Object.keys(byKind);
+    const wOpen=fwExplorerOpen.has('wires');
+    html+='<div class="fw-tree-node fw-tree-cat" data-fw-cat="wires" style="padding-left:24px"><span class="fw-caret'+(wOpen?' open':'')+'">▸</span>Wiring <small>'+workshopWires.length+'</small></div>';
+    if(wOpen){
       const labels={power:'Power',ground:'Ground',signal:'Signal',data:'Data',fuel:'Fuel',hydraulic:'Hydraulic',water:'Water / waste'};
-      for(const k of kinds)html+='<div class="fw-tree-item fw-wire" data-fw-kind="'+k+'">━ '+labels[k]+' lines <small>'+byKind[k].length+'</small></div>';
-      if(!kinds.length)html+='<div class="fw-tree-item fw-wire" style="opacity:.5">No lines yet</div>';
+      for(const k of kinds)html+='<div class="fw-tree-item fw-wire" style="padding-left:38px">━ '+labels[k]+' <small>'+byKind[k].length+'</small></div>';
+      if(!kinds.length)html+='<div class="fw-tree-item fw-wire" style="padding-left:38px;opacity:.5">No wires yet</div>';
     }
   }
   tree.innerHTML=html;
@@ -10238,12 +10287,31 @@ function fwRefreshExplorerNow(){
 function fwRefreshExplorer(){clearTimeout(fwExplorerTimer);fwExplorerTimer=setTimeout(fwRefreshExplorerNow,120);}
 $('fwExplorerFilter').addEventListener('input',fwRefreshExplorerNow);
 $('fwExplorerTree').addEventListener('click',e=>{
+  const ux=e.target.closest('[data-fw-ungroup]');
+  if(ux){const g=fwGroupById(ux.dataset.fwUngroup);if(g){workshopSelectedId=null;workshopMultiSelect=new Set([g.id]);workshopUngroupSelection();}return;}
+  const caret=e.target.closest('.fw-caret');
+  if(caret){const node=caret.parentElement,key=node.dataset.fwGroup||node.dataset.fwCat||node.dataset.fwXp;
+    if(key){if(fwExplorerOpen.has(key))fwExplorerOpen.delete(key);else fwExplorerOpen.add(key);fwRefreshExplorerNow();}return;}
+  const grp=e.target.closest('[data-fw-group]');
+  if(grp){const g=fwGroupById(grp.dataset.fwGroup);if(!g)return;
+    if(e.ctrlKey||e.metaKey){workshopMultiToggle(g.id);workshopUpdateStats();return;}
+    const parts=fwDescendantParts(g);workshopMultiSelect=new Set(parts);
+    if(workshopGetPart(parts[0]))workshopSelectPart(parts[0]);
+    workshopSetStatus('“'+g.name+'” · '+parts.length+' parts selected — Ctrl+G nests it in a new group, Ctrl+U dissolves it');
+    return;}
   const cat=e.target.closest('[data-fw-cat]');
   if(cat){const c=cat.dataset.fwCat;if(fwExplorerOpen.has(c))fwExplorerOpen.delete(c);else fwExplorerOpen.add(c);fwRefreshExplorerNow();return;}
   const item=e.target.closest('[data-fw-part]');
-  if(item){workshopSelectPart(item.dataset.fwPart);return;}
-  if(e.target.closest('[data-fw-xp="root"]')){workshopSelectPart(null);}
+  if(item){
+    if(e.ctrlKey||e.metaKey){workshopMultiToggle(item.dataset.fwPart);workshopUpdateStats();return;}
+    const gId=item.dataset.fwInGroup;
+    if(gId){const g=fwGroupById(gId);if(g)workshopMultiSelect=new Set(fwDescendantParts(g));}
+    else if(workshopMultiSelect.size)workshopMultiSelect.clear();
+    workshopSelectPart(item.dataset.fwPart);return;}
+  if(e.target.closest('[data-fw-xp="root"]')){if(fwExplorerOpen.has('root'))fwExplorerOpen.delete('root');else fwExplorerOpen.add('root');fwRefreshExplorerNow();if(!workshopSelectedId&&workshopMultiSelect.size)workshopMultiSelect.clear();}
 });
+$('fwGroupBtn').addEventListener('click',()=>workshopGroupSelection());
+$('fwUngroupBtn').addEventListener('click',()=>workshopUngroupSelection());
 /* keep the tree in sync with every build change (debounced) */
 const fwBaseUpdateStats=workshopUpdateStats;
 workshopUpdateStats=function(){const r=fwBaseUpdateStats.apply(this,arguments);fwRefreshExplorer();return r;};
@@ -10267,6 +10335,79 @@ fwRefreshExplorerNow();
 })();
 
 
+
+/* ============================================================
+   FLIGHT WORLD · GROUPS v4 — Ctrl+G / Ctrl+U, Explorer folders
+   Parts can be organised into named groups (like Roblox Studio
+   Models). Groups move together, persist in the build JSON and
+   appear as folders in the Explorer.
+   ============================================================ */
+var workshopGroups=[];          // [{id, name, parts:[partId | groupId...]}] — nested hierarchy
+var workshopMultiSelect=new Set();
+var fwExplorerOpen;              // Explorer open-folder state (assigned by the Explorer patch)
+
+function fwIsGroup(id){return (workshopGroups||[]).some(g=>g.id===id);}
+function fwGroupById(id){return (workshopGroups||[]).find(g=>g.id===id)||null;}
+function fwParentGroup(id){return (workshopGroups||[]).find(g=>g.parts.includes(id))||null;}
+function fwDescendantParts(g){const out=[];for(const id of g.parts){if(fwIsGroup(id)){const sub=fwGroupById(id);if(sub)out.push(...fwDescendantParts(sub));}else out.push(id);}return out;}
+function workshopGroupOf(partId){return fwParentGroup(partId);}
+function workshopMultiToggle(partId){
+  if(workshopMultiSelect.has(partId))workshopMultiSelect.delete(partId);
+  else workshopMultiSelect.add(partId);
+  const p=workshopGetPart(partId);
+  workshopSetStatus(workshopMultiSelect.size>1?workshopMultiSelect.size+' parts selected — Ctrl+G to group':(workshopMultiSelect.size===1?'1 part selected':'Selection cleared'));
+}
+function workshopNextGroupName(){let n=1;const names=new Set(workshopGroups.map(g=>g.name));while(names.has('Group '+n))n++;return 'Group '+n;}
+function workshopGroupSelection(){
+  const ids=[...workshopMultiSelect];
+  if(!ids.length&&workshopSelectedId)ids.push(workshopSelectedId);
+  if(ids.length<1){workshopSetStatus('Select parts first — Ctrl+click adds parts to the selection');return;}
+  workshopPushUndo();
+  // every item lives in one place: detach parts from their group, groups from their parent
+  for(const gid of ids)for(const g of workshopGroups)g.parts=g.parts.filter(id=>id!==gid);
+  workshopGroups=workshopGroups.filter(g=>g.parts.length);
+  const grp={id:'grp-'+Math.random().toString(36).slice(2,9),name:workshopNextGroupName(),parts:ids.slice()};
+  workshopGroups.push(grp);
+  fwExplorerOpen.add(grp.id);
+  workshopMultiSelect.clear();
+  workshopUpdateStats();
+  const firstId=ids.find(id=>!fwIsGroup(id))||ids[0];
+  if(workshopGetPart(firstId))workshopSelectPart(firstId);
+  workshopSetStatus('Grouped '+ids.length+' item'+(ids.length>1?'s':'')+' as “'+grp.name+'” — the whole hierarchy moves together · Ctrl+U to ungroup');
+}
+function workshopUngroupSelection(){
+  const ids=[...workshopMultiSelect];if(!ids.length&&workshopSelectedId)ids.push(workshopSelectedId);
+  if(!ids.length){workshopSetStatus('Select a grouped part, then Ctrl+U to dissolve its group');return;}
+  const hit=workshopGroups.filter(g=>ids.includes(g.id)||g.parts.some(id=>ids.includes(id)));
+  if(!hit.length){workshopSetStatus('That is not inside a group');return;}
+  workshopPushUndo();
+  for(const g of hit){
+    const parent=fwParentGroup(g.id);
+    for(const child of g.parts)if(parent)parent.parts.push(child); // no parent: children return to the top level
+    workshopGroups=workshopGroups.filter(x=>x!==g);
+  }
+  workshopMultiSelect.clear();
+  workshopUpdateStats();
+  workshopSetStatus('Ungrouped '+hit.length+' group'+(hit.length>1?'s':'')+' — children kept, moved up one level');
+}
+try{window.__flightWorld&&(window.__flightWorld.workshop.groups=()=>workshopGroups,window.__flightWorld.workshop.multi=()=>workshopMultiSelect);}catch(_e){}
+function workshopPruneGroups(){
+  if(!workshopGroups)return false; // not initialised yet (module still loading)
+  const live=new Set(workshopParts.map(p=>p.userData.partId));
+  let changed=false;
+  for(const g of workshopGroups){const n=g.parts.filter(id=>live.has(id)||fwIsGroup(id));if(n.length!==g.parts.length){g.parts=n;changed=true;}}
+  let pass=true;
+  while(pass){pass=false;
+    for(const g of [...workshopGroups]){
+      if(!g.parts.length){
+        workshopGroups=workshopGroups.filter(x=>x!==g);
+        for(const p of workshopGroups)p.parts=p.parts.filter(id=>id!==g.id);
+        changed=true;pass=true;
+      }
+    }
+  }
+  return changed;
+}
 </script>
 <script data-pplx-inline-edit>
 (function () {
@@ -10753,6 +10894,7 @@ fwRefreshExplorerNow();
 #buildModeOverlay .workshop-category-tab.active{background:#252b34!important;color:var(--v2acc)!important;border-color:#3a4250!important}
 #buildModeOverlay .workshop-parts-list{padding:2px 10px 18px!important}
 #buildModeOverlay .workshop-palette-item{padding:9px 9px 11px!important;min-height:58px}
+#buildModeOverlay .workshop-palette-item small{display:block;line-height:1.4;padding-top:2px}
 #buildModeOverlay .workshop-palette-item{background:#1a1e24!important;border:1px solid var(--v2line)!important;border-radius:9px!important;padding:8px 9px!important;margin-bottom:5px!important;transition:border-color .12s,background .12s}
 #buildModeOverlay .workshop-palette-item:hover{border-color:#414a56!important;background:#20252c!important}
 #buildModeOverlay .workshop-palette-item.active{border-color:var(--v2acc)!important;background:#2a2415!important}
