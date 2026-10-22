@@ -491,6 +491,50 @@ items marked PENDING were not done and are the next AI's queue.
 - Preset gear: wheels hang below the belly line so builds rest on wheels
   (visual check pending the flight-verification item above).
 
+## AirplaneCraft — 17.10.3 additions (same day, owner follow-up)
+
+Owner follow-up: "upgrade the unity a lot also continue, and the cockpit
+/cabin should not be a single part — it must be a group of many parts that
+are grouped".
+
+- **Cockpit/cabin is now a group of many parts** in every generated preset:
+  skin-panel floor, port/starboard walls, roof, rear bulkhead, glazing,
+  two seats, instrument panel, flight computer, servo and receiver — all
+  under the named "Cockpit" group (12 parts on the C172). No cabinBlock.
+- **Ground-stick root causes found and fixed in the generator:** the earlier
+  zero-speed was my own test error (mixture set to 1% — withdrawn the
+  environment claim); the REAL preset blockers were (a) propeller disks
+  and scaled jet nacelles dipping below the ground plane (now lifted:
+  engine y = max(wing offset, prop radius + margin / nacelle clearance))
+  and (b) thrust scale (jet nacelles now scale with aircraft class since
+  the flight model scales jet thrust with nacelle x·y scale — 747 gets
+  ~234 kN per engine, T/W ≈ 0.24).
+- **Gascolator moved to the belly** (under the cabin floor, aft of the
+  cockpit) per real GA practice — fuel lines no longer cross the crewed
+  zone.
+- Fleet label in the landing menu is now computed from the real fleet
+  table (was a stale hard-coded "28").
+
+## UnityCraft — pass 3 (owner follow-up)
+
+- **Nested hierarchy with drag-to-reparent:** children keyed by parentId,
+  depth-first render with indents and collapsible carets; dropping a row
+  on another makes it a child (cycle-safe), dropping on the empty area
+  unpairs to root; deleting a parent re-homes its children to the
+  grandparent; nesting survives save/load and play-mode snapshots;
+  pasted copies and prefab instances always start at the root.
+- **Horizontal play-mode collision:** axis-separated AABB blocking with
+  slide-along-walls and a 0.3 m step allowance (walk onto ledges, blocked
+  by walls) — previously vertical ground collision only.
+- **Spawn Point object type** (GameObject menu): editor-only ring + cone
+  marker, never a collider; entering Play teleports the PlayerController
+  to it.
+- **Project window management:** scene delete, prefab delete and rename
+  (with confirm dialogs), synced to the unitycraft-scenes/prefabs keys.
+- Next candidates: real local transforms (children move with parents —
+  nesting is currently logical only), rotation-aware collisions, prefab
+  variant overrides.
+
 ### Constraints that still stand
 
 - Atoms/air molecules never visible. Damage cells stay clipped original

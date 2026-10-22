@@ -180,10 +180,12 @@ function designFor(cfg) {
   if (engines.length) {
   tankL = b.add('fuelTank', [-half * .35, wingY + .1, 0], { name: 'Port tank' });
   tankR = b.add('fuelTank', [half * .35, wingY + .1, 0], { name: 'Starboard tank' });
-  // gascolator at the low point under the cabin floor, aft of the cockpit — real
-  // GA aircraft drain the strainer from the belly, never inside the cabin
-  strainer = b.add('fuelStrainer', [0, Math.max(.15, H * .22), -L * .02], { name: 'Fuel strainer (belly low point)' });
-  pump = cfg.wingPlacement === 'high' && !jet ? null : b.add('fuelPump', [0, Math.max(.17, H * .24), -L * .05], { name: 'Boost pump' });
+  // gascolator + pump on the PORT cabin side, low: real GA fuel lines run along the
+  // side/belly (never through the crewed zone), so the audit's cockpit-clearance
+  // rule passes and the routing matches real installations
+  const fuelX = -Math.max(.6, W * .75);
+  strainer = b.add('fuelStrainer', [fuelX, Math.max(.15, H * .22), -L * .02], { name: 'Fuel strainer (port side, low point)' });
+  pump = cfg.wingPlacement === 'high' && !jet ? null : b.add('fuelPump', [fuelX, Math.max(.17, H * .24), -L * .05], { name: 'Boost pump' });
   b.wire(tankL, strainer, 'fuel'); b.wire(tankR, strainer, 'fuel');
   if (pump) b.wire(strainer, pump, 'fuel');
   const fuelTo = pump || strainer;

@@ -814,9 +814,9 @@
      {
       "id": "part-33",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -4.575,
        "y": 1.386,
        "z": -1.526
       },
@@ -841,7 +841,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -4.575,
        "y": 1.512,
        "z": -3.815
       },
@@ -2510,9 +2510,9 @@
      {
       "id": "part-32",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -0.885,
        "y": 0.282,
        "z": -0.166
       },
@@ -3963,9 +3963,9 @@
      {
       "id": "part-32",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -0.84,
        "y": 0.273,
        "z": -0.146
       },
@@ -3990,7 +3990,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -0.84,
        "y": 0.298,
        "z": -0.366
       },
@@ -5457,9 +5457,9 @@
      {
       "id": "part-32",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -0.915,
        "y": 0.295,
        "z": -0.158
       },
@@ -5484,7 +5484,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -0.915,
        "y": 0.322,
        "z": -0.396
       },
@@ -6951,9 +6951,9 @@
      {
       "id": "part-32",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -0.952,
        "y": 0.312,
        "z": -0.168
       },
@@ -6978,7 +6978,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -0.952,
        "y": 0.341,
        "z": -0.419
       },
@@ -8495,9 +8495,9 @@
      {
       "id": "part-34",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -0.915,
        "y": 0.29,
        "z": -0.171
       },
@@ -8522,7 +8522,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -0.915,
        "y": 0.317,
        "z": -0.428
       },
@@ -9995,9 +9995,9 @@
      {
       "id": "part-32",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -0.75,
        "y": 0.242,
        "z": -0.133
       },
@@ -10022,7 +10022,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -0.75,
        "y": 0.264,
        "z": -0.332
       },
@@ -11489,9 +11489,9 @@
      {
       "id": "part-32",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -0.96,
        "y": 0.308,
        "z": -0.182
       },
@@ -11516,7 +11516,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -0.96,
        "y": 0.336,
        "z": -0.456
       },
@@ -14249,9 +14249,9 @@
      {
       "id": "part-32",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -1.35,
        "y": 0.451,
        "z": -0.288
       },
@@ -15752,9 +15752,9 @@
      {
       "id": "part-34",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -1.335,
        "y": 0.44,
        "z": -0.284
       },
@@ -15779,7 +15779,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -1.335,
        "y": 0.48,
        "z": -0.711
       },
@@ -17227,9 +17227,9 @@
      {
       "id": "part-31",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -1.185,
        "y": 0.383,
        "z": -0.311
       },
@@ -17254,7 +17254,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -1.185,
        "y": 0.418,
        "z": -0.777
       },
@@ -18721,9 +18721,9 @@
      {
       "id": "part-31",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -2.963,
        "y": 0.869,
        "z": -0.751
       },
@@ -18748,7 +18748,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -2.963,
        "y": 0.948,
        "z": -1.878
       },
@@ -20360,9 +20360,9 @@
      {
       "id": "part-31",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -2.82,
        "y": 0.827,
        "z": -0.79
       },
@@ -20387,7 +20387,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -2.82,
        "y": 0.902,
        "z": -1.975
       },
@@ -22124,9 +22124,9 @@
      {
       "id": "part-36",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -2.175,
        "y": 0.583,
        "z": -1.233
       },
@@ -22151,7 +22151,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -2.175,
        "y": 0.636,
        "z": -3.083
       },
@@ -23753,9 +23753,9 @@
      {
       "id": "part-31",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -0.84,
        "y": 0.273,
        "z": -0.301
       },
@@ -23780,7 +23780,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -0.84,
        "y": 0.298,
        "z": -0.753
       },
@@ -25391,9 +25391,9 @@
      {
       "id": "part-32",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -1.162,
        "y": 0.378,
        "z": -0.253
       },
@@ -26844,9 +26844,9 @@
      {
       "id": "part-32",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -0.885,
        "y": 0.286,
        "z": -0.197
       },
@@ -26871,7 +26871,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -0.885,
        "y": 0.312,
        "z": -0.492
       },
@@ -28463,9 +28463,9 @@
      {
       "id": "part-37",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -2.55,
        "y": 0.759,
        "z": -0.596
       },
@@ -30053,9 +30053,9 @@
      {
       "id": "part-31",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -1.222,
        "y": 0.356,
        "z": -0.354
       },
@@ -30080,7 +30080,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -1.222,
        "y": 0.389,
        "z": -0.884
       },
@@ -31692,9 +31692,9 @@
      {
       "id": "part-31",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -4.327,
        "y": 1.236,
        "z": -1.256
       },
@@ -31719,7 +31719,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -4.327,
        "y": 1.349,
        "z": -3.141
       },
@@ -33331,9 +33331,9 @@
      {
       "id": "part-31",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -4.47,
        "y": 1.272,
        "z": -1.336
       },
@@ -33358,7 +33358,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -4.47,
        "y": 1.387,
        "z": -3.34
       },
@@ -34970,9 +34970,9 @@
      {
       "id": "part-31",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -4.65,
        "y": 1.331,
        "z": -1.478
       },
@@ -34997,7 +34997,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -4.65,
        "y": 1.452,
        "z": -3.695
       },
@@ -36659,9 +36659,9 @@
      {
       "id": "part-33",
       "type": "fuelStrainer",
-      "name": "Fuel strainer (belly low point)",
+      "name": "Fuel strainer (port side, low point)",
       "position": {
-       "x": 0,
+       "x": -5.355,
        "y": 1.573,
        "z": -1.454
       },
@@ -36686,7 +36686,7 @@
       "type": "fuelPump",
       "name": "Boost pump",
       "position": {
-       "x": 0,
+       "x": -5.355,
        "y": 1.716,
        "z": -3.636
       },
