@@ -113,8 +113,11 @@ function designFor(cfg) {
   /* --- propulsion --- */
   const engines = [];
   const engineType = jet ? 'jetEngine' : 'pistonEngine';
+  // jet thrust scales with nacelle scale (x·y) in the flight model, so bigger
+  // aircraft get proportionally bigger engines: real airliners run T/W ≈ 0.25–0.3
+  const jetScale = jet ? Math.min(3, 1 + Math.max(0, (cfg.massKg || 0) - 5000) / 40000 * 2) : 1;
   if (cfg.engineCount === 1 && !isGlider) {
-    const e = b.add(engineType, jet ? [0, H * .45, -L * .36] : [0, H * .55, L * .4], { name: 'Engine' });
+    const e = b.add(engineType, jet ? [0, H * .45, -L * .36] : [0, H * .55, L * .4], { name: 'Engine', ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
     engines.push(e);
     if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [e.position.x, e.position.y, e.position.z + .55], { name: 'Propeller' });
   } else if (cfg.engineCount > 1) {
@@ -123,7 +126,7 @@ function designFor(cfg) {
       const side = i % 2 === 0 ? 1 : -1;
       const rank = Math.floor(i / 2);
       const x = side * (half * (.35 + rank * .25));
-      const e = b.add(engineType, [x, wingY - .1, jet ? L * .18 : L * .05], { name: 'Engine ' + (i + 1) });
+      const e = b.add(engineType, [x, wingY - .1, jet ? L * .18 : L * .05], { name: 'Engine ' + (i + 1), ...(jet ? { scale: { x: jetScale, y: jetScale, z: Math.min(2.5, jetScale * .8) } } : {}) });
       engines.push(e);
       if (!jet) b.add(cfg.propBlades >= 4 ? 'prop4' : 'prop2', [x, e.position.y, e.position.z + .55], { name: 'Propeller ' + (i + 1) });
     }
@@ -156,15 +159,19 @@ function designFor(cfg) {
   const receiver = b.add('receiver', [-W * .3, H * .55, -L * .05], { name: 'Receiver' });
   cockpit.push(receiver);
 
-  /* --- fuel system: wing tanks -> strainer -> (pump) -> engines --- */
-  const tankL = b.add('fuelTank', [-half * .35, wingY + .1, 0], { name: 'Port tank' });
-  const tankR = b.add('fuelTank', [half * .35, wingY + .1, 0], { name: 'Starboard tank' });
-  const strainer = b.add('fuelStrainer', [0, H * .3, L * .1], { name: 'Fuel strainer (low point)' });
-  const pump = cfg.wingPlacement === 'high' && !jet ? null : b.add('fuelPump', [0, H * .32, L * .18], { name: 'Boost pump' });
+  /* --- fuel system: wing tanks -> strainer -> (pump) -> engines.
+         Gliders have no engines — no fuel system at all. --- */
+  let tankL = null, tankR = null, strainer = null, pump = null;
+  if (engines.length) {
+  tankL = b.add('fuelTank', [-half * .35, wingY + .1, 0], { name: 'Port tank' });
+  tankR = b.add('fuelTank', [half * .35, wingY + .1, 0], { name: 'Starboard tank' });
+  strainer = b.add('fuelStrainer', [0, H * .3, L * .1], { name: 'Fuel strainer (low point)' });
+  pump = cfg.wingPlacement === 'high' && !jet ? null : b.add('fuelPump', [0, H * .32, L * .18], { name: 'Boost pump' });
   b.wire(tankL, strainer, 'fuel'); b.wire(tankR, strainer, 'fuel');
   if (pump) b.wire(strainer, pump, 'fuel');
   const fuelTo = pump || strainer;
   for (const e of engines) b.wire(fuelTo, e, 'fuel');
+  }
 
   /* --- electrics: battery + alternator -> bus -> breaker -> loads --- */
   const battery = b.add('battery', [0, H * .3, L * .22], { name: 'Battery' });
@@ -221,7 +228,7 @@ function designFor(cfg) {
   b.group('Cockpit', cockpit);
   b.group('Engines', engines);
   b.group('Landing gear', gear);
-  b.group('Fuel system', [tankL, tankR, strainer, ...(pump ? [pump] : [])]);
+  if (engines.length) b.group('Fuel system', [tankL, tankR, strainer, ...(pump ? [pump] : [])]);
   b.group('Electrics', [battery, bus, cb, ...(alternator ? [alternator] : [])]);
   if (hydPump) b.group('Hydraulics', partsOf(b, /Hydraulic|Gear actuator/));
   b.group('Lights', lightParts);

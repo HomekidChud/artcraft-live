@@ -251,9 +251,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -276,9 +276,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -301,9 +301,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -326,9 +326,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -11717,81 +11717,6 @@
      },
      {
       "id": "part-23",
-      "type": "fuelTank",
-      "name": "Port tank",
-      "position": {
-       "x": -2.975,
-       "y": 0.74,
-       "z": 0
-      },
-      "rotation": {
-       "x": 0,
-       "y": 0,
-       "z": 0
-      },
-      "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
-      },
-      "color": null,
-      "locked": false,
-      "symmetryPairId": null,
-      "symmetrySide": 0,
-      "rotationY": 0
-     },
-     {
-      "id": "part-24",
-      "type": "fuelTank",
-      "name": "Starboard tank",
-      "position": {
-       "x": 2.975,
-       "y": 0.74,
-       "z": 0
-      },
-      "rotation": {
-       "x": 0,
-       "y": 0,
-       "z": 0
-      },
-      "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
-      },
-      "color": null,
-      "locked": false,
-      "symmetryPairId": null,
-      "symmetrySide": 0,
-      "rotationY": 0
-     },
-     {
-      "id": "part-25",
-      "type": "fuelStrainer",
-      "name": "Fuel strainer (low point)",
-      "position": {
-       "x": 0,
-       "y": 0.246,
-       "z": 0.835
-      },
-      "rotation": {
-       "x": 0,
-       "y": 0,
-       "z": 0
-      },
-      "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
-      },
-      "color": null,
-      "locked": false,
-      "symmetryPairId": null,
-      "symmetrySide": 0,
-      "rotationY": 0
-     },
-     {
-      "id": "part-26",
       "type": "battery",
       "name": "Battery",
       "position": {
@@ -11816,7 +11741,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-27",
+      "id": "part-24",
       "type": "powerBus",
       "name": "Main bus",
       "position": {
@@ -11841,7 +11766,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-28",
+      "id": "part-25",
       "type": "circuitBreaker",
       "name": "Breaker panel",
       "position": {
@@ -11866,7 +11791,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-29",
+      "id": "part-26",
       "type": "navLight",
       "name": "Nav light (port, red)",
       "position": {
@@ -11891,7 +11816,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-30",
+      "id": "part-27",
       "type": "navLight",
       "name": "Nav light (stbd, green)",
       "position": {
@@ -11916,7 +11841,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-31",
+      "id": "part-28",
       "type": "navLight",
       "name": "Nav light (tail, white)",
       "position": {
@@ -11941,7 +11866,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-32",
+      "id": "part-29",
       "type": "strobeLight",
       "name": "Strobe (port wingtip)",
       "position": {
@@ -11966,7 +11891,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-33",
+      "id": "part-30",
       "type": "strobeLight",
       "name": "Strobe (stbd wingtip)",
       "position": {
@@ -11991,7 +11916,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-34",
+      "id": "part-31",
       "type": "strobeLight",
       "name": "Strobe (tailcone)",
       "position": {
@@ -12016,7 +11941,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-35",
+      "id": "part-32",
       "type": "beaconLight",
       "name": "Beacon (top)",
       "position": {
@@ -12041,7 +11966,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-36",
+      "id": "part-33",
       "type": "beaconLight",
       "name": "Beacon (bottom)",
       "position": {
@@ -12066,7 +11991,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-37",
+      "id": "part-34",
       "type": "landingLight",
       "name": "Landing light (port)",
       "position": {
@@ -12091,7 +12016,7 @@
       "rotationY": 0
      },
      {
-      "id": "part-38",
+      "id": "part-35",
       "type": "landingLight",
       "name": "Landing light (stbd)",
       "position": {
@@ -12119,146 +12044,136 @@
     "wires": [
      {
       "from": "part-23",
-      "to": "part-25",
-      "kind": "fuel"
+      "to": "part-24",
+      "kind": "power"
+     },
+     {
+      "from": "part-23",
+      "to": "part-24",
+      "kind": "ground"
      },
      {
       "from": "part-24",
       "to": "part-25",
-      "kind": "fuel"
+      "kind": "power"
      },
      {
-      "from": "part-26",
+      "from": "part-24",
+      "to": "part-25",
+      "kind": "ground"
+     },
+     {
+      "from": "part-25",
+      "to": "part-26",
+      "kind": "power"
+     },
+     {
+      "from": "part-24",
+      "to": "part-26",
+      "kind": "ground"
+     },
+     {
+      "from": "part-25",
       "to": "part-27",
       "kind": "power"
      },
      {
-      "from": "part-26",
+      "from": "part-24",
       "to": "part-27",
       "kind": "ground"
      },
      {
-      "from": "part-27",
+      "from": "part-25",
       "to": "part-28",
       "kind": "power"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-28",
       "kind": "ground"
      },
      {
-      "from": "part-28",
+      "from": "part-25",
       "to": "part-29",
       "kind": "power"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-29",
       "kind": "ground"
      },
      {
-      "from": "part-28",
+      "from": "part-25",
       "to": "part-30",
       "kind": "power"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-30",
       "kind": "ground"
      },
      {
-      "from": "part-28",
+      "from": "part-25",
       "to": "part-31",
       "kind": "power"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-31",
       "kind": "ground"
      },
      {
-      "from": "part-28",
+      "from": "part-25",
       "to": "part-32",
       "kind": "power"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-32",
       "kind": "ground"
      },
      {
-      "from": "part-28",
+      "from": "part-25",
       "to": "part-33",
       "kind": "power"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-33",
       "kind": "ground"
      },
      {
-      "from": "part-28",
+      "from": "part-25",
       "to": "part-34",
       "kind": "power"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-34",
       "kind": "ground"
      },
      {
-      "from": "part-28",
+      "from": "part-25",
       "to": "part-35",
       "kind": "power"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-35",
       "kind": "ground"
      },
      {
-      "from": "part-28",
-      "to": "part-36",
-      "kind": "power"
-     },
-     {
-      "from": "part-27",
-      "to": "part-36",
-      "kind": "ground"
-     },
-     {
-      "from": "part-28",
-      "to": "part-37",
-      "kind": "power"
-     },
-     {
-      "from": "part-27",
-      "to": "part-37",
-      "kind": "ground"
-     },
-     {
-      "from": "part-28",
-      "to": "part-38",
-      "kind": "power"
-     },
-     {
-      "from": "part-27",
-      "to": "part-38",
-      "kind": "ground"
-     },
-     {
-      "from": "part-28",
+      "from": "part-25",
       "to": "part-18",
       "kind": "power"
      },
      {
-      "from": "part-28",
+      "from": "part-25",
       "to": "part-20",
       "kind": "power"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-18",
       "kind": "ground"
      },
@@ -12283,7 +12198,7 @@
       "kind": "signal"
      },
      {
-      "from": "part-27",
+      "from": "part-24",
       "to": "part-20",
       "kind": "ground"
      },
@@ -12345,7 +12260,7 @@
      },
      {
       "id": "grp-5",
-      "name": "Fuel system",
+      "name": "Electrics",
       "parts": [
        "part-23",
        "part-24",
@@ -12354,27 +12269,18 @@
      },
      {
       "id": "grp-6",
-      "name": "Electrics",
+      "name": "Lights",
       "parts": [
        "part-26",
        "part-27",
-       "part-28"
-      ]
-     },
-     {
-      "id": "grp-7",
-      "name": "Lights",
-      "parts": [
+       "part-28",
        "part-29",
        "part-30",
        "part-31",
        "part-32",
        "part-33",
        "part-34",
-       "part-35",
-       "part-36",
-       "part-37",
-       "part-38"
+       "part-35"
       ]
      }
     ],
@@ -15378,9 +15284,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 1.14,
+       "y": 1.14,
+       "z": 0.912
       },
       "color": null,
       "locked": false,
@@ -15403,9 +15309,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 1.14,
+       "y": 1.14,
+       "z": 0.912
       },
       "color": null,
       "locked": false,
@@ -16742,9 +16648,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -16767,9 +16673,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -18251,9 +18157,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -18276,9 +18182,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -27164,9 +27070,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 1.238,
+       "y": 1.238,
+       "z": 0.99
       },
       "color": null,
       "locked": false,
@@ -27189,9 +27095,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 1.238,
+       "y": 1.238,
+       "z": 0.99
       },
       "color": null,
       "locked": false,
@@ -28673,9 +28579,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -28698,9 +28604,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -30182,9 +30088,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -30207,9 +30113,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -31691,9 +31597,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -31716,9 +31622,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -33200,9 +33106,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -33225,9 +33131,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -33250,9 +33156,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
@@ -33275,9 +33181,9 @@
        "z": 0
       },
       "scale": {
-       "x": 1,
-       "y": 1,
-       "z": 1
+       "x": 3,
+       "y": 3,
+       "z": 2.4
       },
       "color": null,
       "locked": false,
