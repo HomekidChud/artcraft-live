@@ -604,3 +604,15 @@ are grouped".
   geometry. No hard-coded preset geometry once the build-from-parts path is
   live (it is live — the generator is the only allowed source of preset
   geometry, driven by the fleet table). Cite research for every routing rule.
+
+## Waypoint wire routing (this session)
+Done:
+- Wire schema now supports optional per-wire `waypoints` (max 8, ±500 m, x/y/z) — accepted by client `validateDesign`, mirrored server-side in `server/index.js` with round-trip + rejection tests (`server/test/server.test.js`).
+- `workshopWirePath()` (client) resolves a wire's rendered polyline (part endpoints + waypoints); `workshopRebuildWires()` renders routed wires as CatmullRom tubes through waypoints; straight wires keep the old gentle arc. One helper serves rendering, selection and audit.
+- `workshopSystemsAudit()` fuel-through-cockpit rule now checks the real polyline segment by segment (straight through cabin fails; belly run passes).
+- `tools/seed-presets/generate.mjs`: `routedWire()` emits belly-following fuel polylines (90 routed wires across the 24 presets); presets-fleet.json regenerated and re-validated (24/24 pass client validateDesign, waypoints preserved).
+- Verified with extracted-function tests: waypoint schema accept/reject, polyline rendering, audit straight-vs-routed, full preset pack through client validateDesign.
+- Committed and pushed (a1d1834).
+Still to do:
+- Editor affordance: user-facing way to add/move/remove waypoints on a selected wire in the workshop UI (right now waypoints exist in schema + presets + audit only).
+- Extend `routedWire()` to other kinds (hydraulic return lines, power/ground trunk runs along spars) once the editor affordance exists.
