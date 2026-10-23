@@ -612,7 +612,8 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
             </div></div>
             <div class="fw-prop-section" data-open="true"><div class="fw-prop-title">Systems</div><div class="fw-prop-body">
               <div id="workshopPartDetails" class="workshop-part-details">No special component properties.</div>
-              <div class="workshop-inspector-actions"><button id="workshopWeld" type="button" title="Attach this part — welded parts fly with the aircraft">🔗 Weld</button><button id="workshopUnweld" type="button" title="Unwelded parts break off and fall during flight">⛓ Unweld</button><button id="workshopDelete" type="button" class="workshop-danger">Delete</button></div>
+              <div class="workshop-inspector-actions"><button id="workshopDelete" type="button" class="workshop-danger">Delete</button></div>
+              <div class="workshop-part-details" style="margin-top:6px">Attachment: use the ◌ Glue tool to stick parts together — glued parts fly with the aircraft; anything not touching structure and not glued breaks off at flight start.</div>
             </div></div>
           </div>
           <div id="workshopWireInspector" hidden>
@@ -643,6 +644,7 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
         <div class="glass readout" id="airspeedReadout"><div class="label">Airspeed · EAS</div><span class="value" id="speed">0</span><span class="unit">KT</span><div class="label" id="trueAirspeed" style="margin-top:3px">TAS 0 · M 0.00</div></div>
         <div class="glass readout"><div class="label">Vertical speed</div><span class="value" id="vs">+0</span><span class="unit">FPM</span></div>
         <div class="glass readout"><div class="label">Heading</div><span class="value" id="heading">000°</span></div>
+        <div class="glass readout"><div class="label">Energy · forms</div><span class="value" style="font-size:10.5px;letter-spacing:0" id="energy">—</span><div class="label" id="energy2" style="margin-top:3px">—</div></div>
       </div>
     </div>
     <div class="hudrow" style="align-items:flex-end">
@@ -3335,7 +3337,8 @@ function workshopRenderInspector(){const g=workshopGetPart(workshopSelectedId);c
  const gl=$('workshopGlueList'),gc=$('workshopGlueCount');
  if(gl){const bonds=(g?workshopBonds.filter(b=>b.from===g.userData.partId||b.to===g.userData.partId):[]);if(gc)gc.textContent=String(bonds.length);
   gl.innerHTML=bonds.length?bonds.map(b=>{const other=b.from===g.userData.partId?b.to:b.from;const op=workshopGetPart(other);return '<div class="workshop-connection-row"><span>◌ '+(op?op.userData.name:other)+'</span><button type="button" data-workshop-unglue="'+b.from+'|'+b.to+'" title="Unglue">×</button></div>';}).join(''):'<span class="workshop-muted">Nothing glued to this part.</span>';}
- if(wsel){const prAll=(wsel.kind==='hydraulic'||wsel.kind==='fuel')?workshopSystemPressures():null;const pr=prAll?(prAll[wsel.from]||prAll[wsel.to]):null;const psi=pr?pr[wsel.kind]:null;$('workshopWireType').textContent=String(wsel.kind||'power').toUpperCase()+' / ROUTED WIRE'+(psi!=null?' · '+Math.round(psi)+' psi':'');$('workshopWireRoute').textContent=(workshopGetPart(wsel.from)?.userData.name||wsel.from)+' → '+(workshopGetPart(wsel.to)?.userData.name||wsel.to)+(wsel.waypoints&&wsel.waypoints.length?' · '+wsel.waypoints.length+' waypoint'+(wsel.waypoints.length>1?'s':''):' · straight run');$('workshopWaypointList').innerHTML=(wsel.waypoints&&wsel.waypoints.length)?wsel.waypoints.map((p,i)=>`<div class="workshop-connection-row workshop-waypoint-row"><span>WP${i+1}</span><div class="workshop-number-grid"><label>X<input data-wp-axis="x" data-wp-i="${i}" type="number" step="0.25" value="${p.x}"></label><label>Y<input data-wp-axis="y" data-wp-i="${i}" type="number" step="0.25" value="${p.y}"></label><label>Z<input data-wp-axis="z" data-wp-i="${i}" type="number" step="0.25" value="${p.z}"></label></div><button type="button" data-workshop-wp-delete="${i}" title="Remove waypoint">×</button></div>`).join(''):'<span class="workshop-muted">Straight run — add a waypoint to route it along structure.</span>';}
+ if(wsel){const prAll=(wsel.kind==='hydraulic'||wsel.kind==='fuel')?workshopSystemPressures():null;const pr=prAll?(prAll[wsel.from]||prAll[wsel.to]):null;const psi=pr?pr[wsel.kind]:null;
+  const sim=workshopWireSims[workshopSelectedWire];$('workshopWireType').textContent=String(wsel.kind||'power').toUpperCase()+' / ROUTED WIRE'+(psi!=null?' · '+Math.round(psi)+' psi':'')+(sim&&sim.temp!=null?' · '+Math.round(sim.temp)+'°C'+(sim.temp>80?' ⚠ INSULATION':''):'');$('workshopWireRoute').textContent=(workshopGetPart(wsel.from)?.userData.name||wsel.from)+' → '+(workshopGetPart(wsel.to)?.userData.name||wsel.to)+(wsel.waypoints&&wsel.waypoints.length?' · '+wsel.waypoints.length+' waypoint'+(wsel.waypoints.length>1?'s':''):' · straight run');$('workshopWaypointList').innerHTML=(wsel.waypoints&&wsel.waypoints.length)?wsel.waypoints.map((p,i)=>`<div class="workshop-connection-row workshop-waypoint-row"><span>WP${i+1}</span><div class="workshop-number-grid"><label>X<input data-wp-axis="x" data-wp-i="${i}" type="number" step="0.25" value="${p.x}"></label><label>Y<input data-wp-axis="y" data-wp-i="${i}" type="number" step="0.25" value="${p.y}"></label><label>Z<input data-wp-axis="z" data-wp-i="${i}" type="number" step="0.25" value="${p.z}"></label></div><button type="button" data-workshop-wp-delete="${i}" title="Remove waypoint">×</button></div>`).join(''):'<span class="workshop-muted">Straight run — add a waypoint to route it along structure.</span>';}
  $('workshopInspectorEmpty').hidden=!!g||!!wsel;$('workshopInspectorFields').hidden=!g;$('workshopDuplicate').disabled=!g;$('workshopMirrorSelected').disabled=!g||!!workshopMirrorMate(g);if(!g){$('workshopConnectionsList').innerHTML='<span class="workshop-muted">No wires connected yet.</span>';return;}const d=WORKSHOP_PARTS[g.userData.type];$('workshopSelectedType').textContent=(d.category||'component').toUpperCase()+' / '+g.userData.type.toUpperCase();$('workshopPartName').value=g.userData.name;$('workshopPosX').value=g.position.x.toFixed(2);$('workshopPosY').value=g.position.y.toFixed(2);$('workshopPosZ').value=g.position.z.toFixed(2);$('workshopScaleX').value=g.scale.x.toFixed(2);$('workshopScaleY').value=g.scale.y.toFixed(2);$('workshopScaleZ').value=g.scale.z.toFixed(2);$('workshopRotation').value=(g.rotation.y*180/Math.PI).toFixed(1);$('workshopPartMass').textContent=workshopPartMass(g).toFixed(2)+' kg';$('workshopPartCategory').textContent=d.category;$('workshopPartDetails').textContent=d.electrical?`${d.electrical.role} · ${d.electrical.volts} V · ${d.electrical.ports} ports. Connect compatible modules using Wire mode.`:d.engineType?`${d.engineType} propulsion · estimated static thrust ${d.thrustN} N.`:d.detail;const rows=workshopWires.map((w,i)=>({w,i})).filter(({w})=>w.from===g.userData.partId||w.to===g.userData.partId);$('workshopConnectionCount').textContent=String(rows.length);$('workshopConnectionsList').innerHTML=rows.length?rows.map(({w,i})=>`<div class="workshop-connection-row"><span>${escapeHTML(w.kind.toUpperCase())} · ${escapeHTML(workshopGetPart(w.from)?.userData.name||w.from)} → ${escapeHTML(workshopGetPart(w.to)?.userData.name||w.to)}</span><button type="button" data-workshop-wire-delete="${i}" title="Remove wire">×</button></div>`).join(''):'<span class="workshop-muted">No wires attached to this part.</span>';}
 /* Resolve a wire's rendered polyline: attached part endpoints (lifted slightly
    off the part centre) joined through any structure-following waypoints. One
@@ -3371,7 +3374,10 @@ function workshopRebuildWireSims(){
  workshopWireSims.length=workshopWires.length;
  for(let i=0;i<workshopWires.length;i++){
   const w=workshopWires[i],key=workshopWireSimKey(w),prev=workshopWireSims[i];
-  if(prev&&prev.key===key&&prev.line)continue; // unchanged — keep the settled rope
+  if(prev&&prev.key===key&&prev.line){ // unchanged — keep the settled rope (and its temperature)
+   if(!prev.stiffness){prev.stiffness=WORKSHOP_WIRE_STIFFNESS[w.kind]||2500;prev.damping=2;prev.mcK=prev.pts.length*.05*385;prev.hA=prev.pts.length*.005*10;prev.temp=prev.temp||20;}
+   continue;
+  }
   const pins=workshopWirePinsFor(w);
   if(!pins){workshopWireSims[i]=null;continue;}
   const pts=[],rests=[];
@@ -3384,7 +3390,7 @@ function workshopRebuildWireSims(){
    add(b,true);
    rests.push(span/(k+1));
   }
-  workshopWireSims[i]={key,pts,rests,line:null};
+  workshopWireSims[i]={key,pts,rests,line:null,stiffness:WORKSHOP_WIRE_STIFFNESS[w.kind]||2500,damping:2,mcK:pts.length*.05*385,hA:pts.length*.005*10,temp:(prev&&prev.temp)||20,elasticJ:0,dampW:0};
  }
 }
 function workshopSparkAt(pos){
@@ -3404,6 +3410,21 @@ function workshopSparkAt(pos){
  }
  attr.needsUpdate=true;workshopSparkBurst.userData.life=1;workshopSparkBurst.material.opacity=.95;
 }
+/* EnergyCore — deterministic energy-form models (testable, no hidden state).
+   Constants: Jet-A 43.02 MJ/kg (Chevron spec), copper cp 385 J/(kg·K),
+   PVC wire insulation 70–105°C (Wikipedia), radiant efficiency of small
+   incandescent/LED aircraft lamps ~15% (design estimate). */
+const WORKSHOP_WIRE_STIFFNESS={power:2500,ground:2500,signal:1200,data:1200,hydraulic:4000,fuel:3000,water:2500}; // N/m; k·h²/m < 1 for stability (h=dt/6, m=.05 kg)
+const EnergyCore={
+ kinetic:(m,v)=>.5*m*v*v,
+ gravitational:(m,h,g=9.81)=>m*g*h,
+ spring:(k,x)=>.5*k*x*x,
+ damperHeat:(c,vRel,dt)=>c*vRel*vRel*dt,
+ thermalStep:(T,pinW,mcK,hA,Tamb,dt)=>T+((pinW-hA*(T-Tamb))/mcK)*dt,
+ batteryStep:(e,p,dt)=>Math.max(0,e-p*dt),
+ fuelEnergy:(kg)=>kg*43.02e6,
+ radiantFromDraw:(w,eff=.15)=>w*eff,
+};
 function workshopStepWirePhysics(dt){
  if(!workshopWireRoot||!workshopWires.length)return;
  const damp=.985,gy=-9.81*dt*dt;
@@ -3422,23 +3443,46 @@ function workshopStepWirePhysics(dt){
   if(pins&&pins.length===sim.pts.filter(sp=>sp.pin).length){
    let pi=0;for(const sp of sim.pts)if(sp.pin){const v=pins[pi++];sp.p.copy(v);sp.pp.copy(v);}
   }
-  // integrate free nodes (gravity + damping); keep them off the floor
-  for(const sp of sim.pts){
-   if(sp.pin)continue;
-   const nx=sp.p.x+(sp.p.x-sp.pp.x)*damp,ny=sp.p.y+(sp.p.y-sp.pp.y)*damp+gy,nz=sp.p.z+(sp.p.z-sp.pp.z)*damp;
-   sp.pp.copy(sp.p);sp.p.set(nx,Math.max(.03,ny),nz);
-  }
-  // distance constraints (6 Gauss–Seidel passes; full correction toward pinned nodes)
-  for(let it=0;it<6;it++){
-   for(let j=0;j<sim.pts.length-1;j++){
-    const a=sim.pts[j],b=sim.pts[j+1],d=a.p.distanceTo(b.p);
-    if(d<1e-6)continue;
-    const diff=(d-sim.rests[Math.min(j,sim.rests.length-1)])/d,wa=a.pin?0:(b.pin?2:1),wb=b.pin?0:(a.pin?2:1),tw=wa+wb||1;
-    const dx=(b.p.x-a.p.x)*diff,dy=(b.p.y-a.p.y)*diff,dz=(b.p.z-a.p.z)*diff;
-    a.p.x+=dx*wa/tw;a.p.y+=dy*wa/tw;a.p.z+=dz*wa/tw;
-    b.p.x-=dx*wb/tw;b.p.y-=dy*wb/tw;b.p.z-=dz*wb/tw;
+  // elastic spring–damper dynamics, 4 substeps per frame (EnergyCore):
+  // tension-only springs with EXPLICIT stiffness (a wire carries no compression),
+  // viscous damping along each segment. Elastic energy = 1/2 k x^2 on actual
+  // stretch; damping power (c v^2) dissipates as heat into the wire's thermal
+  // mass, which cools by Newton's law — a real coupled mechanical/thermal slice.
+  const h=dt/6,nodeM=.05; // 50 g per node; 6 substeps keep k·h²/m < 1 (stability)
+  let dampW=0;
+  for(let sub=0;sub<6;sub++){
+   // integrate free nodes (gravity + damping); keep them off the floor
+   for(const sp of sim.pts){
+    if(sp.pin)continue;
+    const nx=sp.p.x+(sp.p.x-sp.pp.x)*damp,ny=sp.p.y+(sp.p.y-sp.pp.y)*damp+gy,nz=sp.p.z+(sp.p.z-sp.pp.z)*damp;
+    sp.pp.copy(sp.p);sp.p.set(nx,Math.max(.03,ny),nz);
    }
+   // spring–damper forces between adjacent nodes (verlet: x += a·h²)
+   for(let j=0;j<sim.pts.length-1;j++){
+    const a=sim.pts[j],b=sim.pts[j+1];
+    const dx=b.p.x-a.p.x,dy=b.p.y-a.p.y,dz=b.p.z-a.p.z,d=Math.hypot(dx,dy,dz);
+    if(d<1e-6)continue;
+    const ux=dx/d,uy=dy/d,uz=dz/d,stretch=d-sim.rests[Math.min(j,sim.rests.length-1)];
+    // relative velocity of b w.r.t. a along the segment
+    const vRel=((b.p.x-b.pp.x)-(a.p.x-a.pp.x))/h*ux+((b.p.y-b.pp.y)-(a.p.y-a.pp.y))/h*uy+((b.p.z-b.pp.z)-(a.p.z-a.pp.z))/h*uz;
+    const tension=stretch>0?sim.stiffness*stretch:0; // tension-only spring
+    const f=(tension+sim.damping*vRel)/nodeM*h*h;
+    if(!a.pin){a.p.x+=ux*f;a.p.y+=uy*f;a.p.z+=uz*f;}
+    if(!b.pin){b.p.x-=ux*f;b.p.y-=uy*f;b.p.z-=uz*f;}
+    dampW+=sim.damping*vRel*vRel; // instantaneous damping power
+   }
+   // floor clamp
+   for(const sp of sim.pts)if(!sp.pin&&sp.p.y<.03)sp.p.y=.03;
   }
+  sim.dampW=dampW/6; // mean damping power this frame
+  // elastic energy on the CURRENT stretch + thermal balance (heat in, cooling out)
+  let elasticJ=0;
+  for(let j=0;j<sim.pts.length-1;j++){
+   const a=sim.pts[j],b=sim.pts[j+1],d=a.p.distanceTo(b.p),stretch=Math.max(0,d-sim.rests[Math.min(j,sim.rests.length-1)]);
+   elasticJ+=EnergyCore.spring(sim.stiffness,stretch);
+  }
+  sim.elasticJ=elasticJ;
+  sim.temp=EnergyCore.thermalStep(sim.temp,sim.dampW,sim.mcK,sim.hA,20,dt);
   // powered line touching a water line -> arc (short circuit, sparks)
   if(waterPts.length&&(w.kind==='power'||w.kind==='ground')){
    for(const sp of sim.pts){
@@ -4803,6 +4847,20 @@ function updateControlSurfaces(){
  if(fleetModel?.userData?.lights)for(const lamp of fleetModel.userData.lights){const on=S.lights&&(lamp.strobe?flash:true);if(lamp.mat){lamp.mesh.visible=true;lamp.mat.emissiveIntensity=on?(lamp.strobe?7:2.6):0;if(lamp.light)lamp.light.intensity=on?(lamp.lightIntensity||1):0;}else lamp.mesh.visible=on;}
 }
 
+/* Full-aircraft energy ledger from live state (no invented dynamics):
+   stored forms (kinetic, gravitational potential, chemical fuel) are exact
+   for the current state; electrical/light are the current draw; sound is NOT
+   listed (not modelled). Elastic is workshop-side (wire springs). */
+function fwEnergyLedger(){
+ const cfg=getActiveAircraft();
+ const fuelKg=Math.max(0,(systems.fuel??100)/100*(systems.fuelCapacity||0));
+ const massKg=Math.max(1,((S.customAircraft&&S.customAircraft.massKg)||cfg.massKg)+fuelKg);
+ const v=physicsVelocity.length();
+ const elW=(Electrics&&Electrics.active&&typeof Electrics.loadW==='number')?Electrics.loadW:0;
+ const lampW=workshopParts.reduce((sum,p)=>sum+(FW_LIGHT_TYPES.includes(p.userData.type)?(FW_ELECTRIC_LOAD[p.userData.type]||0):0),0);
+ return {massKg,v,ke:EnergyCore.kinetic(massKg,v),pe:EnergyCore.gravitational(massKg,Math.max(0,plane.position.y)),
+  chem:EnergyCore.fuelEnergy(fuelKg),fuelKg,elW,lampW,lightW:EnergyCore.radiantFromDraw(lampW)};
+}
 function updateUI(){
  const agl=Math.max(0,plane.position.y-contactHeight(plane.position.x,plane.position.z));
  const alt=Math.max(0,plane.position.y);
@@ -4811,6 +4869,9 @@ function updateUI(){
  $('speed').textContent=Math.round(S.speed);
  $('trueAirspeed').textContent=`TAS ${Math.round(S.trueSpeed||0)} · M ${(S.mach||0).toFixed(2)}`;
  $('airspeedReadout').title='EAS is equivalent airspeed; TAS is true airspeed in knots. Mach uses local speed of sound.';
+ try{const led=fwEnergyLedger();
+  $('energy').textContent=`KE ${(led.ke/1e6).toFixed(1)} MJ · PE ${(led.pe/1e6).toFixed(1)} MJ · FUEL ${(led.chem/1e6).toFixed(0)} MJ`;
+  $('energy2').textContent=`EL ${Math.round(led.elW)} W · LIGHT ${Math.round(led.lightW)} W · m ${led.massKg.toFixed(0)} kg`;}catch(e){}
  const fpm=Math.round(S.vs*196.85);
  $('vs').textContent=(fpm>0?'+':'')+fpm;
  $('heading').textContent=String(Math.round(S.heading)%360).padStart(3,'0')+'°';
@@ -6103,7 +6164,7 @@ window.addEventListener('keydown',e=>{if(buildModeOpen){keys.clear();if(e.code==
 resetSystems();S.paused=true;$('pause').textContent='Resume';
 
 const lighting=document.createElement('label');lighting.className='deck-field';lighting.innerHTML='Lighting <select id="lightingTime"><option value="live">Live local time</option><option value="12">Midday</option><option value="17">Late afternoon</option><option value="0">Midnight</option></select>';$('worldSettings').appendChild(lighting);$('lightingTime').onchange=e=>{S.clockHour=e.target.value==='live'?null:Number(e.target.value);};
-if(new URLSearchParams(location.search).has('debug'))window.__flightWorld={THREE,camera,state:S,systems,plane,velocity:physicsVelocity,step:stepFlight,reset:resetFlight,place:placeInFlight,setAircraft:setAircraftType,core:AeroCore,interactive:()=>cockpitInteractive,doorTest:{state:()=>({...cockpitDoorState}),click:a=>cockpitActionClick(a),step:n=>{for(let i=0;i<n;i++)updateCockpitDoors();}},debris:()=>debrisField,tick:dt=>updateFlight(dt),elec:()=>Electrics,workshop:{snapshot:workshopSnapshot,restore:workshopRestoreSnapshot,template:workshopTemplate,open:openBuildMode,select:workshopSelectPart,parts:()=>workshopParts,validate:d=>AeroCore.validateDesign(d,WORKSHOP_PARTS)},removePart:name=>{const m=fleetModelSlot.children[0];if(!m)return null;let hit=null;m.traverse(o=>{if(!hit&&o.userData&&o.userData.fleetPart&&o.userData.fleetPart.name===name)hit=o;});if(!hit)return null;forgetFleetPart(m,hit);detachPartAsDebris(hit,null);if(typeof rebuildComponentShapes==='function')rebuildComponentShapes();return{name,remaining:m.children.filter(c=>c.userData&&c.userData.fleetPart).length};}};
+if(new URLSearchParams(location.search).has('debug'))window.__flightWorld={THREE,camera,state:S,systems,plane,velocity:physicsVelocity,step:stepFlight,reset:resetFlight,place:placeInFlight,setAircraft:setAircraftType,core:AeroCore,interactive:()=>cockpitInteractive,doorTest:{state:()=>({...cockpitDoorState}),click:a=>cockpitActionClick(a),step:n=>{for(let i=0;i<n;i++)updateCockpitDoors();}},debris:()=>debrisField,tick:dt=>updateFlight(dt),elec:()=>Electrics,workshop:{snapshot:workshopSnapshot,restore:workshopRestoreSnapshot,energy:fwEnergyLedger,template:workshopTemplate,open:openBuildMode,select:workshopSelectPart,parts:()=>workshopParts,validate:d=>AeroCore.validateDesign(d,WORKSHOP_PARTS)},removePart:name=>{const m=fleetModelSlot.children[0];if(!m)return null;let hit=null;m.traverse(o=>{if(!hit&&o.userData&&o.userData.fleetPart&&o.userData.fleetPart.name===name)hit=o;});if(!hit)return null;forgetFleetPart(m,hit);detachPartAsDebris(hit,null);if(typeof rebuildComponentShapes==='function')rebuildComponentShapes();return{name,remaining:m.children.filter(c=>c.userData&&c.userData.fleetPart).length};}};
 
 // Collision shapes use orthonormal axes, a centre and three half-extents.
 const dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -7159,7 +7220,7 @@ let workshopAdvanced=false,workshopStep='choose';
 const easySteps=document.createElement('nav');easySteps.className='builder-steps';easySteps.setAttribute('aria-label','Build steps');easySteps.innerHTML='<button data-build-step="choose">1 · Choose a starter</button><button data-build-step="build">2 · Add & arrange</button><button data-build-step="check">3 · Check & fly</button><button id="builderAdvanced" aria-pressed="false">Advanced tools</button>';document.querySelector('#fwRibbon').after(easySteps);
 const welcome=document.createElement('div');welcome.id='builderWelcome';welcome.innerHTML='<span class="builder-kicker">YOUR FIRST AIRCRAFT</span><h2>Start with something that flies.</h2><p>Choose a starter, then change its parts. Your work saves automatically.</p><div class="starter-cards"><button data-starter="templateTrainer"><b>Trainer</b><span>Easy to fly · one engine</span></button><button data-starter="templateTwin"><b>Twin engine</b><span>Two engines · wider wings</span></button><button data-starter="templateGlider"><b>Glider</b><span>No engine · long wings</span></button></div><button id="blankBuild">Continue with your design</button>';$('workshopCanvasWrap').appendChild(welcome);
 const builderHint=document.createElement('div');builderHint.id='builderHint';$('workshopCanvasWrap').appendChild(builderHint);
-const simpleMove=document.createElement('div');simpleMove.id='simpleMove';simpleMove.innerHTML='<h3>Move selected part</h3><p>Drag it on the grid, or use these buttons.</p><div class="nudge-grid"><button data-nudge="y,1">Up</button><button data-nudge="z,1">Forward</button><button data-nudge="y,-1">Down</button><button data-nudge="x,-1">Left</button><button data-nudge="z,-1">Back</button><button data-nudge="x,1">Right</button></div><div class="simple-actions"><button id="easyRotate">Rotate 15°</button><button id="easyDuplicate">Duplicate</button><button id="easyWeld">Weld</button><button id="easyUnweld">Unweld</button><button id="easyDelete">Remove</button></div>';$('workshopInspectorFields').prepend(simpleMove);
+const simpleMove=document.createElement('div');simpleMove.id='simpleMove';simpleMove.innerHTML='<h3>Move selected part</h3><p>Drag it on the grid, or use these buttons.</p><div class="nudge-grid"><button data-nudge="y,1">Up</button><button data-nudge="z,1">Forward</button><button data-nudge="y,-1">Down</button><button data-nudge="x,-1">Left</button><button data-nudge="z,-1">Back</button><button data-nudge="x,1">Right</button></div><div class="simple-actions"><button id="easyRotate">Rotate 15°</button><button id="easyDuplicate">Duplicate</button><button id="easyDelete">Remove</button></div>';$('workshopInspectorFields').prepend(simpleMove);
 const buildChecklist=document.createElement('section');buildChecklist.id='builderChecklist';buildChecklist.innerHTML='<h2>Ready for a test flight?</h2><div id="simpleChecks"></div><button id="easyTestFly" class="primary">Test my aircraft ↗</button><button id="backToBuild">Keep editing</button>';$('workshopCanvasWrap').appendChild(buildChecklist);
 function setBuilderStep(step){workshopStep=step;$('buildModeOverlay').dataset.step=step;welcome.hidden=step!=='choose';buildChecklist.hidden=step!=='check';builderHint.hidden=step!=='build';builderHint.textContent='Click a part to add it · drag a part to move it · drag empty space to look around';easySteps.querySelectorAll('[data-build-step]').forEach(b=>b.setAttribute('aria-current',String(b.dataset.buildStep===step)));$('workshopSearch').placeholder=workshopAdvanced?'Search all components…':'Find a part…';if(workshopRenderer){workshopResize();workshopRenderPalette();}updateSimpleChecks();}
 function updateSimpleChecks(){const types=workshopParts.map(p=>p.userData.type),requirements=[['Body',types.some(t=>['bodyBlock','bodySegment','cabinBlock'].includes(t))],['Main wings',types.some(t=>['wingPanel','longWing','deltaWing'].includes(t))],['Tail',types.some(t=>['fin','vTail','tailplane'].includes(t))],['Wheels or skid',types.some(t=>['wheel','skid'].includes(t))]];$('simpleChecks').replaceChildren(...requirements.map(([name,ok])=>{const row=document.createElement('p');row.className=ok?'check-ok':'check-missing';row.textContent=(ok?'✓ ':'○ ')+name+(ok?' added':' needed');return row;}));$('easyTestFly').disabled=requirements.some(([,ok])=>!ok);}
@@ -7168,7 +7229,7 @@ $('builderAdvanced').onclick=()=>{workshopAdvanced=!workshopAdvanced;$('buildMod
 welcome.querySelectorAll('[data-starter]').forEach(button=>button.onclick=()=>{if(workshopParts.length&&!confirm('Replace the current design? You can undo this change.'))return;workshopTemplate(button.dataset.starter);$('workshopName').value=button.querySelector('b').textContent+' project';saveWorkshop();setBuilderStep('build');workshopCategory='structure';workshopRenderPalette();$('workshopResetView').click();});
 $('blankBuild').onclick=()=>setBuilderStep('build');$('backToBuild').onclick=()=>setBuilderStep('build');$('easyTestFly').onclick=()=>$('workshopFly').click();
 simpleMove.querySelectorAll('[data-nudge]').forEach(button=>button.onclick=()=>{const part=workshopGetPart(workshopSelectedId);if(!part||part.userData.locked)return;workshopPushUndo();const [axis,direction]=button.dataset.nudge.split(',');part.position[axis]=clamp(part.position[axis]+Number(direction)*(workshopSnapIncrement||.25),-500,500);workshopSyncMirror(part);workshopRenderInspector();workshopRebuildWires();workshopUpdateStats();});
-$('easyRotate').onclick=()=>$('workshopRotateRight').click();$('easyDuplicate').onclick=()=>$('workshopDuplicate').click();$('easyWeld').onclick=()=>$('workshopWeld').click();$('easyUnweld').onclick=()=>$('workshopUnweld').click();$('easyDelete').onclick=()=>$('workshopDelete').click();
+$('easyRotate').onclick=()=>$('workshopRotateRight').click();$('easyDuplicate').onclick=()=>$('workshopDuplicate').click();$('easyDelete').onclick=()=>$('workshopDelete').click();
 const originalPartTool=workshopSetPartTool;
 workshopSetPartTool=function(type){if(workshopAdvanced||type.startsWith('template')||type.startsWith('__wire'))return originalPartTool(type);const def=WORKSHOP_PARTS[type];if(!def)return;const anchors={bodyBlock:[0,.65,0],bodySegment:[0,.65,-1.5],noseCone:[0,.68,2.15],cabinBlock:[0,1.1,.2],wingPanel:[0,1.06,0],longWing:[0,1.1,0],deltaWing:[0,1.0,0],tailplane:[0,.85,-2.25],fin:[0,.85,-2.45],vTail:[0,.85,-2.4],pistonEngine:[0,.68,2.55],electricMotor:[0,.68,2.5],jetEngine:[0,.7,-.6],prop2:[0,.7,3.18],prop4:[0,.7,3.18],wheel:[.6,.35,-.65],gearStrut:[.6,.6,-.65],skid:[0,.1,-2.6],canopy:[0,1.3,.3]};const pos=anchors[type]||[0,def.size[1]/2,0];const existing=workshopParts.filter(p=>p.userData.type===type).length;workshopPushUndo();const part=workshopCreateMirroredPair(type,{x:pos[0],y:pos[1],z:pos[2]-existing*.35});if(part){workshopSetTool('select');workshopSetStatus(def.name+' added. Drag it to adjust its position.');}updateSimpleChecks();};
 const simpleCategories=new Set(['structure','wings','tail','propulsion','gear']);
@@ -7573,7 +7634,7 @@ function detachUnweldedParts(){
  for(const p of parts)detachPartAsDebris(p,new THREE.Vector3(0,.4,0));
  if(parts.length){
   refreshCustomFlightStats(true);
-  if(typeof flightLog==='function')flightLog(parts.length+' unwelded part(s) broke off and fell away');
+  if(typeof flightLog==='function')flightLog(parts.length+' unattached part(s) broke off and fell away');
  }
 }
 
@@ -7703,11 +7764,9 @@ document.addEventListener('keydown',e=>{
  else if(e.key==='3')gizmoSetMode('scale');
 });
 /* Weld / unweld buttons */
-$('workshopWeld').addEventListener('click',()=>{const g=workshopGetPart(workshopSelectedId);if(!g)return;workshopPushUndo();g.userData.unwelded=false;workshopSetStatus(g.userData.name+' welded — stays attached in flight');});
-$('workshopUnweld').addEventListener('click',()=>{const g=workshopGetPart(workshopSelectedId);if(!g)return;workshopPushUndo();g.userData.unwelded=true;workshopSetStatus(g.userData.name+' unwelded — it breaks off and falls in flight');});
 /* Keep gizmos + weld buttons in sync with the selection */
 const baseWorkshopSelectPart=workshopSelectPart;
-workshopSelectPart=function(id){baseWorkshopSelectPart(id);gizmoRefresh();const g=workshopGetPart(id);if($('workshopWeld')){$('workshopWeld').disabled=!g;$('workshopUnweld').disabled=!g;}};
+workshopSelectPart=function(id){baseWorkshopSelectPart(id);gizmoRefresh();};
 const baseWorkshopFrame=workshopFrame;
 workshopFrame=function(){baseWorkshopFrame();if(buildModeOpen)gizmoRefresh();};
 
@@ -10415,14 +10474,6 @@ function physicalPartsTouch(a,b,ownOnly=false){
 function duplicateSolid(a,b){
  return a.userData.type===b.userData.type&&a.position.distanceTo(b.position)<.015&&Math.abs(a.quaternion.dot(b.quaternion))>.9999&&a.scale.distanceTo(b.scale)<.015;
 }
-$('workshopWeld').addEventListener('click',e=>{
- const part=workshopGetPart(workshopSelectedId);if(!part)return;
- const others=workshopParts.filter(p=>p!==part);
- const duplicate=others.some(p=>duplicateSolid(part,p));
- if(duplicate||!others.some(p=>physicalPartsTouch(part,p))){
-  e.stopImmediatePropagation();workshopSetStatus(duplicate?'Invalid joint: duplicate solid occupies the same space.':'Cannot weld empty space: move the part onto a real attachment surface (within 25 mm).');
- }
-},true);
 $('workshopFly').addEventListener('click',e=>{
  for(let i=0;i<workshopParts.length;i++)for(let j=i+1;j<workshopParts.length;j++)if(duplicateSolid(workshopParts[i],workshopParts[j])){
   e.stopImmediatePropagation();workshopSetStatus('Test flight blocked: duplicate solid parts occupy the same position. Move or remove the duplicate.');return;
@@ -10434,6 +10485,9 @@ markDetachedFlightParts=function(root){
  for(const p of parts)delete p.userData.flightDetached;
  for(let i=0;i<connected.length;i++)for(let j=i+1;j<connected.length;j++)
   if(!duplicateSolid(connected[i],connected[j])&&physicalPartsTouch(connected[i],connected[j]))parents[find(j)]=find(i);
+ // glue bonds attach parts even across empty space (replaces the old weld)
+ const idx=new Map(connected.map((p,i)=>[p.userData.partId,i]));
+ for(const b of workshopBonds){const i=idx.get(b.from),j=idx.get(b.to);if(i!=null&&j!=null)parents[find(j)]=find(i);}
  const masses=new Map();connected.forEach((p,i)=>masses.set(find(i),(masses.get(find(i))||0)+Math.max(.01,workshopPartMass(p))));
  const main=[...masses].sort((a,b)=>b[1]-a[1])[0]?.[0];
  for(const p of parts){const i=connected.indexOf(p);p.userData.flightDetached=i<0||find(i)!==main;}

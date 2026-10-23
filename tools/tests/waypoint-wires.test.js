@@ -50,6 +50,7 @@ let workshopSparkBurst = null;
 let workshopBonds = [];
 let workshopGlueRoot = null;
 let workshopGlueStart = null;
+let WORKSHOP_WIRE_STIFFNESS = {}; // eval'd in the sag test
 let workshopMultiSelect = new Set();
 const validateSrc = extract(body, 'function validateDesign(input, catalog) {');
 const pathSrc = extract(body, 'function workshopWirePath(w){');
@@ -305,6 +306,8 @@ function physicsEnv() {
 test('wire physics: an unclamped span sags under gravity', () => {
   physicsEnv();
   const stepSrc = extract(body, 'function workshopStepWirePhysics(dt){');
+  eval(body.match(/const WORKSHOP_WIRE_STIFFNESS=\{[^}]*\};/)[0].replace('const WORKSHOP_WIRE_STIFFNESS', 'WORKSHOP_WIRE_STIFFNESS'));
+  eval(body.match(/const EnergyCore=\{[\s\S]*?\n\};/)[0].replace('const EnergyCore', 'globalThis.EnergyCore'));
   const simSrc = extract(body, 'function workshopRebuildWireSims(){');
   const keySrc = extract(body, 'function workshopWireSimKey(w){');
   const pinsSrc = extract(body, 'function workshopWirePinsFor(w){');
@@ -505,4 +508,95 @@ test('snapshot: restore carries glue bonds end-to-end', () => {
     { id: 'c', type: 'fuelTank', position: { x: 4, y: 1, z: 0 }, scale: 1 }
   ] });
   assert.deepEqual(workshopBonds, [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }], 'restore rebuilds bonds');
+});
+
+/* ---------- EnergyCore: the 8 energy forms + conservation ---------- */
+
+function energyEnv() {
+  const m = body.match(/const EnergyCore=\{[\s\S]*?\n\};/)[0];
+  globalThis.EnergyCore = eval('(' + m.replace('const EnergyCore=', '').replace(/;\s*$/, '') + ')');
+  globalThis.WORKSHOP_WIRE_STIFFNESS = null;
+}
+
+test('EnergyCore: kinetic + gravitational — ballistic energy is conserved', () => {
+  energyEnv();
+  const E = globalThis.EnergyCore;
+  let m = 2, y = 100, vy = 0; // 2 kg dropped from 100 m
+  const dt = 1 / 360, g = 9.81; // small step: symplectic Euler oscillation ≪ tolerance
+  let ePrev = E.gravitational(m, y) + E.kinetic(m, 0);
+  for (let i = 0; i < 1800 && y > 0; i++) {
+    vy -= g * dt; y += vy * dt;
+    const e = E.gravitational(m, Math.max(0, y)) + E.kinetic(m, Math.abs(vy));
+    assert.ok(Math.abs(e - ePrev) < 2 * m * g * Math.abs(vy) * dt + .5, `energy drifted: ${e} vs ${ePrev}`); // symplectic oscillation O(g·v·dt)
+    ePrev = e;
+  }
+  assert.ok(Math.abs(ePrev - m * g * 100) < 10, 'total energy should stay ≈ mgh₀'); // within 0.5%
+});
+
+test('EnergyCore: elastic spring energy is ½kx² and damped motion converts to heat', () => {
+  energyEnv();
+  const E = globalThis.EnergyCore;
+  assert.ok(Math.abs(E.spring(3000, 0.01) - 0.15) < 1e-9); // ½·3000·0.0001
+  // explicit spring–damper oscillator (semi-implicit Euler): mechanical loss == heat gained
+  const m = 0.05, k = 2500, c = 2, dt = 1 / 3600; // small step: v changes ~1%/substep
+  let x = 0.05, v = 0, heat = 0;
+  for (let i = 0; i < 36000; i++) { // 10 s
+    const a = (-k * x - c * v) / m;
+    v += a * dt; x += v * dt;
+    heat += E.damperHeat(c, v, dt);
+  }
+  const mechLoss = E.spring(k, 0.05) - (E.spring(k, Math.abs(x)) + 0.5 * m * v * v);
+  assert.ok(Math.abs(mechLoss - heat) < Math.max(1e-4, heat * 0.02), `mechanical loss ${mechLoss} != heat ${heat}`);
+});
+
+test('EnergyCore: thermal step heats toward equilibrium and cools toward ambient', () => {
+  energyEnv();
+  const E = globalThis.EnergyCore;
+  const mcK = 385, hA = 1, Tamb = 20;
+  // constant 5 W into the body: equilibrium is 20 + 5/1 = 25 °C
+  let T = 20;
+  for (let i = 0; i < 120000; i++) T = E.thermalStep(T, 5, mcK, hA, Tamb, 1 / 60); // ~5 time constants
+  assert.ok(Math.abs(T - 25) < 0.2, `did not reach equilibrium: ${T}`);
+  // cooling with no input returns to ambient, no overshoot
+  let T2 = 80;
+  let prev = 80;
+  for (let i = 0; i < 200000; i++) { T2 = E.thermalStep(T2, 0, mcK, hA, Tamb, 1 / 60); assert.ok(T2 <= prev + 1e-9, 'cooling overshot'); prev = T2; }
+  assert.ok(Math.abs(T2 - 20) < 0.2, `did not cool to ambient: ${T2}`);
+});
+
+test('EnergyCore: battery floors at zero; fuel energy uses Jet-A density', () => {
+  energyEnv();
+  const E = globalThis.EnergyCore;
+  let e = 100;
+  for (let i = 0; i < 20; i++) e = E.batteryStep(e, 10, 1);
+  assert.equal(e, 0);
+  assert.ok(Math.abs(E.fuelEnergy(100) - 4.302e9) < 1e6); // 100 kg Jet-A ≈ 4.302 GJ
+  assert.ok(Math.abs(E.radiantFromDraw(100) - 15) < 1e-9); // 15% radiant
+});
+
+test('fwEnergyLedger: computes every form from live state', () => {
+  energyEnv();
+  const E = globalThis.EnergyCore;
+  const ledSrc = extract(body, 'function fwEnergyLedger(){');
+  globalThis.FW_LIGHT_TYPES = ['navLight', 'strobeLight', 'beaconLight', 'landingLight'];
+  globalThis.FW_ELECTRIC_LOAD = { navLight: 5, landingLight: 45, fuelTank: 0 };
+  // stub the live-state dependencies
+  globalThis.getActiveAircraft = () => ({ massKg: 900 });
+  globalThis.systems = { fuel: 50, fuelCapacity: 100 }; // 50 kg fuel
+  globalThis.S = { customAircraft: null };
+  globalThis.plane = { position: { y: 1000 } };
+  globalThis.physicsVelocity = { length: () => 50 };
+  globalThis.Electrics = { active: true, loadW: 240 };
+  globalThis.workshopParts = [
+    { userData: { type: 'landingLight' } }, { userData: { type: 'navLight' } }, { userData: { type: 'fuelTank' } }
+  ];
+  let ledger; eval(ledSrc.replace('function fwEnergyLedger', 'ledger = function fwEnergyLedger'));
+  const led = ledger();
+  assert.ok(Math.abs(led.ke - .5 * 950 * 2500) < 1e-6, 'KE ½mv²');
+  assert.ok(Math.abs(led.pe - 950 * 9.81 * 1000) < 1e-6, 'GPE mgh');
+  assert.ok(Math.abs(led.chem - 50 * 43.02e6) < 1e3, 'chemical fuel');
+  assert.equal(led.elW, 240, 'electrical draw');
+  assert.equal(led.lampW, 50, 'lamp draw 45+5');
+  assert.equal(led.lightW, E.radiantFromDraw(50), 'light output');
+  assert.ok(Math.abs(led.massKg - 950) < 1e-9, 'mass includes fuel');
 });

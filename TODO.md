@@ -698,3 +698,34 @@ test — plus 4 glue tests) + 1 e2e
   light fixture models for fleet lamps, Unity/game-engine deep research, Render
   deploy verification. Live smoke test of this session's features on Pages is
   still pending (Pages rebuild is slow — use `?debug&fresh=N`).
+
+## AirplaneCraft — 17.10.5b (same day): glue replaces weld + 8 energy forms
+
+Commits: see git log (glue-replaces-weld + EnergyCore). Tests: 23 waypoint-wires
+(+5 energy: ballistic conservation, spring→heat, thermal equilibrium/cooling,
+battery/fuel-density, full ledger from stubbed live state).
+
+### Glue replaces weld (owner: "remove the weld its useless when we got glue")
+- Weld/Unweld buttons removed from both inspector UIs (advanced + simple builder);
+  replaced with a glue hint. The `unwelded` flag stays in the schema for imported
+  files but has no UI.
+- `markDetachedFlightParts` now unions glue-bonded parts — glued parts fly with the
+  aircraft even across empty space; anything not touching structure and not glued
+  breaks off at flight start (wording: "unattached part(s) broke off").
+- `workshopClear` resets glue state.
+
+### Energy physics (owner: "all the 7 or 8 physics")
+- `EnergyCore` pure functions: kinetic, gravitational, spring (½kx²), damper heat
+  (c·v²·dt), thermal step (heat in − Newton cooling), battery, fuel (43.02 MJ/kg
+  Jet-A), radiant output. Cited in docs/systems-research.md §9.
+- Wire ropes upgraded from hard constraints to **tension-only spring–damper** dynamics
+  (6 substeps/frame, explicit stiffness per wire kind, stability k·h²/m < 1):
+  real stretch stores elastic energy, damping dissipates as heat, each wire carries
+  a temperature (thermal mass + cooling) shown live in the wire inspector with a
+  ⚠ INSULATION warning above 80°C (PVC 70–105°C).
+- Flight HUD: new **Energy** readout — KE, PE, chemical fuel from live state
+  (mass incl. fuel, physicsVelocity, altitude, fuel kg), electrical draw, light
+  output. `window.__flightWorld.workshop.energy()` exposes the ledger.
+- Honest limits: sound deliberately not modelled; light efficiency is a labelled
+  estimate; thermal is wire-level only (no engine/airframe heat yet); flight-time
+  wires are static clones (spring/thermal live in the workshop only).

@@ -186,3 +186,25 @@ Wikipedia nav lights ([4](https://en.wikipedia.org/wiki/Navigation_light)).
 - Pending: waypoint editor affordance (drag to add/move/remove), per-class
   audit matrix, cockpit-bounding-volume helper, fleet-lamp lens fixtures,
   Build Mode UI consolidation, Render deploy verification.
+
+## §9 Energy-form physics (17.10.5, 2026-10-23)
+
+Implemented as `EnergyCore` (pure functions) + a coupled mechanical/thermal slice on
+the wire ropes + a live aircraft energy ledger in the HUD.
+
+| Form | Model | Source |
+|---|---|---|
+| Kinetic | E = ½mv², m = aircraft + fuel, v = physicsVelocity | textbook |
+| Gravitational potential | E = mgh (h = MSL) | textbook |
+| Elastic | tension-only springs, explicit stiffness per wire kind (1.2–4 kN/m), E = ½kx² on actual stretch | steel-wire behaviour, stability bound k·h²/m < 1 for the integrator |
+| Thermal/heat | damping power c·v² dissipates into wire thermal mass; copper cp 385 J/(kg·K); Newton cooling h·A·(T−T_amb) | copper cp: [Wikipedia – copper](https://en.wikipedia.org/wiki/Copper_(data_page)) |
+| Temperature limit | PVC wire insulation 70–105°C → inspector warning above 80°C | [Wikipedia – PVC](https://en.wikipedia.org/wiki/Polyvinyl_chloride) |
+| Chemical | fuel energy 43.02 MJ/kg (Jet-A) | [Chevron Jet A spec](https://www.chevron.com/-/media/chevron/stories/documents/chevron-jet-a.pdf) |
+| Electrical | live Electrics bus load (W) | existing Electrics system |
+| Light | lamp draw × 15% radiant efficiency (design estimate; remainder → heat) | estimate, labelled as such |
+| Sound | not modelled — deliberately excluded rather than invented | — |
+| Pressure | hydraulic 3000 psi / fuel 30 psi connectivity model (previous session) | nominal system ratings |
+
+Glue replaces weld: flight attachment is now "physically touching structure OR glued
+(bond graph)"; the Weld/Unweld buttons were removed. Constants are cited in the code
+comments next to `EnergyCore`.
