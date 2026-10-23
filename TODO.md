@@ -609,13 +609,13 @@ are grouped".
 Scope note: this is a routing/schema milestone, NOT a full editor affordance — wires with waypoints are rendered, audited, validated and persisted, but there is no UI yet to drag a waypoint; selection/editing of wires is unchanged from before.
 Done:
 - Wire schema now supports optional per-wire `waypoints` (max 8, ±500 m, x/y/z) — accepted by client `validateDesign`, mirrored server-side in `server/index.js` with round-trip + rejection tests (`server/test/server.test.js`).
-- `workshopWirePath()` (client) resolves a wire's rendered polyline (part endpoints + waypoints); `workshopRebuildWires()` renders routed wires as CatmullRom tubes through waypoints; straight wires keep the old gentle arc. One helper serves rendering, selection and audit.
+- `workshopWirePath()` (client) resolves a wire's polyline (part endpoints + waypoints); `workshopRebuildWires()` renders it as straight LineSegments. Rendering and audit share the helper so they see the same geometry. NOTE: wire selection/editing in the UI is unchanged from before — waypoints are schema + render + audit, not yet a draggable editor affordance.
 - `workshopSystemsAudit()` fuel-through-cockpit rule now checks the real polyline segment by segment (straight through cabin fails; belly run passes).
 - `tools/seed-presets/generate.mjs`: `routedWire()` emits belly-following fuel polylines (90 routed wires across the 24 presets); presets-fleet.json regenerated and re-validated (24/24 pass client validateDesign, waypoints preserved).
 - Verified with extracted-function tests: waypoint schema accept/reject, polyline rendering, audit straight-vs-routed, full preset pack through client validateDesign.
-- `tools/tests/waypoint-wires.test.js`: 8 committed regression tests against the production functions (extracted verbatim from the client), including save→validate→restore round-trip preserving waypoints and an exact-intersection cockpit-clip case the old 13-point sampler could miss.
-- Rendering caveat: routed wires render as CatmullRom splines through the waypoints; the audit checks the straight polyline between those points, so the audit is a conservative envelope of the rendered curve, not a pixel-exact match.
-- Waypoints persist through workshopSnapshot (wires are deep-cloned), so cloud save/load and undo/redo snapshots keep them.
+- `tools/tests/waypoint-wires.test.js`: 9 committed regression tests against the production functions (extracted verbatim from the client), including save→validate→restore round-trip preserving waypoints and an exact-intersection cockpit-clip case the old 13-point sampler could miss.
+- Rendering now matches the audit exactly: workshopRebuildWires renders straight LineSegments through workshopWirePath's resolved points, the same polyline the audit checks segment-by-segment. No spline bow can hide from the audit.
+- Waypoints persist through workshopSnapshot and workshopRestoreSnapshot (both deep-clone wires via workshopCloneJSON), so cloud save/load, undo/redo and preset load keep them — pinned by tests.
 - Committed and pushed (a1d1834 + follow-up fixes).
 Still to do:
 - Editor affordance: user-facing way to add/move/remove waypoints on a selected wire in the workshop UI (right now waypoints exist in schema + presets + audit only).

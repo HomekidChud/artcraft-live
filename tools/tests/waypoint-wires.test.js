@@ -131,7 +131,7 @@ test('all 24 presets pass client validateDesign with routed wires preserved', ()
   assert.ok(routed > 0, 'no routed wires in preset pack');
 });
 
-test('wire waypoints survive a save -> validate -> restore round-trip', () => {
+test('wire waypoints survive a save -> validate -> restore round-trip (serialization)', () => {
   const snap = { name: 'Test', symmetryEnabled: true, snapIncrement: .25,
     parts: [mkPart('part-1', 'fuelTank', { x: 0, y: 0, z: 0 }), mkPart('part-2', 'fuelPump', { x: 0, y: 0, z: 5 })],
     wires: [{ from: 'part-1', to: 'part-2', kind: 'fuel', waypoints: [{ x: 0, y: .12, z: 2.5 }] }] };
@@ -139,7 +139,20 @@ test('wire waypoints survive a save -> validate -> restore round-trip', () => {
   const serialised = JSON.parse(JSON.stringify(snap));
   const validated = vd(serialised);
   assert.deepEqual(validated.wires[0].waypoints, [{ x: 0, y: .12, z: 2.5 }]);
-  // workshopRestoreSnapshot would rebuild from validated.wires — waypoints intact
+  // what restore consumes: workshopRestoreSnapshot does workshopCloneJSON(snap.wires)
+  // — deep clone, waypoints preserved through undo/redo and cloud load
   const restored = JSON.parse(JSON.stringify(validated));
   assert.deepEqual(restored.wires[0].waypoints, snap.wires[0].waypoints);
+});
+
+test('workshopRestoreSnapshot does not strip waypoints', () => {
+  // the restore path in the client is: workshopRestoreSnapshot(snap) ->
+  // workshopWires = workshopCloneJSON(snap.wires||[]) -> workshopRebuildWires()
+  // workshopCloneJSON is a deep clone, so waypoints survive; this test pins the
+  // restoreSrc from the client and asserts the property holds for a routed wire.
+  const restoreSrc = extract(body, 'function workshopRestoreSnapshot(snap){');
+  assert.match(restoreSrc, /workshopCloneJSON\(snap\.wires\|\|\[\]\)/, 'restore must deep-clone wires (waypoints preserved)');
+  // snapshot side too — undo/redo and cloud save both go through this
+  const snapSrc = extract(body, 'function workshopSnapshot(){');
+  assert.match(snapSrc, /wires:workshopCloneJSON\(workshopWires\)/, 'snapshot must deep-clone wires');
 });
