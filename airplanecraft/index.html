@@ -4855,6 +4855,7 @@ function updateControlSurfaces(){
    high Mach heats the skin (isentropic stagnation T = T_amb·(1+0.2M²)) and a
    re-entry flame appears above 150°C skin temperature. */
 const FW_WIRE_SNAP_STRETCH=.08; // 8% elastic limit before a wire snaps
+const FW_WIRE_SETTLE_FRAMES=30; // a freshly built rope starts straight; its gravity settle transient is not a snap
 const FW_WIRE_INSULATION_MELT_C=105; // PVC continuous rating — hotter and the insulation fails
 const FW_GLUE_BOND_STRENGTH_N=350; // ~25 mm² epoxy lap joint at ~14 MPa shear (design estimate)
 const FW_WIRE_COLORS={power:'#ffd24a',ground:'#9aa7ad',signal:'#6fd3ff',data:'#6fd3ff',hydraulic:'#ff9a3d',fuel:'#c9a86a',water:'#5ac8ff'};
@@ -4877,7 +4878,7 @@ function fwBuildFlightWireSims(flightWires){
    const p1=pins[sp],p2=pins[sp+1],span=p1.distanceTo(p2);
    const k=Math.min(10,Math.max(0,Math.round(span/.8)-1));
    for(let j=1;j<=k;j++)add(new THREE.Vector3().lerpVectors(p1,p2,j/(k+1)),false);
-   add(p2,true);rests.push(span/(k+1));
+   add(p2,true);for(let r=0;r<=k;r++)rests.push(span/(k+1)); // per-SEGMENT rest — the step indexes by segment
   }
   const line=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:FW_WIRE_COLORS[w.kind]||'#ffd24a',transparent:true,opacity:.95}));
   line.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(Math.max(2,(pts.length-1)*2)*3),3));
@@ -4899,6 +4900,7 @@ function fwStepFlightWires(dt){
  const gx=gLocal.x*dt*dt,gy=gLocal.y*dt*dt,gz=gLocal.z*dt*dt,damp=.985,h=dt/6,nodeM=.05;
  for(let i=0;i<fwFlightWireSims.length;i++){
   const sim=fwFlightWireSims[i];if(!sim||sim.dead)continue;
+  sim.age=(sim.age||0)+1; // frames since build — the settle guard uses this
   let dampW=0;
   for(let sub=0;sub<6;sub++){
    for(const sp of sim.pts){
@@ -4917,8 +4919,9 @@ function fwStepFlightWires(dt){
     if(!A.pin){A.p.x+=ux*f;A.p.y+=uy*f;A.p.z+=uz*f;}
     if(!B.pin){B.p.x-=ux*f;B.p.y-=uy*f;B.p.z-=uz*f;}
     dampW+=sim.damping*vRel*vRel;
-    // elastic limit: an overstretched wire SNAPS (spark, electrical fault)
-    if(stretch>sim.rests[j]*FW_WIRE_SNAP_STRETCH){
+    // elastic limit: an overstretched wire SNAPS (spark, electrical fault) —
+    // but not during the settle transient of a freshly built, perfectly straight rope
+    if(sim.age>FW_WIRE_SETTLE_FRAMES&&stretch>sim.rests[j]*FW_WIRE_SNAP_STRETCH){
      sim.dead=true;sim.line.visible=false;
      if(typeof Electrics!=='undefined')Electrics.brokenWires.add(i);
      if(typeof flightLog==='function')flightLog('Wire snapped — overstretched past its elastic limit');
@@ -5005,34 +5008,52 @@ function fwBuildGlueJoints(root,carriedIds){
 function fwGlueLoadUpdate(){
  const j=fwFlightGlueJoints;if(!j)return;
  if(!j.root.parent||!j.root.parent.parent){fwFlightGlueJoints=null;return;} // custom aircraft gone
+ const carriedSet=new Set(j.carried);
+ const bonds=j.bonds.filter(b=>b.a.parent===j.root&&b.c.parent===j.root); // live bonds only
+ const adj=new Map();const link=(x,y)=>{(adj.get(x)||adj.set(x,[]).get(x)).push(y);};
+ for(const b of bonds){link(b.a,b.c);link(b.c,b.a);}
+ const seen=new Set();
  for(const p of j.carried){
-  if(p.parent!==j.root)continue; // already torn off or reparented
-  let n=0;for(const b of j.bonds)if(b.a===p||b.c===p)n++;
-  const joint=fwGlueJoint(workshopPartMass(p),fwLastGAppMag,n);
-  if(!joint.fails){j.over.delete(p);continue;}
-  // two consecutive overloaded frames before failure: single-frame
-  // acceleration spikes (spawn teleports, mid-flight resets) must not rip parts off
-  if((j.over.get(p)||0)<1){j.over.set(p,1);continue;}
-  j.bonds=j.bonds.filter(b=>b.a!==p&&b.c!==p); // the overloaded joint lets go
-  j.over.delete(p);
-  // chains cascade: parts glued only to this one lose these bonds and fail
-  // on their own next pass — no floating unsupported groups
+  if(p.parent!==j.root||seen.has(p))continue; // already torn off, reparented, or handled in an earlier component
+  // one bond-connected component: the carried parts + any structurally attached parts they hang from
+  const group=[],stack=[p];seen.add(p);
+  let carriedM=0,boundary=0;
+  while(stack.length){
+   const q=stack.pop();
+   if(carriedSet.has(q)){group.push(q);carriedM+=workshopPartMass(q);} // else: structurally attached anchor
+   for(const nb of (adj.get(q)||[])){
+    // a load-path bond to the structure — counted from the carried side, so exactly once
+    if(carriedSet.has(q)&&!carriedSet.has(nb))boundary++;
+    if(!seen.has(nb)){seen.add(nb);stack.push(nb);}
+   }
+  }
+  // the boundary bonds carry the whole group's weight; no boundary = nothing holds it
+  const joint=fwGlueJoint(carriedM,fwLastGAppMag,boundary);
+  if(!joint.fails){j.over.delete(p.userData.partId);continue;}
+  // two consecutive overloaded frames: single-frame acceleration spikes (spawn
+  // teleports, mid-flight resets) must not rip parts off
+  if((j.over.get(p.userData.partId)||0)<1){j.over.set(p.userData.partId,1);continue;}
+  j.over.delete(p.userData.partId);
+  // the overloaded joint lets go: the whole carried group tears off together —
+  // chained parts glued only to this group lose their bonds too, so no
+  // unsupported group is left floating on the airframe
+  const ids=new Set(group.map(g=>g.userData.partId));
+  j.bonds=j.bonds.filter(b=>!ids.has(b.a.userData.partId)&&!ids.has(b.c.userData.partId));
   if(typeof workshopSparkAt==='function')workshopSparkAt(p.getWorldPosition(new THREE.Vector3()));
-  detachPartAsDebris(p,new THREE.Vector3(0,-.5,0));
-  // wires attached to the torn-off part rip out with it — no anchors left in mid-air
-  const pid=p.userData.partId;
+  for(const g of group)detachPartAsDebris(g,new THREE.Vector3(0,-.5,0));
+  // wires attached to any torn-off part rip out with it — no anchors left in mid-air
   for(let i=0;i<workshopWires.length;i++){
    const w=workshopWires[i],sim=fwFlightWireSims[i];
    if(!w||!sim||sim.dead)continue;
-   if(w.from===pid||w.to===pid){
+   if(ids.has(w.from)||ids.has(w.to)){
     sim.dead=true;sim.line.visible=false;
     if(typeof Electrics!=='undefined'&&Electrics.brokenWires)Electrics.brokenWires.add(i);
-    if(typeof flightLog==='function')flightLog('Wire ripped out with '+(p.userData.name||'the torn-off part')+' — '+(w.kind||'wire')+' line torn loose');
+    if(typeof flightLog==='function')flightLog('Wire ripped out with a torn-off part — '+(w.kind||'wire')+' line torn loose');
     if(typeof workshopSparkAt==='function')workshopSparkAt(p.getWorldPosition(new THREE.Vector3()));
    }
   }
   if(typeof refreshCustomFlightStats==='function')refreshCustomFlightStats(true);
-  if(typeof flightLog==='function')flightLog('Glue joint failed at '+Math.round(fwLastGAppMag/9.81)+'g ('+Math.round(joint.load)+' N > '+Math.round(joint.capacity)+' N) — '+(p.userData.name||'part')+' tore away');
+  if(typeof flightLog==='function')flightLog('Glue joint failed at '+Math.round(fwLastGAppMag/9.81)+'g ('+Math.round(joint.load)+' N > '+Math.round(joint.capacity)+' N) — '+(group.length>1?group.length+'-part group tore away':(p.userData.name||'part')+' tore away'));
  }
 }
 /* Full-aircraft energy ledger from live state (no invented dynamics):

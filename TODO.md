@@ -753,6 +753,19 @@ battery/fuel-density, full ledger from stubbed live state).
 Owner follow-up: glued groups should be able to fall apart ("never fall apart"),
 and the physics should keep advancing. Two additions, both tested.
 
+### ROOT-CAUSE FIX: flight ropes had springs on the FIRST segment only
+- Found during review: the flight rope builder pushed ONE rest length per span
+  (`rests.push(span/(k+1))`) while the step indexes `sim.rests[j]` per SEGMENT —
+  so on every built wire, all segments past the first had `rests[j]` undefined →
+  NaN stretch → NO spring force and NO snap check. Result: rope nodes past
+  segment 1 free-fell — very plausibly the owner's original "wires that
+  disobey the laws of gravity" bug. Builder now emits per-SEGMENT rests
+  (`rests.length === pts.length-1`), verified by a builder integration test.
+- Settle guard added: a freshly built rope starts perfectly straight; its
+  gravity-sag transient could exceed the 8% elastic limit and snap it
+  (`FW_WIRE_SETTLE_FRAMES=30`). Snap checks run only after the settle window;
+  a genuinely overstretched rope (pinned 4 m apart, 2 m of rest) still snaps.
+
 ### Glue joint strength (flight-time load test)
 - `FW_GLUE_BOND_STRENGTH_N=350` (~25 mm² epoxy lap joint at ~14 MPa shear —
   design estimate, cited in docs §9 addendum 2).
@@ -760,11 +773,18 @@ and the physics should keep advancing. Two additions, both tested.
   an optional bonds list, default `workshopBonds`) to find parts attached ONLY
   by glue; `fwBuildGlueJoints` maps the bonds onto the flight-model parts.
 - Every frame `fwGlueLoadUpdate` (after `fwStepFlightWires`, which publishes the
-  apparent-gravity magnitude in `fwLastGAppMag`): load = mass × |g_app|, capacity
-  = intact bonds × 350 N. Overload → spark, bond removed, `detachPartAsDebris`,
-  `refreshCustomFlightStats(true)`, flight log "Glue joint failed at Ng". A 5 kg
-  part on one bond tears off above ~7g; hard re-entries and crashes rip glued
-  parts off — glued groups now fall apart like real structures.
+  apparent-gravity magnitude in `fwLastGAppMag`) evaluates glue groups as
+  BOND-CONNECTED COMPONENTS: the boundary bonds (carried ↔ structural) carry
+  the whole group's weight — load = carried mass × |g_app|, capacity = boundary
+  bonds × 350 N. Overload → spark, the whole carried group tears off as debris
+  (`detachPartAsDebris` each), `refreshCustomFlightStats(true)`, flight log
+  "Glue joint failed at Ng (X N > Y N)". A 5 kg part on one bond tears off above
+  ~7g; hard re-entries and crashes rip glued parts off — glued groups now fall
+  apart like real structures.
+- Chained parts go WITH their joint (part glued only to an overloaded part
+  tears off in the same event), and a part whose structural anchor is removed
+  by the damage model has zero boundary bonds → falls off even at 1g — no
+  floating unsupported groups.
 - Honesty: bond-chain loading (a bond also carrying a neighbouring glued part)
   is approximated by counting bonds; strength is game-scaled, not a specific
   adhesive spec; joints backed by physical contact are held by that contact
@@ -772,15 +792,21 @@ and the physics should keep advancing. Two additions, both tested.
   The 105°C insulation failure is a tuned gameplay threshold at the PVC
   continuous-service rating, not a material-spec melt model.
 
-### Review-fix round (same session, before push): robustness
+### Review-fix rounds (same session, before push): robustness
 - **Two-frame overload guard**: a glue joint fails only after two consecutive
   overloaded frames — single-frame acceleration spikes (spawn teleports,
   mid-flight resets) can no longer rip parts off.
-- **Wires rip out with torn-off parts**: when a glued part detaches, every wire
-  attached to it dies with it (line hidden, Electrics fault, flight log) — no
-  rope left anchored in mid-air.
-- **Cascade**: a part glued only to the torn-off one loses those bonds and fails
-  on its own next pass — no floating unsupported groups.
+- **Wires rip out with torn-off parts**: when a glued group detaches, every wire
+  attached to any of its parts dies with it (line hidden, Electrics fault,
+  flight log) — no rope left anchored in mid-air.
+- **Component model**: glue groups are bond-connected components; boundary
+  bonds are counted once (from the carried side) and carry the group's total
+  weight; teardown detaches the whole group so no unsupported group floats.
+- **Rope rest-length fix + settle guard** (see ROOT-CAUSE FIX above).
+- **105°C insulation failure** documented as a tuned gameplay threshold at the
+  PVC continuous-service rating (not a material-spec melt model); touching
+  glued joints are held by contact per the game's contact-attachment model
+  (same as unwelded stacked parts) and are not additionally glue-load-tested.
 
 ### Flight wire thermal (wires now burn in re-entry)
 - Flight ropes carry a temperature (same copper thermal mass as the workshop)
@@ -790,10 +816,13 @@ and the physics should keep advancing. Two additions, both tested.
   rating) → insulation melts: spark, line dead, Electrics fault — same failure
   path as a snap. A hard re-entry that soaks the skin at hundreds of °C cooks
   the wiring harness.
-- Tests: 29 waypoint-wires (+4: glue joint holds at 1g / tears off at 9g,
-  glue load-update integration — spike guard, teardown, wire rip-out, cascade,
-  wire cooks past 105°C in a pure-thermalStep loop and in a full step
-  integration with a hot skin). The rope test harness gained `length()`/`sub()`
-  stubs and rebinding for `fwLastGAppMag`/`fwReentry`. Repo `npm test` 64/64 green.
+- Tests: 30 waypoint-wires (+5: glue joint holds at 1g / tears off at 9g;
+  glue load-update integration — spike guard, group teardown, chain, wire
+  rip-out, floating group; wire cooks past 105°C in a pure-thermalStep loop;
+  full-step melt integration with a hot skin; rope BUILDER integration —
+  per-segment rests, distinct waypoint-span rests, builder rope sags without
+  snapping; plus the settle-guard assertions in the rope test). The rope test
+  harness gained `length()`/`sub()`/`add()` stubs and rebinding for
+  `fwLastGAppMag`/`fwReentry`/`FW_WIRE_SETTLE_FRAMES`. Repo `npm test` 64/64 green.
 - Remaining (unchanged): fleet path removal, Build Mode UI overhaul, fleet lamp
   fixtures, Render deploy verification, live Pages smoke test (`?debug&fresh=N`).

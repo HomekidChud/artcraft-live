@@ -241,13 +241,14 @@ comments next to `EnergyCore`.
   of °C cooks the wires: 80°C triggers an insulation warning; at 105°C (the PVC
   continuous-service rating, used as a TUNED GAMEPLAY DAMAGE THRESHOLD) the
   insulation gives and the line burns through (electrical fault, spark) — the
-  same failure path as a snap. Failure needs two consecutive overloaded/hot
-  frames so single-frame spikes (spawn teleports, resets) never kill a wire.
-- **Glue failure mechanics**: when a joint lets go, its part detaches as debris
-  and every wire attached to that part rips out with it (line dead, electrical
-  fault) — no wire stays anchored in mid-air. Chains cascade: a part glued only
-  to the torn-off one loses those bonds and fails on its own next pass, so no
-  unsupported group floats on the airframe.
+  same failure path as a snap. Wire temperature is an integrated state, so a
+  single frame can never kill a wire; glue failure additionally needs two
+  consecutive overloaded frames (see the honest limits below).
+- **Glue failure mechanics**: glued parts are evaluated as bond-connected
+  components — when a group's joint lets go, the whole group detaches as debris
+  and every wire attached to any of its parts rips out with it (line dead,
+  electrical fault) — no wire stays anchored in mid-air and no part is left
+  floating without a support path.
 - **Honest limits**: the bond strength is a game-scaled design estimate, not a
   specific adhesive spec; load is the part's own inertia (bond-chain loading,
   where a bond also carries a neighbouring glued part's weight, is approximated
@@ -259,3 +260,24 @@ comments next to `EnergyCore`.
   integrated state (no single-frame spikes possible), but glue failure needs
   two consecutive overloaded frames so single-frame acceleration spikes
   (spawn teleports, mid-flight resets) never rip parts off.
+
+### §9 addendum 3 — rope rest-length root cause + settle guard (17.10.5d, review round)
+
+- **Root cause of "wires that disobey gravity"**: the flight rope builder
+  emitted ONE rest length per span while the verlet step indexes rests per
+  SEGMENT — on every built wire, all segments past the first had an undefined
+  rest → NaN stretch → no spring force and no snap check, so those rope nodes
+  free-fell. The builder now emits per-segment rests
+  (`rests.length === pts.length - 1`, verified by an integration test that also
+  checks unequal waypoint spans get distinct rests and that a builder-produced
+  rope sags without snapping).
+- **Settle guard**: a freshly built rope starts perfectly straight; its
+  gravity-sag transient can exceed the 8% elastic limit. Snap checks are
+  suppressed for the first 30 frames (`FW_WIRE_SETTLE_FRAMES`); a genuinely
+  overstretched rope (pins 4 m apart, 2 m of total rest — the stretch cannot
+  relax below the pin-to-pin distance) still snaps once the window passes.
+- **Glue groups as components**: glued parts are evaluated as bond-connected
+  components — the boundary bonds (carried ↔ structural) carry the group's total
+  weight (counted once, from the carried side); teardown detaches the whole
+  group, and a part whose structural anchor was removed by the damage model
+  falls off even at 1g. No unsupported group can float on the airframe.
