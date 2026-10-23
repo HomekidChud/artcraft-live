@@ -47,6 +47,9 @@ let workshopSelectedId = null;
 let workshopSelectedWire = null;
 let workshopWireSims = [];
 let workshopSparkBurst = null;
+let workshopBonds = [];
+let workshopGlueRoot = null;
+let workshopGlueStart = null;
 let workshopMultiSelect = new Set();
 const validateSrc = extract(body, 'function validateDesign(input, catalog) {');
 const pathSrc = extract(body, 'function workshopWirePath(w){');
@@ -389,4 +392,105 @@ test('pressure: pumps pressurise their own fluid networks only', () => {
   ];
   const pr2 = pressures();
   assert.equal(pr2.act, 3000, 'hydraulic wins on a shared part without leaking fuel pressure upward');
+});
+
+/* ---------- glue: bond graph, click flow, schema, snapshot roundtrip ---------- */
+
+test('glue: bond graph traversal reaches chained parts, not the start', () => {
+  physicsEnv();
+  const setSrc = extract(body, 'function workshopBondedSet(partId){');
+  let bondedSet; eval(setSrc.replace('function workshopBondedSet', 'bondedSet = function workshopBondedSet'));
+  // a—b—c chain plus an isolated d
+  workshopBonds = [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'd', to: 'e' }];
+  assert.deepEqual([...bondedSet('a')].sort(), ['b', 'c']);
+  assert.deepEqual([...bondedSet('c')].sort(), ['a', 'b']);
+  assert.deepEqual([...bondedSet('d')], ['e']);
+  assert.deepEqual([...bondedSet('x')], []);
+});
+
+test('glue: click flow creates and removes bonds, pushes undo', () => {
+  physicsEnv();
+  const glueSrc = extract(body, 'function workshopPartClickForGlue(p){');
+  const P = (id) => ({ userData: { partId: id, name: id.toUpperCase() } });
+  globalThis.__parts = new Map([['a', P('a')], ['b', P('b')], ['c', P('c')]]);
+  globalThis.workshopParts = [];
+  workshopBonds = [];
+  workshopGlueStart = null;
+  const undoStack = [];
+  globalThis.workshopPushUndo = () => undoStack.push(workshopSnapshotOf());
+  globalThis.workshopRebuildWires = () => {};
+  globalThis.workshopRenderInspector = () => {};
+  globalThis.workshopUpdateStats = () => {};
+  globalThis.workshopSaveDraft = () => {};
+  globalThis.workshopSelectPart = () => {};
+  globalThis.workshopSetStatus = () => {};
+  const workshopSnapshotOf = () => JSON.parse(JSON.stringify(workshopBonds));
+  let glue; eval(glueSrc.replace('function workshopPartClickForGlue', 'glue = function workshopPartClickForGlue'));
+
+  glue(P('a'));                       // pick start
+  assert.equal(workshopGlueStart, 'a');
+  glue(P('b'));                       // glue a—b
+  assert.deepEqual(workshopBonds, [{ from: 'a', to: 'b' }]);
+  assert.equal(undoStack.length, 1, 'bond creation pushes undo');
+  assert.equal(workshopGlueStart, null, 'start resets after bonding');
+
+  glue(P('a')); glue(P('b'));          // click the same pair again → unglue
+  assert.deepEqual(workshopBonds, [], 'second click on a glued pair unglues');
+  assert.equal(undoStack.length, 2);
+
+  glue(P('a')); glue(P('a'));          // clicking the same part cancels
+  assert.equal(workshopGlueStart, null);
+  assert.deepEqual(workshopBonds, []);
+});
+
+test('schema: bonds validate — valid pass, self/dup/unknown rejected', () => {
+  const design = (bonds) => ({
+    name: 'Glue test', parts: [
+      { id: 'part-1', type: 'fuelTank', position: { x: 0, y: 1, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      { id: 'part-2', type: 'fuelPump', position: { x: 2, y: 1, z: 0 }, scale: { x: 1, y: 1, z: 1 } },
+      { id: 'part-3', type: 'fuelStrainer', position: { x: 4, y: 1, z: 0 }, scale: { x: 1, y: 1, z: 1 } }
+    ], wires: [], bonds
+  });
+  assert.deepEqual(vd(design([{ from: 'part-1', to: 'part-2' }])).bonds,
+    [{ from: 'part-1', to: 'part-2' }]);
+  assert.throws(() => vd(design([{ from: 'part-1', to: 'part-1' }])), /Invalid glue bond/);
+  assert.throws(() => vd(design([{ from: 'part-1', to: 'nope' }])), /Invalid glue bond/);
+  assert.throws(() => vd(design([{ from: 'part-1', to: 'part-2' }, { from: 'part-2', to: 'part-1' }])), /Duplicate glue bond/);
+});
+
+test('snapshot: restore carries glue bonds end-to-end', () => {
+  physicsEnv();
+  const snapSrc = extract(body, 'function workshopSnapshot(){');
+  const restoreSrc = extract(body, 'function workshopRestoreSnapshot(snap){');
+  const V = () => new THREE.Vector3(0, 1, 0);
+  globalThis.__parts = new Map();
+  globalThis.workshopParts = [];
+  globalThis.workshopGroups = [];
+  globalThis.workshopWires = [];
+  workshopBonds = [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }];
+  globalThis.workshopSymmetryEnabled = true;
+  globalThis.workshopSnapIncrement = .25;
+  globalThis.workshopNextId = 1; globalThis.workshopNextSymmetryId = 1;
+  globalThis.workshopLoading = false;
+  globalThis.workshopSelectedId = null; globalThis.workshopSelectedWire = null; globalThis.workshopMultiSelect = new Set();
+  globalThis.workshopUndoStack = []; globalThis.workshopRedoStack = [];
+  const fake = () => ({ add(){}, remove(){}, clear(){}, children: [] });
+  globalThis.workshopBuildRoot = fake(); globalThis.workshopWireRoot = fake(); globalThis.workshopGlueRoot = fake(); globalThis.workshopWaypointRoot = fake();
+  globalThis.workshopCreatePart = (type, st) => { const p = { userData: { partId: st.id, type, symmetryPairId: st.symmetryPairId }, position: V() }; globalThis.workshopParts.push(p); globalThis.__parts.set(st.id, p); return p; };
+  globalThis.workshopPartState = (p) => ({ id: p.userData.partId, type: p.userData.type, position: { x: 0, y: 1, z: 0 }, scale: { x: 1, y: 1, z: 1 } });
+  globalThis.workshopSelectPart = () => {}; globalThis.workshopUpdateStats = () => {}; globalThis.workshopUpdateEmptyHint = () => {}; globalThis.workshopUpdateHistoryButtons = () => {};
+  globalThis.workshopRebuildWires = () => {}; globalThis.workshopRebuildBonds = () => {};
+  $('workshopName').value = 'x'; $('workshopSymmetryToggle').textContent = ''; $('workshopSnapSize').value = '.25';
+
+  let snapshot; eval(snapSrc.replace('function workshopSnapshot', 'snapshot = function workshopSnapshot'));
+  let restore; eval(restoreSrc.replace('function workshopRestoreSnapshot', 'restore = function workshopRestoreSnapshot'));
+  const snap = snapshot();
+  assert.deepEqual(snap.bonds, [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }], 'snapshot carries bonds');
+  workshopBonds = [];
+  restore({ ...snap, parts: [
+    { id: 'a', type: 'fuselageTube', position: { x: 0, y: 1, z: 0 }, scale: 1 },
+    { id: 'b', type: 'cockpitBlock', position: { x: 2, y: 1, z: 0 }, scale: 1 },
+    { id: 'c', type: 'fuelTank', position: { x: 4, y: 1, z: 0 }, scale: 1 }
+  ] });
+  assert.deepEqual(workshopBonds, [{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }], 'restore rebuilds bonds');
 });

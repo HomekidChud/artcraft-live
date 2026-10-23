@@ -118,6 +118,18 @@ function validateBuildData(data) {
     if (seen.has(key)) throw new Error('Duplicate wiring connection');
     seen.add(key);
   }
+  // glue bonds (mirrors client validateDesign)
+  if (data.bonds != null) {
+    if (!Array.isArray(data.bonds)) throw new Error('Invalid glue bond list');
+    const bondSeen = new Set();
+    if (data.bonds.length > 400) throw new Error('Maximum 400 glue bonds');
+    for (const b of data.bonds) {
+      if (!b || !ids.has(b.from) || !ids.has(b.to) || b.from === b.to) throw new Error('Invalid glue bond');
+      const key = [b.from, b.to].sort().join(':');
+      if (bondSeen.has(key)) throw new Error('Duplicate glue bond');
+      bondSeen.add(key);
+    }
+  }
   if (data.groups != null) {
     if (!Array.isArray(data.groups)) throw new Error('Invalid groups list');
     // group membership may reference parts OR other groups (nested hierarchy)
