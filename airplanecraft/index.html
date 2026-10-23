@@ -917,7 +917,10 @@ html,body{height:100%;overflow:hidden}#view{height:100dvh;min-height:280px}.sim{
 import * as THREE from 'https://unpkg.com/three@0.166.1/build/three.module.js';
 import RAPIER from 'https://cdn.jsdelivr.net/npm/@dimforge/rapier3d-compat@0.17.3/+esm';
 await RAPIER.init();
-const fwPreviewStore=(()=>{const m=new Map();return{getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k),clear:()=>m.clear(),key:i=>[...m.keys()][i]??null,get length(){return m.size}}})();
+/* Persistent workshop store: real localStorage when the environment allows it
+   (drafts survive reloads — the UI says "SAVED ON THIS DEVICE" and means it),
+   in-memory Map as a fallback for sandboxed contexts where storage throws. */
+const fwPreviewStore=(()=>{try{const t='__fwStoreTest__';window.localStorage.setItem(t,'1');window.localStorage.removeItem(t);return window.localStorage;}catch(_e){const m=new Map();return{getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k),clear:()=>m.clear(),key:i=>[...m.keys()][i]??null,get length(){return m.size}}}})();
 
 // Pure engineering helpers. Units: metres, seconds, kilograms, radians unless named.
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
