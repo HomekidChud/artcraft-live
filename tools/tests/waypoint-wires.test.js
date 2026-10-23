@@ -251,6 +251,9 @@ test('workshopRebuildWireHandles: spheres only for the selected routed wire', ()
   globalThis.THREE = { ...THREE, Group: class { constructor(){ this.children=[]; } add(o){ this.children.push(o); } remove(o){ this.children=this.children.filter(c=>c!==o); } }, Mesh: class { constructor(){ this.userData={}; this.position={ set(){}, x:0, y:0, z:0 }; } }, SphereGeometry: class {}, MeshBasicMaterial: class {} };
   globalThis.workshopScene = scene;
   globalThis.workshopWaypointRoot = null;
+  // camera stub for the distance-adaptive handle size (fixed 55 m like the side-view test)
+  globalThis.workshopCamera = { position: { distanceTo: () => 55 } };
+  globalThis.workshopTarget = new THREE.Vector3(0, 1, 0);
   globalThis.workshopWires = [
     { from: 'a', to: 'b', kind: 'fuel', waypoints: [{ x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: 2 }] },
     { from: 'b', to: 'c', kind: 'power' }
