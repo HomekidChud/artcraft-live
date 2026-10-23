@@ -808,6 +808,24 @@ and the physics should keep advancing. Two additions, both tested.
   glued joints are held by contact per the game's contact-attachment model
   (same as unwelded stacked parts) and are not additionally glue-load-tested.
 
+### Live smoke test round (same day): the clone swap — glue/ropes never ran in the scene
+- **Found live on the deployed Pages build** (blob-instrumented page + CDP):
+  Test Fly's `resetFlight()` → `restoreCustomAircraft()` REPLACES the model with
+  a clone of `customPristineModel`, detaching the flight root the glue joints
+  and rope sims were built on. Result in the live game: the glue load test
+  never ran (joints nulled by the parent guard on frame 1) and the visible
+  wires were frozen straight copies — the user's "wires disobey gravity"
+  symptom persisting in the real game despite all unit tests passing.
+- **Fix**: new `fwRebindFlightPhysics(model)` — rebuilds glue joints (with fresh
+  carried ids) and rope sims (on the model's `ElectricalWiring` group) against
+  the model actually in `fleetModelSlot`. Called at the end of Test Fly and
+  inside `restoreCustomAircraft` (repairs/flight resets keep physics alive).
+- **Live verification**: 144 kg drop tank on one 350 N bond tore off at 1 g
+  with the proper "Glue joint failed at 1g (1413 N > 350 N)" log entry and
+  airframe mass refresh — the full glue pipeline works in the deployed game.
+- Tests: 31→32 (+rebind regression); npm test 64/64, e2e-cloud green.
+- Docs: §9 addendum 5.
+
 ### Final review round (same day): 36× rope gravity + shared-anchor capacity
 - **36× gravity bug fixed (workshop AND flight ropes)**: the verlet substep
   (h=dt/6, added for spring stability) still applied gravity as a·dt² per

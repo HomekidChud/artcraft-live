@@ -966,3 +966,42 @@ test('flight rope builder: every segment gets a spring; builder ropes sag withou
   }
   assert.ok(s1.pts[1].p.y < y0, 'builder rope sags under gravity');
 });
+
+test('rebind: glue joints and rope sims re-attach to the model actually flying (clone swap regression)', () => {
+  // Test Fly / repairs swap in a CLONE of the flight root; the joints and rope sims
+  // built on the original must be re-pointed at the clone or they never run.
+  physicsEnv();
+  const src = extract(body, 'function fwRebindFlightPhysics(model){');
+  let bondsList = [], wiresList = [], jointsState = null, simsState = [];
+  let builtJointsOn = null, builtSimsOn = null;
+  const rebind = eval('(' + src.replace('function fwRebindFlightPhysics(model)', 'function(model)')
+    .replace(/fwBuildGlueJoints/g, 'stubBuildJoints').replace(/fwGlueCarriedIds/g, 'stubCarriedIds')
+    .replace(/fwFlightGlueJoints/g, 'jointsState').replace(/fwBuildFlightWireSims/g, 'stubBuildSims')
+    .replace(/workshopBonds/g, 'bondsList').replace(/workshopWires/g, 'wiresList') + ')');
+  const stubBuildJoints = (model, ids) => { builtJointsOn = model; jointsState = { bonds: bondsList.length, carried: [...ids], root: model }; };
+  const stubCarriedIds = () => new Set(['part-36']);
+  const stubBuildSims = (wires) => { builtSimsOn = wires; simsState = ['sims']; };
+  const wiresGroup = { name: 'ElectricalWiring' };
+  const liveModel = { name: 'ScratchAircraftParts', getObjectByName: (n) => (n === 'ElectricalWiring' ? wiresGroup : null) };
+  const detachedOriginal = { name: 'old root', getObjectByName: () => null };
+  // bonds present: joints are (re)built on the model passed in, with fresh carried ids
+  bondsList = [{ from: 'part-36', to: 'part-1' }];
+  rebind(liveModel);
+  assert.equal(builtJointsOn, liveModel, 'joints bind to the live model, not the detached original');
+  assert.deepEqual(jointsState.carried, ['part-36'], 'carried ids come from the live model');
+  // wires present and the group is found by name: rope sims rebuild on it
+  wiresList = [{ from: 'a', to: 'b' }];
+  rebind(liveModel);
+  assert.equal(builtSimsOn, wiresGroup, 'rope sims bind to the live model\'s ElectricalWiring group');
+  // no glue bonds: stale joints are explicitly cleared (they must not linger on the old root)
+  bondsList = [];
+  rebind(liveModel);
+  assert.equal(jointsState, null, 'no bonds → joints cleared');
+  // no wires in the build: sim rebuild is skipped, not crashed on a missing group
+  wiresList = []; builtSimsOn = null;
+  rebind(detachedOriginal);
+  assert.equal(builtSimsOn, null, 'no wires → no sim rebuild, no throw');
+  // guard: a null model (empty slot) is a no-op
+  rebind(null);
+  assert.equal(builtJointsOn, liveModel, 'null model changes nothing');
+});

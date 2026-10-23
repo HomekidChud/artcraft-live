@@ -296,3 +296,22 @@ comments next to `EnergyCore`.
   rope that snapped in 3 frames under the old gravity now survives 10 s of 1g
   (regression test); the settle guard is kept as protection for degenerate
   straight-start builds, and genuinely overstretched ropes still snap.
+
+### §9 addendum 5 — the clone swap: physics must bind to the model actually flying (17.10.5d, live smoke test)
+
+- **Root cause found live**: `resetFlight()` (called by Test Fly) and every repair
+  run `restoreCustomAircraft()`, which replaces `fleetModelSlot`'s content with a
+  fresh `clone(true)` of `customPristineModel`. The glue joints and rope sims were
+  built on the ORIGINAL flight root — which that swap detaches from the scene.
+  The glue load test then never ran (joints sat on a parentless root; the guard
+  nulled them on the first frame), and the visible wires were frozen straight
+  COPIES of the rope lines — exactly the "wires that disobey gravity" symptom.
+  Unit tests never caught it because they call the steps directly; only a live
+  browser run (blob-instrumented page + CDP) exposed the swap.
+- **Fix**: `fwRebindFlightPhysics(model)` re-binds both systems to the model
+  actually in the slot — glue joints rebuilt from the live model's own parts
+  (fresh `fwGlueCarriedIds`), rope sims rebuilt on its `ElectricalWiring` group.
+  Called at the end of Test Fly (after `detachUnweldedParts`) and inside
+  `restoreCustomAircraft` (so repairs and flight resets keep glue + ropes alive).
+  Verified live: a 144 kg drop tank on one 350 N bond tore off at 1 g with the
+  proper flight-log entry and airframe mass refresh.
