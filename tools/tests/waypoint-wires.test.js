@@ -443,7 +443,7 @@ test('glue: click flow creates and removes bonds, pushes undo', () => {
   globalThis.workshopRebuildWires = () => {};
   globalThis.workshopRenderInspector = () => {};
   globalThis.workshopUpdateStats = () => {};
-  globalThis.workshopSaveDraft = () => {};
+  globalThis.saveWorkshop = () => {};
   globalThis.workshopSelectPart = () => {};
   globalThis.workshopSetStatus = () => {};
   const workshopSnapshotOf = () => JSON.parse(JSON.stringify(workshopBonds));

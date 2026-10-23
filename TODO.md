@@ -927,3 +927,22 @@ and the physics should keep advancing. Two additions, both tested.
   console errors. `npm test` 64/64 green.
 - Remaining (unchanged): fleet path removal, fleet lamp fixtures, Render deploy
   verification, live Pages smoke test (`?debug&fresh=N`).
+
+### 17.10.5e follow-up (same day): review fixes + real-path QA
+
+- Fixed an invalid CSS rule I introduced in the notebook checkbox
+  (`border:solid:#08283f` → `border:solid #08283f`); verified the custom
+  checkbox renders (blue 14px box, tick) via element screenshot.
+- Restored the flight-side electrics chip styles (`.elec-chip`, `#fwMaster`,
+  `#fwElecReadout`) that were only defined in the retired cream skin — now in
+  `#fwStudioUnified` with the master switch retuned to the blue accent.
+- `tools/qa-smoke.mjs` now drives the REAL interaction paths: palette picks via
+  DOM clicks, glue via canvas pointer events at projected part positions (full
+  raycast → `workshopPartClickForGlue` → `saveWorkshop` chain, including undo
+  history and click-pair-to-unglue), Test Fly, and re-entry persistence. 19
+  assertions, exits non-zero on failure; all green with zero console errors.
+  The debug glue/wire hooks remain for convenience but the smoke test no
+  longer relies on them for the glue path (they bypass undo history).
+- `waypoint-wires.test.js` glue harness updated to stub `saveWorkshop` (the
+  real function; the old stub targeted the never-defined `workshopSaveDraft`
+  the glue tool used to call). 33/33; repo `npm test` 64/64.

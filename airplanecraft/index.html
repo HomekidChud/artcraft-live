@@ -11295,7 +11295,7 @@ function workshopPruneGroups(){
 .nb-row{display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:11px;color:#b9c1c8;cursor:default}
 .nb-row input[type=checkbox]{appearance:none;width:14px;height:14px;min-width:14px;border:1.5px solid #4a525c;border-radius:4px;background:var(--uinput);cursor:default;position:relative;flex:0 0 auto}
 .nb-row input[type=checkbox]:checked{background:var(--uacc,#4fb3ff);border-color:var(--uacc,#4fb3ff)}
-.nb-row input[type=checkbox]:checked:after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid:#08283f;border-width:0 2px 2px 0;transform:rotate(42deg)}
+.nb-row input[type=checkbox]:checked:after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #08283f;border-width:0 2px 2px 0;transform:rotate(42deg)}
 .nb-row .nb-name{font-weight:600}
 .nb-row .nb-hint{display:block;font-size:9px;color:#79818b;font-weight:400}
 .nb-row.ok .nb-name{color:var(--uink)}
@@ -11322,6 +11322,11 @@ function workshopPruneGroups(){
 #buildModeOverlay .workshop-cloud-actions button{background:var(--ubtn)!important;border:1px solid var(--ubtnline)!important;color:var(--uink)!important;border-radius:5px!important}
 #buildModeOverlay .workshop-cloud-actions button.primary{background:var(--uacc)!important;border-color:var(--uacc)!important;color:#08283f!important}
 #buildModeOverlay .workshop-cloud-row{border-color:var(--uline)!important}
+/* ---- flight-side electrics chip (carried over from the retired hangar skin) ---- */
+.elec-chip{display:flex;align-items:center;gap:6px;padding:5px 7px;border:1px solid #d8ebef55;border-radius:10px;background:#0b1b25dc;backdrop-filter:blur(9px)}
+.elec-chip #fwMaster{background:#1d3a52;color:#bfe2ff;border:1px solid var(--uacc,#4fb3ff);font-weight:800;letter-spacing:.06em;font-size:10px;padding:6px 8px}
+.elec-chip #fwMaster.on{background:#c9f69a;color:#17251a;border-color:#c9f69a}
+.elec-chip #fwElecReadout{font:10px ui-monospace,monospace;color:#ffe9bd;white-space:nowrap}
 </style>
 <script>
 
