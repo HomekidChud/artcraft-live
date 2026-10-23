@@ -998,6 +998,7 @@ function validateDesign(input, catalog) {
   const wires = input.wires || [];
   if (wires.length > 2400) throw new Error('Maximum 2400 connections');
   const seen = new Set();
+  const wireRows = [];   // normalised wires (from/to/kind + optional waypoints)
   for (const w of wires) {
     if (!w || !ids.has(w.from) || !ids.has(w.to) || w.from === w.to || !['power','signal','data','ground','hydraulic','fuel','water'].includes(w.kind)) throw new Error('Invalid wiring connection');
     // routed polyline: optional waypoints in workshop coordinates (metres, X/Y/Z).
@@ -3507,7 +3508,21 @@ function workshopSystemsAudit(){
    const box=new THREE.Box3();
    for(const p of cockpitParts)box.expandByPoint(p.position);
    box.expandByScalar(.35);
-   const segHitsBox=(a,b)=>{for(let i=0;i<=12;i++){const t=i/12;if(box.containsPoint(new THREE.Vector3(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t)))return true;}return false;};
+   // exact segment–box intersection (slab method): no sampling gaps — a long
+   // segment that clips a corner of the cockpit box between sample points is
+   // still caught. Cheaper than 13 containsPoint calls too.
+   const segHitsBox=(a,b)=>{
+    const d={x:b.x-a.x,y:b.y-a.y,z:b.z-a.z};let t0=0,t1=1;
+    for(const ax of ['x','y','z']){
+     if(Math.abs(d[ax])<1e-9){if(a[ax]<box.min[ax]||a[ax]>box.max[ax])return false;}
+     else{
+      let ta=(box.min[ax]-a[ax])/d[ax],tb=(box.max[ax]-a[ax])/d[ax];
+      if(ta>tb){const s=ta;ta=tb;tb=s;}
+      t0=Math.max(t0,ta);t1=Math.min(t1,tb);if(t0>t1)return false;
+     }
+    }
+    return true;
+   };
    for(const w of fuelWires){
     const pts=workshopWirePath(w);if(!pts)continue;
     let hit=false;
