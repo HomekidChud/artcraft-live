@@ -41,6 +41,11 @@ function extract(body, header) {
 test('client module parses', () => { clientModule(); });
 
 const body = clientModule();
+// module-scope editor state: the extracted client functions read AND write these,
+// and strict-mode eval cannot assign to undeclared identifiers
+let workshopSelectedId = null;
+let workshopSelectedWire = null;
+let workshopMultiSelect = new Set();
 const validateSrc = extract(body, 'function validateDesign(input, catalog) {');
 const pathSrc = extract(body, 'function workshopWirePath(w){');
 const auditSrc = extract(body, 'function workshopSystemsAudit(){');
@@ -181,6 +186,8 @@ test('workshopRestoreSnapshot preserves waypoints through the real restore path'
   globalThis.workshopParts = [];
   globalThis.workshopWires = [];
   globalThis.workshopNextId = 1;
+  workshopSelectedId = null;
+  workshopSelectedWire = null;
   globalThis.workshopNextSymmetryId = 1;
   globalThis.workshopSymmetryEnabled = true;
   globalThis.workshopSnapIncrement = .25;
@@ -209,4 +216,59 @@ test('workshopRestoreSnapshot preserves waypoints through the real restore path'
   // deep-copy independence: mutating the restored wire must not touch the snapshot
   globalThis.workshopWires[0].waypoints[0].y = 9;
   assert.equal(wire.waypoints[0].y, .12, 'restore aliased the snapshot — undo/redo would corrupt history');
+});
+
+/* ---------- waypoint editor (selectable wires, draggable waypoints) ---------- */
+
+test('workshopSelectWire: valid index selects and clears part selection; invalid clears', () => {
+  const selectSrc = extract(body, 'function workshopSelectWire(i){');
+  const fakePart = { userData: { partId: 'part-1' }, position: new THREE.Vector3(0, 0, 0) };
+  globalThis.workshopWires = [
+    { from: 'part-1', to: 'part-2', kind: 'fuel', waypoints: [{ x: 0, y: .12, z: 1 }] },
+    { from: 'part-2', to: 'part-3', kind: 'power' }
+  ];
+  globalThis.workshopGetPart = () => fakePart;
+  workshopSelectedId = 'part-1';
+  workshopMultiSelect = new Set(['a', 'b']);
+  globalThis.workshopRenderInspector = () => {};
+  globalThis.workshopRebuildWires = () => {};
+  let sel; eval(selectSrc.replace('function workshopSelectWire', 'sel = function workshopSelectWire'));
+  sel(0);
+  assert.equal(workshopSelectedWire, 0);
+  assert.equal(workshopSelectedId, null, 'selecting a wire must clear the part selection');
+  assert.equal(workshopMultiSelect.size, 0, 'selecting a wire must clear multi-select');
+  sel(99);   // out of range -> deselect
+  assert.equal(workshopSelectedWire, null);
+  sel(null); // explicit null
+  assert.equal(workshopSelectedWire, null);
+});
+
+test('workshopRebuildWireHandles: spheres only for the selected routed wire', () => {
+  const handlesSrc = extract(body, 'function workshopRebuildWireHandles(){');
+  const V = THREE.Vector3;
+  const mkMesh = () => ({ userData: {}, position: new V(0,0,0), geometry: null, material: null });
+  const scene = { children: [], add(o){ this.children.push(o); }, remove(o){ this.children = this.children.filter(c => c !== o); } };
+  globalThis.THREE = { ...THREE, Group: class { constructor(){ this.children=[]; } add(o){ this.children.push(o); } remove(o){ this.children=this.children.filter(c=>c!==o); } }, Mesh: class { constructor(){ this.userData={}; this.position={ set(){}, x:0, y:0, z:0 }; } }, SphereGeometry: class {}, MeshBasicMaterial: class {} };
+  globalThis.workshopScene = scene;
+  globalThis.workshopWaypointRoot = null;
+  globalThis.workshopWires = [
+    { from: 'a', to: 'b', kind: 'fuel', waypoints: [{ x: 0, y: 0, z: 1 }, { x: 0, y: 0, z: 2 }] },
+    { from: 'b', to: 'c', kind: 'power' }
+  ];
+  workshopSelectedWire = 0;
+  let rebuild; eval(handlesSrc.replace('function workshopRebuildWireHandles', 'rebuild = function workshopRebuildWireHandles'));
+  rebuild();
+  assert.equal(scene.children.length, 1, 'waypoint root not added to scene');
+  const root = scene.children[0];
+  assert.equal(root.children.length, 2, 'expected one handle per waypoint');
+  assert.deepEqual(root.children[0].userData, { isWaypointHandle: true, wireIndex: 0, wpIndex: 0 });
+  assert.deepEqual(root.children[1].userData, { isWaypointHandle: true, wireIndex: 0, wpIndex: 1 });
+  // selecting the straight wire (no waypoints) -> no handles
+  workshopSelectedWire = 1;
+  rebuild();
+  assert.equal(root.children.length, 0);
+  // no selection -> no handles
+  workshopSelectedWire = null;
+  rebuild();
+  assert.equal(root.children.length, 0);
 });
