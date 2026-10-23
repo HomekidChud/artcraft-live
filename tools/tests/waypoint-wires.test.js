@@ -45,6 +45,8 @@ const body = clientModule();
 // and strict-mode eval cannot assign to undeclared identifiers
 let workshopSelectedId = null;
 let workshopSelectedWire = null;
+let workshopWireSims = [];
+let workshopSparkBurst = null;
 let workshopMultiSelect = new Set();
 const validateSrc = extract(body, 'function validateDesign(input, catalog) {');
 const pathSrc = extract(body, 'function workshopWirePath(w){');
@@ -274,4 +276,117 @@ test('workshopRebuildWireHandles: spheres only for the selected routed wire', ()
   workshopSelectedWire = null;
   rebuild();
   assert.equal(root.children.length, 0);
+});
+
+/* ---------- wire physics: gravity/sag (verlet), water arcing, pressure ---------- */
+
+function physicsEnv() {
+  // THREE stub good enough for the verlet rope + audit + pressure code paths
+  globalThis.THREE = { Vector3: class V {
+      constructor(x=0,y=0,z=0){Object.assign(this,{x,y,z});}
+      clone(){return new V(this.x,this.y,this.z);}
+      copy(v){this.x=v.x;this.y=v.y;this.z=v.z;return this;}
+      set(x,y,z){this.x=x;this.y=y;this.z=z;return this;}
+      distanceTo(v){return Math.hypot(this.x-v.x,this.y-v.y,this.z-v.z);}
+      distanceToSquared(v){const dx=this.x-v.x,dy=this.y-v.y,dz=this.z-v.z;return dx*dx+dy*dy+dz*dz;}
+      static lerpVectors(a,b,t){return new V(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t);}
+      lerpVectors(a,b,t){this.x=a.x+(b.x-a.x)*t;this.y=a.y+(b.y-a.y)*t;this.z=a.z+(b.z-a.z)*t;return this;}
+    } };
+  globalThis.workshopScene = { add(){}, children: [] };
+  globalThis.workshopWireRoot = { children: [] };
+  globalThis.workshopSetNDC = () => {};
+  globalThis.workshopGetPart = id => globalThis.__parts.get(id) || null;
+  globalThis.workshopSetStatus = () => {};
+}
+
+test('wire physics: an unclamped span sags under gravity', () => {
+  physicsEnv();
+  const stepSrc = extract(body, 'function workshopStepWirePhysics(dt){');
+  const simSrc = extract(body, 'function workshopRebuildWireSims(){');
+  const keySrc = extract(body, 'function workshopWireSimKey(w){');
+  const pinsSrc = extract(body, 'function workshopWirePinsFor(w){');
+
+  globalThis.__parts = new Map([
+    ['a', { userData: { partId: 'a' }, position: new THREE.Vector3(-3, 2, 0) }],
+    ['b', { userData: { partId: 'b' }, position: new THREE.Vector3(3, 2, 0) }]
+  ]);
+  globalThis.workshopWires = [{ from: 'a', to: 'b', kind: 'power' }];
+  globalThis.workshopParts = [...globalThis.__parts.values()];
+  let rebuildSims; eval(simSrc.replace('function workshopRebuildWireSims', 'rebuildSims = function workshopRebuildWireSims'));
+  let step; eval(stepSrc.replace('function workshopStepWirePhysics', 'step = function workshopStepWirePhysics'));
+  eval(keySrc.replace('function workshopWireSimKey', 'globalThis.workshopWireSimKey = function workshopWireSimKey'));
+  eval(pinsSrc.replace('function workshopWirePinsFor', 'globalThis.workshopWirePinsFor = function workshopWirePinsFor'));
+
+  rebuildSims();
+  const sim = workshopWireSims[0]; // module-scope let, not a globalThis property
+  assert.ok(sim, 'sim built');
+  const n = sim.pts.length;
+  assert.ok(n >= 8, 'expected subdivided nodes, got ' + n);
+  // geometry stub the step writes into
+  const attr = { setXYZ(){}, needsUpdate: false };
+  sim.line = { geometry: { getAttribute: () => attr, computeBoundingSphere(){} } };
+  const yBefore = sim.pts[Math.floor(n / 2)].p.y;
+  for (let i = 0; i < 120; i++) step(1 / 60); // 2 s of settling
+  const yAfter = sim.pts[Math.floor(n / 2)].p.y;
+  assert.ok(yAfter < yBefore - 0.01, 'wire did not sag: ' + yBefore + ' -> ' + yAfter);
+  // endpoints stay pinned at their parts
+  assert.equal(sim.pts[0].p.y, 2.1);
+  assert.equal(sim.pts[n - 1].p.y, 2.1);
+  // free nodes stay above the floor
+  for (const sp of sim.pts) assert.ok(sp.p.y >= 0.03, 'node fell through the floor');
+});
+
+test('audit: powered line within 0.5 m of a water line is an arcing fault', () => {
+  physicsEnv();
+  const auditSrc = extract(body, 'function workshopSystemsAudit(){');
+  const P = (id, type, pos) => ({ userData: { partId: id, type }, position: new THREE.Vector3(...pos) });
+  // power wire and water wire running side by side, 0.2 m apart
+  globalThis.workshopParts = [
+    P('p1', 'battery', [0, 1, 0]), P('p2', 'powerBus', [0, 1, 4]),
+    P('w1', 'waterTank', [0.2, 1, 0]), P('w2', 'waterPump', [0.2, 1, 4])
+  ];
+  globalThis.workshopWires = [
+    { from: 'p1', to: 'p2', kind: 'power' },
+    { from: 'w1', to: 'w2', kind: 'water' }
+  ];
+  globalThis.__parts = new Map(globalThis.workshopParts.map(p => [p.userData.partId, p])); // workshopGetPart reads this
+  globalThis.workshopRenderInspector = () => {};
+  let audit; eval(auditSrc.replace('function workshopSystemsAudit', 'audit = function workshopSystemsAudit'));
+  const errors = audit().errors;
+  assert.ok(errors.some(e => /water line/.test(e)), 'water/power proximity not caught: ' + JSON.stringify(errors));
+  // separated runs pass
+  globalThis.workshopParts = [
+    P('p1', 'battery', [0, 1, 0]), P('p2', 'powerBus', [0, 1, 4]),
+    P('w1', 'waterTank', [3, 1, 0]), P('w2', 'waterPump', [3, 1, 4])
+  ];
+  globalThis.__parts = new Map(globalThis.workshopParts.map(p => [p.userData.partId, p]));
+  const clean = audit().errors;
+  assert.ok(!clean.some(e => /water line/.test(e)), 'separated runs falsely flagged: ' + JSON.stringify(clean));
+});
+
+test('pressure: pumps pressurise their own fluid networks only', () => {
+  physicsEnv();
+  const prSrc = extract(body, 'function workshopSystemPressures(){');
+  const P = (id, type, pos) => ({ userData: { partId: id, type }, position: new THREE.Vector3(...pos) });
+  globalThis.workshopParts = [
+    P('hp', 'hydraulicPump', [0, 1, 0]), P('act', 'gearActuator', [0, 1, 2]),
+    P('fp', 'fuelPump', [2, 1, 0]), P('eng', 'engine', [2, 1, 2]),
+    P('iso', 'cabinBlock', [5, 1, 0])
+  ];
+  globalThis.workshopWires = [
+    { from: 'hp', to: 'act', kind: 'hydraulic' },
+    { from: 'fp', to: 'eng', kind: 'fuel' }
+  ];
+  let pressures; eval(prSrc.replace('function workshopSystemPressures', 'pressures = function workshopSystemPressures'));
+  const pr = pressures();
+  assert.equal(pr.act, 3000, 'hydraulic actuator pressure');
+  assert.equal(pr.eng, 30, 'fuel line pressure');
+  assert.equal(pr.iso, undefined, 'isolated part must not inherit pressure');
+  // a part reachable by BOTH kinds keeps the networks separate
+  globalThis.workshopWires = [
+    { from: 'hp', to: 'act', kind: 'hydraulic' },
+    { from: 'fp', to: 'act', kind: 'fuel' } // actuator fed by fuel too (bad design, but the model must not cross-contaminate
+  ];
+  const pr2 = pressures();
+  assert.equal(pr2.act, 3000, 'hydraulic wins on a shared part without leaking fuel pressure upward');
 });

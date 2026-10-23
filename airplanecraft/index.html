@@ -3317,7 +3317,7 @@ function workshopUpdateStats(){
 function workshopRenderInspector(){const g=workshopGetPart(workshopSelectedId);const wi=workshopSelectedWire,wsel=(wi!=null)?workshopWires[wi]:null;
  // wire routing panel (only when a wire is selected)
  const wp=$('workshopWireInspector');if(wp)wp.hidden=!wsel;
- if(wsel){$('workshopWireType').textContent=String(wsel.kind||'power').toUpperCase()+' / ROUTED WIRE';$('workshopWireRoute').textContent=(workshopGetPart(wsel.from)?.userData.name||wsel.from)+' → '+(workshopGetPart(wsel.to)?.userData.name||wsel.to)+(wsel.waypoints&&wsel.waypoints.length?' · '+wsel.waypoints.length+' waypoint'+(wsel.waypoints.length>1?'s':''):' · straight run');$('workshopWaypointList').innerHTML=(wsel.waypoints&&wsel.waypoints.length)?wsel.waypoints.map((p,i)=>`<div class="workshop-connection-row workshop-waypoint-row"><span>WP${i+1}</span><div class="workshop-number-grid"><label>X<input data-wp-axis="x" data-wp-i="${i}" type="number" step="0.25" value="${p.x}"></label><label>Y<input data-wp-axis="y" data-wp-i="${i}" type="number" step="0.25" value="${p.y}"></label><label>Z<input data-wp-axis="z" data-wp-i="${i}" type="number" step="0.25" value="${p.z}"></label></div><button type="button" data-workshop-wp-delete="${i}" title="Remove waypoint">×</button></div>`).join(''):'<span class="workshop-muted">Straight run — add a waypoint to route it along structure.</span>';}
+ if(wsel){const pr=(wsel.kind==='hydraulic'||wsel.kind==='fuel')?workshopSystemPressures():null;$('workshopWireType').textContent=String(wsel.kind||'power').toUpperCase()+' / ROUTED WIRE'+((pr&&(pr[wsel.from]||pr[wsel.to]))?' · '+Math.round(pr[wsel.from]||pr[wsel.to])+' psi':'');$('workshopWireRoute').textContent=(workshopGetPart(wsel.from)?.userData.name||wsel.from)+' → '+(workshopGetPart(wsel.to)?.userData.name||wsel.to)+(wsel.waypoints&&wsel.waypoints.length?' · '+wsel.waypoints.length+' waypoint'+(wsel.waypoints.length>1?'s':''):' · straight run');$('workshopWaypointList').innerHTML=(wsel.waypoints&&wsel.waypoints.length)?wsel.waypoints.map((p,i)=>`<div class="workshop-connection-row workshop-waypoint-row"><span>WP${i+1}</span><div class="workshop-number-grid"><label>X<input data-wp-axis="x" data-wp-i="${i}" type="number" step="0.25" value="${p.x}"></label><label>Y<input data-wp-axis="y" data-wp-i="${i}" type="number" step="0.25" value="${p.y}"></label><label>Z<input data-wp-axis="z" data-wp-i="${i}" type="number" step="0.25" value="${p.z}"></label></div><button type="button" data-workshop-wp-delete="${i}" title="Remove waypoint">×</button></div>`).join(''):'<span class="workshop-muted">Straight run — add a waypoint to route it along structure.</span>';}
  $('workshopInspectorEmpty').hidden=!!g||!!wsel;$('workshopInspectorFields').hidden=!g;$('workshopDuplicate').disabled=!g;$('workshopMirrorSelected').disabled=!g||!!workshopMirrorMate(g);if(!g){$('workshopConnectionsList').innerHTML='<span class="workshop-muted">No wires connected yet.</span>';return;}const d=WORKSHOP_PARTS[g.userData.type];$('workshopSelectedType').textContent=(d.category||'component').toUpperCase()+' / '+g.userData.type.toUpperCase();$('workshopPartName').value=g.userData.name;$('workshopPosX').value=g.position.x.toFixed(2);$('workshopPosY').value=g.position.y.toFixed(2);$('workshopPosZ').value=g.position.z.toFixed(2);$('workshopScaleX').value=g.scale.x.toFixed(2);$('workshopScaleY').value=g.scale.y.toFixed(2);$('workshopScaleZ').value=g.scale.z.toFixed(2);$('workshopRotation').value=(g.rotation.y*180/Math.PI).toFixed(1);$('workshopPartMass').textContent=workshopPartMass(g).toFixed(2)+' kg';$('workshopPartCategory').textContent=d.category;$('workshopPartDetails').textContent=d.electrical?`${d.electrical.role} · ${d.electrical.volts} V · ${d.electrical.ports} ports. Connect compatible modules using Wire mode.`:d.engineType?`${d.engineType} propulsion · estimated static thrust ${d.thrustN} N.`:d.detail;const rows=workshopWires.map((w,i)=>({w,i})).filter(({w})=>w.from===g.userData.partId||w.to===g.userData.partId);$('workshopConnectionCount').textContent=String(rows.length);$('workshopConnectionsList').innerHTML=rows.length?rows.map(({w,i})=>`<div class="workshop-connection-row"><span>${escapeHTML(w.kind.toUpperCase())} · ${escapeHTML(workshopGetPart(w.from)?.userData.name||w.from)} → ${escapeHTML(workshopGetPart(w.to)?.userData.name||w.to)}</span><button type="button" data-workshop-wire-delete="${i}" title="Remove wire">×</button></div>`).join(''):'<span class="workshop-muted">No wires attached to this part.</span>';}
 /* Resolve a wire's rendered polyline: attached part endpoints (lifted slightly
    off the part centre) joined through any structure-following waypoints. One
@@ -3333,20 +3333,165 @@ function workshopWirePath(w){const a=workshopGetPart(w.from),b=workshopGetPart(w
 function workshopSelectWire(i){const valid=i!=null&&i>=0&&i<workshopWires.length;workshopSelectedWire=valid?i:null;if(valid){workshopSelectedId=null;if(workshopMultiSelect.size)workshopMultiSelect.clear();}workshopRenderInspector();workshopRebuildWires();}
 function workshopRebuildWireHandles(){if(!workshopScene)return;if(!workshopWaypointRoot){workshopWaypointRoot=new THREE.Group();workshopWaypointRoot.name='WireWaypointHandles';workshopScene.add(workshopWaypointRoot);}while(workshopWaypointRoot.children.length){const o=workshopWaypointRoot.children[0];workshopWaypointRoot.remove(o);if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}const wi=workshopSelectedWire,w=(wi!=null)?workshopWires[wi]:null;if(!w||!w.waypoints||!w.waypoints.length)return;const col=({power:'#f06b4f',signal:'#4ea8ff',data:'#e9c76b',ground:'#5dc78c',hydraulic:'#ff9a3c',fuel:'#d9a441',water:'#4fa3e3'})[w.kind]||'#f06b4f';const hs=Math.min(6,Math.max(.14,workshopCamera.position.distanceTo(workshopTarget)*.006));for(let i=0;i<w.waypoints.length;i++){const p=w.waypoints[i],s=new THREE.Mesh(new THREE.SphereGeometry(hs,10,8),new THREE.MeshBasicMaterial({color:col}));s.position.set(p.x,p.y,p.z);s.userData={isWaypointHandle:true,wireIndex:wi,wpIndex:i};workshopWaypointRoot.add(s);}}
 function workshopWaypointAtEvent(e){if(!workshopWaypointRoot||!workshopRaycaster)return null;workshopSetNDC(e);const hits=workshopRaycaster.intersectObjects(workshopWaypointRoot.children,false);return hits.length?hits[0].object.userData:null;}
+
+/* ---------- wire physics: gravity, sag, swing (verlet rope) ----------
+   Wires are physical cables, not floating lines: endpoints are attached to
+   parts (and waypoints act as clamps on structure), everything in between
+   is a mass–spring chain under gravity. A free span sags into a catenary
+   between its clamps (FAA AC 43.13-1B: lines are supported at intervals,
+   never left hanging), and dragging a part makes the wire follow and swing.
+   Water contact on a powered line arcs — sparks and a short-circuit error. */
+const workshopWireSims=[];   // parallel to workshopWires: {key,pts:[{p,pp,pin}],rests:[],line}
+let workshopSparkBurst=null; // THREE.Points spark emitter (created lazily)
+function workshopWireSimKey(w){return w.from+'|'+w.to+'|'+w.kind+'|'+((w.waypoints||[]).map(p=>Math.round(p.x*100)+','+Math.round(p.y*100)+','+Math.round(p.z*100)).join(';'));}
+function workshopWirePinsFor(w){ // current attachment points: part endpoints + declared waypoints
+ const a=workshopGetPart(w.from),b=workshopGetPart(w.to);if(!a||!b)return null;
+ const A=a.position.clone(),B=b.position.clone();A.y+=.1;B.y+=.1;
+ return [A,...(w.waypoints||[]).map(p=>new THREE.Vector3(p.x,p.y,p.z)),B];
+}
+function workshopRebuildWireSims(){
+ workshopWireSims.length=workshopWires.length;
+ for(let i=0;i<workshopWires.length;i++){
+  const w=workshopWires[i],key=workshopWireSimKey(w),prev=workshopWireSims[i];
+  if(prev&&prev.key===key&&prev.line)continue; // unchanged — keep the settled rope
+  const pins=workshopWirePinsFor(w);
+  if(!pins){workshopWireSims[i]=null;continue;}
+  const pts=[],rests=[];
+  const add=(v,pin)=>pts.push({p:v.clone(),pp:v.clone(),pin:!!pin});
+  add(pins[0],true);
+  for(let s=0;s<pins.length-1;s++){
+   const a=pins[s],b=pins[s+1],span=a.distanceTo(b);
+   const k=Math.min(10,Math.max(0,Math.round(span/.8)-1)); // ~0.8 m between nodes
+   for(let j=1;j<=k;j++)add(new THREE.Vector3().lerpVectors(a,b,j/(k+1)),false);
+   add(b,true);
+   rests.push(span/(k+1));
+  }
+  workshopWireSims[i]={key,pts,rests,line:null};
+ }
+}
+function workshopSparkAt(pos){
+ if(!workshopScene)return;
+ if(!workshopSparkBurst){const n=48,posArr=new Float32Array(n*3),vel=[];
+  for(let i=0;i<n;i++)vel.push(null);
+  workshopSparkBurst=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({color:'#ffb347',size:.09,sizeAttenuation:true,transparent:true,opacity:.95,depthWrite:false,blending:THREE.AdditiveBlending}));
+  workshopSparkBurst.userData={vel,life:0};
+  workshopScene.add(workshopSparkBurst);}
+ const g=workshopSparkBurst.geometry,n=g.userData.n||48,vel=workshopSparkBurst.userData.vel;
+ if(g.userData.n!==n){g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(n*3),3));g.userData.n=n;}
+ const attr=g.getAttribute('position');vel.length=0;
+ for(let i=0;i<n;i++){
+  attr.setXYZ(i,pos.x+(Math.random()-.5)*.08,pos.y+(Math.random()-.5)*.08,pos.z+(Math.random()-.5)*.08);
+  const th=Math.random()*Math.PI*2,ph=Math.random()*Math.PI,sp=1.2+Math.random()*2.2;
+  vel.push(new THREE.Vector3(Math.sin(ph)*Math.cos(th)*sp,Math.abs(Math.cos(ph))*sp+1,Math.sin(ph)*Math.sin(th)*sp));
+ }
+ attr.needsUpdate=true;workshopSparkBurst.userData.life=1;workshopSparkBurst.material.opacity=.95;
+}
+function workshopStepWirePhysics(dt){
+ if(!workshopWireRoot||!workshopWires.length)return;
+ const damp=.985,gy=-9.81*dt*dt;
+ // water wire node positions (for powered-wire arcing checks)
+ const waterPts=[];
+ for(let i=0;i<workshopWires.length;i++){
+  if(workshopWires[i].kind!=='water')continue;
+  const sim=workshopWireSims[i];if(sim)for(const sp of sim.pts)waterPts.push(sp.p);
+ }
+ let sparkPos=null;
+ for(let i=0;i<workshopWireSims.length;i++){
+  const sim=workshopWireSims[i],w=workshopWires[i];
+  if(!sim||!w||!sim.line)continue;
+  // re-sync pins: parts and waypoint clamps may have moved
+  const pins=workshopWirePinsFor(w);
+  if(pins&&pins.length===sim.pts.filter(sp=>sp.pin).length){
+   let pi=0;for(const sp of sim.pts)if(sp.pin){const v=pins[pi++];sp.p.copy(v);sp.pp.copy(v);}
+  }
+  // integrate free nodes (gravity + damping); keep them off the floor
+  for(const sp of sim.pts){
+   if(sp.pin)continue;
+   const nx=sp.p.x+(sp.p.x-sp.pp.x)*damp,ny=sp.p.y+(sp.p.y-sp.pp.y)*damp+gy,nz=sp.p.z+(sp.p.z-sp.pp.z)*damp;
+   sp.pp.copy(sp.p);sp.p.set(nx,Math.max(.03,ny),nz);
+  }
+  // distance constraints (6 Gauss–Seidel passes; full correction toward pinned nodes)
+  for(let it=0;it<6;it++){
+   for(let j=0;j<sim.pts.length-1;j++){
+    const a=sim.pts[j],b=sim.pts[j+1],d=a.p.distanceTo(b.p);
+    if(d<1e-6)continue;
+    const diff=(d-sim.rests[Math.min(j,sim.rests.length-1)])/d,wa=a.pin?0:(b.pin?2:1),wb=b.pin?0:(a.pin?2:1),tw=wa+wb||1;
+    const dx=(b.p.x-a.p.x)*diff,dy=(b.p.y-a.p.y)*diff,dz=(b.p.z-a.p.z)*diff;
+    a.p.x+=dx*wa/tw;a.p.y+=dy*wa/tw;a.p.z+=dz*wa/tw;
+    b.p.x-=dx*wb/tw;b.p.y-=dy*wb/tw;b.p.z-=dz*wb/tw;
+   }
+  }
+  // powered line touching a water line -> arc (short circuit, sparks)
+  if(waterPts.length&&(w.kind==='power'||w.kind==='ground')){
+   for(const sp of sim.pts){
+    for(const wp of waterPts){
+     if(sp.p.distanceToSquared(wp)<.09){sparkPos=sp.p.clone();break;}
+    }
+    if(sparkPos)break;
+   }
+  }
+  // write the simulated rope into the rendered geometry
+  const attr=sim.line.geometry.getAttribute('position');
+  if(attr){
+   for(let j=0;j<sim.pts.length-1;j++){attr.setXYZ(j*2,sim.pts[j].p.x,sim.pts[j].p.y,sim.pts[j].p.z);attr.setXYZ(j*2+1,sim.pts[j+1].p.x,sim.pts[j+1].p.y,sim.pts[j+1].p.z);}
+   attr.needsUpdate=true;sim.line.geometry.computeBoundingSphere();
+  }
+ }
+ if(sparkPos)workshopSparkAt(sparkPos);
+ if(workshopSparkBurst){ // sparks fly and fade
+  const g=workshopSparkBurst.userData;g.life-=dt*1.8;
+  if(g.life<=0){workshopSparkBurst.material.opacity=Math.max(0,workshopSparkBurst.material.opacity-dt*2);}
+  else{
+   const attr=workshopSparkBurst.geometry.getAttribute('position');
+   for(let i=0;i<attr.count;i++){
+    const v=g.vel[i];if(!v)continue;
+    v.y-=9.81*dt;
+    attr.setXYZ(i,attr.getX(i)+v.x*dt,attr.getY(i)+v.y*dt,attr.getZ(i)+v.z*dt);
+   }
+   attr.needsUpdate=true;
+  }
+ }
+}
+/* ---------- fluid pressure: pumps pressurise their networks ----------
+   Steady-state model — a pump raises everything hydraulically connected to it
+   to its nominal pressure (typical engine-driven hydraulic pump 3000 psi,
+   electric backup ~1500 psi; GA boost fuel pump ~30 psi); gravity-fed fuel
+   from high tanks carries no pump pressure. Used by the audit and the
+   inspector so the numbers on screen mean something. */
+function workshopSystemPressures(){
+ const pressures={}; // partId -> psi
+ const pumps=workshopParts.filter(p=>p.userData.type==='hydraulicPump'||p.userData.type==='fuelPump');
+ const adj={}; // fuel and hydraulic networks are separate circuits — never cross
+ for(const w of workshopWires){
+  if(w.kind!=='hydraulic'&&w.kind!=='fuel')continue;
+  (adj[w.from]=adj[w.from]||[]).push([w.to,w.kind]);(adj[w.to]=adj[w.to]||[]).push([w.from,w.kind]);
+ }
+ for(const pump of pumps){
+  const kind=pump.userData.type==='hydraulicPump'?'hydraulic':'fuel';
+  const psi=kind==='hydraulic'?3000:30;
+  const seen=new Set([pump.userData.partId]),q=[pump.userData.partId];
+  while(q.length){const n=q.pop();pressures[n]=Math.max(pressures[n]||0,psi);for(const [t,k] of(adj[n]||[]))if(k===kind&&!seen.has(t)){seen.add(t);q.push(t);}}
+ }
+ return pressures;
+}
 function workshopWireAtEvent(e){if(!workshopWireRoot||!workshopRaycaster)return null;workshopSetNDC(e);const prev=workshopRaycaster.params.Line?workshopRaycaster.params.Line.threshold:undefined;const thresh=Math.max(.35,workshopCamera.position.distanceTo(workshopTarget)*.008);try{workshopRaycaster.params.Line={threshold:thresh};const hits=workshopRaycaster.intersectObjects(workshopWireRoot.children,false);return hits.length?hits[0].object.userData.wireIndex:null;}finally{if(workshopRaycaster.params.Line)workshopRaycaster.params.Line.threshold=prev==null?1:prev;}}
-function workshopRebuildWires(){if(!workshopWireRoot)return;while(workshopWireRoot.children.length){const o=workshopWireRoot.children[0];workshopWireRoot.remove(o);if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}const colors={power:'#f06b4f',signal:'#4ea8ff',data:'#e9c76b',ground:'#5dc78c',hydraulic:'#ff9a3c',fuel:'#d9a441',water:'#4fa3e3'};let wi=0;for(const w of workshopWires){const pts=workshopWirePath(w);if(!pts)continue;
+function workshopRebuildWires(){if(!workshopWireRoot)return;while(workshopWireRoot.children.length){const o=workshopWireRoot.children[0];workshopWireRoot.remove(o);if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}const colors={power:'#f06b4f',signal:'#4ea8ff',data:'#e9c76b',ground:'#5dc78c',hydraulic:'#ff9a3c',fuel:'#d9a441',water:'#4fa3e3'};
+ workshopRebuildWireSims();
+ for(let i=0;i<workshopWires.length;i++){const w=workshopWires[i],sim=workshopWireSims[i];if(!sim||!sim.pts.length)continue;
+  const pts=sim.pts.map(sp=>sp.p);
   /* Render the wire exactly as the audit sees it: straight segments through
      the resolved points (workshopWirePath). The audit (workshopSystemsAudit)
      tests segment-by-segment intersection against the same polyline, so the
      rendered geometry and the checked geometry are identical — what you see
      is what gets checked. */
   const positions=[];
-  for(let i=0;i<pts.length-1;i++)positions.push(pts[i].x,pts[i].y,pts[i].z,pts[i+1].x,pts[i+1].y,pts[i+1].z);
+  for(let j=0;j<pts.length-1;j++)positions.push(pts[j].x,pts[j].y,pts[j].z,pts[j+1].x,pts[j+1].y,pts[j+1].z);
   const seg=new THREE.BufferGeometry();
   seg.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
   const tube=new THREE.LineSegments(seg,new THREE.LineBasicMaterial({color:colors[w.kind]||colors.power}));
-  tube.userData.isWorkshopWire=true;tube.userData.wireIndex=wi;tube.userData.partId=null;
-  workshopWireRoot.add(tube);wi++;}workshopRebuildWireHandles();workshopRenderInspector();}
+  tube.userData.isWorkshopWire=true;tube.userData.wireIndex=i;tube.userData.partId=null;
+  sim.line=tube;
+  workshopWireRoot.add(tube);}workshopRebuildWireHandles();workshopRenderInspector();}
 function workshopRestoreSnapshot(snap){workshopSymmetryEnabled=snap.symmetryEnabled!==false;workshopSnapIncrement=snap.snapIncrement==null?.25:Number(snap.snapIncrement);const stoggle=$('workshopSymmetryToggle');if(stoggle){stoggle.textContent='Symmetry: '+(workshopSymmetryEnabled?'ON':'OFF');stoggle.classList.toggle('symmetry-on',workshopSymmetryEnabled);stoggle.setAttribute('aria-pressed',String(workshopSymmetryEnabled));}const ssnap=$('workshopSnapSize');if(ssnap)ssnap.value=String(workshopSnapIncrement);workshopLoading=true;while(workshopBuildRoot.children.length){const g=workshopBuildRoot.children[0];workshopBuildRoot.remove(g);}workshopParts=[];workshopGroups=(snap.groups||[]).map(g=>({id:g.id||('grp-'+Math.random().toString(36).slice(2,9)),name:g.name||'Group',parts:Array.isArray(g.parts)?[...g.parts]:[]}));workshopWires=workshopCloneJSON(snap.wires||[]);workshopSelectedWire=null;workshopWireRoot.clear();let maxImportedId=0;for(const st of snap.parts||[]){const g=workshopCreatePart(st.type,st);if(g){workshopBuildRoot.add(g);workshopParts.push(g);const m=/^part-(\d+)$/.exec(g.userData.partId);if(m)maxImportedId=Math.max(maxImportedId,Number(m[1]));}}workshopNextId=Math.max(workshopNextId,maxImportedId+1);for(const st of (snap.parts||[])){const m=/^mirror-(\d+)$/.exec(st.symmetryPairId||'');if(m)workshopNextSymmetryId=Math.max(workshopNextSymmetryId,Number(m[1])+1);}$('workshopName').value=snap.name||'Untitled aircraft';workshopSelectedId=workshopParts[workshopParts.length-1]?.userData.partId||null;workshopLoading=false;workshopRebuildWires();workshopSelectPart(workshopSelectedId);workshopUpdateStats();workshopUpdateEmptyHint();workshopUpdateHistoryButtons();}
 function workshopUndo(){if(!workshopUndoStack.length)return;workshopRedoStack.push(workshopSnapshot());const s=workshopUndoStack.pop();workshopRestoreSnapshot(s);}
 function workshopRedo(){if(!workshopRedoStack.length)return;workshopUndoStack.push(workshopSnapshot());const s=workshopRedoStack.pop();workshopRestoreSnapshot(s);}
@@ -3359,7 +3504,7 @@ function workshopIntersectPlane(e,y=0){workshopSetNDC(e);const p=new THREE.Plane
 function workshopMoveCamera(){if(!workshopCamera)return;const cp=Math.cos(workshopPitch),sp=Math.sin(workshopPitch);workshopCamera.position.set(workshopTarget.x+Math.sin(workshopYaw)*cp*workshopDistance,workshopTarget.y+sp*workshopDistance,workshopTarget.z+Math.cos(workshopYaw)*cp*workshopDistance);workshopCamera.lookAt(workshopTarget);workshopCamera.updateProjectionMatrix();}
 function workshopInit(){if(workshopRenderer)return true;try{const canvas=$('workshopCanvas');workshopRenderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});workshopRenderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));workshopRenderer.outputColorSpace=THREE.SRGBColorSpace;workshopRenderer.toneMapping=THREE.ACESFilmicToneMapping;workshopRenderer.toneMappingExposure=1.15;workshopScene=new THREE.Scene();workshopScene.background=new THREE.Color('#0a151d');workshopCamera=new THREE.PerspectiveCamera(48,1,.1,1200);workshopRaycaster=new THREE.Raycaster();workshopPointer=new THREE.Vector2();workshopFloorPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);const hemi=new THREE.HemisphereLight('#d9efff','#35434b',2.2);workshopScene.add(hemi);const key=new THREE.DirectionalLight('#fff1d7',3.1);key.position.set(-8,14,9);workshopScene.add(key);const fill=new THREE.DirectionalLight('#8cc9e5',1.05);fill.position.set(8,8,-8);workshopScene.add(fill);workshopGround=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshStandardMaterial({color:'#101d25',roughness:.98,metalness:0}));workshopGround.rotation.x=-Math.PI/2;workshopGround.position.y=-.08;workshopGround.receiveShadow=true;workshopScene.add(workshopGround);workshopGrid=new THREE.GridHelper(160,160,0x638190,0x29404d);workshopGrid.position.y=-.03;workshopScene.add(workshopGrid);const axes=new THREE.AxesHelper(2.5);axes.position.set(0,.02,0);workshopScene.add(axes);workshopBuildRoot=new THREE.Group();workshopBuildRoot.name='ScratchAircraftParts';workshopScene.add(workshopBuildRoot);workshopWireRoot=new THREE.Group();workshopWireRoot.name='ElectricalWiring';workshopScene.add(workshopWireRoot);workshopMoveCamera();workshopResize();new ResizeObserver(workshopResize).observe(canvas);requestAnimationFrame(workshopFrame);return true;}catch(err){$('workshopCanvasError').hidden=false;$('workshopCanvasError').textContent='3D workshop unavailable: '+(err.message||'WebGL initialisation failed');return false;}}
 function workshopResize(){if(!workshopRenderer||!workshopCamera)return;const c=$('workshopCanvas'),w=c.clientWidth,h=c.clientHeight;if(!w||!h)return;workshopRenderer.setSize(w,h,false);workshopCamera.aspect=w/h;workshopCamera.updateProjectionMatrix();}
-function workshopFrame(){requestAnimationFrame(workshopFrame);if(!workshopRenderer||!buildModeOpen)return;if(workshopSelectionBox){const g=workshopGetPart(workshopSelectedId);if(g)workshopSelectionBox.update();}workshopRenderer.render(workshopScene,workshopCamera);}
+function workshopFrame(){requestAnimationFrame(workshopFrame);if(!workshopRenderer||!buildModeOpen)return;workshopStepWirePhysics(1/60);if(workshopSelectionBox){const g=workshopGetPart(workshopSelectedId);if(g)workshopSelectionBox.update();}workshopRenderer.render(workshopScene,workshopCamera);}
 function openBuildMode(){if(!buildModeOpen)buildWasPaused=!!S.paused;const sb=$('workshopSymmetryToggle');if(sb){sb.textContent='Symmetry: '+(workshopSymmetryEnabled?'ON':'OFF');sb.classList.toggle('symmetry-on',workshopSymmetryEnabled);sb.setAttribute('aria-pressed',String(workshopSymmetryEnabled));}$('workshopSnapSize').value=String(workshopSnapIncrement);buildModeOpen=true;S.paused=true;$('pause').textContent='Resume';$('buildModeOverlay').hidden=false;$('buildModeOverlay').setAttribute('aria-hidden','false');$('simViewport').classList.add('build-mode');$('aircraftType').value=S.aircraftId;if(workshopInit()){workshopResize();workshopRenderPalette();workshopRenderInspector();workshopUpdateStats();workshopUpdateEmptyHint();setTimeout(workshopResize,60);}}
 function closeBuildMode(){if(!buildModeOpen)return;buildModeOpen=false;$('buildModeOverlay').hidden=true;$('buildModeOverlay').setAttribute('aria-hidden','true');$('simViewport').classList.remove('build-mode');$('aircraftType').value=S.aircraftId;S.paused=buildWasPaused;$('pause').textContent=S.paused?'Resume':'Pause';workshopDrag=null;}
 function workshopTemplate(name){
@@ -3526,6 +3671,25 @@ function workshopSystemsAudit(){
  const hydWires=workshopWires.filter(w=>w.kind==='hydraulic');info.hydWires=hydWires.length;
  const adj={};for(const w of fuelWires){(adj[w.from]=adj[w.from]||[]).push(w.to);(adj[w.to]=adj[w.to]||[]).push(w.from);}
  const tanks=workshopParts.filter(p=>p.userData.type==='fuelTank'),strainers=workshopParts.filter(p=>p.userData.type==='fuelStrainer'),pumps=workshopParts.filter(p=>p.userData.type==='fuelPump');
+ // powered lines near water lines arc (wet locations): check every power/ground
+ // wire's polyline against every water wire's polyline; <0.5 m is a fault risk.
+ // AC 43.13-1B ch.11: wiring in wet locations needs protection from moisture.
+ {
+  const waterWires=workshopWires.filter(w=>w.kind==='water');
+  if(waterWires.length){
+   const powerWires=workshopWires.filter(w=>w.kind==='power'||w.kind==='ground');
+   const near=(a,b,r2)=>{const dx=a.x-b.x,dy=a.y-b.y,dz=a.z-b.z;return dx*dx+dy*dy+dz*dz<r2;};
+   for(const pw of powerWires){
+    const pPts=workshopWirePath(pw);if(!pPts)continue;
+    for(const ww of waterWires){
+     const wPts=workshopWirePath(ww);if(!wPts)continue;
+     let hit=false;
+     for(const a of pPts){for(const b of wPts)if(near(a,b,.25)){hit=true;break;}if(hit)break;}
+     if(hit){errors.push('Power line '+name(pw.from)+' → '+name(pw.to)+' runs within 0.5 m of a water line — separate electrical runs from water lines (wet-location arcing)');break;}
+    }
+   }
+  }
+ }
  if(fuelWires.length||hydWires.length){ // cockpit clearance covers both fluid kinds
   // fuel reachability from tanks
   const tankIds=new Set(tanks.map(p=>p.userData.partId));
