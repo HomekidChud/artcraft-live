@@ -622,4 +622,4 @@ Cloud-browser smoke test (PARTIAL, on GitHub Pages): Build Mode opened, 24 local
 
 Still to do:
 - Editor affordance: user-facing way to add/move/remove waypoints on a selected wire in the workshop UI (right now waypoints exist in schema + presets + audit only).
-- Extend `routedWire()` to other kinds (hydraulic return lines, power/ground trunk runs along spars) once the editor affordance exists.
+- DONE (follow-up session): routing extended beyond fuel — hydraulic supply AND return lines now follow the wing spar (sparWire), alternator power/ground and hydraulic-pump power/ground feeds follow the belly (routedWire). Presets regenerated: 225 routed wires (fuel 113, power 34, ground 34, hydraulic 44). Client audit's cockpit-clearance rule now covers hydraulic lines as well as fuel (same structure-following rule); committed test covers both. Verified 0 cockpit-box violations across all 24 presets for both kinds, using the exact lifted-endpoint slab geometry the client audit uses.

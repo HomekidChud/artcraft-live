@@ -85,11 +85,27 @@ function makeBuilder() {
     ];
     wire(a, b, kind, belly);
   };
+  /* sparWire — spanwise run along the wing box: hydraulics to wing-mounted
+     actuators (gear, flaps) follow the main spar out to the actuator, then
+     step fore/aft. Power/ground feeds to wing-located pumps use the same
+     corridor (systems-research.md §2: lines run with structure, never
+     across the cabin). */
+  const sparWire = (a, b, kind) => {
+    const outboard = Math.max(Math.abs(a.position.x), Math.abs(b.position.x));
+    const y = Math.min(a.position.y, b.position.y);       // spar plane height
+    const zSpar = Math.min(Math.abs(a.position.z), Math.abs(b.position.z));
+    const side = Math.sign(a.position.x || b.position.x || 1);
+    const spar = [
+      [side * Math.min(Math.abs(a.position.x), outboard * .4), y, zSpar],
+      [side * outboard * .85, y, zSpar]
+    ];
+    wire(a, b, kind, spar);
+  };
   const group = (name, list) => groups.push({
     id: 'grp-' + (groups.length + 1), name, parts: list.map(p => p.id)
   });
   const byId = () => new Map(parts.map(p => [p.id, p]));
-  return { parts, wires, groups, add, mirror, wire, routedWire, group, byId };
+  return { parts, wires, groups, add, mirror, wire, routedWire, sparWire, group, byId };
 }
 const round = n => Math.round(n * 1000) / 1000;
 
@@ -232,7 +248,7 @@ function designFor(cfg) {
     ? b.add('alternator', [engines[0].position.x, engines[0].position.y + .2, engines[0].position.z - .4], { name: 'Alternator' })
     : null;
   b.wire(battery, bus, 'power'); b.wire(battery, bus, 'ground');
-  if (alternator) { b.wire(alternator, bus, 'power'); b.wire(alternator, bus, 'ground'); }
+  if (alternator) { b.routedWire(alternator, bus, 'power'); b.routedWire(alternator, bus, 'ground'); }
   b.wire(bus, cb, 'power'); b.wire(bus, cb, 'ground');
 
   /* --- hydraulics (heavies): pump -> reservoir -> actuators, own circuit --- */
@@ -242,9 +258,10 @@ function designFor(cfg) {
     const hydRes = b.add('hydraulicReservoir', [W * .3, H * .45, -L * .15], { name: 'Hydraulic reservoir' });
     const act1 = b.add('hydraulicActuator', [-W * .35, H * .28, L * .04], { name: 'Gear actuator (port main)' });
     const act2 = b.add('hydraulicActuator', [W * .35, H * .28, L * .04], { name: 'Gear actuator (stbd main)' });
-    b.wire(hydPump, hydRes, 'hydraulic'); b.wire(hydRes, act1, 'hydraulic'); b.wire(hydRes, act2, 'hydraulic');
-    b.wire(act1, hydPump, 'hydraulic'); b.wire(act2, hydPump, 'hydraulic'); // return lines
-    b.wire(cb, hydPump, 'power'); b.wire(bus, hydPump, 'ground');
+    b.wire(hydPump, hydRes, 'hydraulic');
+    b.sparWire(hydRes, act1, 'hydraulic'); b.sparWire(hydRes, act2, 'hydraulic');
+    b.sparWire(act1, hydPump, 'hydraulic'); b.sparWire(act2, hydPump, 'hydraulic'); // return lines
+    b.routedWire(cb, hydPump, 'power'); b.routedWire(bus, hydPump, 'ground');
   }
 
   /* --- lights: port red, starboard green, aft white; strobes wingtips+tail;

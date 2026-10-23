@@ -3500,7 +3500,7 @@ function workshopSystemsAudit(){
  const hydWires=workshopWires.filter(w=>w.kind==='hydraulic');info.hydWires=hydWires.length;
  const adj={};for(const w of fuelWires){(adj[w.from]=adj[w.from]||[]).push(w.to);(adj[w.to]=adj[w.to]||[]).push(w.from);}
  const tanks=workshopParts.filter(p=>p.userData.type==='fuelTank'),strainers=workshopParts.filter(p=>p.userData.type==='fuelStrainer'),pumps=workshopParts.filter(p=>p.userData.type==='fuelPump');
- if(fuelWires.length){
+ if(fuelWires.length||hydWires.length){ // cockpit clearance covers both fluid kinds
   // fuel reachability from tanks
   const tankIds=new Set(tanks.map(p=>p.userData.partId));
   const seen=new Set(tankIds),q=[...tankIds];while(q.length){const n=q.pop();for(const t of (adj[n]||[])){if(!seen.has(t)){seen.add(t);q.push(t);}}}
@@ -3535,11 +3535,13 @@ function workshopSystemsAudit(){
     }
     return true;
    };
-   for(const w of fuelWires){
+   // structure-following rule applies to every fluid line: fuel AND hydraulics
+   // run with the spars/longerons/belly, never across the crewed zone
+   for(const w of [...fuelWires,...hydWires]){
     const pts=workshopWirePath(w);if(!pts)continue;
     let hit=false;
     for(let i=0;i<pts.length-1&&!hit;i++)if(segHitsBox(pts[i],pts[i+1]))hit=true;
-    if(hit){errors.push('Fuel line '+name(w.from)+' → '+name(w.to)+' runs through the cockpit — route it along the spars or the belly');break;}
+    if(hit){const k=w.kind==='fuel'?'Fuel line':'Hydraulic line';errors.push(k+' '+name(w.from)+' → '+name(w.to)+' runs through the cockpit — route it along the spars or the belly');break;}
    }
   }
  }

@@ -112,6 +112,14 @@ test('audit catches a straight fuel line through the cockpit, passes a belly run
   globalThis.workshopWires = [{ from: 'tank', to: 'eng', kind: 'fuel', waypoints: [{ x: 0, y: 0.12, z: -2 }, { x: 0, y: 0.12, z: 2 }] }];
   assert.equal(audit().errors.length, 0);
 
+  // hydraulic lines are held to the same structure-following rule as fuel
+  globalThis.workshopWires = [{ from: 'tank', to: 'eng', kind: 'hydraulic' }];
+  const hydStraight = audit().errors;
+  assert.ok(hydStraight.some(e => /Hydraulic line.*cockpit/.test(e)), 'hydraulic through cockpit not caught: ' + JSON.stringify(hydStraight));
+  globalThis.workshopWires = [{ from: 'tank', to: 'eng', kind: 'hydraulic', waypoints: [{ x: 0, y: 0.12, z: -2 }, { x: 0, y: 0.12, z: 2 }] }];
+  const hydRouted = audit().errors;
+  assert.ok(!hydRouted.some(e => /cockpit/.test(e)), 'routed hydraulic flagged: ' + JSON.stringify(hydRouted));
+
   // long segment that only clips a thin sliver of the box: with the old
   // 13-point sampler a short chord near a corner could fall between samples;
   // the exact slab intersection cannot miss it.
