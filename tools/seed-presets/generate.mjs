@@ -61,12 +61,35 @@ function makeBuilder() {
     port.symmetryPairId = pair; port.symmetrySide = 1;
     starboard.symmetryPairId = pair; starboard.symmetrySide = -1;
   };
-  const wire = (a, b, kind) => wires.push({ from: a.id, to: b.id, kind });
+  const wire = (a, b, kind, waypoints = null) => {
+    const w = { from: a.id, to: b.id, kind };
+    if (waypoints) w.waypoints = waypoints.map(([x, y, z]) => ({ x: round(x), y: round(y), z: round(z) }));
+    wires.push(w);
+  };
+  /* routedWire — a -> b as a structure-following polyline: belly (under the cabin
+     floor) when both ends sit low / aft of the cockpit, straight otherwise.
+     Real GA fuel lines run under the floor and climb ahead of the firewall
+     (systems-research.md §1); a straight tank->engine line would cut through the
+     cockpit and fail the audit. max 8 waypoints per wire (validateDesign cap). */
+  const routedWire = (a, b, kind) => {
+    const zFwd = Math.max(a.position.z, b.position.z);   // forward end of run
+    const zAft = Math.min(a.position.z, b.position.z);   // aft end of run
+    const yLow = Math.min(a.position.y, b.position.y) - .35;
+    const yBelly = Math.max(.12, yLow);                  // under the cabin floor
+    const zStart = Math.min(zAft + .25, zFwd - .1);
+    const zEnd = Math.max(zAft + .35, zFwd - .2);
+    const belly = [
+      [a.position.x * .4, yBelly, zStart],
+      [0, yBelly, (zStart + zEnd) / 2],
+      [b.position.x * .4, yBelly, zEnd]
+    ];
+    wire(a, b, kind, belly);
+  };
   const group = (name, list) => groups.push({
     id: 'grp-' + (groups.length + 1), name, parts: list.map(p => p.id)
   });
   const byId = () => new Map(parts.map(p => [p.id, p]));
-  return { parts, wires, groups, add, mirror, wire, group, byId };
+  return { parts, wires, groups, add, mirror, wire, routedWire, group, byId };
 }
 const round = n => Math.round(n * 1000) / 1000;
 
@@ -195,10 +218,10 @@ function designFor(cfg) {
   // detach as floating fragments at flight start
   strainer = b.add('fuelStrainer', [-W * .25, .18, -L * .05], { name: 'Fuel strainer (belly, aft)' });
   pump = b.add('fuelPump', [0, .3, Math.min(L * .27 + .4, L * .31 - .05)], { name: 'Boost pump (under floor, fwd)' });
-  b.wire(tankL, strainer, 'fuel'); b.wire(tankR, strainer, 'fuel');
+  b.routedWire(tankL, strainer, 'fuel'); b.routedWire(tankR, strainer, 'fuel');
   if (pump) b.wire(strainer, pump, 'fuel');
   const fuelTo = pump || strainer;
-  for (const e of engines) b.wire(fuelTo, e, 'fuel');
+  for (const e of engines) b.routedWire(fuelTo, e, 'fuel');
   }
 
   /* --- electrics: battery + alternator -> bus -> breaker -> loads --- */
@@ -345,12 +368,16 @@ function cockpitClearOk(snap) {
     if (w.kind !== 'fuel') continue;
     const a = byId.get(w.from), b = byId.get(w.to);
     if (!a || !b) continue;
-    for (let i = 0; i <= 12; i++) {
-      const t = i / 12;
-      if (inside(a.position.x + (b.position.x - a.position.x) * t,
-                 a.position.y + (b.position.y - a.position.y) * t,
-                 a.position.z + (b.position.z - a.position.z) * t))
-        return `${a.name} → ${b.name} crosses the cockpit box`;
+    // check the REAL polyline (endpoints + waypoints), segment by segment —
+    // matches the client audit, which uses workshopWirePath()
+    const pts = [a.position, ...(w.waypoints || []).map(p => p), b.position];
+    for (let s = 0; s < pts.length - 1; s++) {
+      const P = pts[s], Q = pts[s + 1];
+      for (let i = 0; i <= 12; i++) {
+        const t = i / 12;
+        if (inside(P.x + (Q.x - P.x) * t, P.y + (Q.y - P.y) * t, P.z + (Q.z - P.z) * t))
+          return `${a.name} → ${b.name} crosses the cockpit box`;
+      }
     }
   }
   return true;

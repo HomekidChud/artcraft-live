@@ -1000,13 +1000,33 @@ function validateDesign(input, catalog) {
   const seen = new Set();
   for (const w of wires) {
     if (!w || !ids.has(w.from) || !ids.has(w.to) || w.from === w.to || !['power','signal','data','ground','hydraulic','fuel','water'].includes(w.kind)) throw new Error('Invalid wiring connection');
+    // routed polyline: optional waypoints in workshop coordinates (metres, X/Y/Z).
+    // Wires still connect part-to-part; waypoints add structure-following elbows
+    // (spars / longerons / belly runs) so a line hugs real structure instead of
+    // cutting straight through the aircraft (docs/systems-research.md §6).
+    let waypoints = null;
+    if (w.waypoints != null) {
+      if (!Array.isArray(w.waypoints)) throw new Error('Invalid wire waypoints');
+      if (w.waypoints.length > 8) throw new Error('Maximum 8 waypoints per wire');
+      waypoints = w.waypoints.map(pt => {
+        if (!pt || typeof pt !== 'object') throw new Error('Invalid waypoint');
+        const out = {};
+        for (const axis of ['x','y','z']) {
+          const n = pt[axis];
+          if (typeof n !== 'number' || !Number.isFinite(n) || n < -500 || n > 500) throw new Error('Invalid waypoint ' + axis);
+          out[axis] = n;
+        }
+        return out;
+      });
+    }
     const key = [w.from,w.to].sort().join(':') + ':' + w.kind;
     if (seen.has(key)) throw new Error('Duplicate wiring connection');
     seen.add(key);
+    wireRows.push({from:w.from,to:w.to,kind:w.kind,waypoints});
   }
   const snap = input.snapIncrement ?? .25;
   if (![0,.25,.5,1,2].includes(snap)) throw new Error('Invalid grid snap');
-  return {name:String(input.name || 'Imported aircraft').slice(0,60),symmetryEnabled:input.symmetryEnabled !== false,snapIncrement:snap,parts,wires:wires.map(w=>({from:w.from,to:w.to,kind:w.kind}))};
+  return {name:String(input.name || 'Imported aircraft').slice(0,60),symmetryEnabled:input.symmetryEnabled !== false,snapIncrement:snap,parts,wires:wireRows};
 }
 // Geometry and engineering share this planform. +X right, +Y up, +Z forward.
 function planform(d) {
@@ -3281,7 +3301,13 @@ function workshopUpdateStats(){
  if(report){const checks=[{ok:hasBody,label:hasBody?'Fuselage / cabin structure detected':'Add a fuselage or cabin structure'},{ok:hasWing,label:hasWing?`${area.toFixed(1)} m² estimated lifting area`:'Add a main lifting surface'},{ok:hasTail,label:hasTail?'Tail or directional stabiliser present':'Check empennage: no tail surfaces found',warn:true},{ok:hasSpar,label:hasSpar?'Main structural spar included':'No dedicated main wing spar placed',warn:true},{ok:engines.length>0,label:engines.length?`${engines.length} propulsion component(s)`:'No propulsion: glider-like build only',warn:true},{ok:gears.some(p=>p.userData.type==='wheel'||p.userData.type==='skid'),label:'Landing contact gear detected',warn:true},{ok:pairIds.size>0||!workshopSymmetryEnabled,label:pairIds.size?`${pairIds.size} mirrored pair group(s) linked`:'No mirrored parts — check lateral balance',warn:true},{ok:Math.abs(left-right)<=Math.max(5,total*.08),label:`Lateral component-mass difference: ${Math.abs(left-right).toFixed(1)} kg`,warn:true},{ok:powerVoltageIssues.length===0,label:powerVoltageIssues.length?`${powerVoltageIssues.length} power connection(s) have a nominal voltage mismatch`:'No obvious nominal voltage mismatch on power wires',warn:true}];report.innerHTML=checks.map(c=>`<div class="workshop-check-row ${c.ok?'':'warn'}"><span class="dot">${c.ok?'●':'▲'}</span><span>${c.label}</span></div>`).join('');}
 }
 function workshopRenderInspector(){const g=workshopGetPart(workshopSelectedId);$('workshopInspectorEmpty').hidden=!!g;$('workshopInspectorFields').hidden=!g;$('workshopDuplicate').disabled=!g;$('workshopMirrorSelected').disabled=!g||!!workshopMirrorMate(g);if(!g){$('workshopConnectionsList').innerHTML='<span class="workshop-muted">No wires connected yet.</span>';return;}const d=WORKSHOP_PARTS[g.userData.type];$('workshopSelectedType').textContent=(d.category||'component').toUpperCase()+' / '+g.userData.type.toUpperCase();$('workshopPartName').value=g.userData.name;$('workshopPosX').value=g.position.x.toFixed(2);$('workshopPosY').value=g.position.y.toFixed(2);$('workshopPosZ').value=g.position.z.toFixed(2);$('workshopScaleX').value=g.scale.x.toFixed(2);$('workshopScaleY').value=g.scale.y.toFixed(2);$('workshopScaleZ').value=g.scale.z.toFixed(2);$('workshopRotation').value=(g.rotation.y*180/Math.PI).toFixed(1);$('workshopPartMass').textContent=workshopPartMass(g).toFixed(2)+' kg';$('workshopPartCategory').textContent=d.category;$('workshopPartDetails').textContent=d.electrical?`${d.electrical.role} · ${d.electrical.volts} V · ${d.electrical.ports} ports. Connect compatible modules using Wire mode.`:d.engineType?`${d.engineType} propulsion · estimated static thrust ${d.thrustN} N.`:d.detail;const rows=workshopWires.map((w,i)=>({w,i})).filter(({w})=>w.from===g.userData.partId||w.to===g.userData.partId);$('workshopConnectionCount').textContent=String(rows.length);$('workshopConnectionsList').innerHTML=rows.length?rows.map(({w,i})=>`<div class="workshop-connection-row"><span>${escapeHTML(w.kind.toUpperCase())} · ${escapeHTML(workshopGetPart(w.from)?.userData.name||w.from)} → ${escapeHTML(workshopGetPart(w.to)?.userData.name||w.to)}</span><button type="button" data-workshop-wire-delete="${i}" title="Remove wire">×</button></div>`).join(''):'<span class="workshop-muted">No wires attached to this part.</span>';}
-function workshopRebuildWires(){if(!workshopWireRoot)return;while(workshopWireRoot.children.length){const o=workshopWireRoot.children[0];workshopWireRoot.remove(o);if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}const colors={power:'#f06b4f',signal:'#4ea8ff',data:'#e9c76b',ground:'#5dc78c',hydraulic:'#ff9a3c',fuel:'#d9a441',water:'#4fa3e3'};for(const w of workshopWires){const a=workshopGetPart(w.from),b=workshopGetPart(w.to);if(!a||!b)continue;const A=a.position.clone(),B=b.position.clone();A.y+=.1;B.y+=.1;const mid=A.clone().add(B).multiplyScalar(.5);mid.y+=Math.max(.08,A.distanceTo(B)*.035);const curve=new THREE.CatmullRomCurve3([A,mid,B]);const tube=new THREE.Mesh(new THREE.TubeGeometry(curve,18,.018,6,false),new THREE.MeshStandardMaterial({color:colors[w.kind]||colors.power,roughness:.42,metalness:.25,emissive:colors[w.kind]||colors.power,emissiveIntensity:.06}));tube.userData.isWorkshopWire=true;workshopWireRoot.add(tube);}workshopRenderInspector();}
+/* Resolve a wire's rendered polyline: attached part endpoints (lifted slightly
+   off the part centre) joined through any structure-following waypoints. One
+   helper serves rendering, selection and the systems audit so what you see is
+   what gets checked — a straight wire has no waypoints, a routed wire bends
+   through spars / longerons / belly runs exactly as drawn. */
+function workshopWirePath(w){const a=workshopGetPart(w.from),b=workshopGetPart(w.to);if(!a||!b)return null;const A=a.position.clone(),B=b.position.clone();A.y+=.1;B.y+=.1;if(!w.waypoints||!w.waypoints.length)return [A,B];return [A,...w.waypoints.map(p=>new THREE.Vector3(p.x,p.y,p.z)),B];}
+function workshopRebuildWires(){if(!workshopWireRoot)return;while(workshopWireRoot.children.length){const o=workshopWireRoot.children[0];workshopWireRoot.remove(o);if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}const colors={power:'#f06b4f',signal:'#4ea8ff',data:'#e9c76b',ground:'#5dc78c',hydraulic:'#ff9a3c',fuel:'#d9a441',water:'#4fa3e3'};let wi=0;for(const w of workshopWires){const pts=workshopWirePath(w);if(!pts)continue;let curve;if(pts.length===2){const A=pts[0],B=pts[1],mid=A.clone().add(B).multiplyScalar(.5);mid.y+=Math.max(.08,A.distanceTo(B)*.035);curve=new THREE.CatmullRomCurve3([A,mid,B]);}else curve=new THREE.CatmullRomCurve3(pts);const tube=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(18,pts.length*6),.018,6,false),new THREE.MeshStandardMaterial({color:colors[w.kind]||colors.power,roughness:.42,metalness:.25,emissive:colors[w.kind]||colors.power,emissiveIntensity:.06}));tube.userData.isWorkshopWire=true;tube.userData.wireIndex=wi;tube.userData.partId=null;workshopWireRoot.add(tube);wi++;}workshopRenderInspector();}
 function workshopRestoreSnapshot(snap){workshopSymmetryEnabled=snap.symmetryEnabled!==false;workshopSnapIncrement=snap.snapIncrement==null?.25:Number(snap.snapIncrement);const stoggle=$('workshopSymmetryToggle');if(stoggle){stoggle.textContent='Symmetry: '+(workshopSymmetryEnabled?'ON':'OFF');stoggle.classList.toggle('symmetry-on',workshopSymmetryEnabled);stoggle.setAttribute('aria-pressed',String(workshopSymmetryEnabled));}const ssnap=$('workshopSnapSize');if(ssnap)ssnap.value=String(workshopSnapIncrement);workshopLoading=true;while(workshopBuildRoot.children.length){const g=workshopBuildRoot.children[0];workshopBuildRoot.remove(g);}workshopParts=[];workshopGroups=(snap.groups||[]).map(g=>({id:g.id||('grp-'+Math.random().toString(36).slice(2,9)),name:g.name||'Group',parts:Array.isArray(g.parts)?[...g.parts]:[]}));workshopWires=workshopCloneJSON(snap.wires||[]);workshopWireRoot.clear();let maxImportedId=0;for(const st of snap.parts||[]){const g=workshopCreatePart(st.type,st);if(g){workshopBuildRoot.add(g);workshopParts.push(g);const m=/^part-(\d+)$/.exec(g.userData.partId);if(m)maxImportedId=Math.max(maxImportedId,Number(m[1]));}}workshopNextId=Math.max(workshopNextId,maxImportedId+1);for(const st of (snap.parts||[])){const m=/^mirror-(\d+)$/.exec(st.symmetryPairId||'');if(m)workshopNextSymmetryId=Math.max(workshopNextSymmetryId,Number(m[1])+1);}$('workshopName').value=snap.name||'Untitled aircraft';workshopSelectedId=workshopParts[workshopParts.length-1]?.userData.partId||null;workshopLoading=false;workshopRebuildWires();workshopSelectPart(workshopSelectedId);workshopUpdateStats();workshopUpdateEmptyHint();workshopUpdateHistoryButtons();}
 function workshopUndo(){if(!workshopUndoStack.length)return;workshopRedoStack.push(workshopSnapshot());const s=workshopUndoStack.pop();workshopRestoreSnapshot(s);}
 function workshopRedo(){if(!workshopRedoStack.length)return;workshopUndoStack.push(workshopSnapshot());const s=workshopRedoStack.pop();workshopRestoreSnapshot(s);}
@@ -3473,7 +3499,9 @@ function workshopSystemsAudit(){
    const above=tanks.some(t=>t.position.y>e.position.y+.1);
    if(!above&&!pumps.length){errors.push('Tanks sit below '+name(e.userData.partId)+' — a boost pump is required (gravity feed only works for high wings)');break;}
   }
-  // fuel lines must not run through the cockpit: box around the crewed zone
+  // fuel lines must not run through the cockpit: box around the crewed zone.
+  // Checks the REAL rendered polyline (endpoints + waypoints) segment by segment,
+  // so a routed belly run passes and a straight line through the cabin fails.
   const cockpitParts=workshopParts.filter(p=>['cockpitSeat','instrumentPanel','canopy','cabinBlock'].includes(p.userData.type));
   if(cockpitParts.length){
    const box=new THREE.Box3();
@@ -3481,8 +3509,10 @@ function workshopSystemsAudit(){
    box.expandByScalar(.35);
    const segHitsBox=(a,b)=>{for(let i=0;i<=12;i++){const t=i/12;if(box.containsPoint(new THREE.Vector3(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t)))return true;}return false;};
    for(const w of fuelWires){
-    const a=workshopGetPart(w.from),b=workshopGetPart(w.to);if(!a||!b)continue;
-    if(segHitsBox(a.position,b.position)){errors.push('Fuel line '+name(w.from)+' → '+name(w.to)+' runs through the cockpit — route it along the spars or the belly');break;}
+    const pts=workshopWirePath(w);if(!pts)continue;
+    let hit=false;
+    for(let i=0;i<pts.length-1&&!hit;i++)if(segHitsBox(pts[i],pts[i+1]))hit=true;
+    if(hit){errors.push('Fuel line '+name(w.from)+' → '+name(w.to)+' runs through the cockpit — route it along the spars or the belly');break;}
    }
   }
  }

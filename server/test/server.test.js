@@ -119,6 +119,16 @@ test('validation rejects malformed builds the same way the client does', async (
   ] }), /Duplicate wiring/);
   // group referencing unknown part
   assert.throws(() => validateBuildData(snapshot({ groups: [{ id: 'g', name: 'G', parts: ['part-77'] }] })), /Group references unknown/);
+  // wire waypoints: valid routed polyline passes, malformed ones fail
+  assert.doesNotThrow(() => validateBuildData(snapshot({ wires: [{ from: 'part-1', to: 'part-2', kind: 'fuel', waypoints: [{ x: 0, y: -0.4, z: 1 }, { x: 0, y: -0.4, z: 1.5 }] }] })));
+  assert.throws(() => validateBuildData(snapshot({ wires: [{ from: 'part-1', to: 'part-2', kind: 'fuel', waypoints: 'belly' }] })), /waypoints/);
+  assert.throws(() => validateBuildData(snapshot({ wires: [{ from: 'part-1', to: 'part-2', kind: 'fuel', waypoints: Array.from({ length: 9 }, (_, i) => ({ x: i, y: 0, z: 0 })) }] })), /waypoints/);
+  assert.throws(() => validateBuildData(snapshot({ wires: [{ from: 'part-1', to: 'part-2', kind: 'fuel', waypoints: [{ x: 0, y: 9999, z: 0 }] }] })), /waypoint/);
+  // waypoint survives the server round-trip
+  const routed = await api('POST', '/api/builds', { name: 'Routed', kind: 'build', data: snapshot({ wires: [{ from: 'part-1', to: 'part-2', kind: 'fuel', waypoints: [{ x: 0, y: -0.4, z: 1 }] }] }) });
+  assert.equal(routed.status, 201);
+  const back = await api('GET', '/api/builds/' + routed.json.id);
+  assert.deepEqual(back.json.data.wires[0].waypoints, [{ x: 0, y: -0.4, z: 1 }]);
   // server round-trip: POST rejects invalid build
   const r = await api('POST', '/api/builds', { name: 'Bad', kind: 'build', data: { parts: 'nope' } });
   assert.equal(r.status, 400);

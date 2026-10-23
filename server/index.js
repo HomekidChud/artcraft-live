@@ -107,6 +107,13 @@ function validateBuildData(data) {
   const seen = new Set();
   for (const w of wires) {
     if (!w || !ids.has(w.from) || !ids.has(w.to) || w.from === w.to || !WIRE_KINDS.includes(w.kind)) throw new Error('Invalid wiring connection');
+    // optional structure-following polyline (mirrors client validateDesign)
+    if (w.waypoints != null) {
+      if (!Array.isArray(w.waypoints) || w.waypoints.length > 8) throw new Error('Invalid wire waypoints');
+      for (const pt of w.waypoints) {
+        if (!pt || typeof pt !== 'object' || !validVector(pt, -500, 500)) throw new Error('Invalid waypoint');
+      }
+    }
     const key = [w.from, w.to].sort().join(':') + ':' + w.kind;
     if (seen.has(key)) throw new Error('Duplicate wiring connection');
     seen.add(key);
