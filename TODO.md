@@ -618,6 +618,8 @@ Done:
 - Waypoints persist through workshopSnapshot and workshopRestoreSnapshot — the restore test EXECUTES the real restore with scene/DOM stubs, asserts waypoints survive and that the restore is a deep copy (undo/redo history cannot be corrupted through aliasing).
 - Generator's cockpit-clearance check upgraded to exact slab intersection on the SAME lifted-endpoint polyline the client audit uses — it immediately caught a real violation (Extra 300 straight strainer→pump through the cockpit box) which is now routed under the floor; presets regenerated.
 - Committed and pushed (a1d1834 + follow-up fixes).
+Cloud-browser smoke test (RUN): Build Mode opened, Fleet presets (local) listed all 24, Boeing 747-8 preset loaded as an editable workshop build (build notebook 10/11 ticks, Test connection untested — this was GitHub Pages against the Render API), Test Fly entered flight sim on the runway with 4 engines at 650 RPM and "READY FOR DEPARTURE". No rendering defects, no truncated text, nothing broken. Wires in the workshop viewport render correctly.
+
 Still to do:
 - Editor affordance: user-facing way to add/move/remove waypoints on a selected wire in the workshop UI (right now waypoints exist in schema + presets + audit only).
 - Extend `routedWire()` to other kinds (hydraulic return lines, power/ground trunk runs along spars) once the editor affordance exists.
