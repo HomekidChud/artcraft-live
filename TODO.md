@@ -887,3 +887,43 @@ and the physics should keep advancing. Two additions, both tested.
   `fwLastGAppMag`/`fwReentry`/`FW_WIRE_SETTLE_FRAMES`. Repo `npm test` 64/64 green.
 - Remaining (unchanged): fleet path removal, Build Mode UI overhaul, fleet lamp
   fixtures, Render deploy verification, live Pages smoke test (`?debug&fresh=N`).
+
+## AirplaneCraft — 17.10.5e (2026-10-23, same day): unified Build Mode UI + bug fixes
+
+- **One design system for Build Mode** (the owner's complaint: "top bar and
+  explorer is nice, the property isn't same for the toolbox"). The Properties
+  panel was rendering cream cards from the retired FW53 hangar reskin while the
+  Toolbox showed the amber v2 skin and the ribbon/Explorer showed the Studio
+  blue skin — three themes fighting. Changes:
+  - The FW53 `hangarReskin()` cream CSS injection is retired (kept in source,
+    no longer appended).
+  - `#fwBuildUiV2` is replaced by `#fwStudioUnified`, a full skin retuned to
+    the Studio tokens (panel #1f2327, head #24282d, line #2e3338, ink #d6dade,
+    accent #4fb3ff) so ribbon, Toolbox, Explorer, Properties, welcome/tour
+    cards, notebook and cloud panel all share one language. The simple-mode
+    "wiring stays visible" display rules from the hangar skin were carried
+    over. Verified via headless-browser computed-style audit: every panel now
+    resolves to the same palette; screenshots confirm no cream/amber leakage.
+- **Bug: glue threw on every use** — the glue tool handler (and my new debug
+  hooks) called `workshopSaveDraft()`, which does not exist. Every glue/unglue
+  action raised a ReferenceError after mutating state. Fixed to `saveWorkshop()`.
+- **Bug: starter modal blocked the first placement** — `#builderWelcome` only
+  closed when a part was created, but it covers the canvas centre, so the
+  placement click never landed on the grid. `workshopSetPartTool()` now
+  advances the builder step (closing the modal) as soon as a palette item is
+  picked.
+- **Bug: runway z-fighting** — mountain foothills rise up to ~3.5 m across the
+  runway strip and poked through the asphalt (green stripes, bumpy physics).
+  `analyticTerrainHeight` now flattens the airport field (|x|≤260, |z|≤1650
+  with 340/420 m fades); the runway/asphalt/paint/taxi materials got layered
+  `polygonOffset` (-2/-4/-6) so the stacked airport surfaces stop z-fighting at
+  distance. Verified in flight screenshots.
+- **Missing favicon** (404 in console) — added an inline SVG data-URI favicon.
+- **QA tooling**: `tools/qa-shots.mjs` (build-mode screenshots + computed-style
+  audit) and `tools/qa-smoke.mjs` (place → glue → wire → Test Fly → re-open
+  persistence, console-error capture). The `?debug` workshop API gained
+  `glue/unglue/wire/bonds/wires` hooks so QA drives the same code paths as the
+  tools. Full smoke run: parts/glue/wires persist across Test Fly, zero
+  console errors. `npm test` 64/64 green.
+- Remaining (unchanged): fleet path removal, fleet lamp fixtures, Render deploy
+  verification, live Pages smoke test (`?debug&fresh=N`).

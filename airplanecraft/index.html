@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Flight World 17.10 · Systems, lights & cloud builds</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%231f2327'/%3E%3Cpath d='M16 6l3 10-3 10-3-10z' fill='%234fb3ff'/%3E%3Cpath d='M6 16l10-3 10 3-10 3z' fill='%23d6dade'/%3E%3C/svg%3E">
 <style>
 :root{color-scheme:dark;--bg:#0c1822;--panel:#132530;--line:#395464;--muted:#a9bdc9;--lime:#c9f69a}
 *{box-sizing:border-box}
@@ -1514,6 +1515,12 @@ let terrainHeight=function analyticTerrainHeight(x,z){
  h-=25*Math.exp(-Math.pow(riverD/105,2))*THREE.MathUtils.smoothstep(x,-5200,-3550);
  // A narrow beach ramps from seabed to the inland surface rather than forming a hard cliff.
  if(shoreDistance<340)h*=THREE.MathUtils.smoothstep(shoreDistance,0,340);
+ // Airport field: keep the runway, taxiways and apron level. The mountain
+ // foothills rise up to ~3.5 m across the runway strip and used to poke
+ // through the asphalt (green stripes on the runway, bumpy takeoff rolls).
+ const apx=Math.max(0,Math.abs(x)-260)/340,apz=Math.max(0,Math.abs(z)-1650)/420;
+ const ap=1-Math.min(1,apx+apz);
+ if(ap>0)h*=1-ap*.995;
  return h;
 };
 const terrainMapMaterial=new THREE.MeshStandardMaterial({map:grassMap,color:'#ffffff',roughness:.98,vertexColors:true,side:THREE.DoubleSide,emissive:'#0c160b',emissiveIntensity:.10});
@@ -1898,13 +1905,13 @@ const runwayMap=tex(256,1024,(c,w,h)=>{
 });
 runwayMap.wrapS=runwayMap.wrapT=THREE.RepeatWrapping;
 runwayMap.repeat.set(1,6);
-const asphalt=mat('#ffffff',.9,.015,{map:runwayMap});
+const asphalt=mat('#ffffff',.9,.015,{map:runwayMap,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4});
 
 /* Airport, runway markings, edge lights and buildings. */
 const airport=new THREE.Group();scene.add(airport);
-box(airport,mat('#82847a',.96),[150,.05,2900],[0,-.05,0]);
+box(airport,mat('#82847a',.96,0,{polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),[150,.05,2900],[0,-.05,0]);
 box(airport,asphalt,[44,.15,2700],[0,.04,0]);
-const paint=mat('#f5f3e8',.82);
+const paint=mat('#f5f3e8',.82,0,{polygonOffset:true,polygonOffsetFactor:-6,polygonOffsetUnits:-6});
 for(const x of [-20.4,20.4])box(airport,paint,[.42,.02,2660],[x,.126,0]);
 for(let z=-1160;z<=1160;z+=88)box(airport,paint,[.55,.025,27],[0,.13,z]);
 for(const end of [-1,1]){
@@ -1913,8 +1920,8 @@ for(const end of [-1,1]){
  const numberTex=tex(128,64,(c,w,h)=>{c.fillStyle='#faf8eb';c.font='bold 42px Arial';c.textAlign='center';c.textBaseline='middle';c.fillText(end<0?'09':'27',w/2,h/2)});
  add(airport,new THREE.PlaneGeometry(10,5),new THREE.MeshBasicMaterial({map:numberTex,transparent:true,side:THREE.DoubleSide}),[0,.15,end*1190],[-Math.PI/2,0,0],false,false);
 }
-box(airport,mat('#808277',.95),[95,.07,190],[80,-.01,-180]);
-for(let z=-255;z<-100;z+=18)box(airport,mat('#f3d15b',.8),[.45,.02,8],[52,.1,z]);
+box(airport,mat('#808277',.95,0,{polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2}),[95,.07,190],[80,-.01,-180]);
+for(let z=-255;z<-100;z+=18)box(airport,mat('#f3d15b',.8,0,{polygonOffset:true,polygonOffsetFactor:-6,polygonOffsetUnits:-6}),[.45,.02,8],[52,.1,z]);
 const lampMat=mat('#e9f7ff',.25,.1,{emissive:'#b6edff',emissiveIntensity:1.2});
 for(const x of [-24,24])for(let z=-1300;z<=1300;z+=100)sphere(airport,lampMat,[x,.28,z],[.12,.12,.12],10);
 
@@ -3691,7 +3698,7 @@ function workshopPartClickForGlue(p){
  workshopPushUndo();
  if(has){workshopBonds=workshopBonds.filter(b=>!((b.from===workshopGlueStart&&b.to===id)||(b.to===workshopGlueStart&&b.from===id)));workshopSetStatus('Unglued');}
  else{workshopBonds.push({from:workshopGlueStart,to:id});workshopSetStatus('Glued '+workshopGetPart(workshopGlueStart)?.userData.name+' ↔ '+p.userData.name+' — they move together now');}
- workshopGlueStart=null;workshopRebuildWires();workshopRenderInspector();workshopUpdateStats();workshopSaveDraft();
+ workshopGlueStart=null;workshopRebuildWires();workshopRenderInspector();workshopUpdateStats();saveWorkshop();
 }
 function workshopExport(){const data=workshopSnapshot();data.format='FlightWorldWorkshop';data.version=2;const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=(data.name||'aircraft-build').replace(/[^a-z0-9-_]+/gi,'_')+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);workshopSetStatus('Build exported as JSON');}
 function workshopImportFile(file){const reader=new FileReader();reader.onload=()=>{try{const s=JSON.parse(reader.result);if(!Array.isArray(s.parts))throw new Error('Missing parts list');workshopPushUndo();const parts=s.parts.filter(p=>WORKSHOP_PARTS[p.type]);if(parts.length!==s.parts.length)throw new Error('This file contains unknown component types');workshopRestoreSnapshot({name:s.name||'Imported aircraft',parts,wires:Array.isArray(s.wires)?s.wires:[],bonds:Array.isArray(s.bonds)?s.bonds:[]});workshopSetStatus('Imported '+parts.length+' components');}catch(e){workshopSetStatus('Import failed: '+e.message);}};reader.readAsText(file);}
@@ -3891,7 +3898,7 @@ function workshopFly(){if(workshopParts.length===0){workshopSetStatus('Add compo
 function workshopBeginPlacement(e){const d=WORKSHOP_PARTS[workshopPendingType];if(!d)return;const p=workshopIntersectPlane(e,0);if(!p)return;const pos={x:workshopSnap(p.x),y:workshopPlacementHeight(workshopPendingType),z:workshopSnap(p.z)};workshopPushUndo();const g=workshopCreateMirroredPair(workshopPendingType,pos);if(!g)return;workshopSetStatus(`Placed ${d.name}${workshopMirrorMate(g)?' with mirrored counterpart':''} · centreline symmetry ${workshopSymmetryEnabled?'ON':'OFF'}`);}
 function workshopCreateGhost(type){if(workshopGhost){workshopScene.remove(workshopGhost);workshopGhost=null;}if(workshopGhostMirror){workshopScene.remove(workshopGhostMirror);workshopGhostMirror=null;}if(!type||!WORKSHOP_PARTS[type])return;workshopGhost=workshopMakeVisual(type,true);workshopScene.add(workshopGhost);workshopGhostMirror=workshopMakeVisual(type,true);workshopScene.add(workshopGhostMirror);workshopGhostMirror.visible=false;}
 function workshopUpdateGhost(e){if(workshopTool!=='place'||!workshopGhost||!workshopPendingType)return;const d=WORKSHOP_PARTS[workshopPendingType],p=workshopIntersectPlane(e,0);if(!p)return;const x=workshopSnap(p.x),z=workshopSnap(p.z);workshopGhost.position.set(x,workshopPlacementHeight(workshopPendingType),z);if(workshopGhostMirror){workshopGhostMirror.visible=workshopShouldMirror(workshopPendingType,x);workshopGhostMirror.position.set(-x,workshopPlacementHeight(workshopPendingType),z);}}
-function workshopSetPartTool(type){if(type.startsWith('__wire_')){workshopWireKind=type.split('_').pop();workshopSetTool('wire');workshopCategory='wiring';workshopRenderPalette();return;}if(type.startsWith('template')){workshopTemplate(type);return;}if(!WORKSHOP_PARTS[type])return;workshopPendingType=type;workshopTool='place';workshopWireStart=null;workshopGlueStart=null;$('workshopSelectTool').classList.remove('active');$('workshopWireTool').classList.remove('active');$('workshopGlueTool')?.classList.remove('active');$('workshopWireHint').hidden=true;workshopCreateGhost(type);workshopRenderPalette();workshopSetStatus(`Place ${WORKSHOP_PARTS[type].name} · click the grid to add a component`);}
+function workshopSetPartTool(type){if(type.startsWith('__wire_')){workshopWireKind=type.split('_').pop();workshopSetTool('wire');workshopCategory='wiring';workshopRenderPalette();return;}if(type.startsWith('template')){workshopTemplate(type);return;}if(!WORKSHOP_PARTS[type])return;workshopPendingType=type;workshopTool='place';workshopWireStart=null;workshopGlueStart=null;if(typeof workshopStep!=='undefined'&&workshopStep==='choose')setBuilderStep('build');$('workshopSelectTool').classList.remove('active');$('workshopWireTool').classList.remove('active');$('workshopGlueTool')?.classList.remove('active');$('workshopWireHint').hidden=true;workshopCreateGhost(type);workshopRenderPalette();workshopSetStatus(`Place ${WORKSHOP_PARTS[type].name} · click the grid to add a component`);}
 function workshopClear(){if(!workshopParts.length&&!workshopWires.length)return;if(!confirm('Clear all components and wiring from this scratch build?'))return;workshopPushUndo();workshopBuildRoot.clear();workshopParts=[];workshopGroups=[];workshopMultiSelect.clear();workshopWires=[];workshopBonds=[];workshopGlueStart=null;workshopWireRoot.clear();workshopSelectedId=null;workshopSelectPart(null);workshopRebuildWires();workshopUpdateStats();workshopUpdateEmptyHint();workshopSetStatus('Empty workshop · ready to build from scratch');}
 $('menuSandbox').addEventListener('click',()=>{$('mainMenuOverlay').hidden=true;S.paused=false;$('pause').textContent='Pause';});
 $('menuBuild').addEventListener('click',()=>{$('mainMenuOverlay').hidden=true;openBuildMode();});
@@ -7562,7 +7569,9 @@ workshopSetPartTool=function(type){
 };
 const inputHints={workshopPosX:'Right / left',workshopPosY:'Up / down',workshopPosZ:'Forward / back'};for(const [id,hint]of Object.entries(inputHints))$(id).title=hint+' · metres';
 $('workshopInspectorEmpty').querySelector('span').textContent='Choose a part to move it or change its size in metres.';
-if(window.__flightWorld)Object.assign(window.__flightWorld.workshop,{catalog:WORKSHOP_PARTS,visual:type=>workshopMakeVisual(type),create:workshopAddPart,tool:workshopSetPartTool,fit:fitWorkshopPropeller,engineering:()=>AeroCore.engineering(workshopParts.map(workshopPartState),WORKSHOP_PARTS),propulsion:()=>AeroCore.propulsion(workshopParts.map(workshopPartState),WORKSHOP_PARTS),camera:()=>workshopCamera,resize:resizeWorkshopPart,sync:workshopSyncMirror,refresh:workshopUpdateStats});
+if(window.__flightWorld)Object.assign(window.__flightWorld.workshop,{catalog:WORKSHOP_PARTS,visual:type=>workshopMakeVisual(type),create:workshopAddPart,tool:workshopSetPartTool,fit:fitWorkshopPropeller,engineering:()=>AeroCore.engineering(workshopParts.map(workshopPartState),WORKSHOP_PARTS),propulsion:()=>AeroCore.propulsion(workshopParts.map(workshopPartState),WORKSHOP_PARTS),camera:()=>workshopCamera,resize:resizeWorkshopPart,sync:workshopSyncMirror,refresh:workshopUpdateStats,
+/* QA hooks: drive glue / wires the same way the tools do */
+bonds:()=>workshopBonds,wires:()=>workshopWires,glue:(a,b)=>{if(!workshopGetPart(a)||!workshopGetPart(b))return false;const has=workshopBonds.some(x=>(x.from===a&&x.to===b)||(x.to===a&&x.from===b));if(!has)workshopBonds.push({from:a,to:b});workshopRebuildWires();workshopRenderInspector();workshopUpdateStats();saveWorkshop();return!has;},unglue:(a,b)=>{const n=workshopBonds.length;workshopBonds=workshopBonds.filter(x=>!((x.from===a&&x.to===b)||(x.to===a&&x.from===b)));const changed=n!==workshopBonds.length;workshopRebuildWires();workshopRenderInspector();workshopUpdateStats();saveWorkshop();return changed;},wire:(a,b,kind='power')=>{if(!workshopGetPart(a)||!workshopGetPart(b))return false;workshopWires.push({from:a,to:b,kind});workshopRebuildWires();workshopRenderInspector();workshopUpdateStats();saveWorkshop();return true;}});
 
 function trimCustomAirborneStart(cfg,approach){
  const tas=physicsVelocity.length(),atmo=AeroCore.atmosphere(plane.position.y),q=.5*atmo.density*tas*tas,chord=cfg.wingArea/Math.max(1,cfg.wingspan),flap=clamp(S.flaps/30,0,1),requiredCL=cfg.massKg*9.80665/(q*cfg.wingArea);
@@ -8188,10 +8197,12 @@ animate();
   #buildModeOverlay .workshop-save-state{color:#cde8a8!important}
   #buildModeOverlay .workshop-library-foot{color:#8a7a62!important}
   `;
-  document.head.appendChild(css);
+  /* RETIRED: the warm-cream hangar reskin fought the later studio skin and left
+     the Properties panel cream while the Toolbox went dark. Superseded by the
+     single studio design system (#fwStudioUnified, end of file). The CSS above
+     is kept for reference but is no longer injected. */
+  /* document.head.appendChild(css); */
 })();
-
-/* ---------------- 2. FRIENDLIER WORKSHOP COPY ---------------- */
 (function friendlierCopy(){
   const base=workshopSetStatus;
   const map=[
@@ -11147,146 +11158,170 @@ function workshopPruneGroups(){
   return changed;
 }
 </script>
-<style id="fwBuildUiV2">
+<style id="fwStudioUnified">
 /* ============================================================
-   FLIGHT WORLD · BUILD UI v2 — one coherent editor theme
-   (replaces the stacked lime/graphite/cream skins)
+   FLIGHT WORLD · STUDIO UNIFIED — one design system for Build Mode
+   Same tokens as the Studio layout skin (#fwStudioSkin): the ribbon,
+   Explorer, Toolbox and Properties panels now share one language.
+   This block is last in the document and wins the cascade over the
+   retired lime / graphite / cream / v2 skins.
    ============================================================ */
-#buildModeOverlay{--v2bg:#0d1013;--v2panel:#15181d;--v2panel2:#191d23;--v2line:#262c34;--v2ink:#e7eaee;--v2mut:#9aa4ae;--v2acc:#e8a33d;--v2ok:#7fc95e;--v2bad:#e0604d;
+#buildModeOverlay{--ubg:#191c1f;--upanel:#1f2327;--uhead:#24282d;--uline:#2e3338;--uink:#d6dade;--umut:#8f979e;--uacc:#4fb3ff;--uaccbg:#1d3a52;--uok:#7fc95e;--ubad:#e0604d;--uinput:#181b1e;--ubtn:#2b3136;--ubtnline:#3a4147;
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,'Helvetica Neue',sans-serif}
-#buildModeOverlay .workshop-overlay,#buildModeOverlay.workshop-overlay{background:#0d1013f2!important}
-#buildModeOverlay .workshop-topbar{background:#12151a!important;border-bottom:1px solid var(--v2line)!important;height:54px!important;gap:10px!important;padding:0 12px!important}
-#buildModeOverlay .workshop-brand{gap:8px!important}
-#buildModeOverlay .workshop-brand-mark{background:#1b1f25!important;color:var(--v2acc)!important;border:1px solid #2c333c!important;border-radius:7px!important;font-weight:800!important;font-size:12px!important;letter-spacing:.06em!important}
-#buildModeOverlay .workshop-brand strong{font-size:11px!important;letter-spacing:.18em!important;text-transform:uppercase!important;color:var(--v2ink)!important}
-#buildModeOverlay .workshop-brand small{color:var(--v2mut)!important;font-size:9.5px!important}
-#buildModeOverlay .workshop-name-label{font-size:9.5px!important;letter-spacing:.14em!important;color:var(--v2mut)!important}
-#buildModeOverlay #workshopName{background:#1a1e24!important;border:1px solid var(--v2line)!important;border-radius:7px!important;color:var(--v2ink)!important;font-weight:650!important;padding:7px 10px!important}
-#buildModeOverlay #workshopName:focus{border-color:var(--v2acc)!important;outline:none!important}
-#buildModeOverlay .workshop-top-actions{gap:6px!important}
-#buildModeOverlay .workshop-top-actions button,#buildModeOverlay .workshop-top-actions select{background:#1c2027!important;border:1px solid var(--v2line)!important;color:#cfd5db!important;border-radius:7px!important;font-size:11.5px!important;font-weight:600!important;padding:7px 11px!important;transition:background .12s,border-color .12s}
-#buildModeOverlay .workshop-top-actions button:hover{background:#252a32!important;border-color:#39414c!important;color:var(--v2ink)!important}
-#buildModeOverlay .workshop-top-actions button.primary{background:var(--v2acc)!important;border-color:var(--v2acc)!important;color:#221804!important;font-weight:750!important}
-#buildModeOverlay .workshop-top-actions button.primary:hover{background:#f2b455!important}
-#buildModeOverlay .build-close{background:transparent!important;border:1px solid transparent!important;color:var(--v2mut)!important;font-size:19px!important}
-#buildModeOverlay .build-close:hover{color:var(--v2bad)!important;background:#241a19!important}
-/* segmented steps bar */
-#buildModeOverlay .builder-steps{background:#12151a!important;border-bottom:1px solid var(--v2line)!important;padding:6px 12px!important;gap:5px!important;align-items:center!important}
-#buildModeOverlay .builder-steps button{padding:6px 13px!important;border:1px solid var(--v2line)!important;border-radius:99px!important;background:#1a1e24!important;color:#c3cad2!important;font-size:11px!important;font-weight:650!important;letter-spacing:.02em!important;transition:all .12s}
-#buildModeOverlay .builder-steps button:hover{background:#242932!important;color:var(--v2ink)!important}
-#buildModeOverlay .builder-steps button[aria-current="true"]{background:var(--v2acc)!important;border-color:var(--v2acc)!important;color:#221804!important}
-#buildModeOverlay .builder-steps #builderAdvanced{margin-left:auto!important;border-style:dashed!important}
-#buildModeOverlay .builder-steps #builderAdvanced[aria-pressed="true"]{background:#2a2416!important;border-color:var(--v2acc)!important;color:var(--v2acc)!important}
-/* sidebars */
-#buildModeOverlay .workshop-sidebar{background:var(--v2panel)!important;border-color:var(--v2line)!important}
-#buildModeOverlay .workshop-sidebar-head{border-bottom:1px solid var(--v2line)!important;padding:11px 13px!important}
-#buildModeOverlay .workshop-sidebar-head h2{font-size:13px!important;color:var(--v2ink)!important;letter-spacing:.01em!important}
-#buildModeOverlay .workshop-eyebrow{font-size:9px!important;letter-spacing:.2em!important;color:var(--v2acc)!important}
-#buildModeOverlay .workshop-live-dot{background:#243024!important;color:var(--v2ok)!important;border:1px solid #35502f!important;font-size:8.5px!important;letter-spacing:.16em!important}
-#buildModeOverlay #workshopSearch{background:#1a1e24!important;border:1px solid var(--v2line)!important;border-radius:8px!important;color:var(--v2ink)!important;margin:10px 12px 8px!important;width:calc(100% - 24px)!important;padding:8px 11px!important;font-size:12px!important}
-#buildModeOverlay #workshopSearch:focus{border-color:var(--v2acc)!important;outline:none!important}
+#buildModeOverlay.workshop-overlay{background:var(--ubg)!important}
+/* ---- legacy topbar / steps (superseded by the ribbon, kept for safety) ---- */
+#buildModeOverlay .workshop-topbar{background:var(--uhead)!important;border-bottom:1px solid var(--uline)!important}
+#buildModeOverlay .builder-steps{background:var(--uhead)!important;border-bottom:1px solid var(--uline)!important}
+#buildModeOverlay .builder-steps button{background:var(--ubtn)!important;border:1px solid var(--ubtnline)!important;color:var(--uink)!important}
+#buildModeOverlay .builder-steps button[aria-current="true"]{background:var(--uaccbg)!important;border-color:var(--uacc)!important;color:var(--uacc)!important}
+/* ---- sidebars: Toolbox + Properties share one panel language ---- */
+#buildModeOverlay .workshop-sidebar{background:var(--upanel)!important;border-color:var(--uline)!important}
+#buildModeOverlay .workshop-sidebar-head{background:var(--uhead)!important;border-bottom:1px solid var(--uline)!important;padding:11px 13px!important}
+#buildModeOverlay .workshop-sidebar-head h2{font-size:13px!important;color:var(--uink)!important}
+#buildModeOverlay .workshop-eyebrow{color:var(--uacc)!important;font-size:9px!important;letter-spacing:.2em!important}
+#buildModeOverlay .workshop-live-dot{background:#20302a!important;color:var(--uok)!important;border:1px solid #35502f!important;font-size:8.5px!important;letter-spacing:.16em!important}
+#buildModeOverlay #workshopSearch{background:var(--uinput)!important;border:1px solid var(--uline)!important;border-radius:6px!important;color:var(--uink)!important;margin:10px 12px 8px!important;width:calc(100% - 24px)!important;padding:8px 11px!important;font-size:12px!important}
+#buildModeOverlay #workshopSearch:focus{border-color:var(--uacc)!important;outline:none!important}
 #buildModeOverlay .workshop-category-tabs{gap:4px!important;padding:0 10px 8px!important}
-#buildModeOverlay .workshop-category-tab{background:transparent!important;border:1px solid transparent!important;color:var(--v2mut)!important;font-size:10.5px!important;font-weight:650!important;padding:5px 9px!important;border-radius:99px!important;white-space:nowrap}
-#buildModeOverlay .workshop-category-tab:hover{color:var(--v2ink)!important;background:#1e232a!important}
-#buildModeOverlay .workshop-category-tab.active{background:#252b34!important;color:var(--v2acc)!important;border-color:#3a4250!important}
+#buildModeOverlay .workshop-category-tab{background:transparent!important;border:1px solid transparent!important;color:var(--umut)!important;font-size:10.5px!important;font-weight:650!important;padding:5px 9px!important;border-radius:99px!important;white-space:nowrap}
+#buildModeOverlay .workshop-category-tab:hover{color:var(--uink)!important;background:#ffffff08!important}
+#buildModeOverlay .workshop-category-tab.active{background:var(--ubtn)!important;color:var(--uacc)!important;border-color:var(--ubtnline)!important}
 #buildModeOverlay .workshop-parts-list{padding:2px 10px 18px!important}
-#buildModeOverlay .workshop-palette-item{padding:9px 9px 11px!important;min-height:58px}
-#buildModeOverlay .workshop-palette-item small{display:block;line-height:1.4;padding-top:2px}
-#buildModeOverlay .workshop-palette-item{background:#1a1e24!important;border:1px solid var(--v2line)!important;border-radius:9px!important;padding:8px 9px!important;margin-bottom:5px!important;transition:border-color .12s,background .12s}
-#buildModeOverlay .workshop-palette-item:hover{border-color:#414a56!important;background:#20252c!important}
-#buildModeOverlay .workshop-palette-item.active{border-color:var(--v2acc)!important;background:#2a2415!important}
-#buildModeOverlay .workshop-palette-item strong{color:var(--v2ink)!important;font-size:12px!important}
-#buildModeOverlay .workshop-palette-item small{color:var(--v2mut)!important;font-size:10px!important;line-height:1.35!important}
-#buildModeOverlay .workshop-part-icon{color:var(--v2acc)!important;background:#232830!important;border-radius:7px!important}
-#buildModeOverlay .workshop-mass-pill{background:#232830!important;color:#aeb6bf!important;border:1px solid #313945!important;font-size:9px!important;border-radius:99px!important}
-#buildModeOverlay .workshop-library-foot{border-top:1px solid var(--v2line)!important;color:var(--v2mut)!important;font-size:10px!important;padding:9px 12px!important}
-#buildModeOverlay .workshop-danger{background:#2a1b18!important;border-color:#5c332c!important;color:#e88a7a!important}
+#buildModeOverlay .workshop-palette-item{background:#23272b!important;border:1px solid var(--uline)!important;border-radius:6px!important;padding:8px 9px!important;margin-bottom:5px!important;transition:border-color .12s,background .12s}
+#buildModeOverlay .workshop-palette-item:hover{border-color:#4a525a!important;background:#282d32!important}
+#buildModeOverlay .workshop-palette-item.active{border-color:var(--uacc)!important;background:var(--uaccbg)!important}
+#buildModeOverlay .workshop-palette-item strong{color:var(--uink)!important;font-size:12px!important}
+#buildModeOverlay .workshop-palette-item small{color:#9aa4ad!important;font-size:10px!important;line-height:1.35!important}
+#buildModeOverlay .workshop-part-icon{color:var(--uacc)!important;background:#1a1e22!important;border:1px solid #33383d!important;border-radius:6px!important}
+#buildModeOverlay .workshop-mass-pill{background:var(--ubtn)!important;color:#a8b0b9!important;border:1px solid var(--ubtnline)!important;font-size:9px!important;border-radius:99px!important}
+#buildModeOverlay .workshop-library-foot{border-top:1px solid var(--uline)!important;color:var(--umut)!important;font-size:10px!important;padding:9px 12px!important}
+#buildModeOverlay .workshop-danger{background:#2a1d1b!important;border-color:#5c332c!important;color:#e88a7a!important}
 #buildModeOverlay .workshop-danger:hover{background:#3a221d!important}
-/* stagebar tools */
-#buildModeOverlay .workshop-stagebar{background:#12151a!important;border-bottom:1px solid var(--v2line)!important}
-#buildModeOverlay .workshop-tools{gap:5px!important}
-#buildModeOverlay .workshop-tools button,#buildModeOverlay .workshop-tools select{background:#1c2027!important;border:1px solid var(--v2line)!important;color:#cfd5db!important;border-radius:7px!important;font-size:11px!important;font-weight:600!important;padding:6px 10px!important}
-#buildModeOverlay .workshop-tools button:hover{background:#252a32!important;color:var(--v2ink)!important}
-#buildModeOverlay .workshop-tools button.active{background:#2a2415!important;border-color:var(--v2acc)!important;color:var(--v2acc)!important}
-#buildModeOverlay .workshop-tools button.symmetry-on{border-color:#3d5c35!important;color:var(--v2ok)!important}
-#buildModeOverlay .workshop-wire-hint{background:#241d10!important;border:1px solid var(--v2acc)!important;color:var(--v2acc)!important;border-radius:8px!important;font-size:10.5px!important;letter-spacing:.08em!important}
-#buildModeOverlay .workshop-empty-hint{background:#15181df0!important;border:1px solid var(--v2line)!important;border-radius:11px!important}
-#buildModeOverlay .workshop-empty-hint strong{color:var(--v2ink)!important;letter-spacing:.16em!important;font-size:11px!important}
-#buildModeOverlay .workshop-empty-hint small{color:var(--v2mut)!important}
-#buildModeOverlay .workshop-statusbar{background:#12151a!important;border-top:1px solid var(--v2line)!important;color:var(--v2mut)!important;font-size:10.5px!important}
-/* inspector */
-#buildModeOverlay .workshop-inspector-section-title{color:var(--v2acc)!important;font-size:9px!important;letter-spacing:.18em!important;border-bottom:1px solid #20252c!important}
-#buildModeOverlay .workshop-number-grid input,#buildModeOverlay .workshop-field-label input{background:#1a1e24!important;border:1px solid var(--v2line)!important;color:var(--v2ink)!important;border-radius:6px!important}
-#buildModeOverlay .workshop-number-grid input:focus,#buildModeOverlay .workshop-field-label input:focus{border-color:var(--v2acc)!important;outline:none!important}
-#buildModeOverlay .workshop-inspector-actions button{background:#1c2027!important;border:1px solid var(--v2line)!important;color:#cfd5db!important;border-radius:7px!important;font-size:11px!important}
-#buildModeOverlay .workshop-inspector-actions button:hover{background:#252a32!important}
-#buildModeOverlay .workshop-inspector-foot{background:#12151a!important;border-top:1px solid var(--v2line)!important}
-#buildModeOverlay .workshop-inspector-foot strong{color:var(--v2ok)!important}
-#buildModeOverlay .workshop-check-row .dot{color:var(--v2acc)!important}
-#buildModeOverlay .workshop-assembly-report{border-color:var(--v2line)!important}
-#buildModeOverlay .workshop-assembly-metrics{border-color:var(--v2line)!important;background:#12151a!important}
-#buildModeOverlay .workshop-assembly-metrics small{color:var(--v2mut)!important}
+/* ---- stage / tools / status ---- */
+#buildModeOverlay .workshop-stagebar{background:var(--uhead)!important;border-bottom:1px solid var(--uline)!important}
+#buildModeOverlay .workshop-tools button,#buildModeOverlay .workshop-tools select{background:var(--ubtn)!important;border:1px solid var(--ubtnline)!important;color:var(--uink)!important;border-radius:5px!important;font-size:11px!important;font-weight:600!important;padding:6px 10px!important}
+#buildModeOverlay .workshop-tools button:hover{background:#353c42!important;color:#fff!important}
+#buildModeOverlay .workshop-tools button.active{background:var(--uaccbg)!important;border-color:var(--uacc)!important;color:var(--uacc)!important}
+#buildModeOverlay .workshop-tools button.symmetry-on{border-color:#3d5c35!important;color:var(--uok)!important}
+#buildModeOverlay .workshop-wire-hint{background:var(--uaccbg)!important;border:1px solid var(--uacc)!important;color:var(--uacc)!important;border-radius:6px!important;font-size:10.5px!important;letter-spacing:.08em!important}
+#buildModeOverlay .workshop-empty-hint{background:#15181df0!important;border:1px solid var(--uline)!important;border-radius:11px!important}
+#buildModeOverlay .workshop-empty-hint strong{color:var(--uink)!important;letter-spacing:.16em!important;font-size:11px!important}
+#buildModeOverlay .workshop-empty-hint small{color:var(--umut)!important}
+#buildModeOverlay .workshop-statusbar{background:var(--uhead)!important;border-top:1px solid var(--uline)!important;color:var(--umut)!important;font-size:10.5px!important}
+#buildModeOverlay .workshop-statusbar span:first-child{color:var(--uink)!important}
+/* ---- Properties panel: same language as the Toolbox ---- */
+#buildModeOverlay .workshop-inspector{background:var(--upanel)!important}
+#buildModeOverlay .fw-prop-section{border-bottom:1px solid var(--uline)!important}
+#buildModeOverlay .fw-prop-title{color:#b9c1c8!important}
+#buildModeOverlay .fw-prop-title:hover{color:var(--uink)!important}
+#buildModeOverlay .fw-prop-sub{color:var(--umut)!important}
+#buildModeOverlay .fw-prop-row{color:#b9c1c8!important}
+#buildModeOverlay .fw-prop-row input{background:var(--uinput)!important;border:1px solid var(--uline)!important;color:var(--uink)!important;border-radius:5px!important}
+#buildModeOverlay .fw-prop-row input:focus{border-color:var(--uacc)!important;outline:none!important}
+#buildModeOverlay .workshop-selected-type{color:var(--uacc)!important}
+#buildModeOverlay .workshop-inspector-section-title{color:var(--umut)!important;font-size:9px!important;letter-spacing:.18em!important;border-bottom:1px solid var(--uline)!important}
+#buildModeOverlay .workshop-number-grid input,#buildModeOverlay .workshop-field-label input{background:var(--uinput)!important;border:1px solid var(--uline)!important;color:var(--uink)!important;border-radius:5px!important}
+#buildModeOverlay .workshop-number-grid input:focus,#buildModeOverlay .workshop-field-label input:focus{border-color:var(--uacc)!important;outline:none!important}
+#buildModeOverlay .workshop-number-grid label{color:var(--umut)!important}
+#buildModeOverlay .workshop-part-meta>div{border-color:var(--uline)!important;background:var(--uhead)!important;border-radius:6px!important}
+#buildModeOverlay .workshop-part-meta span{color:var(--umut)!important}
+#buildModeOverlay .workshop-part-meta strong{color:var(--uink)!important}
+#buildModeOverlay .workshop-part-details{border-color:var(--uline)!important;background:var(--uhead)!important;color:#aeb6bd!important;border-radius:6px!important}
+#buildModeOverlay .workshop-connection-row{background:var(--uhead)!important;border-color:var(--uline)!important;color:#aeb6bd!important;border-radius:5px!important}
 #buildModeOverlay .workshop-connections-list{font-size:10.5px!important}
-#buildModeOverlay #simpleMove,#buildModeOverlay #partDimensions,#buildModeOverlay #partAttachment{background:transparent!important;color:var(--v2ink)!important;border-bottom:1px solid var(--v2line)!important}
-#buildModeOverlay #simpleMove h3,#buildModeOverlay #partDimensions h3{color:var(--v2ink)!important}
-#buildModeOverlay #simpleMove p,#buildModeOverlay #partSizeHint,#buildModeOverlay #attachmentHint{color:var(--v2mut)!important}
-#buildModeOverlay .nudge-grid button,#buildModeOverlay .simple-actions button,#buildModeOverlay #fitPropeller{background:#1c2027!important;border:1px solid var(--v2line)!important;color:#cfd5db!important;border-radius:7px!important;font-weight:600!important;box-shadow:none!important}
-#buildModeOverlay .nudge-grid button:hover,#buildModeOverlay .simple-actions button:hover{background:#252a32!important;color:var(--v2ink)!important}
-#buildModeOverlay .dimension-fields label,#buildModeOverlay #partDimensions>label{color:var(--v2mut)!important}
+#buildModeOverlay .workshop-muted{color:var(--umut)!important}
+#buildModeOverlay .workshop-inspector-actions button{background:var(--ubtn)!important;border:1px solid var(--ubtnline)!important;color:var(--uink)!important;border-radius:5px!important;font-size:10px!important;box-shadow:none!important}
+#buildModeOverlay .workshop-inspector-actions button:hover{background:#353c42!important}
+#buildModeOverlay .workshop-inspector-empty{background:#23272b!important;border:1px dashed #3a4147!important;color:var(--umut)!important;border-radius:8px!important}
+#buildModeOverlay .workshop-inspector-icon{background:#1a1e22!important;color:var(--uacc)!important}
+#buildModeOverlay .workshop-inspector-foot{background:transparent!important;color:var(--umut)!important;border-top:1px solid var(--uline)!important}
+#buildModeOverlay .workshop-inspector-foot strong{color:var(--uok)!important}
+#buildModeOverlay .workshop-check-row .dot{color:var(--uacc)!important}
+#buildModeOverlay .workshop-check-row{color:#aeb6bd!important}
+#buildModeOverlay .workshop-assembly-report{border-color:var(--uline)!important;color:#aeb6bd!important}
+#buildModeOverlay .workshop-assembly-metrics{border-color:var(--uline)!important;background:var(--uhead)!important}
+#buildModeOverlay .workshop-assembly-metrics small{color:var(--umut)!important}
+#buildModeOverlay .workshop-assembly-metrics b{color:var(--uink)!important}
+#buildModeOverlay .workshop-engineering{background:var(--uhead)!important;border:1px solid var(--uline)!important;color:#aeb6bd!important;border-radius:6px!important}
+#buildModeOverlay .workshop-engineering b{color:var(--uacc)!important}
+#buildModeOverlay .workshop-scene-tree{border-top:1px solid var(--uline)!important}
+#buildModeOverlay .scene-row{color:#aeb6bd!important}
+#buildModeOverlay .scene-row small{color:var(--umut)!important}
+#buildModeOverlay .scene-row[aria-current=true]{color:var(--uacc)!important;background:var(--uaccbg)!important}
+#buildModeOverlay .workshop-save-state{color:var(--uok)!important}
+/* ---- simple-builder fields ---- */
+#buildModeOverlay #simpleMove,#buildModeOverlay #partDimensions,#buildModeOverlay #partAttachment{background:transparent!important;color:var(--uink)!important;border-bottom:1px solid var(--uline)!important}
+#buildModeOverlay #simpleMove h3,#buildModeOverlay #partDimensions h3{color:var(--uink)!important}
+#buildModeOverlay #simpleMove p,#buildModeOverlay #partSizeHint,#buildModeOverlay #attachmentHint{color:var(--umut)!important}
+#buildModeOverlay .nudge-grid button,#buildModeOverlay .simple-actions button,#buildModeOverlay #fitPropeller{background:var(--ubtn)!important;border:1px solid var(--ubtnline)!important;color:var(--uink)!important;border-radius:5px!important;font-weight:600!important;box-shadow:none!important}
+#buildModeOverlay .nudge-grid button:hover,#buildModeOverlay .simple-actions button:hover{background:#353c42!important;color:#fff!important}
+#buildModeOverlay .dimension-fields label,#buildModeOverlay #partDimensions>label{color:var(--umut)!important}
+#buildModeOverlay .dimension-fields input{background:var(--uinput)!important;border:1px solid var(--uline)!important;color:var(--uink)!important;border-radius:5px!important}
 #buildModeOverlay #assemblyIssues{color:#e8b06a!important}
-#buildModeOverlay #assemblyIssues .assembly-ok{color:var(--v2ok)!important}
-/* welcome / starter picker — compact dark card */
-#buildModeOverlay #builderWelcome{background:#15181df8!important;border:1px solid #2c333c!important;border-radius:14px!important;color:var(--v2ink)!important;box-shadow:0 24px 70px #000a!important;inset:12% 18%!important;padding:26px 28px!important}
-#buildModeOverlay #builderWelcome .builder-kicker{color:var(--v2acc)!important;letter-spacing:.24em!important;font-size:9.5px!important}
-#buildModeOverlay #builderWelcome h2{color:var(--v2ink)!important;font-size:22px!important}
-#buildModeOverlay #builderWelcome p{color:var(--v2mut)!important}
+#buildModeOverlay #assemblyIssues .assembly-ok{color:var(--uok)!important}
+/* ---- welcome / starter picker ---- */
+#buildModeOverlay #builderWelcome{background:#15181df8!important;border:1px solid #3a4147!important;border-radius:14px!important;color:var(--uink)!important;box-shadow:0 24px 70px #000a!important;inset:12% 18%!important;padding:26px 28px!important}
+#buildModeOverlay #builderWelcome .builder-kicker{color:var(--uacc)!important;letter-spacing:.24em!important;font-size:9.5px!important}
+#buildModeOverlay #builderWelcome h2{color:var(--uink)!important;font-size:22px!important}
+#buildModeOverlay #builderWelcome p{color:var(--umut)!important}
 #buildModeOverlay .starter-cards{gap:9px!important;margin:18px 0!important}
-#buildModeOverlay .starter-cards button{background:#1c2027!important;border:1px solid var(--v2line)!important;color:var(--v2ink)!important;border-radius:11px!important;padding:15px 13px!important;box-shadow:none!important;transition:border-color .12s,background .12s}
-#buildModeOverlay .starter-cards button:hover{border-color:var(--v2acc)!important;background:#242932!important;transform:none!important}
-#buildModeOverlay .starter-cards b{color:var(--v2ink)!important}
-#buildModeOverlay .starter-cards span{color:var(--v2mut)!important}
-#buildModeOverlay #blankBuild{background:transparent!important;border:1px dashed #3a4250!important;color:var(--v2mut)!important;border-radius:8px!important}
-#buildModeOverlay #blankBuild:hover{color:var(--v2ink)!important;border-color:var(--v2acc)!important}
-#buildModeOverlay #builderHint{background:#15181de8!important;border:1px solid #2c333c!important;color:#c3cad2!important;border-radius:8px!important}
-/* legacy checklist overlay retired in favour of the notebook */
+#buildModeOverlay .starter-cards button{background:var(--ubtn)!important;border:1px solid var(--ubtnline)!important;color:var(--uink)!important;border-radius:8px!important;padding:15px 13px!important;box-shadow:none!important;transition:border-color .12s,background .12s}
+#buildModeOverlay .starter-cards button:hover{border-color:var(--uacc)!important;background:#353c42!important;transform:none!important}
+#buildModeOverlay .starter-cards b{color:var(--uink)!important}
+#buildModeOverlay .starter-cards span{color:var(--umut)!important}
+#buildModeOverlay #blankBuild{background:transparent!important;border:1px dashed #4a525a!important;color:var(--umut)!important;border-radius:6px!important}
+#buildModeOverlay #blankBuild:hover{color:var(--uink)!important;border-color:var(--uacc)!important}
+#buildModeOverlay #builderHint{background:#15181de8!important;border:1px solid #3a4147!important;color:#b9c1c8!important;border-radius:6px!important}
 #buildModeOverlay #builderChecklist{display:none!important}
-/* cloud panel */
-#buildModeOverlay .workshop-cloud-card{background:var(--v2panel2)!important;border:1px solid var(--v2line)!important;border-radius:12px!important;color:var(--v2ink)!important}
-#buildModeOverlay .workshop-cloud-head strong{color:var(--v2acc)!important;letter-spacing:.16em!important}
-#buildModeOverlay .workshop-cloud-sub{color:var(--v2mut)!important}
-#buildModeOverlay .workshop-cloud-actions button{background:#1c2027!important;border:1px solid var(--v2line)!important;color:#cfd5db!important;border-radius:7px!important}
-#buildModeOverlay .workshop-cloud-actions button.primary{background:var(--v2acc)!important;border-color:var(--v2acc)!important;color:#221804!important}
-#buildModeOverlay .workshop-cloud-row{border-color:var(--v2line)!important}
-/* ============ BUILD NOTEBOOK (checklist) ============ */
-/* build tutorial card — v2 dark theme */
-#buildModeOverlay #fwBuildTour{background:#15181df8!important;border:1px solid #2c333c!important;border-radius:12px!important;color:#e7eaee!important;box-shadow:0 18px 50px #000a!important;top:58px!important}
-#buildModeOverlay #fwBuildTour .fw-tour-kicker{color:#e8a33d!important;letter-spacing:.2em!important;font-size:9px!important}
-#buildModeOverlay #fwBuildTour h2{color:#e7eaee!important;font-size:15px!important}
-#buildModeOverlay #fwBuildTour p{color:#8b939c!important}
-#buildModeOverlay #fwBuildTour .fw-tour-controls button{background:#1c2027!important;border:1px solid #262c34!important;color:#cfd5db!important;border-radius:7px!important;box-shadow:none!important}
-#buildModeOverlay #fwBuildTour .fw-tour-controls button.primary{background:#e8a33d!important;border-color:#e8a33d!important;color:#221804!important}
-#buildModeOverlay #fwBuildTour .fw-tour-skip{color:#8b939c!important;font-size:10px!important}
-#builderNotebook{position:absolute;left:12px;bottom:44px;z-index:9;width:238px;background:linear-gradient(180deg,#1b1e24,#171a1f);border:1px solid #2e3540;border-radius:12px;box-shadow:0 14px 40px #0008;overflow:hidden;font-family:inherit}
-#builderNotebook:before{content:'';position:absolute;left:10px;top:44px;bottom:52px;width:5px;border-radius:3px;background:repeating-linear-gradient(180deg,#3a4250 0 5px,transparent 5px 11px);opacity:.55;pointer-events:none}
-#nbToggle{display:flex;align-items:center;gap:8px;width:100%;background:#1f232b;border:0;border-bottom:1px solid #2e3540;color:#e7eaee;font:700 10.5px/1 inherit;letter-spacing:.16em;padding:10px 12px;cursor:pointer}
-#nbToggle:hover{background:#262b34}
-#nbToggle .nb-chev{margin-left:auto;transition:transform .15s;color:#8b939c}
+/* ---- build tour ---- */
+#buildModeOverlay #fwBuildTour{background:#15181df8!important;border:1px solid #3a4147!important;border-radius:12px!important;color:var(--uink)!important;box-shadow:0 18px 50px #000a!important;top:58px!important}
+#buildModeOverlay #fwBuildTour .fw-tour-kicker{color:var(--uacc)!important;letter-spacing:.2em!important;font-size:9px!important}
+#buildModeOverlay #fwBuildTour h2{color:var(--uink)!important;font-size:15px!important}
+#buildModeOverlay #fwBuildTour p{color:var(--umut)!important}
+#buildModeOverlay #fwBuildTour .fw-tour-controls button{background:var(--ubtn)!important;border:1px solid var(--ubtnline)!important;color:var(--uink)!important;border-radius:5px!important;box-shadow:none!important}
+#buildModeOverlay #fwBuildTour .fw-tour-controls button.primary{background:var(--uacc)!important;border-color:var(--uacc)!important;color:#08283f!important}
+#buildModeOverlay #fwBuildTour .fw-tour-skip{color:var(--umut)!important;font-size:10px!important}
+/* ---- build notebook ---- */
+#builderNotebook{position:absolute;left:12px;bottom:44px;z-index:9;width:238px;background:linear-gradient(180deg,#23272b,#1f2327);border:1px solid var(--uline);border-radius:12px;box-shadow:0 14px 40px #0008;overflow:hidden;font-family:inherit}
+#builderNotebook:before{content:'';position:absolute;left:10px;top:44px;bottom:52px;width:5px;border-radius:3px;background:repeating-linear-gradient(180deg,#3a4147 0 5px,transparent 5px 11px);opacity:.55;pointer-events:none}
+#nbToggle{display:flex;align-items:center;gap:8px;width:100%;background:var(--uhead);border:0;border-bottom:1px solid var(--uline);color:var(--uink);font:700 10.5px/1 inherit;letter-spacing:.16em;padding:10px 12px;cursor:pointer}
+#nbToggle:hover{background:#2b3036}
+#nbToggle .nb-chev{margin-left:auto;transition:transform .15s;color:var(--umut)}
 #builderNotebook[data-open="false"] #nbToggle .nb-chev{transform:rotate(-90deg)}
 #builderNotebook[data-open="false"] .nb-body{display:none}
-.nb-count{background:#2a2415;border:1px solid #4a3b1e;color:var(--v2acc,#e8a33d);border-radius:99px;padding:2px 8px;font-size:9.5px;letter-spacing:.06em}
+.nb-count{background:var(--uaccbg);border:1px solid #2a4258;color:var(--uacc,#4fb3ff);border-radius:99px;padding:2px 8px;font-size:9.5px;letter-spacing:.06em}
 .nb-body{padding:9px 10px 10px 22px}
-.nb-note{font-size:9.5px;color:#9aa4ae;margin:0 0 7px;line-height:1.4}
-.nb-row{display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:11px;color:#c3cad2;cursor:default}
-.nb-row input[type=checkbox]{appearance:none;width:14px;height:14px;min-width:14px;border:1.5px solid #4a525c;border-radius:4px;background:#12151a;cursor:default;position:relative;flex:0 0 auto}
-.nb-row input[type=checkbox]:checked{background:var(--v2acc,#e8a33d);border-color:var(--v2acc,#e8a33d)}
-.nb-row input[type=checkbox]:checked:after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid #221804;border-width:0 2px 2px 0;transform:rotate(42deg)}
+.nb-note{font-size:9.5px;color:var(--umut);margin:0 0 7px;line-height:1.4}
+.nb-row{display:flex;align-items:center;gap:8px;padding:4px 2px;font-size:11px;color:#b9c1c8;cursor:default}
+.nb-row input[type=checkbox]{appearance:none;width:14px;height:14px;min-width:14px;border:1.5px solid #4a525c;border-radius:4px;background:var(--uinput);cursor:default;position:relative;flex:0 0 auto}
+.nb-row input[type=checkbox]:checked{background:var(--uacc,#4fb3ff);border-color:var(--uacc,#4fb3ff)}
+.nb-row input[type=checkbox]:checked:after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid:#08283f;border-width:0 2px 2px 0;transform:rotate(42deg)}
 .nb-row .nb-name{font-weight:600}
 .nb-row .nb-hint{display:block;font-size:9px;color:#79818b;font-weight:400}
-.nb-row.ok .nb-name{color:#e7eaee}
+.nb-row.ok .nb-name{color:var(--uink)}
 .nb-row.miss .nb-name{color:#d8b98a}
-#nbFly{display:block;width:100%;margin-top:8px;background:var(--v2acc,#e8a33d);border:0;border-radius:8px;color:#221804;font:750 11.5px inherit;padding:9px 0;cursor:pointer;letter-spacing:.02em}
-#nbFly:hover{background:#f2b455}
+#nbFly{display:block;width:100%;margin-top:8px;background:var(--uacc);border:0;border-radius:6px;color:#08283f;font:750 11.5px inherit;padding:9px 0;cursor:pointer;letter-spacing:.02em}
+#nbFly:hover{background:#6cc3ff}
 @media(max-width:760px){#builderNotebook{width:200px;left:8px;bottom:38px}.nb-body{padding-left:16px}}
+/* ---- simple mode: wiring and electronics stay visible (carried over from the hangar skin) ---- */
+#buildModeOverlay:not(.advanced-builder) #workshopWireTool,
+#buildModeOverlay:not(.advanced-builder) #workshopWireType,
+#buildModeOverlay:not(.advanced-builder) #workshopMirrorSelected,
+#buildModeOverlay:not(.advanced-builder) #workshopSnapSize,
+#buildModeOverlay:not(.advanced-builder) #workshopGridToggle,
+#buildModeOverlay:not(.advanced-builder) #workshopImportBtn,
+#buildModeOverlay:not(.advanced-builder) #workshopExport,
+#buildModeOverlay:not(.advanced-builder) .workshop-live-dot{display:inline-block!important}
+#buildModeOverlay:not(.advanced-builder) .workshop-connections-section,
+#buildModeOverlay:not(.advanced-builder) .workshop-assembly-report,
+#buildModeOverlay:not(.advanced-builder) .workshop-assembly-metrics{display:block!important}
+/* ---- cloud panel ---- */
+#buildModeOverlay .workshop-cloud-card{background:var(--uhead)!important;border:1px solid var(--uline)!important;border-radius:12px!important;color:var(--uink)!important}
+#buildModeOverlay .workshop-cloud-head strong{color:var(--uacc)!important;letter-spacing:.16em!important}
+#buildModeOverlay .workshop-cloud-sub{color:var(--umut)!important}
+#buildModeOverlay .workshop-cloud-actions button{background:var(--ubtn)!important;border:1px solid var(--ubtnline)!important;color:var(--uink)!important;border-radius:5px!important}
+#buildModeOverlay .workshop-cloud-actions button.primary{background:var(--uacc)!important;border-color:var(--uacc)!important;color:#08283f!important}
+#buildModeOverlay .workshop-cloud-row{border-color:var(--uline)!important}
 </style>
 <script>
 
