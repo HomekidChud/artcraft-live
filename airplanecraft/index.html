@@ -3370,6 +3370,11 @@ function workshopWaypointAtEvent(e){if(!workshopWaypointRoot||!workshopRaycaster
    never left hanging), and dragging a part makes the wire follow and swing.
    Water contact on a powered line arcs — sparks and a short-circuit error. */
 const workshopWireSims=[];   // parallel to workshopWires: {key,pts:[{p,pp,pin}],rests:[],line}
+let workshopWireLastSpark=null; // cached arc position while every rope is settled
+let workshopWireSparkDirty=false; // wires changed structurally: revalidate the cached arc once
+let workshopWireArcStale=false; // a rope just settled: revalidate the cached arc once
+let workshopWireArcCooldown=0; // motion-time recheck throttle (~100 ms)
+let workshopInspectorLastAt=0; // drag-time inspector refresh throttle
 let workshopSparkBurst=null; // THREE.Points spark emitter (created lazily)
 function workshopWireSimKey(w){return w.from+'|'+w.to+'|'+w.kind+'|'+((w.waypoints||[]).map(p=>Math.round(p.x*100)+','+Math.round(p.y*100)+','+Math.round(p.z*100)).join(';'));}
 function workshopWirePinsFor(w){ // current attachment points: part endpoints + declared waypoints
@@ -3387,8 +3392,8 @@ function workshopRebuildWireSims(){
   }
   const pins=workshopWirePinsFor(w);
   if(!pins){workshopWireSims[i]=null;continue;}
-  const pts=[],rests=[];
-  const add=(v,pin)=>pts.push({p:v.clone(),pp:v.clone(),pin:!!pin});
+  const pts=[],rests=[],pinIdx=[];
+  const add=(v,pin)=>{pts.push({p:v.clone(),pp:v.clone(),pin:!!pin});if(pin)pinIdx.push(pts.length-1);};
   add(pins[0],true);
   for(let s=0;s<pins.length-1;s++){
    const a=pins[s],b=pins[s+1],span=a.distanceTo(b);
@@ -3397,7 +3402,7 @@ function workshopRebuildWireSims(){
    add(b,true);
    rests.push(span/(k+1));
   }
-  workshopWireSims[i]={key,pts,rests,line:null,stiffness:WORKSHOP_WIRE_STIFFNESS[w.kind]||2500,damping:2,mcK:pts.length*.05*385,hA:pts.length*.005*10,temp:(prev&&prev.temp)||20,elasticJ:0,dampW:0};
+  workshopWireSims[i]={key,pts,rests,pinIdx,line:null,stiffness:WORKSHOP_WIRE_STIFFNESS[w.kind]||2500,damping:2,mcK:pts.length*.05*385,hA:pts.length*.005*10,temp:(prev&&prev.temp)||20,elasticJ:0,dampW:0,sleep:false,still:0};
  }
 }
 function workshopSparkAt(pos){
@@ -3432,23 +3437,29 @@ const EnergyCore={
  fuelEnergy:(kg)=>kg*43.02e6,
  radiantFromDraw:(w,eff=.15)=>w*eff,
 };
+function workshopSyncSimPins(sim,w){ // fast pin re-sync (no allocations); true when any pin moved
+ const a=workshopGetPart(w.from),b=workshopGetPart(w.to);if(!a||!b)return false;
+ if(!sim.pinIdx||sim.pinIdx.length!==2+((w.waypoints&&w.waypoints.length)||0))return false;
+ let moved=false;
+ const put=(sp,x,y,z)=>{if(sp.p.x!==x||sp.p.y!==y||sp.p.z!==z)moved=true;sp.p.set(x,y,z);sp.pp.set(x,y,z);};
+ put(sim.pts[sim.pinIdx[0]],a.position.x,a.position.y+.1,a.position.z);
+ for(let k=1;k<sim.pinIdx.length-1;k++){const q=w.waypoints&&w.waypoints[k-1];if(!q)return false;put(sim.pts[sim.pinIdx[k]],q.x,q.y,q.z);}
+ put(sim.pts[sim.pinIdx[sim.pinIdx.length-1]],b.position.x,b.position.y+.1,b.position.z);
+ return moved;
+}
 function workshopStepWirePhysics(dt){
  if(!workshopWireRoot||!workshopWires.length)return;
  const damp=.985,h=Math.min(dt/6,1/480),n=Math.max(1,Math.min(60,Math.round(dt/h))),gy=-9.81*h*h; // fixed-size verlet substeps: k·h²/m < 0.4 even for the stiffest line (4000 N/m) on slow frames — a dt/6 substep explodes past ~25 ms frames
- // water wire node positions (for powered-wire arcing checks)
- const waterPts=[];
- for(let i=0;i<workshopWires.length;i++){
-  if(workshopWires[i].kind!=='water')continue;
-  const sim=workshopWireSims[i];if(sim)for(const sp of sim.pts)waterPts.push(sp.p);
- }
  let sparkPos=null;
  for(let i=0;i<workshopWireSims.length;i++){
   const sim=workshopWireSims[i],w=workshopWires[i];
   if(!sim||!w||!sim.line)continue;
-  // re-sync pins: parts and waypoint clamps may have moved
-  const pins=workshopWirePinsFor(w);
-  if(pins&&pins.length===sim.pts.filter(sp=>sp.pin).length){
-   let pi=0;for(const sp of sim.pts)if(sp.pin){const v=pins[pi++];sp.p.copy(v);sp.pp.copy(v);}
+  // re-sync pins: parts and waypoint clamps may have moved (wakes a settled rope)
+  if(workshopSyncSimPins(sim,w)){sim.sleep=false;sim.still=0;}
+  if(sim.sleep){ // settled rope: keep cooling toward ambient, skip the dynamics entirely
+   sim.dampW=0;
+   sim.temp=EnergyCore.thermalStep(sim.temp,0,sim.mcK,sim.hA,20,dt);
+   continue;
   }
   // elastic spring–damper dynamics, 4 substeps per frame (EnergyCore):
   // tension-only springs with EXPLICIT stiffness (a wire carries no compression),
@@ -3490,22 +3501,63 @@ function workshopStepWirePhysics(dt){
   }
   sim.elasticJ=elasticJ;
   sim.temp=EnergyCore.thermalStep(sim.temp,sim.dampW,sim.mcK,sim.hA,20,dt);
-  // powered line touching a water line -> arc (short circuit, sparks)
-  if(waterPts.length&&(w.kind==='power'||w.kind==='ground')){
-   for(const sp of sim.pts){
-    for(const wp of waterPts){
-     if(sp.p.distanceToSquared(wp)<.25){sparkPos=sp.p.clone();break;}
-    }
-    if(sparkPos)break;
-   }
-  }
-  // write the simulated rope into the rendered geometry
+  // settle detection: sub-millimetre motion for ~0.5 s puts the rope to sleep —
+  // a static build then costs ~nothing per frame; any pin move wakes it again
+  let maxDisp2=0;
+  for(const sp of sim.pts){if(sp.pin)continue;const mx=sp.p.x-sp.pp.x,my=sp.p.y-sp.pp.y,mz=sp.p.z-sp.pp.z,d2=mx*mx+my*my+mz*mz;if(d2>maxDisp2)maxDisp2=d2;}
+  sim.still=maxDisp2<4e-8?(sim.still||0)+1:0;
+  if(sim.still>30&&!sim.sleep){sim.sleep=true;workshopWireArcStale=true;} // final positions need one last arc recheck
+  // write the simulated rope into the rendered geometry (bounding sphere stays
+  // fresh for raycast picking; sleeping ropes are static so theirs stays valid)
   const attr=sim.line.geometry.getAttribute('position');
   if(attr){
    for(let j=0;j<sim.pts.length-1;j++){attr.setXYZ(j*2,sim.pts[j].p.x,sim.pts[j].p.y,sim.pts[j].p.z);attr.setXYZ(j*2+1,sim.pts[j+1].p.x,sim.pts[j+1].p.y,sim.pts[j+1].p.z);}
    attr.needsUpdate=true;sim.line.geometry.computeBoundingSphere();
   }
  }
+ // water-arc check, AFTER integration (final positions): a powered line
+ // touching a water line -> sparks. The old check scanned every power node
+ // against every water node every frame; now a settled build is cached, and
+ // while ropes move a hashed 0.5 m-cell grid replaces the quadratic scan
+ // (throttled to ~100 ms — sparks are a visual effect).
+ let hasPower=false,hasWater=false,anyRelevantAwake=false;
+ for(let i=0;i<workshopWireSims.length;i++){
+  const sim=workshopWireSims[i],w=workshopWires[i];
+  if(!sim||!w||!sim.line)continue;
+  const isPow=w.kind==='power'||w.kind==='ground',isWat=w.kind==='water';
+  if(isPow)hasPower=true;else if(isWat)hasWater=true;
+  if(!sim.sleep&&(isPow||isWat))anyRelevantAwake=true;
+ }
+ if(hasPower&&hasWater){
+  if(!anyRelevantAwake&&!workshopWireSparkDirty&&!workshopWireArcStale)sparkPos=workshopWireLastSpark; // settled build: the arc state cannot change
+  else{
+   workshopWireArcCooldown=(workshopWireArcCooldown||0)-1;
+   if(workshopWireSparkDirty||workshopWireArcStale||workshopWireArcCooldown<=0){
+    const powerNodes=[],waterNodes=[];
+    for(let i=0;i<workshopWireSims.length;i++){
+     const sim=workshopWireSims[i],w=workshopWires[i];
+     if(!sim||!w||!sim.line)continue;
+     const isPow=w.kind==='power'||w.kind==='ground';
+     if(!isPow&&w.kind!=='water')continue;
+     const all=isPow?powerNodes:waterNodes;
+     for(const sp of sim.pts)all.push(sp.p);
+    }
+    const cell=.5,cellKey=(ix,iy,iz)=>((ix*73856093)^(iy*19349663)^(iz*83492791));
+    const grid=new Map();
+    for(const p of waterNodes){const k=cellKey(Math.floor(p.x/cell),Math.floor(p.y/cell),Math.floor(p.z/cell)),b=grid.get(k);if(b)b.push(p);else grid.set(k,[p]);}
+    outer:for(const p of powerNodes){
+     const cx=Math.floor(p.x/cell),cy=Math.floor(p.y/cell),cz=Math.floor(p.z/cell);
+     for(let ox=-1;ox<=1;ox++)for(let oy=-1;oy<=1;oy++)for(let oz=-1;oz<=1;oz++){
+      const b=grid.get(cellKey(cx+ox,cy+oy,cz+oz));
+      if(b)for(const q of b)if(p.distanceToSquared(q)<.25){sparkPos=p.clone();break outer;}
+     }
+    }
+    workshopWireLastSpark=sparkPos;
+    workshopWireArcCooldown=6; // ~100 ms at 60 fps
+    workshopWireSparkDirty=false;workshopWireArcStale=false;
+   }else sparkPos=workshopWireLastSpark;
+  }
+ }else{workshopWireLastSpark=null;workshopWireSparkDirty=false;workshopWireArcStale=false;}
  if(sparkPos)workshopSparkAt(sparkPos);
  if(workshopSparkBurst){ // sparks fly and fade
   const g=workshopSparkBurst.userData;g.life-=dt*1.8;
@@ -3550,12 +3602,12 @@ function workshopRebuildBonds(){if(!workshopGlueRoot)return;while(workshopGlueRo
   const A=a.position.clone().add(new THREE.Vector3(0,.1,0)),B=c.position.clone().add(new THREE.Vector3(0,.1,0));
   const dir=B.clone().sub(A),len=Math.max(dir.length(),.01);
   const strut=new THREE.Mesh(new THREE.CylinderGeometry(.035,.035,len,8),mat);
-  strut.position.copy(A).addScaledVector(dir,.5);strut.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.clone().normalize());
+  strut.position.copy(A).addScaledVector(dir,.5);strut.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir.clone().normalize());strut.userData.bondLen=len;
   workshopGlueRoot.add(strut);
   const blob=new THREE.Mesh(new THREE.SphereGeometry(.09,10,8),new THREE.MeshStandardMaterial({color:'#f2c063',roughness:.7,emissive:'#7a4d0c',emissiveIntensity:.7}));
   blob.position.copy(A).addScaledVector(dir,.5);workshopGlueRoot.add(blob);
  }}
-function workshopRebuildWires(){if(!workshopWireRoot)return;workshopRebuildBonds();while(workshopWireRoot.children.length){const o=workshopWireRoot.children[0];workshopWireRoot.remove(o);if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}const colors={power:'#f06b4f',signal:'#4ea8ff',data:'#e9c76b',ground:'#5dc78c',hydraulic:'#ff9a3c',fuel:'#d9a441',water:'#4fa3e3'};
+function workshopRebuildWires(){if(!workshopWireRoot)return;workshopWireSparkDirty=true;workshopRebuildBonds();while(workshopWireRoot.children.length){const o=workshopWireRoot.children[0];workshopWireRoot.remove(o);if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose();}const colors={power:'#f06b4f',signal:'#4ea8ff',data:'#e9c76b',ground:'#5dc78c',hydraulic:'#ff9a3c',fuel:'#d9a441',water:'#4fa3e3'};
  workshopRebuildWireSims();
  for(let i=0;i<workshopWires.length;i++){const w=workshopWires[i],sim=workshopWireSims[i];if(!sim||!sim.pts.length)continue;
   const pts=sim.pts.map(sp=>sp.p);
@@ -3572,6 +3624,28 @@ function workshopRebuildWires(){if(!workshopWireRoot)return;workshopRebuildBonds
   tube.userData.isWorkshopWire=true;tube.userData.wireIndex=i;tube.userData.partId=null;
   sim.line=tube;
   workshopWireRoot.add(tube);}workshopRebuildWireHandles();workshopRenderInspector();}
+function workshopWiresMoved(){ // light drag-frame update: glue bonds and waypoint handles follow in place (no mass rebuild)
+ if(workshopGlueRoot&&workshopGlueRoot.children.length){
+  const up=new THREE.Vector3(0,1,0),dir=new THREE.Vector3();
+  let i=0;
+  for(const b of workshopBonds){
+   const a=workshopGetPart(b.from),c=workshopGetPart(b.to),strut=workshopGlueRoot.children[i],blob=workshopGlueRoot.children[i+1];
+   if(!a||!c||!strut||!blob)break;
+   const ax=a.position.x,ay=a.position.y+.1,az=a.position.z,bx=c.position.x,by=c.position.y+.1,bz=c.position.z;
+   dir.set(bx-ax,by-ay,bz-az);
+   const len=Math.max(dir.length(),.01);
+   strut.position.set((ax+bx)/2,(ay+by)/2,(az+bz)/2);
+   strut.quaternion.setFromUnitVectors(up,dir.normalize());
+   strut.scale.set(1,Math.max(.01,len/(strut.userData.bondLen||len)),1);
+   blob.position.copy(strut.position);
+   i+=2;
+  }
+ }
+ if(workshopWaypointRoot&&workshopWaypointRoot.children.length){
+  const w=(workshopSelectedWire!=null)?workshopWires[workshopSelectedWire]:null;
+  if(w&&w.waypoints){let i=0;for(const p of w.waypoints){const hnd=workshopWaypointRoot.children[i];if(!hnd)break;hnd.position.set(p.x,p.y,p.z);i++;}}
+ }
+}
 function workshopRestoreSnapshot(snap){workshopSymmetryEnabled=snap.symmetryEnabled!==false;workshopSnapIncrement=snap.snapIncrement==null?.25:Number(snap.snapIncrement);const stoggle=$('workshopSymmetryToggle');if(stoggle){stoggle.textContent='Symmetry: '+(workshopSymmetryEnabled?'ON':'OFF');stoggle.classList.toggle('symmetry-on',workshopSymmetryEnabled);stoggle.setAttribute('aria-pressed',String(workshopSymmetryEnabled));}const ssnap=$('workshopSnapSize');if(ssnap)ssnap.value=String(workshopSnapIncrement);workshopLoading=true;while(workshopBuildRoot.children.length){const g=workshopBuildRoot.children[0];workshopBuildRoot.remove(g);}workshopParts=[];workshopGroups=(snap.groups||[]).map(g=>({id:g.id||('grp-'+Math.random().toString(36).slice(2,9)),name:g.name||'Group',parts:Array.isArray(g.parts)?[...g.parts]:[]}));workshopWires=workshopCloneJSON(snap.wires||[]);workshopBonds=workshopCloneJSON(snap.bonds||[]);workshopSelectedWire=null;workshopWireRoot.clear();workshopGlueRoot?.clear();let maxImportedId=0;for(const st of snap.parts||[]){const g=workshopCreatePart(st.type,st);if(g){workshopBuildRoot.add(g);workshopParts.push(g);const m=/^part-(\d+)$/.exec(g.userData.partId);if(m)maxImportedId=Math.max(maxImportedId,Number(m[1]));}}workshopNextId=Math.max(workshopNextId,maxImportedId+1);for(const st of (snap.parts||[])){const m=/^mirror-(\d+)$/.exec(st.symmetryPairId||'');if(m)workshopNextSymmetryId=Math.max(workshopNextSymmetryId,Number(m[1])+1);}$('workshopName').value=snap.name||'Untitled aircraft';workshopSelectedId=workshopParts[workshopParts.length-1]?.userData.partId||null;workshopLoading=false;workshopRebuildWires();workshopSelectPart(workshopSelectedId);workshopUpdateStats();workshopUpdateEmptyHint();workshopUpdateHistoryButtons();}
 function workshopUndo(){if(!workshopUndoStack.length)return;workshopRedoStack.push(workshopSnapshot());const s=workshopUndoStack.pop();workshopRestoreSnapshot(s);}
 function workshopRedo(){if(!workshopRedoStack.length)return;workshopUndoStack.push(workshopSnapshot());const s=workshopRedoStack.pop();workshopRestoreSnapshot(s);}
@@ -3588,7 +3662,8 @@ let workshopWireAcc=0,workshopWireLast=0;
 function workshopFrame(){requestAnimationFrame(workshopFrame);if(!workshopRenderer||!buildModeOpen)return;
  const now=performance.now();if(!workshopWireLast)workshopWireLast=now;
  workshopWireAcc=Math.min(workshopWireAcc+(now-workshopWireLast)/1000,.25);workshopWireLast=now; // bounded catch-up
- while(workshopWireAcc>=1/60){workshopStepWirePhysics(1/60);workshopWireAcc-=1/60;}if(workshopSelectionBox){const g=workshopGetPart(workshopSelectedId);if(g)workshopSelectionBox.update();}workshopRenderer.render(workshopScene,workshopCamera);}
+ let wireSteps=0;while(workshopWireAcc>=1/60&&wireSteps<4){workshopStepWirePhysics(1/60);workshopWireAcc-=1/60;wireSteps++;} // capped catch-up: a slow frame must not spiral into ever more physics steps
+ if(wireSteps>=4)workshopWireAcc=Math.min(workshopWireAcc,1/60);if(workshopSelectionBox){const g=workshopGetPart(workshopSelectedId);if(g)workshopSelectionBox.update();}workshopRenderer.render(workshopScene,workshopCamera);}
 function openBuildMode(){if(!buildModeOpen)buildWasPaused=!!S.paused;const sb=$('workshopSymmetryToggle');if(sb){sb.textContent='Symmetry: '+(workshopSymmetryEnabled?'ON':'OFF');sb.classList.toggle('symmetry-on',workshopSymmetryEnabled);sb.setAttribute('aria-pressed',String(workshopSymmetryEnabled));}$('workshopSnapSize').value=String(workshopSnapIncrement);buildModeOpen=true;S.paused=true;$('pause').textContent='Resume';$('buildModeOverlay').hidden=false;$('buildModeOverlay').setAttribute('aria-hidden','false');$('simViewport').classList.add('build-mode');$('aircraftType').value=S.aircraftId;if(workshopInit()){workshopResize();workshopRenderPalette();workshopRenderInspector();workshopUpdateStats();workshopUpdateEmptyHint();setTimeout(workshopResize,60);}}
 function closeBuildMode(){if(!buildModeOpen)return;buildModeOpen=false;$('buildModeOverlay').hidden=true;$('buildModeOverlay').setAttribute('aria-hidden','true');$('simViewport').classList.remove('build-mode');$('aircraftType').value=S.aircraftId;S.paused=buildWasPaused;$('pause').textContent=S.paused?'Resume':'Pause';workshopDrag=null;}
 function workshopTemplate(name){
@@ -3983,10 +4058,11 @@ $('workshopCanvas').addEventListener('pointermove',e=>{
   const mm=workshopMirrorMate(g);if(mm)already.add(mm.userData.partId);
   for(const rec of before){const m2=workshopMirrorMate(rec.m);if(m2)already.add(m2.userData.partId);}
   for(const gid of workshopBondedSet(d.partId)){if(already.has(gid))continue;const m=workshopGetPart(gid);if(m){m.position.x+=ddx;m.position.y+=ddy;m.position.z+=ddz;workshopSyncMirror(m);}}
-  workshopRenderInspector();workshopSelectionBox?.update();workshopRebuildWires();
+  const nowMs=performance.now();if(nowMs-workshopInspectorLastAt>90){workshopRenderInspector();workshopInspectorLastAt=nowMs;}
+  workshopSelectionBox?.update();workshopWiresMoved(); // ropes follow via pin re-sync; no per-move mass rebuild
  }
 });
-$('workshopCanvas').addEventListener('pointerup',e=>{if(gizmoDrag){gizmoDrag=null;workshopRenderInspector();workshopUpdateStats();workshopRebuildWires();return;}if(!workshopDrag)return;const d=workshopDrag;workshopDrag=null;if(d.moved){workshopRenderInspector();workshopUpdateStats();return;}if(Math.hypot(e.clientX-d.x,e.clientY-d.y)>5)return;if(d.type==='place')workshopBeginPlacement(e);else if(d.type==='wire'){if(d.partId)workshopPartClickForWire(workshopGetPart(d.partId));else workshopSetStatus('Click a component to begin wiring');}else if(d.type==='glue'){if(d.partId)workshopPartClickForGlue(workshopGetPart(d.partId));else workshopSetStatus('Click a component to begin gluing');}else if(d.type==='move'){workshopRenderInspector();workshopUpdateStats();}});
+$('workshopCanvas').addEventListener('pointerup',e=>{if(gizmoDrag){gizmoDrag=null;workshopRenderInspector();workshopUpdateStats();workshopRebuildWires();return;}if(!workshopDrag)return;const d=workshopDrag;workshopDrag=null;if(d.moved){workshopRenderInspector();workshopUpdateStats();workshopRebuildWires();return;}if(Math.hypot(e.clientX-d.x,e.clientY-d.y)>5)return;if(d.type==='place')workshopBeginPlacement(e);else if(d.type==='wire'){if(d.partId)workshopPartClickForWire(workshopGetPart(d.partId));else workshopSetStatus('Click a component to begin wiring');}else if(d.type==='glue'){if(d.partId)workshopPartClickForGlue(workshopGetPart(d.partId));else workshopSetStatus('Click a component to begin gluing');}else if(d.type==='move'){workshopRenderInspector();workshopUpdateStats();}});
 $('workshopCanvas').addEventListener('pointercancel',()=>{workshopDrag=null;gizmoDrag=null;workshopUpdateStats();});
 $('workshopCanvas').addEventListener('wheel',e=>{e.preventDefault();workshopDistance=THREE.MathUtils.clamp(workshopDistance+e.deltaY*.025,3,180);workshopMoveCamera();workshopRebuildWireHandles();},{passive:false});
 window.addEventListener('keydown',e=>{if(!buildModeOpen)return;if(['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName)||e.target.isContentEditable)return;if(e.code==='Escape'){if(workshopSelectedWire!=null){workshopSelectWire(null);return;}if(workshopTool!=='select'){workshopSetTool('select');return;}closeBuildMode();}if((e.ctrlKey||e.metaKey)&&e.code==='KeyZ'){e.preventDefault();workshopUndo();}if((e.ctrlKey||e.metaKey)&&e.code==='KeyY'){e.preventDefault();workshopRedo();}
@@ -7675,7 +7751,7 @@ workshopSetPartTool=function(type){
 };
 const inputHints={workshopPosX:'Right / left',workshopPosY:'Up / down',workshopPosZ:'Forward / back'};for(const [id,hint]of Object.entries(inputHints))$(id).title=hint+' · metres';
 $('workshopInspectorEmpty').querySelector('span').textContent='Choose a part to move it or change its size in metres.';
-if(window.__flightWorld)Object.assign(window.__flightWorld.workshop,{catalog:WORKSHOP_PARTS,visual:type=>workshopMakeVisual(type),create:workshopAddPart,tool:workshopSetPartTool,fit:fitWorkshopPropeller,engineering:()=>AeroCore.engineering(workshopParts.map(workshopPartState),WORKSHOP_PARTS),propulsion:()=>AeroCore.propulsion(workshopParts.map(workshopPartState),WORKSHOP_PARTS),camera:()=>workshopCamera,resize:resizeWorkshopPart,sync:workshopSyncMirror,refresh:workshopUpdateStats,
+if(window.__flightWorld)Object.assign(window.__flightWorld.workshop,{catalog:WORKSHOP_PARTS,visual:type=>workshopMakeVisual(type),create:workshopAddPart,tool:workshopSetPartTool,fit:fitWorkshopPropeller,engineering:()=>AeroCore.engineering(workshopParts.map(workshopPartState),WORKSHOP_PARTS),propulsion:()=>AeroCore.propulsion(workshopParts.map(workshopPartState),WORKSHOP_PARTS),camera:()=>workshopCamera,resize:resizeWorkshopPart,sync:workshopSyncMirror,refresh:workshopUpdateStats,stepWires:workshopStepWirePhysics,wireStats:()=>({sims:workshopWireSims.length,asleep:workshopWireSims.filter(s=>s&&s.sleep).length,nodes:workshopWireSims.reduce((a,s)=>a+(s?s.pts.length:0),0)}),sim:i=>workshopWireSims[i],arcPos:()=>workshopWireLastSpark,
 /* QA hooks: drive glue / wires the same way the tools do */
 bonds:()=>workshopBonds,wires:()=>workshopWires,glue:(a,b)=>{if(!workshopGetPart(a)||!workshopGetPart(b))return false;const has=workshopBonds.some(x=>(x.from===a&&x.to===b)||(x.to===a&&x.from===b));if(!has)workshopBonds.push({from:a,to:b});workshopRebuildWires();workshopRenderInspector();workshopUpdateStats();saveWorkshop();return!has;},unglue:(a,b)=>{const n=workshopBonds.length;workshopBonds=workshopBonds.filter(x=>!((x.from===a&&x.to===b)||(x.to===a&&x.from===b)));const changed=n!==workshopBonds.length;workshopRebuildWires();workshopRenderInspector();workshopUpdateStats();saveWorkshop();return changed;},wire:(a,b,kind='power')=>{if(!workshopGetPart(a)||!workshopGetPart(b))return false;workshopWires.push({from:a,to:b,kind});workshopRebuildWires();workshopRenderInspector();workshopUpdateStats();saveWorkshop();return true;}});
 
@@ -8097,9 +8173,9 @@ function gizmoDragMove(e){
   else part.scale[d.axisName]=THREE.MathUtils.clamp(d.startScale[d.axisName]*f,.1,20);
  }
  workshopSyncMirror(part);
- workshopRenderInspector();
+ const nowMs=performance.now();if(nowMs-workshopInspectorLastAt>90){workshopRenderInspector();workshopInspectorLastAt=nowMs;}
  workshopSelectionBox?.update();
- workshopRebuildWires();
+ workshopWiresMoved(); // ropes follow via pin re-sync; no per-move mass rebuild
  gizmoRefresh();
 }
 $('gizmoMoveBtn').addEventListener('click',()=>gizmoSetMode('move'));

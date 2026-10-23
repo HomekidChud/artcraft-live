@@ -672,6 +672,98 @@ try {
   check("airplanecraft: no JS errors", real.length === 0, real.slice(0, 3).join(" | "));
 } catch (e) { check("airplanecraft: suite ran", false, String(e).slice(0, 160)); }
 
+/* Build Mode wire physics: ropes must settle (sleep) so a big wired build
+   costs ~nothing per frame, arcs must still detect water contact, and wires
+   must follow moved parts — the lag-fix regression checks. */
+try {
+  await page.goto(BASE + "/airplanecraft/?debug", { waitUntil: "domcontentloaded", timeout: 45000 });
+  await page.waitForTimeout(4000);
+  const wireQA = await page.evaluate(() => {
+    const w = window.__flightWorld && window.__flightWorld.workshop;
+    return { ok: !!(w && w.open && w.stepWires && w.wireStats && w.arcPos) };
+  });
+  check("airplanecraft: build-mode QA handle present", wireQA.ok);
+  if (wireQA.ok) {
+    await page.evaluate(() => window.__flightWorld.workshop.open());
+    await page.waitForTimeout(1000);
+    const res = await page.evaluate(() => new Promise((res) => {
+      const w = window.__flightWorld.workshop;
+      const snap = w.snapshot();
+      snap.parts = [
+        { type: "battery", position: { x: -3, y: 1, z: 0 } },
+        { type: "circuitBreaker", position: { x: 3, y: 1, z: 0 } },
+      ];
+      snap.wires = [];
+      snap.bonds = [];
+      w.restore(snap);
+      const ids = w.parts().map((p) => p.userData.partId);
+      const snap2 = w.snapshot();
+      snap2.wires = [{ from: ids[0], to: ids[1], kind: "power" }];
+      w.restore(snap2);
+      let step = 0;
+      (function run() {
+        for (let i = 0; i < 15; i++) { w.stepWires(1 / 60); step++; }
+        const s = w.wireStats();
+        if (step < 600 && s.asleep < s.sims) setTimeout(run, 0);
+        else {
+          // settled: now move the far part — the rope must wake and follow
+          const b = w.parts().find((p) => p.userData.type === "circuitBreaker");
+          const sim = w.sim(0);
+          const beforeX = b.position.x;
+          b.position.x += 2;
+          for (let i = 0; i < 5; i++) w.stepWires(1 / 60);
+          const pinFollows = Math.abs(sim.pts[sim.pts.length - 1].p.x - b.position.x) < 1e-6;
+          const woke = w.wireStats().asleep < w.wireStats().sims;
+          res({ steps: step, ...s, wires: w.snapshot().wires.length, pinFollows, woke, beforeX });
+        }
+      })();
+    }));
+    check("airplanecraft: build-mode wire settles to sleep",
+      res.asleep === res.sims && res.wires === 1, JSON.stringify(res));
+    check("airplanecraft: moved part wakes rope and pin follows",
+      res.pinFollows && res.woke, JSON.stringify({ pinFollows: res.pinFollows, woke: res.woke }));
+    const arc = await page.evaluate(() => new Promise((res) => {
+      const w = window.__flightWorld.workshop;
+      // power wire A-B and water wire C-D on parallel spans 0.1 m apart -> ropes touch -> arc
+      const ids = w.parts().map((p) => p.userData.partId);
+      const s = w.snapshot();
+      s.parts = [
+        ...s.parts,
+        { type: "battery", position: { x: -3, y: 1, z: 0.1 } },
+        { type: "circuitBreaker", position: { x: 3, y: 1, z: 0.1 } },
+      ];
+      s.wires = [];
+      w.restore(s);
+      const ids2 = w.parts().map((p) => p.userData.partId);
+      const s2 = w.snapshot();
+      s2.wires = [
+        { from: ids[0], to: ids[1], kind: "power" },
+        { from: ids2[ids2.length - 2], to: ids2[ids2.length - 1], kind: "water" },
+      ];
+      w.restore(s2);
+      let step = 0;
+      (function run() {
+        for (let i = 0; i < 15; i++) { w.stepWires(1 / 60); step++; }
+        const st = w.wireStats();
+        if (step < 600 && st.asleep < st.sims) setTimeout(run, 0);
+        else {
+          const touching = w.arcPos() != null;
+          // move the water anchors far away -> ropes no longer touch -> no arc
+          const water = w.parts().slice(-2);
+          for (const p of water) { p.position.x += 8; p.position.z += 5; }
+          for (let i = 0; i < 120; i++) w.stepWires(1 / 60); // wake, move, settle, recheck
+          res({ touching, apart: w.arcPos() == null, asleep: w.wireStats().asleep, sims: w.wireStats().sims });
+        }
+      })();
+    }));
+    check("airplanecraft: powered line arcs on water contact",
+      arc.touching && arc.apart, JSON.stringify(arc));
+    const real2 = errors.filter((e) => !e.includes("Failed to load resource"));
+    errors.length = 0;
+    check("airplanecraft: wire QA no JS errors", real2.length === 0, real2.slice(0, 3).join(" | "));
+  }
+} catch (e) { check("airplanecraft: wire QA ran", false, String(e).slice(0, 160)); }
+
 /* Inspector coverage across the remaining apps: hub, launcher, catalog
    crafts (via the assistant widget) and unitycraft (direct tag). */
 try {
