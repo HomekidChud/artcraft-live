@@ -747,3 +747,39 @@ battery/fuel-density, full ledger from stubbed live state).
 - Tests: 25 waypoint-wires (+2: apparent-gravity sag/float/pushover/snap with a
   hand-built rope, stagnation formula). The snap test caught a real test bug
   (first-step acceleration spike) — production code was correct.
+
+## AirplaneCraft — 17.10.5d (same day): glue joints carry load + flight wire heat
+
+Owner follow-up: glued groups should be able to fall apart ("never fall apart"),
+and the physics should keep advancing. Two additions, both tested.
+
+### Glue joint strength (flight-time load test)
+- `FW_GLUE_BOND_STRENGTH_N=350` (~25 mm² epoxy lap joint at ~14 MPa shear —
+  design estimate, cited in docs §9 addendum 2).
+- At Test Fly, `fwGlueCarriedIds` two-passes `markDetachedFlightParts` (now takes
+  an optional bonds list, default `workshopBonds`) to find parts attached ONLY
+  by glue; `fwBuildGlueJoints` maps the bonds onto the flight-model parts.
+- Every frame `fwGlueLoadUpdate` (after `fwStepFlightWires`, which publishes the
+  apparent-gravity magnitude in `fwLastGAppMag`): load = mass × |g_app|, capacity
+  = intact bonds × 350 N. Overload → spark, bond removed, `detachPartAsDebris`,
+  `refreshCustomFlightStats(true)`, flight log "Glue joint failed at Ng". A 5 kg
+  part on one bond tears off above ~7g; hard re-entries and crashes rip glued
+  parts off — glued groups now fall apart like real structures.
+- Honesty: bond-chain loading (a bond also carrying a neighbouring glued part)
+  is approximated by counting bonds; strength is game-scaled, not a specific
+  adhesive spec.
+
+### Flight wire thermal (wires now burn in re-entry)
+- Flight ropes carry a temperature (same copper thermal mass as the workshop)
+  but cool by FORCED convection (h≈80 W/m²K vs the workshop's h≈10) toward the
+  LIVE skin temperature (`fwReentry.skinT`).
+- 80°C → one-time "insulation running hot" warning; 105°C (PVC continuous
+  rating) → insulation melts: spark, line dead, Electrics fault — same failure
+  path as a snap. A hard re-entry that soaks the skin at hundreds of °C cooks
+  the wiring harness.
+- Tests: 27 waypoint-wires (+2: glue joint holds at 1g / tears off at 9g,
+  wire cooks past 105°C during a 480°C skin soak and stays cool in ordinary
+  flight). The rope test harness gained a `length()` stub and rebinding for
+  `fwLastGAppMag`/`fwReentry`. Repo `npm test` 64/64 green.
+- Remaining (unchanged): fleet path removal, Build Mode UI overhaul, fleet lamp
+  fixtures, Render deploy verification, live Pages smoke test (`?debug&fresh=N`).

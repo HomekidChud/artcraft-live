@@ -221,3 +221,28 @@ comments next to `EnergyCore`.
   skin lags with ~8 s thermal time constant.
 - **Flame threshold is game-scaled** (80°C vs ~500°C for visible dull-red
   steel) so the effect is reachable in normal gameplay; white-hot by ~480°C.
+
+### §9 addendum 2 — glue joints carry load; flight wires carry heat (17.10.5d)
+
+- **Glue joint strength (350 N per bond)**: a design estimate — a ~25 mm² epoxy
+  lap joint at ~14 MPa shear (structural epoxies typically 10–30 MPa,
+  [Wikipedia – epoxy](https://en.wikipedia.org/wiki/Epoxy)). In flight each
+  glue-carried part (attached only by glue) is load-tested every frame:
+  load = mass × apparent-gravity magnitude, capacity = bond count × strength.
+  Overload — hard maneuver, gust, re-entry deceleration, ground impact — and
+  the joint fails: spark, the part tears off as debris, airframe stats refresh.
+  This closes the "glued groups never fall apart" bug.
+- **Flight wire thermal**: flight ropes now carry a temperature (same copper
+  thermal mass as the workshop: 50 g/node, cp 385) but cool by FORCED
+  convection (h ≈ 80 W/m²K, mid-range of the 25–250 W/m²K band for forced
+  convection in air, [Engineering Toolbox](https://www.engineeringtoolbox.com/convective-heat-transfer-d_430.html));
+  the static workshop uses h ≈ 10 (natural convection). Ambient is the live
+  airframe skin temperature — a hard re-entry that heats the skin to hundreds
+  of °C cooks the wires: 80°C triggers an insulation warning, 105°C (PVC
+  continuous rating) melts the insulation and burns the line through (electrical
+  fault, spark), the same failure mode as a snap.
+- **Honest limits**: the bond strength is a game-scaled design estimate, not a
+  specific adhesive spec; load is the part's own inertia (bond-chain loading,
+  where a bond also carries a neighbouring glued part's weight, is approximated
+  by counting bonds only); skin/wire heating is one lumped node per wire, not a
+  longitudinal temperature profile.

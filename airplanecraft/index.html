@@ -3887,7 +3887,7 @@ function workshopFly(){if(workshopParts.length===0){workshopSetStatus('Add compo
  let wingArea=Math.max(.1,engineering.area);
  let mass=workshopParts.reduce((s,p)=>s+workshopPartMass(p),0);mass=Math.max(1,mass);const propulsion=AeroCore.propulsion(workshopParts.map(workshopPartState),WORKSHOP_PARTS),thrust=propulsion.maxThrustN;let engineType=propulsion.units.length?propulsion.units[0].type:'glider';const isElectric=engineType==='electric';if(isElectric)engineType='piston';const sizeX=Math.max(isRocketBuild?2:.1,engineering.span),length=Math.max(2,dims.z),height=Math.max(.8,dims.y);const name=$('workshopName').value.trim()||'Scratch-built aircraft';
  const cfg={id:'scratch-build',electric:isElectric,name,role:'User-built aircraft',wingspan:sizeX,length,height,bodyWidth:Math.max(.35,Math.min(5,sizeX*.13)),bodyHeight:Math.max(.35,Math.min(6,height*.40)),wingArea,massKg:mass,maxThrustN:thrust,maxSpeedKts:isRocketBuild?15000:THREE.MathUtils.clamp(65+(thrust/Math.max(100,mass))*48,65,650),clMax:1.42,flapClMax:workshopParts.some(p=>p.userData.type==='flap')?.18:0,rpmIdle:engineType==='glider'?0:650,rpmMax:(engineType==='jet'||engineType==='rocket')?10000:2700,engineType,engineCount:engines.length,propBlades:props.reduce((s,p)=>s+WORKSHOP_PARTS[p.userData.type].propBlades,0)||0,wingPlacement:'mid',sweep:0,tailType:workshopParts.some(p=>p.userData.type==='vTail')?'vtail':'conventional',gear:gears.some(p=>p.userData.type==='wheel')?'Fixed tricycle':'Fixed skid',paint:'#e4e7e1',stripe:'#3e7d94',windowCount:0,customSeatCount:workshopParts.filter(p=>p.userData.type==='cockpitSeat').length,customFuelTanks:workshopParts.filter(p=>p.userData.type==='fuelTank').length,canopy:false,winglets:workshopParts.some(p=>p.userData.type==='winglet'),dryMassKg:mass,waterKg:workshopParts.filter(p=>p.userData.type==='waterTank').length*400};
- cfg.controlAuth=isRocketBuild?{roll:1,pitch:1,yaw:1}:{roll:workshopParts.some(p=>p.userData.type==='aileron')?1:0,pitch:workshopParts.some(p=>p.userData.type==='elevator')?1:0,yaw:workshopParts.some(p=>p.userData.type==='rudder')?1:.05};if(isRocketBuild){cfg.rocketNoWings=engineering.area<.05;cfg.rocketDragArea=Math.PI*Math.pow(Math.min(dims.x,dims.y)/2,2);}cfg.massProperties=engineering.inertia;cfg.propulsion=propulsion.units.map(u=>({...u,position:u.position.map((n,i)=>n-[engineering.cg.x,engineering.cg.y,engineering.cg.z][i])}));cfg.engineCount=propulsion.units.length;cfg.cgLiftOffset=engineering.wingZ-engineering.cg.z;const flightRoot=workshopBuildRoot.clone(true);flightRoot.userData.customControls=flightRoot.children.filter(p=>['aileron','flap','elevator','rudder','prop2','prop4'].includes(p.userData.type)).map(part=>({part,base:part.rotation.clone(),type:part.userData.type,powered:propulsion.units.some(u=>u.propId===part.userData.partId)}));markDetachedFlightParts(flightRoot);fwRelinkLightTargets(flightRoot);const flightWires=workshopWireRoot.clone(true);flightRoot.add(flightWires);fwBuildFlightWireSims(flightWires);customPristineModel=flightRoot.clone(true);fwRelinkLightTargets(customPristineModel);customPristineCfg={...cfg};flightRoot.position.set(-center.x,-center.y,-center.z);S.customAircraft=cfg;S.workshopGroundCorners=corners;S.aircraftId='c172';$('aircraftType').value='c172';fleetModelSlot.clear();fleetModelSlot.add(flightRoot);fwSyncCustomLights();fleetModelSlot.visible=true;exterior.visible=false;S.camera='chase';$('camera').value='chase';buildWasPaused=false;closeBuildMode();resetFlight();S.paused=false;detachUnweldedParts();$('pause').textContent='Pause';refreshAircraftSpecs();showAircraftMassModel();updateCamera(.8);drawMinimap(true);workshopSetStatus('Custom aircraft loaded into the flight scene');}
+ cfg.controlAuth=isRocketBuild?{roll:1,pitch:1,yaw:1}:{roll:workshopParts.some(p=>p.userData.type==='aileron')?1:0,pitch:workshopParts.some(p=>p.userData.type==='elevator')?1:0,yaw:workshopParts.some(p=>p.userData.type==='rudder')?1:.05};if(isRocketBuild){cfg.rocketNoWings=engineering.area<.05;cfg.rocketDragArea=Math.PI*Math.pow(Math.min(dims.x,dims.y)/2,2);}cfg.massProperties=engineering.inertia;cfg.propulsion=propulsion.units.map(u=>({...u,position:u.position.map((n,i)=>n-[engineering.cg.x,engineering.cg.y,engineering.cg.z][i])}));cfg.engineCount=propulsion.units.length;cfg.cgLiftOffset=engineering.wingZ-engineering.cg.z;const flightRoot=workshopBuildRoot.clone(true);flightRoot.userData.customControls=flightRoot.children.filter(p=>['aileron','flap','elevator','rudder','prop2','prop4'].includes(p.userData.type)).map(part=>({part,base:part.rotation.clone(),type:part.userData.type,powered:propulsion.units.some(u=>u.propId===part.userData.partId)}));markDetachedFlightParts(flightRoot);const glueCarriedIds=fwGlueCarriedIds(flightRoot);fwRelinkLightTargets(flightRoot);const flightWires=workshopWireRoot.clone(true);flightRoot.add(flightWires);fwBuildFlightWireSims(flightWires);customPristineModel=flightRoot.clone(true);fwRelinkLightTargets(customPristineModel);customPristineCfg={...cfg};flightRoot.position.set(-center.x,-center.y,-center.z);S.customAircraft=cfg;S.workshopGroundCorners=corners;S.aircraftId='c172';$('aircraftType').value='c172';fleetModelSlot.clear();fleetModelSlot.add(flightRoot);fwSyncCustomLights();fleetModelSlot.visible=true;exterior.visible=false;S.camera='chase';$('camera').value='chase';buildWasPaused=false;closeBuildMode();resetFlight();S.paused=false;detachUnweldedParts();fwBuildGlueJoints(flightRoot,glueCarriedIds);$('pause').textContent='Pause';refreshAircraftSpecs();showAircraftMassModel();updateCamera(.8);drawMinimap(true);workshopSetStatus('Custom aircraft loaded into the flight scene');}
 function workshopBeginPlacement(e){const d=WORKSHOP_PARTS[workshopPendingType];if(!d)return;const p=workshopIntersectPlane(e,0);if(!p)return;const pos={x:workshopSnap(p.x),y:workshopPlacementHeight(workshopPendingType),z:workshopSnap(p.z)};workshopPushUndo();const g=workshopCreateMirroredPair(workshopPendingType,pos);if(!g)return;workshopSetStatus(`Placed ${d.name}${workshopMirrorMate(g)?' with mirrored counterpart':''} · centreline symmetry ${workshopSymmetryEnabled?'ON':'OFF'}`);}
 function workshopCreateGhost(type){if(workshopGhost){workshopScene.remove(workshopGhost);workshopGhost=null;}if(workshopGhostMirror){workshopScene.remove(workshopGhostMirror);workshopGhostMirror=null;}if(!type||!WORKSHOP_PARTS[type])return;workshopGhost=workshopMakeVisual(type,true);workshopScene.add(workshopGhost);workshopGhostMirror=workshopMakeVisual(type,true);workshopScene.add(workshopGhostMirror);workshopGhostMirror.visible=false;}
 function workshopUpdateGhost(e){if(workshopTool!=='place'||!workshopGhost||!workshopPendingType)return;const d=WORKSHOP_PARTS[workshopPendingType],p=workshopIntersectPlane(e,0);if(!p)return;const x=workshopSnap(p.x),z=workshopSnap(p.z);workshopGhost.position.set(x,workshopPlacementHeight(workshopPendingType),z);if(workshopGhostMirror){workshopGhostMirror.visible=workshopShouldMirror(workshopPendingType,x);workshopGhostMirror.position.set(-x,workshopPlacementHeight(workshopPendingType),z);}}
@@ -4855,6 +4855,8 @@ function updateControlSurfaces(){
    high Mach heats the skin (isentropic stagnation T = T_amb·(1+0.2M²)) and a
    re-entry flame appears above 150°C skin temperature. */
 const FW_WIRE_SNAP_STRETCH=.08; // 8% elastic limit before a wire snaps
+const FW_WIRE_INSULATION_MELT_C=105; // PVC continuous rating — hotter and the insulation fails
+const FW_GLUE_BOND_STRENGTH_N=350; // ~25 mm² epoxy lap joint at ~14 MPa shear (design estimate)
 const FW_WIRE_COLORS={power:'#ffd24a',ground:'#9aa7ad',signal:'#6fd3ff',data:'#6fd3ff',hydraulic:'#ff9a3d',fuel:'#c9a86a',water:'#5ac8ff'};
 let fwFlightWireSims=[],fwFlightWireRoot=null,fwPrevVel=new THREE.Vector3(),fwReentry={skinT:20,flame:null};
 function fwBuildFlightWireSims(flightWires){
@@ -4881,7 +4883,9 @@ function fwBuildFlightWireSims(flightWires){
   line.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(Math.max(2,(pts.length-1)*2)*3),3));
   line.geometry.boundingSphere=new THREE.Sphere(new THREE.Vector3(),1e4); // skip per-frame recompute culls
   flightWires.add(line);
-  fwFlightWireSims.push({pts,rests,line,stiffness:WORKSHOP_WIRE_STIFFNESS[w.kind]||2500,damping:2,dead:false});
+  // thermal mass: 50 g copper nodes (cp 385 J/kg·K) + forced-convection cooling
+  // (h≈80 W/m²K in the slipstream; the static workshop uses h≈10 — natural convection)
+  fwFlightWireSims.push({pts,rests,line,stiffness:WORKSHOP_WIRE_STIFFNESS[w.kind]||2500,damping:2,dead:false,mcK:pts.length*.05*385,hA:pts.length*.005*80,temp:20,warned:false});
  }
 }
 function fwStepFlightWires(dt){
@@ -4891,6 +4895,7 @@ function fwStepFlightWires(dt){
  const gWorld=new THREE.Vector3(0,-9.81,0).sub(a);
  const q=fleetModelSlot.getWorldQuaternion(new THREE.Quaternion()).invert();
  const gLocal=gWorld.applyQuaternion(q);
+ fwLastGAppMag=gLocal.length(); // apparent-gravity magnitude for the glue-joint load test
  const gx=gLocal.x*dt*dt,gy=gLocal.y*dt*dt,gz=gLocal.z*dt*dt,damp=.985,h=dt/6,nodeM=.05;
  for(let i=0;i<fwFlightWireSims.length;i++){
   const sim=fwFlightWireSims[i];if(!sim||sim.dead)continue;
@@ -4925,6 +4930,18 @@ function fwStepFlightWires(dt){
    if(sim.dead)break;
   }
   if(sim.dead)continue;
+  // wire thermal: damping heat in, Newton cooling toward the airframe skin temperature
+  // (in flight the rope sits in the slipstream — forced convection, h≈80 W/m²K)
+  sim.dampW=dampW/6; // mean damping power this frame
+  sim.temp=EnergyCore.thermalStep(sim.temp,sim.dampW,sim.mcK,sim.hA,Math.max(20,fwReentry.skinT),dt);
+  if(sim.temp>80&&!sim.warned){sim.warned=true;if(typeof flightLog==='function')flightLog('⚠ Wire insulation running hot ('+Math.round(sim.temp)+'°C) — PVC limit is 105°C');}
+  if(sim.temp>FW_WIRE_INSULATION_MELT_C){ // insulation fails: the line burns through
+   sim.dead=true;sim.line.visible=false;
+   if(typeof Electrics!=='undefined'&&Electrics.brokenWires)Electrics.brokenWires.add(i);
+   if(typeof flightLog==='function')flightLog('Wire insulation melted at '+Math.round(sim.temp)+'°C — '+(workshopWires[i]&&workshopWires[i].kind||'wire')+' line burned through');
+   if(typeof workshopSparkAt==='function'&&fwFlightWireRoot)workshopSparkAt(fwFlightWireRoot.localToWorld(sim.pts[Math.floor(sim.pts.length/2)].p.clone()));
+   continue;
+  }
   const attr=sim.line.geometry.getAttribute('position');
   if(attr){for(let j=0;j<sim.pts.length-1;j++){attr.setXYZ(j*2,sim.pts[j].p.x,sim.pts[j].p.y,sim.pts[j].p.z);attr.setXYZ(j*2+1,sim.pts[j+1].p.x,sim.pts[j+1].p.y,sim.pts[j+1].p.z);}attr.needsUpdate=true;}
  }
@@ -4953,6 +4970,51 @@ function fwReentryUpdate(dt){
   fwReentry.flame.userData.shell.material.color.setHSL(.07-.05*k,.95,.45+.45*k);
   fwReentry.flame.visible=true;
  }else if(fwReentry.flame)fwReentry.flame.visible=false;
+}
+/* Glue joints carry load (owner: glued groups used to never fall apart).
+   A bond holds until the inertial load on the part (mass × apparent gravity)
+   exceeds the joint capacity (bond count × strength). Overload a glued part —
+   hard maneuver, gust, re-entry deceleration, crash — and the joint fails:
+   spark, part tears off as debris, airframe stats refresh. Design estimate:
+   a ~25 mm² epoxy lap joint at ~14 MPa shear ≈ 350 N per bond. */
+let fwFlightGlueJoints=null,fwLastGAppMag=9.81;
+function fwGlueJoint(partMassKg,gAppMag,bondCount,strengthN=FW_GLUE_BOND_STRENGTH_N){
+ const load=partMassKg*gAppMag,capacity=Math.max(0,bondCount)*strengthN;
+ return {load,capacity,fails:load>capacity};
+}
+function fwGlueCarriedIds(root){ // parts that stay attached ONLY because of glue
+ const ids=new Set();
+ try{
+  markDetachedFlightParts(root,[]); // structural grouping, glue ignored
+  for(const p of root.children)if(p.userData&&p.userData.isWorkshopPart&&p.userData.flightDetached)ids.add(p.userData.partId);
+ }finally{markDetachedFlightParts(root);} // restore the real (with-glue) flags
+ return ids;
+}
+function fwBuildGlueJoints(root,carriedIds){
+ fwFlightGlueJoints=null;
+ if(!root||!workshopBonds.length)return;
+ const parts=root.children.filter(c=>c.userData&&c.userData.isWorkshopPart);
+ const idx=new Map(parts.map(p=>[p.userData.partId,p]));
+ const bonds=[];
+ for(const b of workshopBonds){const a=idx.get(b.from),c=idx.get(b.to);if(a&&c)bonds.push({a,c});}
+ const carried=parts.filter(p=>carriedIds.has(p.userData.partId));
+ if(!bonds.length||!carried.length)return;
+ fwFlightGlueJoints={bonds,carried,root};
+}
+function fwGlueLoadUpdate(){
+ const j=fwFlightGlueJoints;if(!j)return;
+ if(!j.root.parent||!j.root.parent.parent){fwFlightGlueJoints=null;return;} // custom aircraft gone
+ for(const p of j.carried){
+  if(p.parent!==j.root)continue; // already torn off or reparented
+  let n=0;for(const b of j.bonds)if(b.a===p||b.c===p)n++;
+  const joint=fwGlueJoint(workshopPartMass(p),fwLastGAppMag,n);
+  if(!joint.fails)continue;
+  j.bonds=j.bonds.filter(b=>b.a!==p&&b.c!==p); // the overloaded joint lets go
+  if(typeof workshopSparkAt==='function')workshopSparkAt(p.getWorldPosition(new THREE.Vector3()));
+  detachPartAsDebris(p,new THREE.Vector3(0,-.5,0));
+  if(typeof refreshCustomFlightStats==='function')refreshCustomFlightStats(true);
+  if(typeof flightLog==='function')flightLog('Glue joint failed at '+Math.round(fwLastGAppMag/9.81)+'g ('+Math.round(joint.load)+' N > '+Math.round(joint.capacity)+' N) — '+(p.userData.name||'part')+' tore away');
+ }
 }
 /* Full-aircraft energy ledger from live state (no invented dynamics):
    stored forms (kinetic, gravitational potential, chemical fuel) are exact
@@ -7904,6 +7966,7 @@ function animate(){
  if(S.camera==='cockpit')updateCabinMechanisms();
  updateCamera(dt);
  fwStepFlightWires(dt);
+ fwGlueLoadUpdate();
  fwReentryUpdate(dt);
  updateUI();
  updateMapTrack(dt);
@@ -10588,7 +10651,7 @@ $('workshopFly').addEventListener('click',e=>{
   e.stopImmediatePropagation();workshopSetStatus('Test flight blocked: duplicate solid parts occupy the same position. Move or remove the duplicate.');return;
  }
 },true);
-markDetachedFlightParts=function(root){
+markDetachedFlightParts=function(root,bonds=workshopBonds){
  const parts=root.children.filter(c=>c.userData?.isWorkshopPart),connected=parts.filter(p=>!p.userData.unwelded),parents=connected.map((_,i)=>i);
  const find=i=>parents[i]===i?i:(parents[i]=find(parents[i]));
  for(const p of parts)delete p.userData.flightDetached;
@@ -10596,7 +10659,7 @@ markDetachedFlightParts=function(root){
   if(!duplicateSolid(connected[i],connected[j])&&physicalPartsTouch(connected[i],connected[j]))parents[find(j)]=find(i);
  // glue bonds attach parts even across empty space (replaces the old weld)
  const idx=new Map(connected.map((p,i)=>[p.userData.partId,i]));
- for(const b of workshopBonds){const i=idx.get(b.from),j=idx.get(b.to);if(i!=null&&j!=null)parents[find(j)]=find(i);}
+ for(const b of bonds){const i=idx.get(b.from),j=idx.get(b.to);if(i!=null&&j!=null)parents[find(j)]=find(i);}
  const masses=new Map();connected.forEach((p,i)=>masses.set(find(i),(masses.get(find(i))||0)+Math.max(.01,workshopPartMass(p))));
  const main=[...masses].sort((a,b)=>b[1]-a[1])[0]?.[0];
  for(const p of parts){const i=connected.indexOf(p);p.userData.flightDetached=i<0||find(i)!==main;}

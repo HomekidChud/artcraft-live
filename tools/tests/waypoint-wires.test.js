@@ -52,6 +52,7 @@ let workshopGlueRoot = null;
 let workshopGlueStart = null;
 let WORKSHOP_WIRE_STIFFNESS = {}; // eval'd in the sag test
 let FW_WIRE_SNAP_STRETCH = .08; // flight rope elastic limit (mirrors the client const)
+let FW_WIRE_INSULATION_MELT_C = 105; // flight wire PVC insulation rating (mirrors the client const)
 let workshopMultiSelect = new Set();
 const validateSrc = extract(body, 'function validateDesign(input, catalog) {');
 const pathSrc = extract(body, 'function workshopWirePath(w){');
@@ -296,6 +297,7 @@ function physicsEnv() {
       distanceToSquared(v){const dx=this.x-v.x,dy=this.y-v.y,dz=this.z-v.z;return dx*dx+dy*dy+dz*dz;}
       static lerpVectors(a,b,t){return new V(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t);}
       lerpVectors(a,b,t){this.x=a.x+(b.x-a.x)*t;this.y=a.y+(b.y-a.y)*t;this.z=a.z+(b.z-a.z)*t;return this;}
+      length(){return Math.hypot(this.x,this.y,this.z);}
     } };
   globalThis.workshopScene = { add(){}, children: [] };
   globalThis.workshopWireRoot = { children: [] };
@@ -641,7 +643,9 @@ test('flight wires: sag in level flight, float in free fall, snap past the elast
   // rebind the step's closure variables by re-evaluating with local state injected
   const stepLocal = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
     .replace(/fwFlightWireRoot/g, 'flightWireRoot').replace(/fwFlightWireSims/g, 'flightSims')
-    .replace(/fwPrevVel/g, 'prevVel').replace(/physicsVelocity/g, 'vel') + ')');
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub').replace(/physicsVelocity/g, 'vel') + ')');
+  let lastGApp = 9.81; // module-scope apparent-gravity magnitude the step writes
+  const reentryStub = { skinT: 20 }; // module-scope re-entry skin temp
 
   // level flight: constant velocity (a = 0) → apparent gravity pulls the rope down (sag)
   sim = mkRope(); flightSims = [sim]; vel.set(50, 0, 0); prevVel.copy(vel);
@@ -674,4 +678,43 @@ test('re-entry: stagnation temperature follows T·(1+0.2M²)', () => {
   assert.ok(Math.abs(stag(0, 288.15) - 288.15) < 1e-9);          // parked: ambient
   assert.ok(Math.abs(stag(1, 288.15) - 288.15 * 1.2) < 1e-9);    // Mach 1: +20%
   assert.ok(Math.abs(stag(2.5, 223) - 223 * 2.25) < 1e-6);      // high-altitude re-entry
+});
+
+/* ---------- 17.10.5d: glue joints carry load; flight wires carry heat ---------- */
+
+test('glue joints: hold at 1g, tear off when overloaded', () => {
+  physicsEnv();
+  const strength = Number(body.match(/const FW_GLUE_BOND_STRENGTH_N=([\d.]+);/)[1]);
+  assert.ok(strength > 0, 'bond strength constant should exist');
+  let FW_GLUE_BOND_STRENGTH_N = strength; // mirrors the client const for the default param
+  const src = extract(body, 'function fwGlueJoint(partMassKg,gAppMag,bondCount,strengthN=FW_GLUE_BOND_STRENGTH_N){');
+  let joint; eval(src.replace('function fwGlueJoint', 'joint = function fwGlueJoint'));
+  // 5 kg part on 2 bonds in level flight: 49 N << 700 N — the joint holds
+  const held = joint(5, 9.81, 2);
+  assert.ok(!held.fails, '2 bonds hold a 5 kg part at 1g');
+  assert.equal(held.capacity, 2 * strength);
+  assert.ok(Math.abs(held.load - 5 * 9.81) < 1e-9);
+  // same part on ONE bond in a 9g pull-up: 441 N > 350 N — it tears away
+  const torn = joint(5, 9.81 * 9, 1);
+  assert.ok(torn.fails, '1 bond fails a 5 kg part at 9g');
+  assert.ok(Math.abs(torn.load - 5 * 9.81 * 9) < 1e-9);
+  // no bonds: nothing holds the part
+  assert.ok(joint(1, 9.81, 0).fails, 'zero bonds = zero capacity');
+  assert.equal(joint(1, 9.81, 0).capacity, 0);
+});
+
+test('flight wires: cook toward re-entry skin temperature and melt past 105°C', () => {
+  physicsEnv();
+  const melt = Number(body.match(/const FW_WIRE_INSULATION_MELT_C=([\d.]+);/)[1]);
+  assert.equal(melt, 105, 'PVC continuous rating');
+  // flight rope thermal mass: 10 nodes × 50 g copper (cp 385) + forced convection h≈80
+  const mcK = 10 * .05 * 385, hA = 10 * .005 * 80;
+  // hard re-entry: skin 480°C for 120 s — the wire cooks past the PVC rating
+  let t = 20;
+  for (let i = 0; i < 240; i++) t = EnergyCore.thermalStep(t, 0, mcK, hA, 480, .5);
+  assert.ok(t > melt, 'wire should melt during a hot re-entry, got ' + t.toFixed(1) + '°C');
+  // ordinary flight: skin at ambient — the wire stays cool, no warning
+  let t2 = 20;
+  for (let i = 0; i < 240; i++) t2 = EnergyCore.thermalStep(t2, 0, mcK, hA, 22, .5);
+  assert.ok(t2 < 80, 'wire stays below the 80°C warning in ordinary flight');
 });
