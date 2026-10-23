@@ -767,7 +767,20 @@ and the physics should keep advancing. Two additions, both tested.
   parts off — glued groups now fall apart like real structures.
 - Honesty: bond-chain loading (a bond also carrying a neighbouring glued part)
   is approximated by counting bonds; strength is game-scaled, not a specific
-  adhesive spec.
+  adhesive spec; joints backed by physical contact are held by that contact
+  (the game's contact-attachment model) and not additionally glue-load-tested.
+  The 105°C insulation failure is a tuned gameplay threshold at the PVC
+  continuous-service rating, not a material-spec melt model.
+
+### Review-fix round (same session, before push): robustness
+- **Two-frame overload guard**: a glue joint fails only after two consecutive
+  overloaded frames — single-frame acceleration spikes (spawn teleports,
+  mid-flight resets) can no longer rip parts off.
+- **Wires rip out with torn-off parts**: when a glued part detaches, every wire
+  attached to it dies with it (line hidden, Electrics fault, flight log) — no
+  rope left anchored in mid-air.
+- **Cascade**: a part glued only to the torn-off one loses those bonds and fails
+  on its own next pass — no floating unsupported groups.
 
 ### Flight wire thermal (wires now burn in re-entry)
 - Flight ropes carry a temperature (same copper thermal mass as the workshop)
@@ -777,9 +790,10 @@ and the physics should keep advancing. Two additions, both tested.
   rating) → insulation melts: spark, line dead, Electrics fault — same failure
   path as a snap. A hard re-entry that soaks the skin at hundreds of °C cooks
   the wiring harness.
-- Tests: 27 waypoint-wires (+2: glue joint holds at 1g / tears off at 9g,
-  wire cooks past 105°C during a 480°C skin soak and stays cool in ordinary
-  flight). The rope test harness gained a `length()` stub and rebinding for
-  `fwLastGAppMag`/`fwReentry`. Repo `npm test` 64/64 green.
+- Tests: 29 waypoint-wires (+4: glue joint holds at 1g / tears off at 9g,
+  glue load-update integration — spike guard, teardown, wire rip-out, cascade,
+  wire cooks past 105°C in a pure-thermalStep loop and in a full step
+  integration with a hot skin). The rope test harness gained `length()`/`sub()`
+  stubs and rebinding for `fwLastGAppMag`/`fwReentry`. Repo `npm test` 64/64 green.
 - Remaining (unchanged): fleet path removal, Build Mode UI overhaul, fleet lamp
   fixtures, Render deploy verification, live Pages smoke test (`?debug&fresh=N`).

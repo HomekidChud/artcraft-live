@@ -238,11 +238,24 @@ comments next to `EnergyCore`.
   convection in air, [Engineering Toolbox](https://www.engineeringtoolbox.com/convective-heat-transfer-d_430.html));
   the static workshop uses h ≈ 10 (natural convection). Ambient is the live
   airframe skin temperature — a hard re-entry that heats the skin to hundreds
-  of °C cooks the wires: 80°C triggers an insulation warning, 105°C (PVC
-  continuous rating) melts the insulation and burns the line through (electrical
-  fault, spark), the same failure mode as a snap.
+  of °C cooks the wires: 80°C triggers an insulation warning; at 105°C (the PVC
+  continuous-service rating, used as a TUNED GAMEPLAY DAMAGE THRESHOLD) the
+  insulation gives and the line burns through (electrical fault, spark) — the
+  same failure path as a snap. Failure needs two consecutive overloaded/hot
+  frames so single-frame spikes (spawn teleports, resets) never kill a wire.
+- **Glue failure mechanics**: when a joint lets go, its part detaches as debris
+  and every wire attached to that part rips out with it (line dead, electrical
+  fault) — no wire stays anchored in mid-air. Chains cascade: a part glued only
+  to the torn-off one loses those bonds and fails on its own next pass, so no
+  unsupported group floats on the airframe.
 - **Honest limits**: the bond strength is a game-scaled design estimate, not a
   specific adhesive spec; load is the part's own inertia (bond-chain loading,
   where a bond also carries a neighbouring glued part's weight, is approximated
-  by counting bonds only); skin/wire heating is one lumped node per wire, not a
-  longitudinal temperature profile.
+  by counting bonds); joints backed by physical contact (part touching the
+  airframe) are held by that contact per the game's contact-attachment model and
+  are not additionally glue-load-tested; skin/wire heating is one lumped node per
+  wire, not a longitudinal temperature profile; the 105°C melt point is a
+  gameplay threshold, not a material-spec melt model. Temperature is an
+  integrated state (no single-frame spikes possible), but glue failure needs
+  two consecutive overloaded frames so single-frame acceleration spikes
+  (spawn teleports, mid-flight resets) never rip parts off.

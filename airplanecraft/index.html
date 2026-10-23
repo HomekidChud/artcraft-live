@@ -4935,7 +4935,8 @@ function fwStepFlightWires(dt){
   sim.dampW=dampW/6; // mean damping power this frame
   sim.temp=EnergyCore.thermalStep(sim.temp,sim.dampW,sim.mcK,sim.hA,Math.max(20,fwReentry.skinT),dt);
   if(sim.temp>80&&!sim.warned){sim.warned=true;if(typeof flightLog==='function')flightLog('⚠ Wire insulation running hot ('+Math.round(sim.temp)+'°C) — PVC limit is 105°C');}
-  if(sim.temp>FW_WIRE_INSULATION_MELT_C){ // insulation fails: the line burns through
+  if(sim.temp>FW_WIRE_INSULATION_MELT_C){ // tuned damage threshold at the PVC continuous-service
+   // rating: the insulation gives and the line burns through (gameplay failure mode)
    sim.dead=true;sim.line.visible=false;
    if(typeof Electrics!=='undefined'&&Electrics.brokenWires)Electrics.brokenWires.add(i);
    if(typeof flightLog==='function')flightLog('Wire insulation melted at '+Math.round(sim.temp)+'°C — '+(workshopWires[i]&&workshopWires[i].kind||'wire')+' line burned through');
@@ -4999,7 +5000,7 @@ function fwBuildGlueJoints(root,carriedIds){
  for(const b of workshopBonds){const a=idx.get(b.from),c=idx.get(b.to);if(a&&c)bonds.push({a,c});}
  const carried=parts.filter(p=>carriedIds.has(p.userData.partId));
  if(!bonds.length||!carried.length)return;
- fwFlightGlueJoints={bonds,carried,root};
+ fwFlightGlueJoints={bonds,carried,root,over:new Map()}; // over: consecutive-overload counters
 }
 function fwGlueLoadUpdate(){
  const j=fwFlightGlueJoints;if(!j)return;
@@ -5008,10 +5009,28 @@ function fwGlueLoadUpdate(){
   if(p.parent!==j.root)continue; // already torn off or reparented
   let n=0;for(const b of j.bonds)if(b.a===p||b.c===p)n++;
   const joint=fwGlueJoint(workshopPartMass(p),fwLastGAppMag,n);
-  if(!joint.fails)continue;
+  if(!joint.fails){j.over.delete(p);continue;}
+  // two consecutive overloaded frames before failure: single-frame
+  // acceleration spikes (spawn teleports, mid-flight resets) must not rip parts off
+  if((j.over.get(p)||0)<1){j.over.set(p,1);continue;}
   j.bonds=j.bonds.filter(b=>b.a!==p&&b.c!==p); // the overloaded joint lets go
+  j.over.delete(p);
+  // chains cascade: parts glued only to this one lose these bonds and fail
+  // on their own next pass — no floating unsupported groups
   if(typeof workshopSparkAt==='function')workshopSparkAt(p.getWorldPosition(new THREE.Vector3()));
   detachPartAsDebris(p,new THREE.Vector3(0,-.5,0));
+  // wires attached to the torn-off part rip out with it — no anchors left in mid-air
+  const pid=p.userData.partId;
+  for(let i=0;i<workshopWires.length;i++){
+   const w=workshopWires[i],sim=fwFlightWireSims[i];
+   if(!w||!sim||sim.dead)continue;
+   if(w.from===pid||w.to===pid){
+    sim.dead=true;sim.line.visible=false;
+    if(typeof Electrics!=='undefined'&&Electrics.brokenWires)Electrics.brokenWires.add(i);
+    if(typeof flightLog==='function')flightLog('Wire ripped out with '+(p.userData.name||'the torn-off part')+' — '+(w.kind||'wire')+' line torn loose');
+    if(typeof workshopSparkAt==='function')workshopSparkAt(p.getWorldPosition(new THREE.Vector3()));
+   }
+  }
   if(typeof refreshCustomFlightStats==='function')refreshCustomFlightStats(true);
   if(typeof flightLog==='function')flightLog('Glue joint failed at '+Math.round(fwLastGAppMag/9.81)+'g ('+Math.round(joint.load)+' N > '+Math.round(joint.capacity)+' N) — '+(p.userData.name||'part')+' tore away');
  }

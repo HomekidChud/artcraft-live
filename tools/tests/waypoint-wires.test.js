@@ -298,6 +298,8 @@ function physicsEnv() {
       static lerpVectors(a,b,t){return new V(a.x+(b.x-a.x)*t,a.y+(b.y-a.y)*t,a.z+(b.z-a.z)*t);}
       lerpVectors(a,b,t){this.x=a.x+(b.x-a.x)*t;this.y=a.y+(b.y-a.y)*t;this.z=a.z+(b.z-a.z)*t;return this;}
       length(){return Math.hypot(this.x,this.y,this.z);}
+      sub(v){this.x-=v.x;this.y-=v.y;this.z-=v.z;return this;}
+      divideScalar(s){this.x/=s;this.y/=s;this.z/=s;return this;}
     } };
   globalThis.workshopScene = { add(){}, children: [] };
   globalThis.workshopWireRoot = { children: [] };
@@ -717,4 +719,108 @@ test('flight wires: cook toward re-entry skin temperature and melt past 105°C',
   let t2 = 20;
   for (let i = 0; i < 240; i++) t2 = EnergyCore.thermalStep(t2, 0, mcK, hA, 22, .5);
   assert.ok(t2 < 80, 'wire stays below the 80°C warning in ordinary flight');
+});
+
+test('glue load update: spike guard, teardown, wire rip-out, cascade (integration)', () => {
+  physicsEnv();
+  // eval the joint function, then the load update with closure refs rebound to stubs
+  let FW_GLUE_BOND_STRENGTH_N = Number(body.match(/const FW_GLUE_BOND_STRENGTH_N=([\d.]+);/)[1]);
+  const jointSrc = extract(body, 'function fwGlueJoint(partMassKg,gAppMag,bondCount,strengthN=FW_GLUE_BOND_STRENGTH_N){');
+  let jointFn; eval(jointSrc.replace('function fwGlueJoint', 'jointFn = function fwGlueJoint'));
+  assert.ok(Number.isFinite(jointFn(5, 9.81, 2).load), 'joint loads are finite');
+  const src = extract(body, 'function fwGlueLoadUpdate(){');
+  const loadUpdate = eval('(' + src.replace('function fwGlueLoadUpdate', 'function loadUpdate')
+    .replace(/fwFlightGlueJoints/g, 'joints').replace(/fwLastGAppMag/g, 'lastG')
+    .replace(/fwGlueJoint/g, 'jointFn').replace(/workshopPartMass/g, 'massOf')
+    .replace(/detachPartAsDebris/g, 'detach').replace(/refreshCustomFlightStats/g, 'reportStats')
+    .replace(/flightLog/g, 'log').replace(/workshopSparkAt/g, 'spark')
+    .replace(/workshopWires/g, 'wires').replace(/fwFlightWireSims/g, 'flightSims') + ')');
+  globalThis.Electrics = { brokenWires: new Set() };
+  // airframe: two glue-carried parts, each on one bond; a power wire on part 1
+  const root = { parent: { parent: {} } };
+  const mkPart = (id, name) => ({ parent: root, userData: { partId: id, name },
+    getWorldPosition() { return new THREE.Vector3(); } });
+  const part1 = mkPart('p1', 'Battery'), part2 = mkPart('p2', 'Antenna'), anchor = mkPart('s', 'Frame');
+  const flightSims = [{ dead: false, line: { visible: true } }];
+  const wires = [{ from: 'p1', to: 'p2', kind: 'power' }];
+  // part2 sits on TWO bonds (700 N): holds at 9g (441 N), fails at 30g (1470 N)
+  let joints = { bonds: [{ a: part1, c: anchor }, { a: part2, c: anchor }, { a: part2, c: mkPart('s2', 'Frame') }], carried: [part1, part2], root, over: new Map() };
+  const detached = [], logs = [];
+  let lastG = 9.81, stats = 0;
+  const massOf = () => 5, detach = (p) => { detached.push(p); p.parent = null; };
+  const reportStats = () => { stats++; };
+  const log = (m) => { logs.push(m); };
+  const spark = () => {};
+  // 9g on a 5 kg part with one 350 N bond: 441 N > 350 N — the joint is overloaded
+  lastG = 9.81 * 9;
+  loadUpdate(); // frame 1: the two-frame guard holds — nothing detaches yet
+  assert.equal(detached.length, 0, 'first overloaded frame must not detach');
+  loadUpdate(); // frame 2: the joint lets go
+  assert.equal(detached.length, 1);
+  assert.equal(stats, 1, 'airframe stats refreshed');
+  assert.ok(logs.some(m => m.includes('Glue joint failed at 9g')), 'failure is logged with the load');
+  // the wire attached to the torn-off part ripped out with it (no anchor in mid-air)
+  assert.ok(flightSims[0].dead, 'the wire on the torn-off part dies');
+  assert.ok(globalThis.Electrics.brokenWires.has(0), 'the electrical system records the torn wire');
+  // cascade: a part glued only to the torn-off one has no support left
+  assert.ok(jointFn(5, 9.81, 0).fails, 'chained part with zero remaining bonds fails');
+  // a single-frame 30g spike (spawn teleport / reset) must not rip parts off
+  lastG = 9.81 * 30; loadUpdate();
+  assert.equal(detached.length, 1, 'one-frame spike must not detach');
+  lastG = 9.81; loadUpdate(); // back to 1g — the overload counter resets
+  lastG = 9.81 * 30; loadUpdate(); // another single spike frame
+  assert.equal(detached.length, 1, 'spikes separated by a calm frame never detach');
+  lastG = 9.81 * 30; loadUpdate(); lastG = 9.81 * 30; loadUpdate(); // sustained 30g
+  assert.equal(detached.length, 2, 'sustained overload tears the second part off');
+});
+
+test('flight wires: insulation burns through in flight (integration via the step)', () => {
+  physicsEnv();
+  // extend the stub with the ops the flight step uses (same as the rope test)
+  const V = THREE.Vector3;
+  THREE.Vector3 = class extends V {
+    clone(){return new THREE.Vector3(this.x,this.y,this.z);}
+    sub(v){this.x-=v.x;this.y-=v.y;this.z-=v.z;return this;}
+    divideScalar(n){this.x/=n;this.y/=n;this.z/=n;return this;}
+    applyQuaternion(){return this;}
+    negate(){this.x=-this.x;this.y=-this.y;this.z=-this.z;return this;}
+    addScaledVector(v,s){this.x+=v.x*s;this.y+=v.y*s;this.z+=v.z*s;return this;}
+    static multiplyVectors(a,b){return new THREE.Vector3(a.x*b.x,a.y*b.y,a.z*b.z);}
+  };
+  globalThis.THREE.Quaternion = class { constructor(){this.x=0;this.y=0;this.z=0;this.w=1;} invert(){return this;} };
+  globalThis.fleetModelSlot = { getWorldQuaternion: q => q };
+  const stepSrc = extract(body, 'function fwStepFlightWires(dt){');
+  const step = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
+    .replace(/fwFlightWireRoot/g, 'flightWireRoot').replace(/fwFlightWireSims/g, 'flightSims')
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
+    .replace(/physicsVelocity/g, 'vel') + ')');
+  let lastGApp = 9.81;
+  const prevVel = new THREE.Vector3();
+  const vel = new THREE.Vector3(); // parked: no acceleration
+  const flightWireRoot = { localToWorld: (v) => v, parent: { parent: {} } };
+  globalThis.Electrics = { brokenWires: new Set() };
+  globalThis.flightLog = () => {};
+  globalThis.workshopWires = [{ kind: 'power' }];
+  const mkRope = () => { // 5-node rope (the proven sag shape) with the flight thermal fields
+    const pts = [];
+    for (let i = 0; i < 5; i++) pts.push({ p: new THREE.Vector3(-2 + i, 2, 0), pp: new THREE.Vector3(-2 + i, 2, 0), pin: i === 0 || i === 4 });
+    return { pts, rests: [1, 1, 1, 1], line: { geometry: { getAttribute: () => null }, visible: true },
+      dead: false, warned: false, temp: 20, mcK: 5 * .05 * 385, hA: 5 * .005 * 80, stiffness: 2500, damping: 2 };
+  };
+  // hard re-entry: skin soaked at 480°C — the wire cooks past the PVC threshold
+  const reentryStub = { skinT: 480 };
+  let sim = mkRope();
+  let flightSims = [sim];
+  for (let i = 0; i < 900; i++) step(1 / 60); // 15 s
+  assert.ok(Number.isFinite(sim.temp), 'wire temperature stays finite');
+  assert.ok(sim.temp > 105, 'wire should be past the 105°C threshold, got ' + sim.temp.toFixed(1) + '°C');
+  assert.ok(sim.dead, 'the burned-through wire is dead');
+  assert.ok(!sim.line.visible, 'the melted line is hidden');
+  assert.ok(globalThis.Electrics.brokenWires.has(0), 'the electrical system records the burned wire');
+  // ordinary flight: skin at ambient — no melt, no warning
+  sim = mkRope(); flightSims = [sim];
+  reentryStub.skinT = 22;
+  for (let i = 0; i < 900; i++) step(1 / 60);
+  assert.ok(!sim.dead, 'cool wire survives');
+  assert.ok(sim.temp < 80, 'cool wire stays below the warning threshold');
 });
