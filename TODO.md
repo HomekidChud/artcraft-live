@@ -638,7 +638,8 @@ Still to do:
 
 ## AirplaneCraft — 17.10.5 session (2026-10-23): wire physics, water arcing, pressure, glue
 
-Commits: `00603ee` (wire physics), `4c156f1` (glue). Tests: 18 waypoint-wires + 1 e2e
+Commits: `00603ee` (wire physics), `4c156f1` (glue). Tests: 18 waypoint-wires (3 physics tests — the floor clamp lives inside the sag
+test — plus 4 glue tests) + 1 e2e
 + 8 server (27 total for this app; `npm test` at repo root is unrelated tooling).
 
 ### Wire physics (real gravity/sag — owner request: "wires has no physics")
@@ -671,6 +672,26 @@ Commits: `00603ee` (wire physics), `4c156f1` (glue). Tests: 18 waypoint-wires + 
 - Flight-time meaning of glue is NOT yet implemented (bonded parts flying as one
   rigid group in the atoms/damage sim is future work; today the weld flag still
   governs flight detachment).
+
+### Advisor-review fixes (same day, follow-up commit)
+- **Frame-rate independence:** physics now advances via a fixed-step accumulator
+  in `workshopFrame` (1/60 steps driven by elapsed time, catch-up capped at .25 s)
+  — no longer one step per rendered frame (120 Hz displays doubled the physics rate).
+- **Water-arc audit now measures true segment-to-segment distance** (Ericson
+  closest-points, clamped) — the old vertex-only check missed runs that cross
+  halfway between distant endpoints; regression test added with crossing wires.
+  Spark trigger threshold unified with the audit at 0.5 m.
+- **Pressure is kind-keyed** (`pressures[partId] = {hydraulic, fuel}`) — a part on
+  both networks keeps separate readings; a fuel wire never displays 3000 psi.
+- **Glue drag dedupe:** bonded moves skip parts that already moved (group members,
+  synced mirrors) — no more double-delta on grouped+glued parts.
+- **Lifecycle:** `workshopClear` resets bonds/glue start; part-placement tool
+  clears glue start + button; client schema rejects non-array `bonds`.
+- Honesty notes: the 0.5 m threshold is our design choice informed by AC 43.13-1B
+  wet-location guidance, NOT a number published by the FAA; pressure values are
+  nominal connectivity readings (pump rating propagated through the network), not
+  flow/pressure-loss physics; sparks trigger on proximity to water-line geometry,
+  which is a proxy — leaked vs intact plumbing is not modelled.
 
 ### Remaining (unchanged)
 - Fleet path removal (parity unproven), Build Mode UI overhaul (six CSS skins),

@@ -357,6 +357,14 @@ test('audit: powered line within 0.5 m of a water line is an arcing fault', () =
   let audit; eval(auditSrc.replace('function workshopSystemsAudit', 'audit = function workshopSystemsAudit'));
   const errors = audit().errors;
   assert.ok(errors.some(e => /water line/.test(e)), 'water/power proximity not caught: ' + JSON.stringify(errors));
+  // crossing runs whose endpoints are far apart must still be caught (segment-segment, not vertex-vertex)
+  globalThis.workshopParts = [
+    P('p1', 'battery', [0, 1, 0]), P('p2', 'powerBus', [0, 1, 40]),       // power wire along Z
+    P('w1', 'waterTank', [30, 1, 20]), P('w2', 'waterPump', [-30, 1, 20]) // water wire along X, crossing at (0,1,20)
+  ];
+  globalThis.__parts = new Map(globalThis.workshopParts.map(p => [p.userData.partId, p]));
+  const cross = audit().errors;
+  assert.ok(cross.some(e => /water line/.test(e)), 'crossing runs not caught: ' + JSON.stringify(cross));
   // separated runs pass
   globalThis.workshopParts = [
     P('p1', 'battery', [0, 1, 0]), P('p2', 'powerBus', [0, 1, 4]),
@@ -382,16 +390,20 @@ test('pressure: pumps pressurise their own fluid networks only', () => {
   ];
   let pressures; eval(prSrc.replace('function workshopSystemPressures', 'pressures = function workshopSystemPressures'));
   const pr = pressures();
-  assert.equal(pr.act, 3000, 'hydraulic actuator pressure');
-  assert.equal(pr.eng, 30, 'fuel line pressure');
+  assert.deepEqual(pr.act, { hydraulic: 3000 }, 'hydraulic actuator pressure');
+  assert.deepEqual(pr.eng, { fuel: 30 }, 'fuel line pressure');
   assert.equal(pr.iso, undefined, 'isolated part must not inherit pressure');
-  // a part reachable by BOTH kinds keeps the networks separate
+  // a part reachable by BOTH kinds keeps separate readings per fluid (no conflation)
   globalThis.workshopWires = [
     { from: 'hp', to: 'act', kind: 'hydraulic' },
-    { from: 'fp', to: 'act', kind: 'fuel' } // actuator fed by fuel too (bad design, but the model must not cross-contaminate
+    { from: 'fp', to: 'act', kind: 'fuel' } // actuator fed by fuel too (bad design, but the model must not cross-contaminate)
   ];
   const pr2 = pressures();
-  assert.equal(pr2.act, 3000, 'hydraulic wins on a shared part without leaking fuel pressure upward');
+  assert.deepEqual(pr2.act, { hydraulic: 3000, fuel: 30 }, 'shared part keeps distinct fuel and hydraulic pressures');
+  // a fuel-only part must never display the hydraulic reading
+  globalThis.workshopWires = [{ from: 'fp', to: 'act', kind: 'fuel' }];
+  const pr3 = pressures();
+  assert.deepEqual(pr3.act, { fuel: 30 }, 'fuel-fed part shows fuel pressure only');
 });
 
 /* ---------- glue: bond graph, click flow, schema, snapshot roundtrip ---------- */

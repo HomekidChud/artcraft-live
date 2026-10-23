@@ -1043,6 +1043,7 @@ function validateDesign(input, catalog) {
   }
   // glue bonds: pairs of existing parts, no self-bonds, no duplicates
   const bondRows = [];
+  if (input.bonds != null && !Array.isArray(input.bonds)) throw new Error('Invalid glue bond list');
   const bonds = input.bonds || [];
   if (bonds.length > 400) throw new Error('Maximum 400 glue bonds');
   for (const b of bonds) {
@@ -3334,7 +3335,7 @@ function workshopRenderInspector(){const g=workshopGetPart(workshopSelectedId);c
  const gl=$('workshopGlueList'),gc=$('workshopGlueCount');
  if(gl){const bonds=(g?workshopBonds.filter(b=>b.from===g.userData.partId||b.to===g.userData.partId):[]);if(gc)gc.textContent=String(bonds.length);
   gl.innerHTML=bonds.length?bonds.map(b=>{const other=b.from===g.userData.partId?b.to:b.from;const op=workshopGetPart(other);return '<div class="workshop-connection-row"><span>◌ '+(op?op.userData.name:other)+'</span><button type="button" data-workshop-unglue="'+b.from+'|'+b.to+'" title="Unglue">×</button></div>';}).join(''):'<span class="workshop-muted">Nothing glued to this part.</span>';}
- if(wsel){const pr=(wsel.kind==='hydraulic'||wsel.kind==='fuel')?workshopSystemPressures():null;$('workshopWireType').textContent=String(wsel.kind||'power').toUpperCase()+' / ROUTED WIRE'+((pr&&(pr[wsel.from]||pr[wsel.to]))?' · '+Math.round(pr[wsel.from]||pr[wsel.to])+' psi':'');$('workshopWireRoute').textContent=(workshopGetPart(wsel.from)?.userData.name||wsel.from)+' → '+(workshopGetPart(wsel.to)?.userData.name||wsel.to)+(wsel.waypoints&&wsel.waypoints.length?' · '+wsel.waypoints.length+' waypoint'+(wsel.waypoints.length>1?'s':''):' · straight run');$('workshopWaypointList').innerHTML=(wsel.waypoints&&wsel.waypoints.length)?wsel.waypoints.map((p,i)=>`<div class="workshop-connection-row workshop-waypoint-row"><span>WP${i+1}</span><div class="workshop-number-grid"><label>X<input data-wp-axis="x" data-wp-i="${i}" type="number" step="0.25" value="${p.x}"></label><label>Y<input data-wp-axis="y" data-wp-i="${i}" type="number" step="0.25" value="${p.y}"></label><label>Z<input data-wp-axis="z" data-wp-i="${i}" type="number" step="0.25" value="${p.z}"></label></div><button type="button" data-workshop-wp-delete="${i}" title="Remove waypoint">×</button></div>`).join(''):'<span class="workshop-muted">Straight run — add a waypoint to route it along structure.</span>';}
+ if(wsel){const prAll=(wsel.kind==='hydraulic'||wsel.kind==='fuel')?workshopSystemPressures():null;const pr=prAll?(prAll[wsel.from]||prAll[wsel.to]):null;const psi=pr?pr[wsel.kind]:null;$('workshopWireType').textContent=String(wsel.kind||'power').toUpperCase()+' / ROUTED WIRE'+(psi!=null?' · '+Math.round(psi)+' psi':'');$('workshopWireRoute').textContent=(workshopGetPart(wsel.from)?.userData.name||wsel.from)+' → '+(workshopGetPart(wsel.to)?.userData.name||wsel.to)+(wsel.waypoints&&wsel.waypoints.length?' · '+wsel.waypoints.length+' waypoint'+(wsel.waypoints.length>1?'s':''):' · straight run');$('workshopWaypointList').innerHTML=(wsel.waypoints&&wsel.waypoints.length)?wsel.waypoints.map((p,i)=>`<div class="workshop-connection-row workshop-waypoint-row"><span>WP${i+1}</span><div class="workshop-number-grid"><label>X<input data-wp-axis="x" data-wp-i="${i}" type="number" step="0.25" value="${p.x}"></label><label>Y<input data-wp-axis="y" data-wp-i="${i}" type="number" step="0.25" value="${p.y}"></label><label>Z<input data-wp-axis="z" data-wp-i="${i}" type="number" step="0.25" value="${p.z}"></label></div><button type="button" data-workshop-wp-delete="${i}" title="Remove waypoint">×</button></div>`).join(''):'<span class="workshop-muted">Straight run — add a waypoint to route it along structure.</span>';}
  $('workshopInspectorEmpty').hidden=!!g||!!wsel;$('workshopInspectorFields').hidden=!g;$('workshopDuplicate').disabled=!g;$('workshopMirrorSelected').disabled=!g||!!workshopMirrorMate(g);if(!g){$('workshopConnectionsList').innerHTML='<span class="workshop-muted">No wires connected yet.</span>';return;}const d=WORKSHOP_PARTS[g.userData.type];$('workshopSelectedType').textContent=(d.category||'component').toUpperCase()+' / '+g.userData.type.toUpperCase();$('workshopPartName').value=g.userData.name;$('workshopPosX').value=g.position.x.toFixed(2);$('workshopPosY').value=g.position.y.toFixed(2);$('workshopPosZ').value=g.position.z.toFixed(2);$('workshopScaleX').value=g.scale.x.toFixed(2);$('workshopScaleY').value=g.scale.y.toFixed(2);$('workshopScaleZ').value=g.scale.z.toFixed(2);$('workshopRotation').value=(g.rotation.y*180/Math.PI).toFixed(1);$('workshopPartMass').textContent=workshopPartMass(g).toFixed(2)+' kg';$('workshopPartCategory').textContent=d.category;$('workshopPartDetails').textContent=d.electrical?`${d.electrical.role} · ${d.electrical.volts} V · ${d.electrical.ports} ports. Connect compatible modules using Wire mode.`:d.engineType?`${d.engineType} propulsion · estimated static thrust ${d.thrustN} N.`:d.detail;const rows=workshopWires.map((w,i)=>({w,i})).filter(({w})=>w.from===g.userData.partId||w.to===g.userData.partId);$('workshopConnectionCount').textContent=String(rows.length);$('workshopConnectionsList').innerHTML=rows.length?rows.map(({w,i})=>`<div class="workshop-connection-row"><span>${escapeHTML(w.kind.toUpperCase())} · ${escapeHTML(workshopGetPart(w.from)?.userData.name||w.from)} → ${escapeHTML(workshopGetPart(w.to)?.userData.name||w.to)}</span><button type="button" data-workshop-wire-delete="${i}" title="Remove wire">×</button></div>`).join(''):'<span class="workshop-muted">No wires attached to this part.</span>';}
 /* Resolve a wire's rendered polyline: attached part endpoints (lifted slightly
    off the part centre) joined through any structure-following waypoints. One
@@ -3442,7 +3443,7 @@ function workshopStepWirePhysics(dt){
   if(waterPts.length&&(w.kind==='power'||w.kind==='ground')){
    for(const sp of sim.pts){
     for(const wp of waterPts){
-     if(sp.p.distanceToSquared(wp)<.09){sparkPos=sp.p.clone();break;}
+     if(sp.p.distanceToSquared(wp)<.25){sparkPos=sp.p.clone();break;}
     }
     if(sparkPos)break;
    }
@@ -3487,7 +3488,7 @@ function workshopSystemPressures(){
   const kind=pump.userData.type==='hydraulicPump'?'hydraulic':'fuel';
   const psi=kind==='hydraulic'?3000:30;
   const seen=new Set([pump.userData.partId]),q=[pump.userData.partId];
-  while(q.length){const n=q.pop();pressures[n]=Math.max(pressures[n]||0,psi);for(const [t,k] of(adj[n]||[]))if(k===kind&&!seen.has(t)){seen.add(t);q.push(t);}}
+  while(q.length){const n=q.pop();(pressures[n]=pressures[n]||{})[kind]=Math.max(pressures[n][kind]||0,psi);for(const [t,k] of(adj[n]||[]))if(k===kind&&!seen.has(t)){seen.add(t);q.push(t);}}
  }
  return pressures;
 }
@@ -3532,7 +3533,11 @@ function workshopIntersectPlane(e,y=0){workshopSetNDC(e);const p=new THREE.Plane
 function workshopMoveCamera(){if(!workshopCamera)return;const cp=Math.cos(workshopPitch),sp=Math.sin(workshopPitch);workshopCamera.position.set(workshopTarget.x+Math.sin(workshopYaw)*cp*workshopDistance,workshopTarget.y+sp*workshopDistance,workshopTarget.z+Math.cos(workshopYaw)*cp*workshopDistance);workshopCamera.lookAt(workshopTarget);workshopCamera.updateProjectionMatrix();}
 function workshopInit(){if(workshopRenderer)return true;try{const canvas=$('workshopCanvas');workshopRenderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false,powerPreference:'high-performance'});workshopRenderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.5));workshopRenderer.outputColorSpace=THREE.SRGBColorSpace;workshopRenderer.toneMapping=THREE.ACESFilmicToneMapping;workshopRenderer.toneMappingExposure=1.15;workshopScene=new THREE.Scene();workshopScene.background=new THREE.Color('#0a151d');workshopCamera=new THREE.PerspectiveCamera(48,1,.1,1200);workshopRaycaster=new THREE.Raycaster();workshopPointer=new THREE.Vector2();workshopFloorPlane=new THREE.Plane(new THREE.Vector3(0,1,0),0);const hemi=new THREE.HemisphereLight('#d9efff','#35434b',2.2);workshopScene.add(hemi);const key=new THREE.DirectionalLight('#fff1d7',3.1);key.position.set(-8,14,9);workshopScene.add(key);const fill=new THREE.DirectionalLight('#8cc9e5',1.05);fill.position.set(8,8,-8);workshopScene.add(fill);workshopGround=new THREE.Mesh(new THREE.PlaneGeometry(400,400),new THREE.MeshStandardMaterial({color:'#101d25',roughness:.98,metalness:0}));workshopGround.rotation.x=-Math.PI/2;workshopGround.position.y=-.08;workshopGround.receiveShadow=true;workshopScene.add(workshopGround);workshopGrid=new THREE.GridHelper(160,160,0x638190,0x29404d);workshopGrid.position.y=-.03;workshopScene.add(workshopGrid);const axes=new THREE.AxesHelper(2.5);axes.position.set(0,.02,0);workshopScene.add(axes);workshopBuildRoot=new THREE.Group();workshopBuildRoot.name='ScratchAircraftParts';workshopScene.add(workshopBuildRoot);workshopWireRoot=new THREE.Group();workshopWireRoot.name='ElectricalWiring';workshopScene.add(workshopWireRoot);workshopGlueRoot=new THREE.Group();workshopGlueRoot.name='GlueBonds';workshopScene.add(workshopGlueRoot);workshopMoveCamera();workshopResize();new ResizeObserver(workshopResize).observe(canvas);requestAnimationFrame(workshopFrame);return true;}catch(err){$('workshopCanvasError').hidden=false;$('workshopCanvasError').textContent='3D workshop unavailable: '+(err.message||'WebGL initialisation failed');return false;}}
 function workshopResize(){if(!workshopRenderer||!workshopCamera)return;const c=$('workshopCanvas'),w=c.clientWidth,h=c.clientHeight;if(!w||!h)return;workshopRenderer.setSize(w,h,false);workshopCamera.aspect=w/h;workshopCamera.updateProjectionMatrix();}
-function workshopFrame(){requestAnimationFrame(workshopFrame);if(!workshopRenderer||!buildModeOpen)return;workshopStepWirePhysics(1/60);if(workshopSelectionBox){const g=workshopGetPart(workshopSelectedId);if(g)workshopSelectionBox.update();}workshopRenderer.render(workshopScene,workshopCamera);}
+let workshopWireAcc=0,workshopWireLast=0;
+function workshopFrame(){requestAnimationFrame(workshopFrame);if(!workshopRenderer||!buildModeOpen)return;
+ const now=performance.now();if(!workshopWireLast)workshopWireLast=now;
+ workshopWireAcc=Math.min(workshopWireAcc+(now-workshopWireLast)/1000,.25);workshopWireLast=now; // bounded catch-up
+ while(workshopWireAcc>=1/60){workshopStepWirePhysics(1/60);workshopWireAcc-=1/60;}if(workshopSelectionBox){const g=workshopGetPart(workshopSelectedId);if(g)workshopSelectionBox.update();}workshopRenderer.render(workshopScene,workshopCamera);}
 function openBuildMode(){if(!buildModeOpen)buildWasPaused=!!S.paused;const sb=$('workshopSymmetryToggle');if(sb){sb.textContent='Symmetry: '+(workshopSymmetryEnabled?'ON':'OFF');sb.classList.toggle('symmetry-on',workshopSymmetryEnabled);sb.setAttribute('aria-pressed',String(workshopSymmetryEnabled));}$('workshopSnapSize').value=String(workshopSnapIncrement);buildModeOpen=true;S.paused=true;$('pause').textContent='Resume';$('buildModeOverlay').hidden=false;$('buildModeOverlay').setAttribute('aria-hidden','false');$('simViewport').classList.add('build-mode');$('aircraftType').value=S.aircraftId;if(workshopInit()){workshopResize();workshopRenderPalette();workshopRenderInspector();workshopUpdateStats();workshopUpdateEmptyHint();setTimeout(workshopResize,60);}}
 function closeBuildMode(){if(!buildModeOpen)return;buildModeOpen=false;$('buildModeOverlay').hidden=true;$('buildModeOverlay').setAttribute('aria-hidden','true');$('simViewport').classList.remove('build-mode');$('aircraftType').value=S.aircraftId;S.paused=buildWasPaused;$('pause').textContent=S.paused?'Resume':'Pause';workshopDrag=null;}
 function workshopTemplate(name){
@@ -3722,13 +3727,30 @@ function workshopSystemsAudit(){
   const waterWires=workshopWires.filter(w=>w.kind==='water');
   if(waterWires.length){
    const powerWires=workshopWires.filter(w=>w.kind==='power'||w.kind==='ground');
-   const near=(a,b,r2)=>{const dx=a.x-b.x,dy=a.y-b.y,dz=a.z-b.z;return dx*dx+dy*dy+dz*dz<r2;};
+   // closest distance between two 3D segments (clamped endpoint algorithm);
+   // vertex-only checks would miss crossings halfway between distant endpoints
+   const segSegDist2=(a1,a2,b1,b2)=>{
+    const d1=[a2.x-a1.x,a2.y-a1.y,a2.z-a1.z],d2=[b2.x-b1.x,b2.y-b1.y,b2.z-b1.z],r=[a1.x-b1.x,a1.y-b1.y,a1.z-b1.z]; // r = p1 - p2 (Ericson)
+    const a=d1[0]*d1[0]+d1[1]*d1[1]+d1[2]*d1[2],e=d2[0]*d2[0]+d2[1]*d2[1]+d2[2]*d2[2],f=d2[0]*r[0]+d2[1]*r[1]+d2[2]*r[2];
+    let s=0,t=0;
+    if(a<=1e-9&&e<=1e-9){s=0;t=0;}
+    else if(a<=1e-9){t=Math.min(1,Math.max(0,f/e));}
+    else{
+     const c=d1[0]*r[0]+d1[1]*r[1]+d1[2]*r[2];
+     if(e<=1e-9){s=Math.min(1,Math.max(0,-c/a));}
+     else{const b=d1[0]*d2[0]+d1[1]*d2[1]+d1[2]*d2[2],den=a*e-b*b;
+      s=den>1e-9?Math.min(1,Math.max(0,(b*f-c*e)/den)):0;
+      t=(b*s+f)/e;if(t<0){t=0;s=Math.min(1,Math.max(0,-c/a));}else if(t>1){t=1;s=Math.min(1,Math.max(0,(b-c)/a));}}
+    }
+    const px=a1.x+d1[0]*s-(b1.x+d2[0]*t),py=a1.y+d1[1]*s-(b1.y+d2[1]*t),pz=a1.z+d1[2]*s-(b1.z+d2[2]*t);
+    return px*px+py*py+pz*pz;
+   };
    for(const pw of powerWires){
     const pPts=workshopWirePath(pw);if(!pPts)continue;
     for(const ww of waterWires){
      const wPts=workshopWirePath(ww);if(!wPts)continue;
      let hit=false;
-     for(const a of pPts){for(const b of wPts)if(near(a,b,.25)){hit=true;break;}if(hit)break;}
+     for(let i=0;i<pPts.length-1&&!hit;i++)for(let j=0;j<wPts.length-1&&!hit;j++)if(segSegDist2(pPts[i],pPts[i+1],wPts[j],wPts[j+1])<.25)hit=true;
      if(hit){errors.push('Power line '+name(pw.from)+' → '+name(pw.to)+' runs within 0.5 m of a water line — separate electrical runs from water lines (wet-location arcing)');break;}
     }
    }
@@ -3825,8 +3847,8 @@ function workshopFly(){if(workshopParts.length===0){workshopSetStatus('Add compo
 function workshopBeginPlacement(e){const d=WORKSHOP_PARTS[workshopPendingType];if(!d)return;const p=workshopIntersectPlane(e,0);if(!p)return;const pos={x:workshopSnap(p.x),y:workshopPlacementHeight(workshopPendingType),z:workshopSnap(p.z)};workshopPushUndo();const g=workshopCreateMirroredPair(workshopPendingType,pos);if(!g)return;workshopSetStatus(`Placed ${d.name}${workshopMirrorMate(g)?' with mirrored counterpart':''} · centreline symmetry ${workshopSymmetryEnabled?'ON':'OFF'}`);}
 function workshopCreateGhost(type){if(workshopGhost){workshopScene.remove(workshopGhost);workshopGhost=null;}if(workshopGhostMirror){workshopScene.remove(workshopGhostMirror);workshopGhostMirror=null;}if(!type||!WORKSHOP_PARTS[type])return;workshopGhost=workshopMakeVisual(type,true);workshopScene.add(workshopGhost);workshopGhostMirror=workshopMakeVisual(type,true);workshopScene.add(workshopGhostMirror);workshopGhostMirror.visible=false;}
 function workshopUpdateGhost(e){if(workshopTool!=='place'||!workshopGhost||!workshopPendingType)return;const d=WORKSHOP_PARTS[workshopPendingType],p=workshopIntersectPlane(e,0);if(!p)return;const x=workshopSnap(p.x),z=workshopSnap(p.z);workshopGhost.position.set(x,workshopPlacementHeight(workshopPendingType),z);if(workshopGhostMirror){workshopGhostMirror.visible=workshopShouldMirror(workshopPendingType,x);workshopGhostMirror.position.set(-x,workshopPlacementHeight(workshopPendingType),z);}}
-function workshopSetPartTool(type){if(type.startsWith('__wire_')){workshopWireKind=type.split('_').pop();workshopSetTool('wire');workshopCategory='wiring';workshopRenderPalette();return;}if(type.startsWith('template')){workshopTemplate(type);return;}if(!WORKSHOP_PARTS[type])return;workshopPendingType=type;workshopTool='place';workshopWireStart=null;$('workshopSelectTool').classList.remove('active');$('workshopWireTool').classList.remove('active');$('workshopWireHint').hidden=true;workshopCreateGhost(type);workshopRenderPalette();workshopSetStatus(`Place ${WORKSHOP_PARTS[type].name} · click the grid to add a component`);}
-function workshopClear(){if(!workshopParts.length&&!workshopWires.length)return;if(!confirm('Clear all components and wiring from this scratch build?'))return;workshopPushUndo();workshopBuildRoot.clear();workshopParts=[];workshopGroups=[];workshopMultiSelect.clear();workshopWires=[];workshopWireRoot.clear();workshopSelectedId=null;workshopSelectPart(null);workshopRebuildWires();workshopUpdateStats();workshopUpdateEmptyHint();workshopSetStatus('Empty workshop · ready to build from scratch');}
+function workshopSetPartTool(type){if(type.startsWith('__wire_')){workshopWireKind=type.split('_').pop();workshopSetTool('wire');workshopCategory='wiring';workshopRenderPalette();return;}if(type.startsWith('template')){workshopTemplate(type);return;}if(!WORKSHOP_PARTS[type])return;workshopPendingType=type;workshopTool='place';workshopWireStart=null;workshopGlueStart=null;$('workshopSelectTool').classList.remove('active');$('workshopWireTool').classList.remove('active');$('workshopGlueTool')?.classList.remove('active');$('workshopWireHint').hidden=true;workshopCreateGhost(type);workshopRenderPalette();workshopSetStatus(`Place ${WORKSHOP_PARTS[type].name} · click the grid to add a component`);}
+function workshopClear(){if(!workshopParts.length&&!workshopWires.length)return;if(!confirm('Clear all components and wiring from this scratch build?'))return;workshopPushUndo();workshopBuildRoot.clear();workshopParts=[];workshopGroups=[];workshopMultiSelect.clear();workshopWires=[];workshopBonds=[];workshopGlueStart=null;workshopWireRoot.clear();workshopSelectedId=null;workshopSelectPart(null);workshopRebuildWires();workshopUpdateStats();workshopUpdateEmptyHint();workshopSetStatus('Empty workshop · ready to build from scratch');}
 $('menuSandbox').addEventListener('click',()=>{$('mainMenuOverlay').hidden=true;S.paused=false;$('pause').textContent='Pause';});
 $('menuBuild').addEventListener('click',()=>{$('mainMenuOverlay').hidden=true;openBuildMode();});
 $('quickBuild').addEventListener('click',openBuildMode);
@@ -3905,7 +3927,11 @@ $('workshopCanvas').addEventListener('pointermove',e=>{
   // move the rest of the group by the same delta (their mirror mates sync after)
   for(const rec of before){rec.m.position.x+=ddx;rec.m.position.y+=ddy;rec.m.position.z+=ddz;}
   workshopSyncMirror(g);for(const rec of before)workshopSyncMirror(rec.m);
-  for(const gid of workshopBondedSet(d.partId)){const m=workshopGetPart(gid);if(m){m.position.x+=ddx;m.position.y+=ddy;m.position.z+=ddz;workshopSyncMirror(m);}}
+  // glued parts follow, but skip anything that already moved (group members, synced mirrors)
+  const already=new Set(grpMembers);
+  const mm=workshopMirrorMate(g);if(mm)already.add(mm.userData.partId);
+  for(const rec of before){const m2=workshopMirrorMate(rec.m);if(m2)already.add(m2.userData.partId);}
+  for(const gid of workshopBondedSet(d.partId)){if(already.has(gid))continue;const m=workshopGetPart(gid);if(m){m.position.x+=ddx;m.position.y+=ddy;m.position.z+=ddz;workshopSyncMirror(m);}}
   workshopRenderInspector();workshopSelectionBox?.update();workshopRebuildWires();
  }
 });
