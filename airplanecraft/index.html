@@ -4867,12 +4867,47 @@ const FW_WIRE_INSULATION_MELT_C=105; // PVC continuous rating — hotter and the
 const FW_GLUE_BOND_STRENGTH_N=350; // ~25 mm² epoxy lap joint at ~14 MPa shear (design estimate)
 const FW_WIRE_COLORS={power:'#ffd24a',ground:'#9aa7ad',signal:'#6fd3ff',data:'#6fd3ff',hydraulic:'#ff9a3d',fuel:'#c9a86a',water:'#5ac8ff'};
 let fwFlightWireSims=[],fwFlightWireRoot=null,fwPrevVel=new THREE.Vector3(),fwGluePrevVel=new THREE.Vector3(),fwReentry={skinT:20,flame:null};
+let fwFlightWireColliders=[],fwFlightWireBroad=null,fwFlightWireColliderTick=0,fwFlightWireCables=null,fwFlightWireCableCount=0,fwFlightWirePushCount=0;
+const FW_WIRE_MAX_SEGMENTS=6000,FW_WIRE_CABLE_DUMMY=new THREE.Object3D(),FW_WIRE_CABLE_UP=new THREE.Vector3(0,1,0),FW_WIRE_CABLE_V=new THREE.Vector3(),FW_WIRE_CABLE_C=new THREE.Color();
+const FW_WIRE_RADII={power:.013,ground:.011,signal:.008,data:.008,hydraulic:.014,fuel:.012,water:.011};
+/* Refresh the airframe collision boxes (aircraft-local space). Parts flex and
+   tear off in flight, so this re-runs periodically instead of once. */
+function fwRefreshWireColliders(){
+ const root=fwFlightWireRoot;if(!root||!root.parent)return;
+ root.updateWorldMatrix(true,false);
+ const inv=root.matrixWorld.clone().invert();
+ fwFlightWireColliders=[];
+ for(const part of root.parent.children){
+  if(!part.userData||!part.userData.isWorkshopPart||!part.visible||!part.parent)continue;
+  const box=new THREE.Box3().setFromObject(part);
+  if(box.isEmpty())continue;
+  const local=box.applyMatrix4(inv); // world → aircraft-local (the ropes live here)
+  if(local.getSize(FW_WIRE_CABLE_V).length()<.07)continue; // dust: skip boxes smaller than 7 cm
+  local.expandByScalar(.015); // wire radius clearance so cables rest ON the skin
+  fwFlightWireColliders.push(local);
+ }
+ fwFlightWireBroad=fwFlightWireColliders.length?fwFlightWireColliders[0].clone():null;
+ for(let i=1;i<fwFlightWireColliders.length;i++)fwFlightWireBroad.union(fwFlightWireColliders[i]);
+}
+/* Shared instanced cable renderer: every live rope segment becomes one thin
+   cylinder instance — real thickness instead of a 1-px line that reads as a
+   broken dash at distance. One draw call for the whole wire loom. */
+function fwBuildWireCableMesh(flightWires){
+ if(fwFlightWireCables){fwFlightWireCables.geometry.dispose();fwFlightWireCables.material.dispose();flightWires.remove(fwFlightWireCables);fwFlightWireCables=null;}
+ const geo=new THREE.CylinderGeometry(1,1,1,6,1,true);
+ const mat=new THREE.MeshStandardMaterial({roughness:.55,metalness:.2});
+ fwFlightWireCables=new THREE.InstancedMesh(geo,mat,FW_WIRE_MAX_SEGMENTS);
+ fwFlightWireCables.frustumCulled=false; // instances span the whole airframe; the mesh bounds are meaningless
+ fwFlightWireCables.castShadow=false; // hundreds of thin cables — shadow cost outweighs the look
+ flightWires.add(fwFlightWireCables);
+}
 function fwBuildFlightWireSims(flightWires){
  fwFlightWireRoot=flightWires;fwFlightWireSims=[];
  fwPrevVel.copy(physicsVelocity);
  const parts=(flightWires.parent&&flightWires.parent.children||[]).filter(c=>c.userData&&c.userData.isWorkshopPart);
  const idx=new Map(parts.map(p=>[p.userData.partId,p]));
  while(flightWires.children.length){const c=flightWires.children[0];flightWires.remove(c);} // static clones out, ropes in
+ fwFlightWireColliderTick=0;fwRefreshWireColliders();
  for(let i=0;i<workshopWires.length;i++){
   const w=workshopWires[i],a=idx.get(w.from),b=idx.get(w.to);
   if(!a||!b){fwFlightWireSims.push(null);continue;}
@@ -4883,18 +4918,17 @@ function fwBuildFlightWireSims(flightWires){
   add(pins[0],true);
   for(let sp=0;sp<pins.length-1;sp++){
    const p1=pins[sp],p2=pins[sp+1],span=p1.distanceTo(p2);
-   const k=Math.min(10,Math.max(0,Math.round(span/.8)-1));
+   // 0.3 m node spacing (was 0.8 m): enough nodes for a smooth catenary — a
+   // 6-node rope renders as a straight dashed stick, not a sagging cable
+   const k=Math.min(28,Math.max(0,Math.round(span/.3)-1));
    for(let j=1;j<=k;j++)add(new THREE.Vector3().lerpVectors(p1,p2,j/(k+1)),false);
    add(p2,true);for(let r=0;r<=k;r++)rests.push(span/(k+1)); // per-SEGMENT rest — the step indexes by segment
   }
-  const line=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:FW_WIRE_COLORS[w.kind]||'#ffd24a',transparent:true,opacity:.95}));
-  line.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(Math.max(2,(pts.length-1)*2)*3),3));
-  line.geometry.boundingSphere=new THREE.Sphere(new THREE.Vector3(),1e4); // skip per-frame recompute culls
-  flightWires.add(line);
   // thermal mass: 50 g copper nodes (cp 385 J/kg·K) + forced-convection cooling
   // (h≈80 W/m²K in the slipstream; the static workshop uses h≈10 — natural convection)
-  fwFlightWireSims.push({pts,rests,line,stiffness:WORKSHOP_WIRE_STIFFNESS[w.kind]||2500,damping:2,dead:false,mcK:pts.length*.05*385,hA:pts.length*.005*80,temp:20,warned:false});
+  fwFlightWireSims.push({pts,rests,stiffness:WORKSHOP_WIRE_STIFFNESS[w.kind]||2500,damping:2,dead:false,mcK:pts.length*.05*385,hA:pts.length*.005*80,temp:20,warned:false,radius:FW_WIRE_RADII[w.kind]||.011,color:FW_WIRE_COLORS[w.kind]||'#ffd24a'});
  }
+ fwBuildWireCableMesh(flightWires);
 }
 function fwStepFlightWires(dt){
  if(!fwFlightWireRoot||!fwFlightWireRoot.parent||!fwFlightWireRoot.parent.parent)return; // custom aircraft gone
@@ -4929,7 +4963,7 @@ function fwStepFlightWires(dt){
     // elastic limit: an overstretched wire SNAPS (spark, electrical fault) —
     // but not during the settle transient of a freshly built, perfectly straight rope
     if(sim.age>FW_WIRE_SETTLE_FRAMES&&stretch>sim.rests[j]*FW_WIRE_SNAP_STRETCH){
-     sim.dead=true;sim.line.visible=false;
+     sim.dead=true;
      if(typeof Electrics!=='undefined')Electrics.brokenWires.add(i);
      if(typeof flightLog==='function')flightLog('Wire snapped — overstretched past its elastic limit');
      const wp=fwFlightWireRoot.localToWorld(new THREE.Vector3().lerpVectors(A.p,B.p,.5));
@@ -4947,14 +4981,86 @@ function fwStepFlightWires(dt){
   if(sim.temp>80&&!sim.warned){sim.warned=true;if(typeof flightLog==='function')flightLog('⚠ Wire insulation running hot ('+Math.round(sim.temp)+'°C) — PVC limit is 105°C');}
   if(sim.temp>FW_WIRE_INSULATION_MELT_C){ // tuned damage threshold at the PVC continuous-service
    // rating: the insulation gives and the line burns through (gameplay failure mode)
-   sim.dead=true;sim.line.visible=false;
+   sim.dead=true;
    if(typeof Electrics!=='undefined'&&Electrics.brokenWires)Electrics.brokenWires.add(i);
    if(typeof flightLog==='function')flightLog('Wire insulation melted at '+Math.round(sim.temp)+'°C — '+(workshopWires[i]&&workshopWires[i].kind||'wire')+' line burned through');
    if(typeof workshopSparkAt==='function'&&fwFlightWireRoot)workshopSparkAt(fwFlightWireRoot.localToWorld(sim.pts[Math.floor(sim.pts.length/2)].p.clone()));
    continue;
   }
-  const attr=sim.line.geometry.getAttribute('position');
+  const attr=sim.line&&sim.line.geometry&&sim.line.geometry.getAttribute?sim.line.geometry.getAttribute('position'):null; // legacy stubs only — the real render is the instanced cable mesh
   if(attr){for(let j=0;j<sim.pts.length-1;j++){attr.setXYZ(j*2,sim.pts[j].p.x,sim.pts[j].p.y,sim.pts[j].p.z);attr.setXYZ(j*2+1,sim.pts[j+1].p.x,sim.pts[j+1].p.y,sim.pts[j+1].p.z);}attr.needsUpdate=true;}
+ }
+ /* airframe collision: rope nodes rest ON the airframe instead of cutting
+    through it. Runs once per frame (not per substep) — plenty for draping.
+    Waypoint pins get pushed out too: a wire routed through the fuselage
+    interior settles against the skin instead of slicing the geometry. */
+ fwFlightWireColliderTick++;
+ if(fwFlightWireColliderTick>=45){fwFlightWireColliderTick=0;fwRefreshWireColliders();} // parts flex and tear off
+ if(fwFlightWireColliders.length){
+  for(const sim of fwFlightWireSims){
+   if(!sim||sim.dead)continue;
+   // fixed-point passes: each union-escape can land the node in a fresh box
+   // (a stack of overlapping parts), so repeat until no push happens (max 8)
+   for(let iter=0;iter<8;iter++){
+    let pushed=false;
+    for(let j=0;j<sim.pts.length;j++){
+     if(j===0||j===sim.pts.length-1)continue; // endpoints stay attached to their parts
+     const sp=sim.pts[j];
+     if(fwFlightWireBroad&&!fwFlightWireBroad.containsPoint(sp.p))continue;
+     // collect EVERY box the node is inside, then escape along the cheapest
+     // axis-direction whose landing point is free — a naive push out of one box
+     // can land the node inside an overlapping neighbour (engine ⇄ nose cone) and
+     // cycle forever; free space is verified before the move
+     const hit=fwFlightWireColliders.filter(b=>b.containsPoint(sp.p));
+     if(!hit.length)continue;
+     let bestD=Infinity,bestAxis=-1,bestDir=0,bestV=0;
+     for(let a=0;a<3;a++)for(const dir of[-1,1]){
+      const minB=Math.min(...hit.map(b=>b.min.getComponent(a))),maxB=Math.max(...hit.map(b=>b.max.getComponent(a)));
+      const d=dir<0?sp.p.getComponent(a)-minB:maxB-sp.p.getComponent(a);
+      if(d>=bestD)continue;
+      const v=sp.p.getComponent(a)+(dir<0?-d-.005:d+.005);
+      const land=FW_WIRE_CABLE_V.copy(sp.p).setComponent(a,v); // scratch vector — restored after the test
+      if(fwFlightWireColliders.some(b=>b.containsPoint(land)))continue; // landing inside another box — try the next direction
+      bestD=d;bestAxis=a;bestDir=dir;bestV=v;
+     }
+     if(bestAxis<0)continue; // fully boxed in on every side — leave it for the next frame
+     sp.p.setComponent(bestAxis,bestV);
+     sp.pp.copy(sp.p); // kill the node velocity so it rests instead of bouncing
+     pushed=true;fwFlightWirePushCount++;
+     // the detour lengthens the adjacent segments — grow their rest lengths so
+     // draping along the skin does not read as overstretch (the wire slides
+     // along the surface, it does not stretch past its elastic limit)
+     if(j>0){const d=sp.p.distanceTo(sim.pts[j-1].p);if(d>sim.rests[j-1])sim.rests[j-1]=d;}
+     if(j<sim.pts.length-1){const d=sp.p.distanceTo(sim.pts[j+1].p);if(d>sim.rests[j])sim.rests[j]=d;}
+    }
+    if(!pushed)break;
+   }
+  }
+ }
+ /* render pass: every live segment becomes one thin cylinder instance — a
+    real cable with thickness, not a 1-px line that reads as a broken dash */
+ if(fwFlightWireCables){
+  const dummy=FW_WIRE_CABLE_DUMMY;let n=0;
+  for(const sim of fwFlightWireSims){
+   if(!sim||sim.dead)continue;
+   for(let j=0;j<sim.pts.length-1;j++){
+    if(n>=FW_WIRE_MAX_SEGMENTS)break;
+    const A=sim.pts[j].p,B=sim.pts[j+1].p;
+    const dx=B.x-A.x,dy=B.y-A.y,dz=B.z-A.z,len=Math.hypot(dx,dy,dz);
+    if(len<1e-6)continue;
+    dummy.position.set((A.x+B.x)/2,(A.y+B.y)/2,(A.z+B.z)/2);
+    dummy.quaternion.setFromUnitVectors(FW_WIRE_CABLE_UP,FW_WIRE_CABLE_V.set(dx,dy,dz).divideScalar(len));
+    dummy.scale.set(sim.radius,len,sim.radius);
+    dummy.updateMatrix();
+    fwFlightWireCables.setMatrixAt(n,dummy.matrix);
+    fwFlightWireCables.setColorAt(n,FW_WIRE_CABLE_C.set(sim.color));
+    n++;
+   }
+   if(n>=FW_WIRE_MAX_SEGMENTS)break;
+  }
+  fwFlightWireCables.count=n;fwFlightWireCableCount=n;
+  fwFlightWireCables.instanceMatrix.needsUpdate=true;
+  if(fwFlightWireCables.instanceColor)fwFlightWireCables.instanceColor.needsUpdate=true;
  }
 }
 /* isentropic stagnation temperature (compressible flow): T0 = T·(1 + 0.2·M²) */
@@ -6403,7 +6509,7 @@ window.addEventListener('keydown',e=>{if(buildModeOpen){keys.clear();if(e.code==
 resetSystems();S.paused=true;$('pause').textContent='Resume';
 
 const lighting=document.createElement('label');lighting.className='deck-field';lighting.innerHTML='Lighting <select id="lightingTime"><option value="live">Live local time</option><option value="12">Midday</option><option value="17">Late afternoon</option><option value="0">Midnight</option></select>';$('worldSettings').appendChild(lighting);$('lightingTime').onchange=e=>{S.clockHour=e.target.value==='live'?null:Number(e.target.value);};
-if(new URLSearchParams(location.search).has('debug'))window.__flightWorld={THREE,camera,state:S,systems,plane,velocity:physicsVelocity,step:stepFlight,reset:resetFlight,place:placeInFlight,setAircraft:setAircraftType,core:AeroCore,interactive:()=>cockpitInteractive,doorTest:{state:()=>({...cockpitDoorState}),click:a=>cockpitActionClick(a),step:n=>{for(let i=0;i<n;i++)updateCockpitDoors();}},debris:()=>debrisField,tick:dt=>updateFlight(dt),elec:()=>Electrics,workshop:{snapshot:workshopSnapshot,restore:workshopRestoreSnapshot,energy:fwEnergyLedger,template:workshopTemplate,open:openBuildMode,select:workshopSelectPart,parts:()=>workshopParts,validate:d=>AeroCore.validateDesign(d,WORKSHOP_PARTS)},removePart:name=>{const m=fleetModelSlot.children[0];if(!m)return null;let hit=null;m.traverse(o=>{if(!hit&&o.userData&&o.userData.fleetPart&&o.userData.fleetPart.name===name)hit=o;});if(!hit)return null;forgetFleetPart(m,hit);detachPartAsDebris(hit,null);if(typeof rebuildComponentShapes==='function')rebuildComponentShapes();return{name,remaining:m.children.filter(c=>c.userData&&c.userData.fleetPart).length};}};
+if(new URLSearchParams(location.search).has('debug'))window.__flightWorld={THREE,camera,state:S,systems,plane,velocity:physicsVelocity,step:stepFlight,reset:resetFlight,place:placeInFlight,setAircraft:setAircraftType,core:AeroCore,interactive:()=>cockpitInteractive,doorTest:{state:()=>({...cockpitDoorState}),click:a=>cockpitActionClick(a),step:n=>{for(let i=0;i<n;i++)updateCockpitDoors();}},debris:()=>debrisField,wireSims:()=>fwFlightWireSims.map(s=>s?{dead:s.dead,age:s.age,pts:s.pts.length,temp:s.temp,inside:s.pts.reduce((a,sp,j)=>a+((j>0&&j<s.pts.length-1&&fwFlightWireBroad&&fwFlightWireBroad.containsPoint(sp.p)&&fwFlightWireColliders.some(b=>b.containsPoint(sp.p)))?1:0),0)}:null),wireStep:dt=>fwStepFlightWires(dt),wireCables:()=>fwFlightWireCables?{count:fwFlightWireCables.count,max:fwFlightWireCables.instanceMatrix.count,colliders:fwFlightWireColliders.length,pushes:fwFlightWirePushCount,broad:fwFlightWireBroad?fwFlightWireBroad.getSize(FW_WIRE_CABLE_V).toArray().map(v=>+v.toFixed(1)):null,root:(fwFlightWireRoot&&fwFlightWireRoot.parent&&fwFlightWireRoot.parent.name)||null}:null,tick:dt=>updateFlight(dt),elec:()=>Electrics,workshop:{snapshot:workshopSnapshot,restore:workshopRestoreSnapshot,energy:fwEnergyLedger,template:workshopTemplate,open:openBuildMode,select:workshopSelectPart,parts:()=>workshopParts,validate:d=>AeroCore.validateDesign(d,WORKSHOP_PARTS)},removePart:name=>{const m=fleetModelSlot.children[0];if(!m)return null;let hit=null;m.traverse(o=>{if(!hit&&o.userData&&o.userData.fleetPart&&o.userData.fleetPart.name===name)hit=o;});if(!hit)return null;forgetFleetPart(m,hit);detachPartAsDebris(hit,null);if(typeof rebuildComponentShapes==='function')rebuildComponentShapes();return{name,remaining:m.children.filter(c=>c.userData&&c.userData.fleetPart).length};}};
 
 // Collision shapes use orthonormal axes, a centre and three half-extents.
 const dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];

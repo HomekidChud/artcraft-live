@@ -629,6 +629,7 @@ test('flight wires: sag in level flight, float in free fall, snap past the elast
   globalThis.flightLog = () => {};
   globalThis.Electrics = { brokenWires: new Set() };
   globalThis.workshopSparkAt = () => {};
+  globalThis.fwWireStub = { colliderTick: 0, colliders: [], broad: null, cables: null, refresh: () => {}, buildCables: () => {} };
 
   // module-scope state the eval'd step reads/writes
   let sim, vel = new THREE.Vector3(), prevVel = new THREE.Vector3();
@@ -647,7 +648,7 @@ test('flight wires: sag in level flight, float in free fall, snap past the elast
   // rebind the step's closure variables by re-evaluating with local state injected
   const stepLocal = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
     .replace(/fwFlightWireRoot/g, 'flightWireRoot').replace(/fwFlightWireSims/g, 'flightSims')
-    .replace(/fwPrevVel/g, 'prevVel').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub').replace(/physicsVelocity/g, 'vel') + ')');
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwFlightWireColliderTick/g, 'globalThis.fwWireStub.colliderTick').replace(/fwFlightWireColliders/g, 'globalThis.fwWireStub.colliders').replace(/fwFlightWireBroad/g, 'globalThis.fwWireStub.broad').replace(/fwFlightWireCables/g, 'globalThis.fwWireStub.cables').replace(/fwRefreshWireColliders/g, 'globalThis.fwWireStub.refresh').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub').replace(/physicsVelocity/g, 'vel') + ')');
   let lastGApp = 9.81; // module-scope apparent-gravity magnitude the step writes
   const reentryStub = { skinT: 20 }; // module-scope re-entry skin temp
 
@@ -679,7 +680,6 @@ test('flight wires: sag in level flight, float in free fall, snap past the elast
   flightSims = [sim]; prevVel.set(0, 0, 0); vel.set(0, 0, 0);
   for (let i = 0; i < 31; i++) stepLocal(1 / 60); // past the settle window — the stretch persists (pinned 4 m apart, 2 m of rest)
   assert.ok(sim.dead, 'overstretched wire should snap');
-  assert.equal(sim.line.visible, false);
   assert.ok(globalThis.Electrics.brokenWires.has(0), 'snapped wire should register as an electrical fault');
 });
 
@@ -863,7 +863,7 @@ test('flight wires: insulation burns through in flight (integration via the step
   const stepSrc = extract(body, 'function fwStepFlightWires(dt){');
   const step = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
     .replace(/fwFlightWireRoot/g, 'flightWireRoot').replace(/fwFlightWireSims/g, 'flightSims')
-    .replace(/fwPrevVel/g, 'prevVel').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwFlightWireColliderTick/g, 'globalThis.fwWireStub.colliderTick').replace(/fwFlightWireColliders/g, 'globalThis.fwWireStub.colliders').replace(/fwFlightWireBroad/g, 'globalThis.fwWireStub.broad').replace(/fwFlightWireCables/g, 'globalThis.fwWireStub.cables').replace(/fwRefreshWireColliders/g, 'globalThis.fwWireStub.refresh').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
     .replace(/physicsVelocity/g, 'vel') + ')');
   let lastGApp = 9.81;
   const prevVel = new THREE.Vector3();
@@ -886,7 +886,7 @@ test('flight wires: insulation burns through in flight (integration via the step
   assert.ok(Number.isFinite(sim.temp), 'wire temperature stays finite');
   assert.ok(sim.temp > 105, 'wire should be past the 105°C threshold, got ' + sim.temp.toFixed(1) + '°C');
   assert.ok(sim.dead, 'the burned-through wire is dead');
-  assert.ok(!sim.line.visible, 'the melted line is hidden');
+  assert.ok(sim.dead, 'the melted line is dead (hidden from the cable render pass)');
   assert.ok(globalThis.Electrics.brokenWires.has(0), 'the electrical system records the burned wire');
   // ordinary flight: skin at ambient — no melt, no warning
   sim = mkRope(); flightSims = [sim];
@@ -914,7 +914,7 @@ test('flight ropes: the 11-node 0.5 m-rest rope survives ordinary gravity (regre
   const stepSrc = extract(body, 'function fwStepFlightWires(dt){');
   const step = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
     .replace(/fwFlightWireRoot/g, 'flightWireRoot').replace(/fwFlightWireSims/g, 'flightSims')
-    .replace(/fwPrevVel/g, 'prevVel').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwFlightWireColliderTick/g, 'globalThis.fwWireStub.colliderTick').replace(/fwFlightWireColliders/g, 'globalThis.fwWireStub.colliders').replace(/fwFlightWireBroad/g, 'globalThis.fwWireStub.broad').replace(/fwFlightWireCables/g, 'globalThis.fwWireStub.cables').replace(/fwRefreshWireColliders/g, 'globalThis.fwWireStub.refresh').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
     .replace(/physicsVelocity/g, 'vel') + ')');
   let lastGApp = 9.81;
   const prevVel = new THREE.Vector3(), vel = new THREE.Vector3(); // parked: no acceleration
@@ -950,7 +950,7 @@ test('flight ropes: slow and janky frames stay stable (fixed-size substeps regre
   const stepSrc = extract(body, 'function fwStepFlightWires(dt){');
   const step = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
     .replace(/fwFlightWireRoot/g, 'flightWireRoot').replace(/fwFlightWireSims/g, 'flightSims')
-    .replace(/fwPrevVel/g, 'prevVel').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwFlightWireColliderTick/g, 'globalThis.fwWireStub.colliderTick').replace(/fwFlightWireColliders/g, 'globalThis.fwWireStub.colliders').replace(/fwFlightWireBroad/g, 'globalThis.fwWireStub.broad').replace(/fwFlightWireCables/g, 'globalThis.fwWireStub.cables').replace(/fwRefreshWireColliders/g, 'globalThis.fwWireStub.refresh').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
     .replace(/physicsVelocity/g, 'vel') + ')');
   let lastGApp = 9.81;
   const prevVel = new THREE.Vector3(), vel = new THREE.Vector3(); // parked: no acceleration
@@ -1000,6 +1000,7 @@ test('flight rope builder: every segment gets a spring; builder ropes sag withou
   globalThis.THREE.Sphere = class { constructor(){} };
   globalThis.fleetModelSlot = { getWorldQuaternion: q => q };
   globalThis.FW_WIRE_COLORS = { power: '#ffd24a' };
+  globalThis.FW_WIRE_RADII = { power: .013 };
   globalThis.WORKSHOP_WIRE_STIFFNESS = { power: 2500 };
   globalThis.Electrics = { brokenWires: new Set() };
   globalThis.flightLog = () => {};
@@ -1011,7 +1012,7 @@ test('flight rope builder: every segment gets a spring; builder ropes sag withou
   const buildSrc = extract(body, 'function fwBuildFlightWireSims(flightWires){');
   const build = eval('(' + buildSrc.replace('function fwBuildFlightWireSims', 'function build')
     .replace(/fwFlightWireRoot/g, 'wireRoot').replace(/fwFlightWireSims/g, 'sims')
-    .replace(/fwPrevVel/g, 'prevVel').replace(/physicsVelocity/g, 'vel') + ')');
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwFlightWireColliderTick/g, 'globalThis.fwWireStub.colliderTick').replace(/fwFlightWireColliders/g, 'globalThis.fwWireStub.colliders').replace(/fwFlightWireBroad/g, 'globalThis.fwWireStub.broad').replace(/fwFlightWireCables/g, 'globalThis.fwWireStub.cables').replace(/fwRefreshWireColliders/g, 'globalThis.fwWireStub.refresh').replace(/fwBuildWireCableMesh/g, 'globalThis.fwWireStub.buildCables').replace(/physicsVelocity/g, 'vel') + ')');
   const mkPart = (id, x) => ({ userData: { isWorkshopPart: true, partId: id }, position: new THREE.Vector3(x, 0, 0) });
   const parts = [mkPart('a', 0), mkPart('b', 2), mkPart('c', 4)];
   let sims, wireRoot = { parent: { parent: {}, children: parts }, children: [],
@@ -1030,16 +1031,16 @@ test('flight rope builder: every segment gets a spring; builder ropes sag withou
     assert.ok(Number.isFinite(sim.temp), 'wire temperature initialized');
   }
   const [s1, s2] = sims;
-  // single 2 m span: k = round(2/.8)-1 = 2 interior nodes → 3 segments, rest 2/3 each
-  assert.equal(s1.pts.length, 4);
-  assert.ok(Math.abs(s1.rests[0] - 2 / 3) < 1e-9);
+  // single 2 m span at 0.3 m spacing: k = round(2/.3)-1 = 6 interior nodes → 8 points, 7 segments of 2/7 each
+  assert.equal(s1.pts.length, 8);
+  assert.ok(Math.abs(s1.rests[0] - 2 / 7) < 1e-9);
   // waypoint wire: three UNEQUAL spans get their own rest lengths
   assert.ok(new Set(s2.rests).size > 1, 'unequal spans → distinct per-segment rests');
   // now FLY the builder output: the step must not snap it, and it must sag
   const stepSrc = extract(body, 'function fwStepFlightWires(dt){');
   const step = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
     .replace(/fwFlightWireRoot/g, 'wireRoot').replace(/fwFlightWireSims/g, 'sims')
-    .replace(/fwPrevVel/g, 'prevVel').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwFlightWireColliderTick/g, 'globalThis.fwWireStub.colliderTick').replace(/fwFlightWireColliders/g, 'globalThis.fwWireStub.colliders').replace(/fwFlightWireBroad/g, 'globalThis.fwWireStub.broad').replace(/fwFlightWireCables/g, 'globalThis.fwWireStub.cables').replace(/fwRefreshWireColliders/g, 'globalThis.fwWireStub.refresh').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
     .replace(/physicsVelocity/g, 'vel') + ')');
   let lastGApp = 9.81;
   const reentryStub = { skinT: 20 };

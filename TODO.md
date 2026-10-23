@@ -946,3 +946,34 @@ and the physics should keep advancing. Two additions, both tested.
 - `waypoint-wires.test.js` glue harness updated to stub `saveWorkshop` (the
   real function; the old stub targeted the never-defined `workshopSaveDraft`
   the glue tool used to call). 33/33; repo `npm test` 64/64.
+
+### 17.10.5f: preset flight wires — catenary + airframe collision + real cables
+
+- User report: preset aircraft wires "still float" and "go through walls"
+  (flight mode, red 1-px dashed lines clipping the fuselage). Repro on the
+  C172 fleet preset: 42 ropes existed but were coarse (0.8 m nodes), had NO
+  airframe collision, and rendered as 1-px `LineSegments`.
+- Rope resolution 0.8 m → 0.3 m (`fwBuildFlightWireSims`): smooth catenary
+  instead of a dashed stick.
+- Airframe collision (`fwRefreshWireColliders` + pass in `fwStepFlightWires`):
+  part AABBs in aircraft-local space, refreshed every 45 frames. Nodes are
+  pushed out by escaping the UNION of all boxes containing the node along the
+  cheapest axis-direction whose landing point is verified free — a naive
+  single-box push ping-pongs forever between overlapping parts (engine ⇄
+  nose cone). Fixed-point loop (max 8 iterations) per frame; endpoints stay
+  attached; adjacent rest lengths grow on detour so draping never reads as
+  overstretch.
+- Rendering: shared `fwFlightWireCables` InstancedMesh (unit cylinders,
+  6000 segments, per-kind radii/colors) replaces per-wire 1-px lines — one
+  draw call for the whole loom.
+- QA: `tools/wire-verify.mjs` (Playwright, C172 preset, Test Fly, 300 manual
+  wire steps via the new `?debug` hooks `wireStep`/`wireCables`/`wireSims`
+  with `inside` counts). Final state: 42/42 wires alive, 422 nodes, 380
+  cable segments, 0 nodes inside the airframe, 0 snapped. (Earlier "sim
+  barely ran" age=1 mystery was headless rAF throttling, not a product bug.)
+- Tests: `waypoint-wires.test.js` harness updated for the cable renderer
+  (fwWireStub globals, rebinding chains, dead-check assertions). 33/33;
+  repo `npm test` 64/64.
+- Not addressed here: user screenshot's wheels-sunk-into-runway did not
+  reproduce on the C172 (spawn transient or preset-specific — parked as a
+  watch item).
