@@ -84,6 +84,27 @@ the DC-9 family uses two completely separate systems ([Aircraft Systems Tech](ht
   pump for gravity-fed GA installs (positive pressure feed to the pump is the
   general principle; [HAW Hamburg ATA 29](https://www.fzt.haw-hamburg.de/pers/Scholz/materialFS/FS-Notes-ATA29.pdf)).
 
+### Line routing follows structure (implemented in presets v17.10.x)
+
+**Finding:** FAA guidance treats fluid lines and wiring as components that must
+be routed WITH the airframe: wires and cable bundles must be supported by
+clamps at fixed intervals and routed so contact with structure and equipment is
+avoided, and chafing between adjacent components must be designed out by
+rerouting ([FAA AC 43.13-1B Ch. 9/11 — environmental protection & clamping](https://www.landseaskyspace.com/ac4313/11-147.html),
+[EASA SIB CE-17-05](https://ad.easa.europa.eu/blob/CE1705.pdf/SIB_CE-17-05_1));
+fuel line installations are individually reviewed for routing, drainage and
+chafing against structure ([FAA CATA worklist ANAC-001 — fuel line installation](https://www.faa.gov/aircraft/air_cert/design_approvals/transport/transport_intl/cata/CATA_ANAC-001),
+[DTIC — Fuel Line Study ADA284918](https://apps.dtic.mil/sti/tr/pdf/ADA284918.pdf)).
+
+**Sim rule (implemented):** wires are encoded as part-to-part connections with
+optional waypoint polylines that follow structure — fuel and hydraulic supply/
+return lines run under the cabin floor (belly) or spanwise in the wing-box
+plane (spar corridor) to wing-mounted actuators; alternator-to-bus and
+hydraulic-pump power/ground feeds run along the belly with the other trunk
+runs. The workshop audit enforces the same rule for both fluid kinds: a
+straight line through the cockpit volume fails, a belly/spar polyline passes
+(exact segment–box intersection, no sampling gaps).
+
 ## 3. Electrical
 
 **Finding:** small aircraft run a 28 V DC system: alternator charges the
@@ -157,6 +178,11 @@ Wikipedia nav lights ([4](https://en.wikipedia.org/wiki/Navigation_light)).
 - Implemented: fuel/hydraulic/water wire kinds, pump/reservoir/strainer/tank
   catalog parts, strict electrical audit, per-light power gating, ground
   return networks.
-- Pending: routing rules 1–3 and 5 above (needs routed-line polylines that
-  follow structure — see "Build Mode UI overhaul" and the wire-path work in
-  TODO.md), per-class audit matrix, cockpit-bounding-volume helper.
+- Implemented (follow-up): routed-line polylines that follow structure —
+  optional per-wire waypoints (max 8, ±500 m) in the design schema, rendered as
+  straight LineSegments through the resolved points, checked by the audit with
+  exact slab intersection, preserved through snapshot/restore/cloud round trips.
+  Presets: 225 routed wires (fuel 113, power 34, ground 34, hydraulic 44).
+- Pending: waypoint editor affordance (drag to add/move/remove), per-class
+  audit matrix, cockpit-bounding-volume helper, fleet-lamp lens fixtures,
+  Build Mode UI consolidation, Render deploy verification.
