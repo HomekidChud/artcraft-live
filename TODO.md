@@ -605,6 +605,16 @@ are grouped".
   live (it is live — the generator is the only allowed source of preset
   geometry, driven by the fleet table). Cite research for every routing rule.
 
+## Waypoint editor + persistence (second follow-up session)
+
+Done and live-verified (GitHub Pages, ?debug):
+- Waypoint editor UI: wires are clickable in the 3D view (part-hit takes priority; clicking a wire selects it), the 'Wire routing' inspector panel shows kind / from→to / waypoint rows with numeric X-Y-Z inputs, '＋ Waypoint' inserts the snapped midpoint, 'Clear routing' reverts to a straight run, 'Delete wire' removes it. Escape deselects. Selecting a part clears the wire selection and vice versa; restoreSnapshot clears it so a stale index can't point at another wire.
+- Live-verified on the deployed build: wire selected by real viewport click ("Alternator → Main bus · 3 waypoints" in the panel), Add Waypoint 3→4, undo reverted 4→3 and hid the panel (as designed).
+- Autosave actually persists: fwPreviewStore was a pure in-memory Map, so "SAVED ON THIS DEVICE" was false — the saved 747 preset came back EMPTY after reload. Now localStorage with in-memory fallback. Live-verified end-to-end: load preset → localStorage written → full page reload → reopen Build Mode → design restored with all 60 wires / 15 routed / name "Boeing 747-8".
+- Wire pick threshold and waypoint handle size now scale with camera distance (~4-5 px of screen at any zoom); wheel zoom rebuilds handles. Found live: at the auto-framed zoom (camera ~980 m out) the fixed 0.35 m threshold was sub-pixel and wires were unpickable. NOTE: this last change was NOT yet on Pages at verification time — verified by the committed unit tests only; re-check live.
+
+Known issue (pre-existing, cosmetic): the cloud browser showed the "Frame" toolbar button label truncated ("Fra"); sidebar clipped; test-fit sample of mobile layout was not rechecked this session.
+
 ## Waypoint wire routing (this session)
 Scope note: this is a routing/schema milestone, NOT a full editor affordance — wires with waypoints are rendered, audited, validated and persisted, but there is no UI yet to drag a waypoint; selection/editing of wires is unchanged from before.
 Done:
