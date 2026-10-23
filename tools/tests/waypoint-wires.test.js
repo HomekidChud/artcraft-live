@@ -51,6 +51,7 @@ let workshopBonds = [];
 let workshopGlueRoot = null;
 let workshopGlueStart = null;
 let WORKSHOP_WIRE_STIFFNESS = {}; // eval'd in the sag test
+let FW_WIRE_SNAP_STRETCH = .08; // flight rope elastic limit (mirrors the client const)
 let workshopMultiSelect = new Set();
 const validateSrc = extract(body, 'function validateDesign(input, catalog) {');
 const pathSrc = extract(body, 'function workshopWirePath(w){');
@@ -599,4 +600,78 @@ test('fwEnergyLedger: computes every form from live state', () => {
   assert.equal(led.lampW, 50, 'lamp draw 45+5');
   assert.equal(led.lightW, E.radiantFromDraw(50), 'light output');
   assert.ok(Math.abs(led.massKg - 950) < 1e-9, 'mass includes fuel');
+});
+
+/* ---------- flight ropes: apparent gravity, float in free-fall, snap ---------- */
+
+test('flight wires: sag in level flight, float in free fall, snap past the elastic limit', () => {
+  physicsEnv();
+  const V = THREE.Vector3;
+  // extend the stub with the vector ops the flight step uses
+  THREE.Vector3 = class extends V {
+    clone(){return new THREE.Vector3(this.x,this.y,this.z);}
+    sub(v){this.x-=v.x;this.y-=v.y;this.z-=v.z;return this;}
+    divideScalar(n){this.x/=n;this.y/=n;this.z/=n;return this;}
+    applyQuaternion(){return this;}
+    negate(){this.x=-this.x;this.y=-this.y;this.z=-this.z;return this;}
+    addScaledVector(v,s){this.x+=v.x*s;this.y+=v.y*s;this.z+=v.z*s;return this;}
+    static multiplyVectors(a,b){return new THREE.Vector3(a.x*b.x,a.y*b.y,a.z*b.z);}
+  };
+  const stepSrc = extract(body, 'function fwStepFlightWires(dt){');
+  globalThis.fleetModelSlot = { getWorldQuaternion: q => q };
+  globalThis.THREE.Quaternion = class { constructor(){this.x=0;this.y=0;this.z=0;this.w=1;} invert(){return this;} };
+  globalThis.flightLog = () => {};
+  globalThis.Electrics = { brokenWires: new Set() };
+  globalThis.workshopSparkAt = () => {};
+
+  // module-scope state the eval'd step reads/writes
+  let sim, vel = new THREE.Vector3(), prevVel = new THREE.Vector3();
+  const mkRope = () => {
+    const pts = [];
+    for (let i = 0; i < 5; i++) pts.push({ p: new THREE.Vector3(-2 + i, 2, 0), pp: new THREE.Vector3(-2 + i, 2, 0), pin: i === 0 || i === 4 });
+    const attr = { setXYZ(){}, needsUpdate: false };
+    return { pts, rests: [1, 1, 1, 1], line: { geometry: { getAttribute: () => attr }, visible: true }, stiffness: 2500, damping: 2, dead: false };
+  };
+  let flightWireRoot = { parent: { parent: {} }, localToWorld: v => v };
+  let flightSims = [];
+  const src = stepSrc
+    .replace('function fwStepFlightWires(dt)', 'globalThis.__step = function fwStepFlightWires(dt)');
+  eval(src);
+  const step = globalThis.__step;
+  // rebind the step's closure variables by re-evaluating with local state injected
+  const stepLocal = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
+    .replace(/fwFlightWireRoot/g, 'flightWireRoot').replace(/fwFlightWireSims/g, 'flightSims')
+    .replace(/fwPrevVel/g, 'prevVel').replace(/physicsVelocity/g, 'vel') + ')');
+
+  // level flight: constant velocity (a = 0) → apparent gravity pulls the rope down (sag)
+  sim = mkRope(); flightSims = [sim]; vel.set(50, 0, 0); prevVel.copy(vel);
+  for (let i = 0; i < 600; i++) { stepLocal(1 / 60); prevVel.copy(vel); } // 10 s: heavy rope creeps to its catenary
+  assert.ok(sim.pts[2].p.y < 1.99, 'rope should sag in level flight, got y=' + sim.pts[2].p.y);
+
+  // free-fall descent: a = g → apparent gravity zero → rope floats (no sag)
+  sim = mkRope(); flightSims = [sim]; prevVel.set(0, 0, 0); vel.set(0, -9.81 / 60, 0);
+  for (let i = 0; i < 120; i++) { stepLocal(1 / 60); prevVel.copy(vel); vel.y -= 9.81 / 60; }
+  assert.ok(Math.abs(sim.pts[2].p.y - 2) < 0.01, 'rope should float in free fall, got y=' + sim.pts[2].p.y);
+
+  // pushover (negative g): apparent gravity points UP in the plane frame
+  sim = mkRope(); flightSims = [sim]; prevVel.set(0, 0, 0); vel.set(0, -29.4 / 60, 0);
+  for (let i = 0; i < 120; i++) { stepLocal(1 / 60); prevVel.copy(vel); vel.y -= 29.4 / 60; }
+  assert.ok(sim.pts[2].p.y > 2.01, 'rope should rise in a pushover, got y=' + sim.pts[2].p.y);
+
+  // overstretched wire snaps: electrical fault + hidden line
+  sim = mkRope(); sim.rests = [0.5, 0.5, 0.5, 0.5]; // nodes 1m apart, rest 0.5m = 100% stretch
+  flightSims = [sim]; prevVel.set(0, 0, 0); vel.set(0, 0, 0);
+  stepLocal(1 / 60);
+  assert.ok(sim.dead, 'overstretched wire should snap');
+  assert.equal(sim.line.visible, false);
+  assert.ok(globalThis.Electrics.brokenWires.has(0), 'snapped wire should register as an electrical fault');
+});
+
+test('re-entry: stagnation temperature follows T·(1+0.2M²)', () => {
+  physicsEnv();
+  const stSrc = extract(body, 'function fwStagnationTemp(mach,tamb){');
+  let stag; eval(stSrc.replace('function fwStagnationTemp', 'stag = function fwStagnationTemp'));
+  assert.ok(Math.abs(stag(0, 288.15) - 288.15) < 1e-9);          // parked: ambient
+  assert.ok(Math.abs(stag(1, 288.15) - 288.15 * 1.2) < 1e-9);    // Mach 1: +20%
+  assert.ok(Math.abs(stag(2.5, 223) - 223 * 2.25) < 1e-6);      // high-altitude re-entry
 });

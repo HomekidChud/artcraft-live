@@ -729,3 +729,21 @@ battery/fuel-density, full ledger from stubbed live state).
 - Honest limits: sound deliberately not modelled; light efficiency is a labelled
   estimate; thermal is wire-level only (no engine/airframe heat yet); flight-time
   wires are static clones (spring/thermal live in the workshop only).
+
+## AirplaneCraft — 17.10.5c (same day): flight ropes + re-entry flame
+
+- **Flight wires are ropes now** (owner: "flying wires that disobey gravity"):
+  custom aircraft get real rope sims in the airframe frame (`fwBuildFlightWireSims`
+  at Test Fly replaces the static wire clones with LineSegments ropes). They feel
+  APPARENT gravity (g − a_plane, rotated into the plane frame): sag in level
+  flight, float in free-fall/pushover, slam down in pull-ups. Overstretch past
+  the 8% elastic limit SNAPS the wire → spark, hidden line, Electrics fault.
+- **Re-entry flame** (owner: "descending fast flame should come"): skin
+  temperature follows isentropic stagnation heat T·(1+0.2M²) with ~8 s thermal
+  lag; above 80°C skin an additive flame cone trails opposite the velocity,
+  brightening to white-hot by ~480°C. SKIN °C shown in the HUD energy line.
+  Game-scaled glow threshold (real dull-red glow needs ~500°C) — labelled as
+  such in docs §9.
+- Tests: 25 waypoint-wires (+2: apparent-gravity sag/float/pushover/snap with a
+  hand-built rope, stagnation formula). The snap test caught a real test bug
+  (first-step acceleration spike) — production code was correct.

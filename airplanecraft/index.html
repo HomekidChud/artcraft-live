@@ -3887,7 +3887,7 @@ function workshopFly(){if(workshopParts.length===0){workshopSetStatus('Add compo
  let wingArea=Math.max(.1,engineering.area);
  let mass=workshopParts.reduce((s,p)=>s+workshopPartMass(p),0);mass=Math.max(1,mass);const propulsion=AeroCore.propulsion(workshopParts.map(workshopPartState),WORKSHOP_PARTS),thrust=propulsion.maxThrustN;let engineType=propulsion.units.length?propulsion.units[0].type:'glider';const isElectric=engineType==='electric';if(isElectric)engineType='piston';const sizeX=Math.max(isRocketBuild?2:.1,engineering.span),length=Math.max(2,dims.z),height=Math.max(.8,dims.y);const name=$('workshopName').value.trim()||'Scratch-built aircraft';
  const cfg={id:'scratch-build',electric:isElectric,name,role:'User-built aircraft',wingspan:sizeX,length,height,bodyWidth:Math.max(.35,Math.min(5,sizeX*.13)),bodyHeight:Math.max(.35,Math.min(6,height*.40)),wingArea,massKg:mass,maxThrustN:thrust,maxSpeedKts:isRocketBuild?15000:THREE.MathUtils.clamp(65+(thrust/Math.max(100,mass))*48,65,650),clMax:1.42,flapClMax:workshopParts.some(p=>p.userData.type==='flap')?.18:0,rpmIdle:engineType==='glider'?0:650,rpmMax:(engineType==='jet'||engineType==='rocket')?10000:2700,engineType,engineCount:engines.length,propBlades:props.reduce((s,p)=>s+WORKSHOP_PARTS[p.userData.type].propBlades,0)||0,wingPlacement:'mid',sweep:0,tailType:workshopParts.some(p=>p.userData.type==='vTail')?'vtail':'conventional',gear:gears.some(p=>p.userData.type==='wheel')?'Fixed tricycle':'Fixed skid',paint:'#e4e7e1',stripe:'#3e7d94',windowCount:0,customSeatCount:workshopParts.filter(p=>p.userData.type==='cockpitSeat').length,customFuelTanks:workshopParts.filter(p=>p.userData.type==='fuelTank').length,canopy:false,winglets:workshopParts.some(p=>p.userData.type==='winglet'),dryMassKg:mass,waterKg:workshopParts.filter(p=>p.userData.type==='waterTank').length*400};
- cfg.controlAuth=isRocketBuild?{roll:1,pitch:1,yaw:1}:{roll:workshopParts.some(p=>p.userData.type==='aileron')?1:0,pitch:workshopParts.some(p=>p.userData.type==='elevator')?1:0,yaw:workshopParts.some(p=>p.userData.type==='rudder')?1:.05};if(isRocketBuild){cfg.rocketNoWings=engineering.area<.05;cfg.rocketDragArea=Math.PI*Math.pow(Math.min(dims.x,dims.y)/2,2);}cfg.massProperties=engineering.inertia;cfg.propulsion=propulsion.units.map(u=>({...u,position:u.position.map((n,i)=>n-[engineering.cg.x,engineering.cg.y,engineering.cg.z][i])}));cfg.engineCount=propulsion.units.length;cfg.cgLiftOffset=engineering.wingZ-engineering.cg.z;const flightRoot=workshopBuildRoot.clone(true);flightRoot.userData.customControls=flightRoot.children.filter(p=>['aileron','flap','elevator','rudder','prop2','prop4'].includes(p.userData.type)).map(part=>({part,base:part.rotation.clone(),type:part.userData.type,powered:propulsion.units.some(u=>u.propId===part.userData.partId)}));markDetachedFlightParts(flightRoot);fwRelinkLightTargets(flightRoot);const flightWires=workshopWireRoot.clone(true);flightRoot.add(flightWires);customPristineModel=flightRoot.clone(true);fwRelinkLightTargets(customPristineModel);customPristineCfg={...cfg};flightRoot.position.set(-center.x,-center.y,-center.z);S.customAircraft=cfg;S.workshopGroundCorners=corners;S.aircraftId='c172';$('aircraftType').value='c172';fleetModelSlot.clear();fleetModelSlot.add(flightRoot);fwSyncCustomLights();fleetModelSlot.visible=true;exterior.visible=false;S.camera='chase';$('camera').value='chase';buildWasPaused=false;closeBuildMode();resetFlight();S.paused=false;detachUnweldedParts();$('pause').textContent='Pause';refreshAircraftSpecs();showAircraftMassModel();updateCamera(.8);drawMinimap(true);workshopSetStatus('Custom aircraft loaded into the flight scene');}
+ cfg.controlAuth=isRocketBuild?{roll:1,pitch:1,yaw:1}:{roll:workshopParts.some(p=>p.userData.type==='aileron')?1:0,pitch:workshopParts.some(p=>p.userData.type==='elevator')?1:0,yaw:workshopParts.some(p=>p.userData.type==='rudder')?1:.05};if(isRocketBuild){cfg.rocketNoWings=engineering.area<.05;cfg.rocketDragArea=Math.PI*Math.pow(Math.min(dims.x,dims.y)/2,2);}cfg.massProperties=engineering.inertia;cfg.propulsion=propulsion.units.map(u=>({...u,position:u.position.map((n,i)=>n-[engineering.cg.x,engineering.cg.y,engineering.cg.z][i])}));cfg.engineCount=propulsion.units.length;cfg.cgLiftOffset=engineering.wingZ-engineering.cg.z;const flightRoot=workshopBuildRoot.clone(true);flightRoot.userData.customControls=flightRoot.children.filter(p=>['aileron','flap','elevator','rudder','prop2','prop4'].includes(p.userData.type)).map(part=>({part,base:part.rotation.clone(),type:part.userData.type,powered:propulsion.units.some(u=>u.propId===part.userData.partId)}));markDetachedFlightParts(flightRoot);fwRelinkLightTargets(flightRoot);const flightWires=workshopWireRoot.clone(true);flightRoot.add(flightWires);fwBuildFlightWireSims(flightWires);customPristineModel=flightRoot.clone(true);fwRelinkLightTargets(customPristineModel);customPristineCfg={...cfg};flightRoot.position.set(-center.x,-center.y,-center.z);S.customAircraft=cfg;S.workshopGroundCorners=corners;S.aircraftId='c172';$('aircraftType').value='c172';fleetModelSlot.clear();fleetModelSlot.add(flightRoot);fwSyncCustomLights();fleetModelSlot.visible=true;exterior.visible=false;S.camera='chase';$('camera').value='chase';buildWasPaused=false;closeBuildMode();resetFlight();S.paused=false;detachUnweldedParts();$('pause').textContent='Pause';refreshAircraftSpecs();showAircraftMassModel();updateCamera(.8);drawMinimap(true);workshopSetStatus('Custom aircraft loaded into the flight scene');}
 function workshopBeginPlacement(e){const d=WORKSHOP_PARTS[workshopPendingType];if(!d)return;const p=workshopIntersectPlane(e,0);if(!p)return;const pos={x:workshopSnap(p.x),y:workshopPlacementHeight(workshopPendingType),z:workshopSnap(p.z)};workshopPushUndo();const g=workshopCreateMirroredPair(workshopPendingType,pos);if(!g)return;workshopSetStatus(`Placed ${d.name}${workshopMirrorMate(g)?' with mirrored counterpart':''} · centreline symmetry ${workshopSymmetryEnabled?'ON':'OFF'}`);}
 function workshopCreateGhost(type){if(workshopGhost){workshopScene.remove(workshopGhost);workshopGhost=null;}if(workshopGhostMirror){workshopScene.remove(workshopGhostMirror);workshopGhostMirror=null;}if(!type||!WORKSHOP_PARTS[type])return;workshopGhost=workshopMakeVisual(type,true);workshopScene.add(workshopGhost);workshopGhostMirror=workshopMakeVisual(type,true);workshopScene.add(workshopGhostMirror);workshopGhostMirror.visible=false;}
 function workshopUpdateGhost(e){if(workshopTool!=='place'||!workshopGhost||!workshopPendingType)return;const d=WORKSHOP_PARTS[workshopPendingType],p=workshopIntersectPlane(e,0);if(!p)return;const x=workshopSnap(p.x),z=workshopSnap(p.z);workshopGhost.position.set(x,workshopPlacementHeight(workshopPendingType),z);if(workshopGhostMirror){workshopGhostMirror.visible=workshopShouldMirror(workshopPendingType,x);workshopGhostMirror.position.set(-x,workshopPlacementHeight(workshopPendingType),z);}}
@@ -4847,6 +4847,113 @@ function updateControlSurfaces(){
  if(fleetModel?.userData?.lights)for(const lamp of fleetModel.userData.lights){const on=S.lights&&(lamp.strobe?flash:true);if(lamp.mat){lamp.mesh.visible=true;lamp.mat.emissiveIntensity=on?(lamp.strobe?7:2.6):0;if(lamp.light)lamp.light.intensity=on?(lamp.lightIntensity||1):0;}else lamp.mesh.visible=on;}
 }
 
+/* ---- flight-time wire ropes + re-entry heating ----
+   Wires in flight are real ropes: they feel APPARENT gravity (g − a_plane) in
+   the airframe's local frame, so they sag in level flight, float in a pushover
+   or free-fall descent and slam down in a pull-up. Overstretch past the 8%
+   elastic limit SNAPS the wire (spark + electrical fault). Descending fast at
+   high Mach heats the skin (isentropic stagnation T = T_amb·(1+0.2M²)) and a
+   re-entry flame appears above 150°C skin temperature. */
+const FW_WIRE_SNAP_STRETCH=.08; // 8% elastic limit before a wire snaps
+const FW_WIRE_COLORS={power:'#ffd24a',ground:'#9aa7ad',signal:'#6fd3ff',data:'#6fd3ff',hydraulic:'#ff9a3d',fuel:'#c9a86a',water:'#5ac8ff'};
+let fwFlightWireSims=[],fwFlightWireRoot=null,fwPrevVel=new THREE.Vector3(),fwReentry={skinT:20,flame:null};
+function fwBuildFlightWireSims(flightWires){
+ fwFlightWireRoot=flightWires;fwFlightWireSims=[];
+ fwPrevVel.copy(physicsVelocity);
+ const parts=(flightWires.parent&&flightWires.parent.children||[]).filter(c=>c.userData&&c.userData.isWorkshopPart);
+ const idx=new Map(parts.map(p=>[p.userData.partId,p]));
+ while(flightWires.children.length){const c=flightWires.children[0];flightWires.remove(c);} // static clones out, ropes in
+ for(let i=0;i<workshopWires.length;i++){
+  const w=workshopWires[i],a=idx.get(w.from),b=idx.get(w.to);
+  if(!a||!b){fwFlightWireSims.push(null);continue;}
+  const pts=[],rests=[];
+  const add=(v,pin)=>pts.push({p:v.clone(),pp:v.clone(),pin:!!pin});
+  const A=a.position.clone().add(new THREE.Vector3(0,.1,0)),B=b.position.clone().add(new THREE.Vector3(0,.1,0));
+  const pins=[A];if(w.waypoints)for(const wp of w.waypoints)pins.push(new THREE.Vector3(wp.x,wp.y,wp.z));pins.push(B);
+  add(pins[0],true);
+  for(let sp=0;sp<pins.length-1;sp++){
+   const p1=pins[sp],p2=pins[sp+1],span=p1.distanceTo(p2);
+   const k=Math.min(10,Math.max(0,Math.round(span/.8)-1));
+   for(let j=1;j<=k;j++)add(new THREE.Vector3().lerpVectors(p1,p2,j/(k+1)),false);
+   add(p2,true);rests.push(span/(k+1));
+  }
+  const line=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:FW_WIRE_COLORS[w.kind]||'#ffd24a',transparent:true,opacity:.95}));
+  line.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(Math.max(2,(pts.length-1)*2)*3),3));
+  line.geometry.boundingSphere=new THREE.Sphere(new THREE.Vector3(),1e4); // skip per-frame recompute culls
+  flightWires.add(line);
+  fwFlightWireSims.push({pts,rests,line,stiffness:WORKSHOP_WIRE_STIFFNESS[w.kind]||2500,damping:2,dead:false});
+ }
+}
+function fwStepFlightWires(dt){
+ if(!fwFlightWireRoot||!fwFlightWireRoot.parent||!fwFlightWireRoot.parent.parent)return; // custom aircraft gone
+ // apparent gravity (m/s²) in the airframe's local frame: g_world − a_plane
+ const a=physicsVelocity.clone().sub(fwPrevVel).divideScalar(Math.max(dt,1e-4));fwPrevVel.copy(physicsVelocity);
+ const gWorld=new THREE.Vector3(0,-9.81,0).sub(a);
+ const q=fleetModelSlot.getWorldQuaternion(new THREE.Quaternion()).invert();
+ const gLocal=gWorld.applyQuaternion(q);
+ const gx=gLocal.x*dt*dt,gy=gLocal.y*dt*dt,gz=gLocal.z*dt*dt,damp=.985,h=dt/6,nodeM=.05;
+ for(let i=0;i<fwFlightWireSims.length;i++){
+  const sim=fwFlightWireSims[i];if(!sim||sim.dead)continue;
+  let dampW=0;
+  for(let sub=0;sub<6;sub++){
+   for(const sp of sim.pts){
+    if(sp.pin)continue;
+    const nx=sp.p.x+(sp.p.x-sp.pp.x)*damp+gx,ny=sp.p.y+(sp.p.y-sp.pp.y)*damp+gy,nz=sp.p.z+(sp.p.z-sp.pp.z)*damp+gz;
+    sp.pp.copy(sp.p);sp.p.set(nx,ny,nz);
+   }
+   for(let j=0;j<sim.pts.length-1;j++){
+    const A=sim.pts[j],B=sim.pts[j+1];
+    const dx=B.p.x-A.p.x,dy=B.p.y-A.p.y,dz=B.p.z-A.p.z,d=Math.hypot(dx,dy,dz);
+    if(d<1e-6)continue;
+    const ux=dx/d,uy=dy/d,uz=dz/d,stretch=d-sim.rests[j];
+    const vRel=((B.p.x-B.pp.x)-(A.p.x-A.pp.x))/h*ux+((B.p.y-B.pp.y)-(A.p.y-A.pp.y))/h*uy+((B.p.z-B.pp.z)-(A.p.z-A.pp.z))/h*uz;
+    const tension=stretch>0?sim.stiffness*stretch:0;
+    const f=(tension+sim.damping*vRel)/nodeM*h*h;
+    if(!A.pin){A.p.x+=ux*f;A.p.y+=uy*f;A.p.z+=uz*f;}
+    if(!B.pin){B.p.x-=ux*f;B.p.y-=uy*f;B.p.z-=uz*f;}
+    dampW+=sim.damping*vRel*vRel;
+    // elastic limit: an overstretched wire SNAPS (spark, electrical fault)
+    if(stretch>sim.rests[j]*FW_WIRE_SNAP_STRETCH){
+     sim.dead=true;sim.line.visible=false;
+     if(typeof Electrics!=='undefined')Electrics.brokenWires.add(i);
+     if(typeof flightLog==='function')flightLog('Wire snapped — overstretched past its elastic limit');
+     const wp=fwFlightWireRoot.localToWorld(new THREE.Vector3().lerpVectors(A.p,B.p,.5));
+     if(typeof workshopSparkAt==='function')workshopSparkAt(wp);
+     break;
+    }
+   }
+   if(sim.dead)break;
+  }
+  if(sim.dead)continue;
+  const attr=sim.line.geometry.getAttribute('position');
+  if(attr){for(let j=0;j<sim.pts.length-1;j++){attr.setXYZ(j*2,sim.pts[j].p.x,sim.pts[j].p.y,sim.pts[j].p.z);attr.setXYZ(j*2+1,sim.pts[j+1].p.x,sim.pts[j+1].p.y,sim.pts[j+1].p.z);}attr.needsUpdate=true;}
+ }
+}
+/* isentropic stagnation temperature (compressible flow): T0 = T·(1 + 0.2·M²) */
+function fwStagnationTemp(mach,tamb){return tamb*(1+.2*mach*mach);}
+function fwReentryUpdate(dt){
+ const atm=AeroCore.atmosphere(plane.position.y);
+ const stagT=fwStagnationTemp(S.mach||0,atm.temperature);
+ fwReentry.skinT+=(stagT-fwReentry.skinT)*Math.min(1,dt/8); // skin thermal lag ~8 s
+ const over=fwReentry.skinT-80; // glow threshold: first visible heating (game-scaled)
+ if(over>0){
+  if(!fwReentry.flame){
+   const mk=(r,len,col)=>new THREE.Mesh(new THREE.ConeGeometry(r,len,24,1,true),new THREE.MeshBasicMaterial({color:col,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+   fwReentry.flame=new THREE.Group();
+   fwReentry.flame.userData.shell=mk(2.2,10,'#ff8a3d');fwReentry.flame.userData.core=mk(1.1,6.5,'#ffd9a0');
+   fwReentry.flame.add(fwReentry.flame.userData.shell,fwReentry.flame.userData.core);
+   scene.add(fwReentry.flame);
+  }
+  const vel=physicsVelocity.clone();const sp=vel.length();if(sp<1)return;
+  const dir=vel.divideScalar(sp).negate(); // flame points backwards, away from the velocity
+  fwReentry.flame.position.copy(plane.position).addScaledVector(dir,8);
+  fwReentry.flame.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),dir);
+  const k=Math.min(1,over/400); // faint glow at 80°C, white-hot by ~480°C skin
+  fwReentry.flame.userData.shell.material.opacity=.4*k;fwReentry.flame.userData.core.material.opacity=.6*k;
+  fwReentry.flame.userData.shell.material.color.setHSL(.07-.05*k,.95,.45+.45*k);
+  fwReentry.flame.visible=true;
+ }else if(fwReentry.flame)fwReentry.flame.visible=false;
+}
 /* Full-aircraft energy ledger from live state (no invented dynamics):
    stored forms (kinetic, gravitational potential, chemical fuel) are exact
    for the current state; electrical/light are the current draw; sound is NOT
@@ -4871,7 +4978,7 @@ function updateUI(){
  $('airspeedReadout').title='EAS is equivalent airspeed; TAS is true airspeed in knots. Mach uses local speed of sound.';
  try{const led=fwEnergyLedger();
   $('energy').textContent=`KE ${(led.ke/1e6).toFixed(1)} MJ · PE ${(led.pe/1e6).toFixed(1)} MJ · FUEL ${(led.chem/1e6).toFixed(0)} MJ`;
-  $('energy2').textContent=`EL ${Math.round(led.elW)} W · LIGHT ${Math.round(led.lightW)} W · m ${led.massKg.toFixed(0)} kg`;}catch(e){}
+  $('energy2').textContent=`EL ${Math.round(led.elW)} W · LIGHT ${Math.round(led.lightW)} W · m ${led.massKg.toFixed(0)} kg`+(fwReentry.skinT>40?` · SKIN ${Math.round(fwReentry.skinT)}°C`:'');}catch(e){}
  const fpm=Math.round(S.vs*196.85);
  $('vs').textContent=(fpm>0?'+':'')+fpm;
  $('heading').textContent=String(Math.round(S.heading)%360).padStart(3,'0')+'°';
@@ -7796,6 +7903,8 @@ function animate(){
  updateControlSurfaces();
  if(S.camera==='cockpit')updateCabinMechanisms();
  updateCamera(dt);
+ fwStepFlightWires(dt);
+ fwReentryUpdate(dt);
  updateUI();
  updateMapTrack(dt);
  updateSolarSystem();
