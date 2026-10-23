@@ -3427,7 +3427,7 @@ const EnergyCore={
 };
 function workshopStepWirePhysics(dt){
  if(!workshopWireRoot||!workshopWires.length)return;
- const damp=.985,gy=-9.81*dt*dt;
+ const damp=.985,gy=-9.81*(dt/6)*(dt/6); // verlet substep gravity: a·h² per substep (a·dt² was 36× too strong)
  // water wire node positions (for powered-wire arcing checks)
  const waterPts=[];
  for(let i=0;i<workshopWires.length;i++){
@@ -4897,7 +4897,7 @@ function fwStepFlightWires(dt){
  const q=fleetModelSlot.getWorldQuaternion(new THREE.Quaternion()).invert();
  const gLocal=gWorld.applyQuaternion(q);
  fwLastGAppMag=gLocal.length(); // apparent-gravity magnitude for the glue-joint load test
- const gx=gLocal.x*dt*dt,gy=gLocal.y*dt*dt,gz=gLocal.z*dt*dt,damp=.985,h=dt/6,nodeM=.05;
+ const damp=.985,h=dt/6,nodeM=.05;const gx=gLocal.x*h*h,gy=gLocal.y*h*h,gz=gLocal.z*h*h; // verlet substep gravity: a·h² per substep (a·dt² was 36× too strong)
  for(let i=0;i<fwFlightWireSims.length;i++){
   const sim=fwFlightWireSims[i];if(!sim||sim.dead)continue;
   sim.age=(sim.age||0)+1; // frames since build — the settle guard uses this
@@ -5022,8 +5022,10 @@ function fwGlueLoadUpdate(){
    const q=stack.pop();
    if(carriedSet.has(q)){group.push(q);carriedM+=workshopPartMass(q);} // else: structurally attached anchor
    for(const nb of (adj.get(q)||[])){
-    // a load-path bond to the structure — counted from the carried side, so exactly once
-    if(carriedSet.has(q)&&!carriedSet.has(nb))boundary++;
+    if(!carriedSet.has(nb)){ // structural anchor: boundary capacity, not a traversal path —
+     if(carriedSet.has(q))boundary++; // separate assemblies on the same anchor stay separate groups
+     continue;
+    }
     if(!seen.has(nb)){seen.add(nb);stack.push(nb);}
    }
   }

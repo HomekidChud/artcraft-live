@@ -241,9 +241,9 @@ comments next to `EnergyCore`.
   of °C cooks the wires: 80°C triggers an insulation warning; at 105°C (the PVC
   continuous-service rating, used as a TUNED GAMEPLAY DAMAGE THRESHOLD) the
   insulation gives and the line burns through (electrical fault, spark) — the
-  same failure path as a snap. Wire temperature is an integrated state, so a
-  single frame can never kill a wire; glue failure additionally needs two
-  consecutive overloaded frames (see the honest limits below).
+  same failure path as a snap. (Wire temperature is an integrated state that
+  relaxes toward the skin temperature, so it takes a sustained hot soak to cross
+  the threshold — but any update that crosses it kills the wire.)
 - **Glue failure mechanics**: glued parts are evaluated as bond-connected
   components — when a group's joint lets go, the whole group detaches as debris
   and every wire attached to any of its parts rips out with it (line dead,
@@ -281,3 +281,18 @@ comments next to `EnergyCore`.
   weight (counted once, from the carried side); teardown detaches the whole
   group, and a part whose structural anchor was removed by the damage model
   falls off even at 1g. No unsupported group can float on the airframe.
+  Independent assemblies bonded to the SAME structural part are separate groups
+  (the BFS traverses carried↔carried edges only; anchors contribute boundary
+  capacity, never a traversal path) — a 10 kg/1-bond part tears off while a
+  1 kg/2-bond part on the same anchor stays on.
+
+### §9 addendum 4 — rope gravity corrected to a·h² per substep (17.10.5d, final review round)
+
+- **36× gravity bug**: the rope step ran 6 verlet substeps per frame (h = dt/6,
+  introduced for spring stability) but applied the gravity offset as a·dt² per
+  substep instead of a·h² — 36× too strong, in BOTH the workshop and flight rope
+  steps. Fixed in both: ropes now sag under real gravity (a 4 m rope sags ~18 cm,
+  a 5 m/0.5 m-rest rope ~40 cm — still clearly visible). The 11-node 0.5 m-rest
+  rope that snapped in 3 frames under the old gravity now survives 10 s of 1g
+  (regression test); the settle guard is kept as protection for degenerate
+  straight-start builds, and genuinely overstretched ropes still snap.

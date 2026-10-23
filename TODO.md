@@ -808,6 +808,22 @@ and the physics should keep advancing. Two additions, both tested.
   glued joints are held by contact per the game's contact-attachment model
   (same as unwelded stacked parts) and are not additionally glue-load-tested.
 
+### Final review round (same day): 36× rope gravity + shared-anchor capacity
+- **36× gravity bug fixed (workshop AND flight ropes)**: the verlet substep
+  (h=dt/6, added for spring stability) still applied gravity as a·dt² per
+  substep — 36× too strong. Both steps now use a·h². Ropes sag under real
+  gravity (~18 cm for a 4 m rope — still clearly visible); the 11-node 0.5 m-rest
+  rope that snapped in 3 frames under the old gravity survives 10 s of 1g
+  (regression test). The settle guard stays as degenerate-build protection.
+- **Shared-anchor capacity leak fixed**: the glue BFS no longer traverses
+  structural anchors — independent assemblies bonded to the SAME frame part are
+  separate groups (a 10 kg/1-bond part tears off at 9g while a 1 kg/2-bond part
+  on the same anchor stays on). Regression-tested.
+- Docs: removed the wrong "a single frame can never kill a wire" claim.
+- Tests: 31 waypoint-wires (+1: the 11-node regression; glue test extended with
+  the shared-anchor pair; builder test asserts BOTH wires survive with finite
+  positions). npm test 64/64, e2e-cloud green.
+
 ### Flight wire thermal (wires now burn in re-entry)
 - Flight ropes carry a temperature (same copper thermal mass as the workshop)
   but cool by FORCED convection (h≈80 W/m²K vs the workshop's h≈10) toward the

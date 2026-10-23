@@ -750,20 +750,24 @@ test('glue load update: spike guard, group teardown, wire rip-out, chain, floati
   const mkPart = (id, name) => ({ parent: root, userData: { partId: id, name },
     getWorldPosition() { return new THREE.Vector3(); } });
   const part1 = mkPart('p1', 'Battery'), part2 = mkPart('p2', 'Antenna'), part3 = mkPart('p3', 'Light'), part4 = mkPart('p4', 'Pod');
-  // each joint gets its OWN structural anchor — separate components (a shared anchor
-  // would merge them into one group, which the group model also handles correctly)
+  const part5 = mkPart('p5', 'Toolbox'), part6 = mkPart('p6', 'Camera'); // shared-anchor pair
+  // each joint gets its OWN structural anchor — separate components — except part5/part6,
+  // which SHARE anchorE: independent assemblies on one anchor must NOT pool their capacity
   const anchorA = mkPart('s1', 'Frame'), anchorB = mkPart('s2', 'Frame'), anchorC = mkPart('s3', 'Frame'), anchorD = mkPart('s4', 'Frame');
+  const anchorE = mkPart('s5', 'Frame'), anchorF = mkPart('s6', 'Frame');
   const flightSims = [{ dead: false, line: { visible: true } }, { dead: false, line: { visible: true } }];
   const wires = [{ from: 'p1', to: 'p2', kind: 'power' }, { from: 'p4', to: 'p2', kind: 'signal' }];
   let joints = { bonds: [
     { a: part1, c: anchorA },                       // part1 on one bond
     { a: part2, c: anchorB }, { a: part2, c: anchorC }, // part2 on two bonds: holds at 9g, fails at 30g
     { a: part3, c: part1 },                         // part3 glued ONLY to part1 (a chain)
-    { a: part4, c: anchorD },                        // part4 on one bond (floating-group case below)
-  ], carried: [part1, part2, part3, part4], root, over: new Map() };
+    { a: part4, c: anchorD },                       // part4 on one bond (floating-group case below)
+    { a: part5, c: anchorE },                       // 10 kg on one bond (shared anchor with part6)
+    { a: part6, c: anchorE }, { a: part6, c: anchorF }, // 1 kg on two bonds (shared anchor with part5)
+  ], carried: [part1, part2, part3, part4, part5, part6], root, over: new Map() };
   const detached = [], logs = [];
   let lastG = 9.81, stats = 0;
-  const massOf = (p) => p === part4 ? 1 : 5, detach = (p) => { detached.push(p); p.parent = null; };
+  const massOf = (p) => p === part4 || p === part6 ? 1 : p === part5 ? 10 : 5, detach = (p) => { detached.push(p); p.parent = null; };
   const reportStats = () => { stats++; };
   const log = (m) => { logs.push(m); };
   const spark = () => {};
@@ -771,10 +775,12 @@ test('glue load update: spike guard, group teardown, wire rip-out, chain, floati
   lastG = 9.81 * 9;
   loadUpdate(); // frame 1: the two-frame guard holds — nothing detaches yet
   assert.equal(detached.length, 0, 'first overloaded frame must not detach');
-  loadUpdate(); // frame 2: the joint lets go
-  assert.equal(detached.length, 2, 'part1 and its chained part3 tear off TOGETHER');
+  loadUpdate(); // frame 2: the overloaded joints let go
+  assert.equal(detached.length, 3, 'part1+part3 tear off together, and the overloaded 10 kg part on the shared anchor tears off on its own');
   assert.ok(detached.includes(part1) && detached.includes(part3), 'the chain goes with the joint');
-  assert.equal(stats, 1, 'airframe stats refreshed');
+  assert.ok(detached.includes(part5), 'the heavy assembly on the shared anchor fails independently');
+  assert.ok(part6.parent === root, 'the light assembly on the SAME anchor survives — no capacity pooling');
+  assert.equal(stats, 2, 'airframe stats refreshed per group');
   assert.ok(logs.some(m => m.includes('Glue joint failed at 9g')), 'failure is logged with the load');
   assert.ok(logs.some(m => m.includes('2-part group tore away')), 'group failure is named');
   // the wire attached to the torn-off part ripped out with it (no anchor in mid-air)
@@ -783,19 +789,20 @@ test('glue load update: spike guard, group teardown, wire rip-out, chain, floati
   assert.ok(!flightSims[1].dead, 'the wire between two surviving parts lives on');
   // a single-frame 30g spike (spawn teleport / reset) must not rip part2 off
   lastG = 9.81 * 30; loadUpdate();
-  assert.equal(detached.length, 2, 'one-frame spike must not detach');
+  assert.equal(detached.length, 3, 'one-frame spike must not detach');
   lastG = 9.81; loadUpdate(); // back to 1g — the overload counter resets
   lastG = 9.81 * 30; loadUpdate(); // another single spike frame
-  assert.equal(detached.length, 2, 'spikes separated by a calm frame never detach');
+  assert.equal(detached.length, 3, 'spikes separated by a calm frame never detach');
   lastG = 9.81 * 30; loadUpdate(); lastG = 9.81 * 30; loadUpdate(); // sustained 30g: 1470 N > 700 N
-  assert.equal(detached.length, 3, 'sustained overload tears part2 off');
+  assert.equal(detached.length, 4, 'sustained overload tears part2 off');
   // floating group: the damage model removes part4's anchor — no support path left,
   // so even at 1g nothing holds it and it must tear off (no floating groups)
   anchorD.parent = null; // the structural anchor is gone (damage path)
   lastG = 9.81; loadUpdate(); loadUpdate(); // two frames at 1g
-  assert.equal(detached.length, 4, 'a part whose anchor is gone must fall off');
+  assert.equal(detached.length, 5, 'a part whose anchor is gone must fall off');
   assert.ok(flightSims[1].dead, 'the wire on the now-unsupported part ripped out');
   assert.ok(globalThis.Electrics.brokenWires.has(1), 'its electrical fault is recorded');
+  assert.ok(part6.parent === root, 'the healthy light assembly is still flying');
 });
 
 test('flight wires: insulation burns through in flight (integration via the step)', () => {
@@ -847,6 +854,42 @@ test('flight wires: insulation burns through in flight (integration via the step
   for (let i = 0; i < 900; i++) step(1 / 60);
   assert.ok(!sim.dead, 'cool wire survives');
   assert.ok(sim.temp < 80, 'cool wire stays below the warning threshold');
+});
+
+test('flight ropes: the 11-node 0.5 m-rest rope survives ordinary gravity (regression)', () => {
+  physicsEnv();
+  // extend the stub with the ops the flight step uses (same as the rope tests)
+  const V = THREE.Vector3;
+  THREE.Vector3 = class extends V {
+    clone(){return new THREE.Vector3(this.x,this.y,this.z);}
+    sub(v){this.x-=v.x;this.y-=v.y;this.z-=v.z;return this;}
+    divideScalar(n){this.x/=n;this.y/=n;this.z/=n;return this;}
+    applyQuaternion(){return this;}
+    negate(){this.x=-this.x;this.y=-this.y;this.z=-this.z;return this;}
+    addScaledVector(v,s){this.x+=v.x*s;this.y+=v.y*s;this.z+=v.z*s;return this;}
+    static multiplyVectors(a,b){return new THREE.Vector3(a.x*b.x,a.y*b.y,a.z*b.z);}
+  };
+  globalThis.THREE.Quaternion = class { constructor(){this.x=0;this.y=0;this.z=0;this.w=1;} invert(){return this;} };
+  globalThis.fleetModelSlot = { getWorldQuaternion: q => q };
+  const stepSrc = extract(body, 'function fwStepFlightWires(dt){');
+  const step = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
+    .replace(/fwFlightWireRoot/g, 'flightWireRoot').replace(/fwFlightWireSims/g, 'flightSims')
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
+    .replace(/physicsVelocity/g, 'vel') + ')');
+  let lastGApp = 9.81;
+  const prevVel = new THREE.Vector3(), vel = new THREE.Vector3(); // parked: no acceleration
+  const flightWireRoot = { localToWorld: (v) => v, parent: { parent: {} } };
+  const reentryStub = { skinT: 20 };
+  // the rope shape that snapped in 3 frames under the old 36× gravity bug: 11 nodes, 0.5 m rests
+  const pts = [];
+  for (let i = 0; i < 11; i++) pts.push({ p: new THREE.Vector3(0, 2, i * .5), pp: new THREE.Vector3(0, 2, i * .5), pin: i === 0 || i === 10 });
+  const sim = { pts, rests: Array(10).fill(.5), line: { geometry: { getAttribute: () => null }, visible: true },
+    dead: false, warned: false, temp: 20, mcK: 11 * .05 * 385, hA: 11 * .005 * 80, stiffness: 2500, damping: 2 };
+  let flightSims = [sim];
+  for (let i = 0; i < 600; i++) step(1 / 60); // 10 s of 1g
+  assert.ok(!sim.dead, 'the 11-node rope must not snap under ordinary gravity');
+  assert.ok(sim.pts[5].p.y < 1.9, 'it sags into its catenary, got y=' + sim.pts[5].p.y.toFixed(3));
+  for (const sp of sim.pts) assert.ok(Number.isFinite(sp.p.y) && Number.isFinite(sp.p.x) && Number.isFinite(sp.p.z), 'node positions stay finite');
 });
 
 test('flight rope builder: every segment gets a spring; builder ropes sag without snapping', () => {
@@ -915,8 +958,11 @@ test('flight rope builder: every segment gets a spring; builder ropes sag withou
   const reentryStub = { skinT: 20 };
   const y0 = s1.pts[1].p.y;
   for (let i = 0; i < 600; i++) step(1 / 60); // 10 s of level flight
-  assert.ok(!s1.dead, 'builder rope survives level flight — no snap');
-  assert.ok(s1.age >= 600, 'rope ages once per frame');
+  for (const sim of sims) { // BOTH the ordinary wire and the unequal-waypoint wire
+    assert.ok(!sim.dead, 'builder rope survives level flight — no snap');
+    assert.ok(sim.age >= 600, 'rope ages once per frame');
+    assert.ok(Number.isFinite(sim.temp), 'wire temperature stays finite');
+    for (const sp of sim.pts) assert.ok(Number.isFinite(sp.p.x) && Number.isFinite(sp.p.y) && Number.isFinite(sp.p.z), 'node positions stay finite');
+  }
   assert.ok(s1.pts[1].p.y < y0, 'builder rope sags under gravity');
-  assert.ok(Number.isFinite(s1.temp), 'wire temperature stays finite');
 });
