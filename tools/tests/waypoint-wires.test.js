@@ -118,6 +118,13 @@ test('audit catches a straight fuel line through the cockpit, passes a belly run
   globalThis.workshopWires = [{ from: 'tank', to: 'eng', kind: 'fuel', waypoints: [{ x: 2, y: 1.2, z: -2 }, { x: -2, y: 1.2, z: 2 }] }];
   const clipped = audit().errors;
   assert.ok(clipped.some(e => /cockpit/.test(e)), 'diagonal pass-through not caught: ' + JSON.stringify(clipped));
+
+  // regression that motivated the exact check: a long segment whose chord
+  // through the box is a short sliver. The old 13-point sampler MISSES it
+  // (verified independently); the production audit must CATCH it.
+  globalThis.workshopWires = [{ from: 'tank', to: 'eng', kind: 'fuel', waypoints: [{ x: 0, y: 1.2, z: -100 }, { x: 0, y: 1.2, z: 99 }] }];
+  const thinSliver = audit().errors;
+  assert.ok(thinSliver.some(e => /cockpit/.test(e)), 'thin sliver not caught — sampler regression: ' + JSON.stringify(thinSliver));
 });
 
 test('all 24 presets pass client validateDesign with routed wires preserved', () => {
@@ -145,14 +152,53 @@ test('wire waypoints survive a save -> validate -> restore round-trip (serializa
   assert.deepEqual(restored.wires[0].waypoints, snap.wires[0].waypoints);
 });
 
-test('workshopRestoreSnapshot does not strip waypoints', () => {
-  // the restore path in the client is: workshopRestoreSnapshot(snap) ->
-  // workshopWires = workshopCloneJSON(snap.wires||[]) -> workshopRebuildWires()
-  // workshopCloneJSON is a deep clone, so waypoints survive; this test pins the
-  // restoreSrc from the client and asserts the property holds for a routed wire.
+test('workshopRestoreSnapshot preserves waypoints through the real restore path', () => {
+  // Execute the actual client functions (extracted verbatim) with minimal
+  // scene/DOM stubs, as the browser would: snapshot -> restore -> the wire
+  // object the editor holds afterwards must still carry its waypoints, and
+  // must be a DEEP COPY (mutating the restored wire cannot corrupt the
+  // original snapshot, which is what undo/redo relies on).
   const restoreSrc = extract(body, 'function workshopRestoreSnapshot(snap){');
-  assert.match(restoreSrc, /workshopCloneJSON\(snap\.wires\|\|\[\]\)/, 'restore must deep-clone wires (waypoints preserved)');
-  // snapshot side too — undo/redo and cloud save both go through this
-  const snapSrc = extract(body, 'function workshopSnapshot(){');
-  assert.match(snapSrc, /wires:workshopCloneJSON\(workshopWires\)/, 'snapshot must deep-clone wires');
+  const cloneSrc = extract(body, 'function workshopCloneJSON(o){');
+
+  // minimal DOM stub: $('id') returns a plain object with value/textContent etc.
+  const els = new Map();
+  const $ = id => { if (!els.has(id)) els.set(id, { value: '', textContent: '', hidden: false, classList: { toggle() {}, add() {}, remove() {} }, setAttribute() {}, disabled: false }); return els.get(id); };
+
+  // minimal THREE + scene stubs for what restore actually touches
+  globalThis.THREE = { Vector3: class V { constructor(x, y, z) { Object.assign(this, { x, y, z }); } clone() { return new V(this.x, this.y, this.z); } } };
+  globalThis.workshopBuildRoot = { children: [], remove() {}, clear() {} };
+  globalThis.workshopWireRoot = { clear() {} };
+  globalThis.workshopGroups = [];
+  globalThis.workshopParts = [];
+  globalThis.workshopWires = [];
+  globalThis.workshopNextId = 1;
+  globalThis.workshopNextSymmetryId = 1;
+  globalThis.workshopSymmetryEnabled = true;
+  globalThis.workshopSnapIncrement = .25;
+  globalThis.workshopSelectedId = null;
+  globalThis.workshopLoading = false;
+  globalThis.workshopCreatePart = () => null;   // parts not under test
+  globalThis.workshopGetPart = () => null;
+  globalThis.workshopRebuildWires = () => {};   // rendering not under test here
+  globalThis.workshopSelectPart = () => {};
+  globalThis.workshopUpdateStats = () => {};
+  globalThis.workshopUpdateEmptyHint = () => {};
+  globalThis.workshopUpdateHistoryButtons = () => {};
+  globalThis.$ = $;
+
+  // install the real functions
+  let restore; eval(restoreSrc.replace('function workshopRestoreSnapshot', 'restore = function workshopRestoreSnapshot'));
+  let clone; eval(cloneSrc.replace('function workshopCloneJSON', 'clone = function workshopCloneJSON'));
+  globalThis.workshopCloneJSON = clone;
+
+  const wire = { from: 'part-1', to: 'part-2', kind: 'fuel', waypoints: [{ x: 0, y: .12, z: 2.5 }] };
+  const snap = { name: 'Test', symmetryEnabled: true, snapIncrement: .25, parts: [], groups: [], wires: [wire] };
+
+  restore(snap);
+  assert.equal(globalThis.workshopWires.length, 1);
+  assert.deepEqual(globalThis.workshopWires[0].waypoints, [{ x: 0, y: .12, z: 2.5 }], 'waypoints lost through restore');
+  // deep-copy independence: mutating the restored wire must not touch the snapshot
+  globalThis.workshopWires[0].waypoints[0].y = 9;
+  assert.equal(wire.waypoints[0].y, .12, 'restore aliased the snapshot — undo/redo would corrupt history');
 });

@@ -219,7 +219,7 @@ function designFor(cfg) {
   strainer = b.add('fuelStrainer', [-W * .25, .18, -L * .05], { name: 'Fuel strainer (belly, aft)' });
   pump = b.add('fuelPump', [0, .3, Math.min(L * .27 + .4, L * .31 - .05)], { name: 'Boost pump (under floor, fwd)' });
   b.routedWire(tankL, strainer, 'fuel'); b.routedWire(tankR, strainer, 'fuel');
-  if (pump) b.wire(strainer, pump, 'fuel');
+  if (pump) b.routedWire(strainer, pump, 'fuel');
   const fuelTo = pump || strainer;
   for (const e of engines) b.routedWire(fuelTo, e, 'fuel');
   }
@@ -362,22 +362,37 @@ function cockpitClearOk(snap) {
     if (a === 'z') { minZ = Math.min(minZ, v); maxZ = Math.max(maxZ, v); }
   }
   minX -= .35; minY -= .35; minZ -= .35; maxX += .35; maxY += .35; maxZ += .35;
-  const inside = (x, y, z) => x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
+  // exact slab intersection on the cockpit box — matches the client audit's
+  // workshopWirePath geometry: part endpoints lifted 0.1 m above part centre,
+  // waypoints as given, straight segments between them, no sampling gaps
   const byId = new Map(parts.map(p => [p.id, p]));
+  const box = { x: [minX, maxX], y: [minY, maxY], z: [minZ, maxZ] };
+  const segHitsBox = (P, Q) => {
+    const d = { x: Q.x - P.x, y: Q.y - P.y, z: Q.z - P.z };
+    let t0 = 0, t1 = 1;
+    for (const ax of ['x', 'y', 'z']) {
+      if (Math.abs(d[ax]) < 1e-9) {
+        if (P[ax] < box[ax][0] || P[ax] > box[ax][1]) return false;
+      } else {
+        let ta = (box[ax][0] - P[ax]) / d[ax], tb = (box[ax][1] - P[ax]) / d[ax];
+        if (ta > tb) { const s = ta; ta = tb; tb = s; }
+        t0 = Math.max(t0, ta); t1 = Math.min(t1, tb);
+        if (t0 > t1) return false;
+      }
+    }
+    return true;
+  };
   for (const w of snap.wires) {
     if (w.kind !== 'fuel') continue;
     const a = byId.get(w.from), b = byId.get(w.to);
     if (!a || !b) continue;
-    // check the REAL polyline (endpoints + waypoints), segment by segment —
-    // matches the client audit, which uses workshopWirePath()
-    const pts = [a.position, ...(w.waypoints || []).map(p => p), b.position];
+    // endpoints lifted 0.1 m above part centre — exactly what workshopWirePath()
+    // resolves on the client, so the generator and the client audit agree
+    const lift = p => ({ ...p, y: p.y + .1 });
+    const pts = [lift(a.position), ...(w.waypoints || []).map(p => ({ ...p })), lift(b.position)];
     for (let s = 0; s < pts.length - 1; s++) {
-      const P = pts[s], Q = pts[s + 1];
-      for (let i = 0; i <= 12; i++) {
-        const t = i / 12;
-        if (inside(P.x + (Q.x - P.x) * t, P.y + (Q.y - P.y) * t, P.z + (Q.z - P.z) * t))
-          return `${a.name} → ${b.name} crosses the cockpit box`;
-      }
+      if (segHitsBox(pts[s], pts[s + 1]))
+        return `${a.name} → ${b.name} crosses the cockpit box`;
     }
   }
   return true;

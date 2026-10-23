@@ -615,7 +615,8 @@ Done:
 - Verified with extracted-function tests: waypoint schema accept/reject, polyline rendering, audit straight-vs-routed, full preset pack through client validateDesign.
 - `tools/tests/waypoint-wires.test.js`: 9 committed regression tests against the production functions (extracted verbatim from the client), including save→validate→restore round-trip preserving waypoints and an exact-intersection cockpit-clip case the old 13-point sampler could miss.
 - Rendering now matches the audit exactly: workshopRebuildWires renders straight LineSegments through workshopWirePath's resolved points, the same polyline the audit checks segment-by-segment. No spline bow can hide from the audit.
-- Waypoints persist through workshopSnapshot and workshopRestoreSnapshot (both deep-clone wires via workshopCloneJSON), so cloud save/load, undo/redo and preset load keep them — pinned by tests.
+- Waypoints persist through workshopSnapshot and workshopRestoreSnapshot — the restore test EXECUTES the real restore with scene/DOM stubs, asserts waypoints survive and that the restore is a deep copy (undo/redo history cannot be corrupted through aliasing).
+- Generator's cockpit-clearance check upgraded to exact slab intersection on the SAME lifted-endpoint polyline the client audit uses — it immediately caught a real violation (Extra 300 straight strainer→pump through the cockpit box) which is now routed under the floor; presets regenerated.
 - Committed and pushed (a1d1834 + follow-up fixes).
 Still to do:
 - Editor affordance: user-facing way to add/move/remove waypoints on a selected wire in the workshop UI (right now waypoints exist in schema + presets + audit only).
