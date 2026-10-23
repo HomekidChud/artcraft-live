@@ -208,3 +208,16 @@ the wire ropes + a live aircraft energy ledger in the HUD.
 Glue replaces weld: flight attachment is now "physically touching structure OR glued
 (bond graph)"; the Weld/Unweld buttons were removed. Constants are cited in the code
 comments next to `EnergyCore`.
+
+### §9 addendum — flight-time ropes and re-entry heating
+
+- **Apparent gravity**: ropes in the airframe frame feel g − a_plane (rotated
+  into the plane frame) — the standard non-inertial-frame treatment; sag in level
+  flight, weightless in free fall, 2–3g downward in pull-ups.
+- **Elastic limit**: 8% stretch before snap — consistent with copper wire
+  fracture strains (~1–15% depending on temper; conservative game value).
+- **Stagnation heating**: T₀ = T·(1 + 0.2M²), the isentropic compressible-flow
+  relation (e.g. [NASA Glenn](https://www.grc.nasa.gov/www/BGH/stagnnt.html));
+  skin lags with ~8 s thermal time constant.
+- **Flame threshold is game-scaled** (80°C vs ~500°C for visible dull-red
+  steel) so the effect is reachable in normal gameplay; white-hot by ~480°C.
