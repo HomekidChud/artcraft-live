@@ -808,6 +808,19 @@ and the physics should keep advancing. Two additions, both tested.
   glued joints are held by contact per the game's contact-attachment model
   (same as unwelded stacked parts) and are not additionally glue-load-tested.
 
+### Final review round 2 (same day): wire-free glue gravity + slow-frame regression tests
+- **Wire-free build used a stale apparent gravity**: `fwLastGAppMag` was only refreshed by
+  the flight rope step — a glue-only custom aircraft (no wires) has no rope step, so the
+  glue load test ran on the initial 9.81 forever. `fwGlueLoadUpdate(dt)` now computes the
+  apparent gravity itself when there is no live rope root (own prev-velocity tracker),
+  so the load test tracks acceleration in every build.
+- **Regression tests added** (waypoint-wires.test.js 32→33, glue test extended):
+  - slow/janky frames (0.1 s cap, 60/30 fps, alternating) with a 3000 N/m fuel line stay
+    finite, don't snap, don't phantom-melt, and still sag into equilibrium;
+  - wire-free glue-only build computes 1g at rest, tracks ~8g sustained acceleration,
+    and tears an overloaded joint after two consecutive overloaded frames.
+- Tests: 33/33, npm test 64/64, e2e-cloud green.
+
 ### Live smoke test round (same day): the clone swap — glue/ropes never ran in the scene
 - **Found live on the deployed Pages build** (blob-instrumented page + CDP):
   Test Fly's `resetFlight()` → `restoreCustomAircraft()` REPLACES the model with

@@ -4859,7 +4859,7 @@ const FW_WIRE_SETTLE_FRAMES=30; // a freshly built rope starts straight; its gra
 const FW_WIRE_INSULATION_MELT_C=105; // PVC continuous rating — hotter and the insulation fails
 const FW_GLUE_BOND_STRENGTH_N=350; // ~25 mm² epoxy lap joint at ~14 MPa shear (design estimate)
 const FW_WIRE_COLORS={power:'#ffd24a',ground:'#9aa7ad',signal:'#6fd3ff',data:'#6fd3ff',hydraulic:'#ff9a3d',fuel:'#c9a86a',water:'#5ac8ff'};
-let fwFlightWireSims=[],fwFlightWireRoot=null,fwPrevVel=new THREE.Vector3(),fwReentry={skinT:20,flame:null};
+let fwFlightWireSims=[],fwFlightWireRoot=null,fwPrevVel=new THREE.Vector3(),fwGluePrevVel=new THREE.Vector3(),fwReentry={skinT:20,flame:null};
 function fwBuildFlightWireSims(flightWires){
  fwFlightWireRoot=flightWires;fwFlightWireSims=[];
  fwPrevVel.copy(physicsVelocity);
@@ -5005,9 +5005,17 @@ function fwBuildGlueJoints(root,carriedIds){
  if(!bonds.length||!carried.length)return;
  fwFlightGlueJoints={bonds,carried,root,over:new Map()}; // over: consecutive-overload counters
 }
-function fwGlueLoadUpdate(){
+function fwGlueLoadUpdate(dt){
  const j=fwFlightGlueJoints;if(!j)return;
  if(!j.root.parent||!j.root.parent.parent){fwFlightGlueJoints=null;return;} // custom aircraft gone
+ if(!fwFlightWireRoot||!fwFlightWireRoot.parent||!fwFlightWireRoot.parent.parent){
+  // wire-free build: the rope step never runs, so it can't refresh the apparent
+  // gravity — compute it here or the load test runs on a stale value forever
+  const h=Math.max(dt||1/60,1e-4);
+  const a=physicsVelocity.clone().sub(fwGluePrevVel).divideScalar(h);fwGluePrevVel.copy(physicsVelocity);
+  const q=fleetModelSlot.getWorldQuaternion(new THREE.Quaternion()).invert();
+  fwLastGAppMag=new THREE.Vector3(0,-9.81,0).sub(a).applyQuaternion(q).length();
+ }
  const carriedSet=new Set(j.carried);
  const bonds=j.bonds.filter(b=>b.a.parent===j.root&&b.c.parent===j.root); // live bonds only
  const adj=new Map();const link=(x,y)=>{(adj.get(x)||adj.set(x,[]).get(x)).push(y);};
@@ -8022,7 +8030,7 @@ function animate(){
  if(S.camera==='cockpit')updateCabinMechanisms();
  updateCamera(dt);
  fwStepFlightWires(dt);
- fwGlueLoadUpdate();
+ fwGlueLoadUpdate(dt);
  fwReentryUpdate(dt);
  updateUI();
  updateMapTrack(dt);

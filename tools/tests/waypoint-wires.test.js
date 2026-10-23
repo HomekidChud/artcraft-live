@@ -738,9 +738,27 @@ test('glue load update: spike guard, group teardown, wire rip-out, chain, floati
   const jointSrc = extract(body, 'function fwGlueJoint(partMassKg,gAppMag,bondCount,strengthN=FW_GLUE_BOND_STRENGTH_N){');
   let jointFn; eval(jointSrc.replace('function fwGlueJoint', 'jointFn = function fwGlueJoint'));
   assert.ok(Number.isFinite(jointFn(5, 9.81, 2).load), 'joint loads are finite');
-  const src = extract(body, 'function fwGlueLoadUpdate(){');
-  const loadUpdate = eval('(' + src.replace('function fwGlueLoadUpdate', 'function loadUpdate')
+  const src = extract(body, 'function fwGlueLoadUpdate(dt){');
+  let wireRootStub = { parent: { parent: {} } }; // live rope root by default
+  const gluePrevVel = new THREE.Vector3();
+  const velStub = new THREE.Vector3();
+  globalThis.fleetModelSlot = { getWorldQuaternion: q => q };
+  globalThis.THREE.Quaternion = class { constructor(){this.x=0;this.y=0;this.z=0;this.w=1;} invert(){return this;} };
+  // extend the stub with the ops the new wire-free gravity path uses (same as the rope tests)
+  const V3 = THREE.Vector3;
+  THREE.Vector3 = class extends V3 {
+    clone(){return new THREE.Vector3(this.x,this.y,this.z);}
+    sub(v){this.x-=v.x;this.y-=v.y;this.z-=v.z;return this;}
+    divideScalar(n){this.x/=n;this.y/=n;this.z/=n;return this;}
+    applyQuaternion(){return this;}
+    negate(){this.x=-this.x;this.y=-this.y;this.z=-this.z;return this;}
+    addScaledVector(v,s){this.x+=v.x*s;this.y+=v.y*s;this.z+=v.z*s;return this;}
+    static multiplyVectors(a,b){return new THREE.Vector3(a.x*b.x,a.y*b.y,a.z*b.z);}
+  };
+  const loadUpdate = eval('(' + src.replace('function fwGlueLoadUpdate(dt)', 'function(dt)')
     .replace(/fwFlightGlueJoints/g, 'joints').replace(/fwLastGAppMag/g, 'lastG')
+    .replace(/fwFlightWireRoot/g, 'wireRootStub').replace(/fwGluePrevVel/g, 'gluePrevVel')
+    .replace(/physicsVelocity/g, 'velStub')
     .replace(/fwGlueJoint/g, 'jointFn').replace(/workshopPartMass/g, 'massOf')
     .replace(/detachPartAsDebris/g, 'detach').replace(/refreshCustomFlightStats/g, 'reportStats')
     .replace(/flightLog/g, 'log').replace(/workshopSparkAt/g, 'spark')
@@ -803,6 +821,28 @@ test('glue load update: spike guard, group teardown, wire rip-out, chain, floati
   assert.ok(flightSims[1].dead, 'the wire on the now-unsupported part ripped out');
   assert.ok(globalThis.Electrics.brokenWires.has(1), 'its electrical fault is recorded');
   assert.ok(part6.parent === root, 'the healthy light assembly is still flying');
+
+  // wire-free build: with no live rope root the load update must refresh the apparent
+  // gravity itself — a glue-only custom aircraft has no rope step to do it
+  wireRootStub = null; // ropes gone (wire-free build)
+  const part7 = mkPart('p7', 'Battery'); // fresh 5 kg part — earlier parts may already be detached
+  joints = { bonds: [{ a: part7, c: anchorA }], carried: [part7], root, over: new Map() };
+  detached.length = 0; stats = 0;
+  velStub.set(0, 0, 0); gluePrevVel.set(0, 0, 0);
+  loadUpdate(1 / 60);
+  assert.ok(Math.abs(lastG - 9.81) < .05, 'wire-free build computes 1g apparent gravity, got ' + lastG.toFixed(2));
+  // accelerating downward at ~8g → apparent gravity ~8g: a 5 kg part on ONE bond must fail.
+  // the acceleration must SUSTAIN across frames — constant velocity is 1g, so keep
+  // decreasing the velocity by a·dt before every frame
+  let velY = 0;
+  const accel8g = () => { velY -= 88 * (1 / 60); velStub.set(0, velY, 0); };
+  accel8g();
+  loadUpdate(1 / 60);
+  assert.ok(lastG > 70, 'wire-free build tracks acceleration into the load test, got ' + lastG.toFixed(1) + ' m/s²');
+  accel8g();
+  loadUpdate(1 / 60); // second consecutive overloaded frame → teardown
+  assert.ok(detached.includes(part7), 'wire-free glue-only build tears under sustained overload');
+  assert.equal(detached.length, 1, 'only the overloaded joint lets go');
 });
 
 test('flight wires: insulation burns through in flight (integration via the step)', () => {
@@ -890,6 +930,53 @@ test('flight ropes: the 11-node 0.5 m-rest rope survives ordinary gravity (regre
   assert.ok(!sim.dead, 'the 11-node rope must not snap under ordinary gravity');
   assert.ok(sim.pts[5].p.y < 1.9, 'it sags into its catenary, got y=' + sim.pts[5].p.y.toFixed(3));
   for (const sp of sim.pts) assert.ok(Number.isFinite(sp.p.y) && Number.isFinite(sp.p.x) && Number.isFinite(sp.p.z), 'node positions stay finite');
+});
+
+test('flight ropes: slow and janky frames stay stable (fixed-size substeps regression)', () => {
+  physicsEnv();
+  // extend the stub with the ops the flight step uses (same as the rope tests)
+  const V = THREE.Vector3;
+  THREE.Vector3 = class extends V {
+    clone(){return new THREE.Vector3(this.x,this.y,this.z);}
+    sub(v){this.x-=v.x;this.y-=v.y;this.z-=v.z;return this;}
+    divideScalar(n){this.x/=n;this.y/=n;this.z/=n;return this;}
+    applyQuaternion(){return this;}
+    negate(){this.x=-this.x;this.y=-this.y;this.z=-this.z;return this;}
+    addScaledVector(v,s){this.x+=v.x*s;this.y+=v.y*s;this.z+=v.z*s;return this;}
+    static multiplyVectors(a,b){return new THREE.Vector3(a.x*b.x,a.y*b.y,a.z*b.z);}
+  };
+  globalThis.THREE.Quaternion = class { constructor(){this.x=0;this.y=0;this.z=0;this.w=1;} invert(){return this;} };
+  globalThis.fleetModelSlot = { getWorldQuaternion: q => q };
+  const stepSrc = extract(body, 'function fwStepFlightWires(dt){');
+  const step = eval('(' + stepSrc.replace('function fwStepFlightWires(dt)', 'function(dt)')
+    .replace(/fwFlightWireRoot/g, 'flightWireRoot').replace(/fwFlightWireSims/g, 'flightSims')
+    .replace(/fwPrevVel/g, 'prevVel').replace(/fwLastGAppMag/g, 'lastGApp').replace(/fwReentry/g, 'reentryStub')
+    .replace(/physicsVelocity/g, 'vel') + ')');
+  let lastGApp = 9.81;
+  const prevVel = new THREE.Vector3(), vel = new THREE.Vector3(); // parked: no acceleration
+  const flightWireRoot = { localToWorld: (v) => v, parent: { parent: {} } };
+  const reentryStub = { skinT: 20 };
+  globalThis.Electrics = { brokenWires: new Set() };
+  globalThis.flightLog = () => {};
+  globalThis.workshopSparkAt = () => {};
+  // the worst case that exploded live: a 3000 N/m fuel line (stiffest common line) driven
+  // at a 0.1 s capped frame time — the old dt/6 substep gave k·h²/m ≈ 16.7 (needs < 1)
+  const pts = [];
+  for (let i = 0; i < 5; i++) pts.push({ p: new THREE.Vector3(0, 2, i * .8), pp: new THREE.Vector3(0, 2, i * .8), pin: i === 0 || i === 4 });
+  const sim = { pts, rests: [.8, .8, .8, .8], line: { geometry: { getAttribute: () => null }, visible: true },
+    dead: false, warned: false, temp: 20, mcK: 5 * .05 * 385, hA: 5 * .005 * 80, stiffness: 3000, damping: 2 };
+  let flightSims = [sim];
+  // janky frame times: 0.1 s cap, 60 fps, 30 fps, alternating — 10 s of wall time
+  const frames = [.1, 1 / 60, .1, 1 / 30, .1, .0167, .033];
+  for (let i = 0; i < 300; i++) step(frames[i % frames.length]);
+  for (const sp of sim.pts) {
+    assert.ok(Number.isFinite(sp.p.y) && Number.isFinite(sp.p.x) && Number.isFinite(sp.p.z),
+      'slow-frame node positions stay finite (no spring explosion), y=' + sp.p.y);
+    assert.ok(Math.abs(sp.p.y) < 1e3, 'no runaway velocities');
+  }
+  assert.ok(!sim.dead, 'the fuel line must not snap on slow frames');
+  assert.ok(sim.temp < 80, 'wire stays near ambient — no phantom re-entry melt, got ' + sim.temp.toFixed(1) + '°C');
+  assert.ok(sim.pts[2].p.y < 2, 'the stiff fuel line still sags into equilibrium, y=' + sim.pts[2].p.y.toFixed(3));
 });
 
 test('flight rope builder: every segment gets a spring; builder ropes sag without snapping', () => {

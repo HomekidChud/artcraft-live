@@ -297,6 +297,18 @@ comments next to `EnergyCore`.
   (regression test); the settle guard is kept as protection for degenerate
   straight-start builds, and genuinely overstretched ropes still snap.
 
+### §9 addendum 5a — wire-free builds: glue must track gravity on its own (17.10.5d, final review)
+
+- **Gap found in review**: `fwLastGAppMag` (the apparent-gravity magnitude feeding the glue
+  joint load test) was refreshed only by the flight rope step — a glue-only custom
+  aircraft with no wires has no rope step, so the load test ran on the initial 9.81
+  m/s² forever and never saw maneuvers. `fwGlueLoadUpdate(dt)` now computes the apparent
+  gravity itself when there is no live rope root (own prev-velocity tracker, same
+  formula as the rope step: |(0,−g,0) − a| in model space), so every build's glue joints
+  feel real acceleration. Regression-tested: wire-free build computes 1g at rest,
+  tracks ~8g sustained acceleration, and tears an overloaded joint after two
+  consecutive overloaded frames.
+
 ### §9 addendum 5 — the clone swap: physics must bind to the model actually flying (17.10.5d, live smoke test)
 
 - **Root cause found live**: `resetFlight()` (called by Test Fly) and every repair
