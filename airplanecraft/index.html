@@ -3427,7 +3427,7 @@ const EnergyCore={
 };
 function workshopStepWirePhysics(dt){
  if(!workshopWireRoot||!workshopWires.length)return;
- const damp=.985,gy=-9.81*(dt/6)*(dt/6); // verlet substep gravity: a·h² per substep (a·dt² was 36× too strong)
+ const damp=.985,h=Math.min(dt/6,1/480),n=Math.max(1,Math.min(60,Math.round(dt/h))),gy=-9.81*h*h; // fixed-size verlet substeps: k·h²/m < 0.4 even for the stiffest line (4000 N/m) on slow frames — a dt/6 substep explodes past ~25 ms frames
  // water wire node positions (for powered-wire arcing checks)
  const waterPts=[];
  for(let i=0;i<workshopWires.length;i++){
@@ -3448,9 +3448,9 @@ function workshopStepWirePhysics(dt){
   // viscous damping along each segment. Elastic energy = 1/2 k x^2 on actual
   // stretch; damping power (c v^2) dissipates as heat into the wire's thermal
   // mass, which cools by Newton's law — a real coupled mechanical/thermal slice.
-  const h=dt/6,nodeM=.05; // 50 g per node; 6 substeps keep k·h²/m < 1 (stability)
+  const nodeM=.05; // 50 g per node; substeps keep k·h²/m < 1 (stability)
   let dampW=0;
-  for(let sub=0;sub<6;sub++){
+  for(let sub=0;sub<n;sub++){
    // integrate free nodes (gravity + damping); keep them off the floor
    for(const sp of sim.pts){
     if(sp.pin)continue;
@@ -3474,7 +3474,7 @@ function workshopStepWirePhysics(dt){
    // floor clamp
    for(const sp of sim.pts)if(!sp.pin&&sp.p.y<.03)sp.p.y=.03;
   }
-  sim.dampW=dampW/6; // mean damping power this frame
+  sim.dampW=dampW/n; // mean damping power this frame
   // elastic energy on the CURRENT stretch + thermal balance (heat in, cooling out)
   let elasticJ=0;
   for(let j=0;j<sim.pts.length-1;j++){
@@ -4897,12 +4897,12 @@ function fwStepFlightWires(dt){
  const q=fleetModelSlot.getWorldQuaternion(new THREE.Quaternion()).invert();
  const gLocal=gWorld.applyQuaternion(q);
  fwLastGAppMag=gLocal.length(); // apparent-gravity magnitude for the glue-joint load test
- const damp=.985,h=dt/6,nodeM=.05;const gx=gLocal.x*h*h,gy=gLocal.y*h*h,gz=gLocal.z*h*h; // verlet substep gravity: a·h² per substep (a·dt² was 36× too strong)
+ const damp=.985,h=Math.min(dt/6,1/480),n=Math.max(1,Math.min(60,Math.round(dt/h))),nodeM=.05;const gx=gLocal.x*h*h,gy=gLocal.y*h*h,gz=gLocal.z*h*h; // fixed-size verlet substeps: k·h²/m < 0.4 even for the stiffest line on slow frames — a dt/6 substep explodes past ~25 ms frames (a·dt² was also 36× too strong)
  for(let i=0;i<fwFlightWireSims.length;i++){
   const sim=fwFlightWireSims[i];if(!sim||sim.dead)continue;
   sim.age=(sim.age||0)+1; // frames since build — the settle guard uses this
   let dampW=0;
-  for(let sub=0;sub<6;sub++){
+  for(let sub=0;sub<n;sub++){
    for(const sp of sim.pts){
     if(sp.pin)continue;
     const nx=sp.p.x+(sp.p.x-sp.pp.x)*damp+gx,ny=sp.p.y+(sp.p.y-sp.pp.y)*damp+gy,nz=sp.p.z+(sp.p.z-sp.pp.z)*damp+gz;
@@ -4935,7 +4935,7 @@ function fwStepFlightWires(dt){
   if(sim.dead)continue;
   // wire thermal: damping heat in, Newton cooling toward the airframe skin temperature
   // (in flight the rope sits in the slipstream — forced convection, h≈80 W/m²K)
-  sim.dampW=dampW/6; // mean damping power this frame
+  sim.dampW=dampW/n; // mean damping power this frame
   sim.temp=EnergyCore.thermalStep(sim.temp,sim.dampW,sim.mcK,sim.hA,Math.max(20,fwReentry.skinT),dt);
   if(sim.temp>80&&!sim.warned){sim.warned=true;if(typeof flightLog==='function')flightLog('⚠ Wire insulation running hot ('+Math.round(sim.temp)+'°C) — PVC limit is 105°C');}
   if(sim.temp>FW_WIRE_INSULATION_MELT_C){ // tuned damage threshold at the PVC continuous-service
@@ -4954,7 +4954,7 @@ function fwStepFlightWires(dt){
 function fwStagnationTemp(mach,tamb){return tamb*(1+.2*mach*mach);}
 function fwReentryUpdate(dt){
  const atm=AeroCore.atmosphere(plane.position.y);
- const stagT=fwStagnationTemp(S.mach||0,atm.temperature);
+ const stagT=fwStagnationTemp(S.mach||0,atm.temperature)-273.15; // atmosphere is Kelvin; skinT is °C
  fwReentry.skinT+=(stagT-fwReentry.skinT)*Math.min(1,dt/8); // skin thermal lag ~8 s
  const over=fwReentry.skinT-80; // glow threshold: first visible heating (game-scaled)
  if(over>0){

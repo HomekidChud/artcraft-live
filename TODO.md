@@ -826,6 +826,20 @@ and the physics should keep advancing. Two additions, both tested.
 - Tests: 31→32 (+rebind regression); npm test 64/64, e2e-cloud green.
 - Docs: §9 addendum 5.
 
+### Live smoke test round (same day): the clone swap — glue/ropes never ran in the scene
+- **Two more live-only bugs found and fixed** (both hidden because the flight rope
+  step never ran in the scene before the rebind fix):
+  - **Rope spring instability on slow frames**: the substep was h=dt/6 with the
+    frame dt capped only at 0.1 s — k·h²/m hits 33 for a 3000 N/m fuel line
+    (stable < 1), so nodes exploded to ~5e11 m/s, damping power hit ~1e24 W and
+    wire temps "melted at 9.5e22 °C". Both rope steps now run FIXED-SIZE
+    substeps h=min(dt/6,1/480) with n=clamp(round(dt/h),1,60) — stable for any
+    frame time; equilibrium sag is unchanged (mg/k, timestep-independent).
+  - **Re-entry skin temperature chased Kelvin**: atmosphere() returns Kelvin;
+    fwReentry.skinT (°C) converged toward 288 → "SKIN 229°C" and the re-entry
+    flame while parked. stagT now converts to °C (−273.15).
+- Docs: §9 addendum 5 extended. Tests stay 32/32, npm test 64/64, e2e green.
+
 ### Final review round (same day): 36× rope gravity + shared-anchor capacity
 - **36× gravity bug fixed (workshop AND flight ropes)**: the verlet substep
   (h=dt/6, added for spring stability) still applied gravity as a·dt² per

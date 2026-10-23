@@ -315,3 +315,17 @@ comments next to `EnergyCore`.
   `restoreCustomAircraft` (so repairs and flight resets keep glue + ropes alive).
   Verified live: a 144 kg drop tank on one 350 N bond tore off at 1 g with the
   proper flight-log entry and airframe mass refresh.
+- **Two more live-only bugs** (both hidden because the flight rope step never ran
+  in the scene before the rebind):
+  - **Rope spring instability on slow frames**: the substep was h=dt/6 with the
+    frame dt capped only at 0.1 s — k·h²/m reaches 33 for a 3000 N/m fuel line
+    (stability needs < 1), so nodes exploded to ~5e11 m/s, damping power hit
+    ~1e24 W, and wire temps "melted at 9.5e22 °C" (observed live). Both rope
+    steps now run fixed-size substeps h=min(dt/6, 1/480) with
+    n=clamp(round(dt/h), 1, 60) — stable for any frame time; the equilibrium
+    sag is unchanged (mg/k is timestep-independent).
+  - **Re-entry skin temperature chased Kelvin**: `atmosphere()` returns Kelvin,
+    but `fwReentry.skinT` is °C — it converged toward 288 °C at Mach 0 (observed
+    "SKIN 229 °C" and a re-entry flame while parked). `stagT` now converts
+    to °C (−273.15); real re-entry heating at high Mach is unaffected
+    (Mach 5 at sea level ≈ 1450 °C).
