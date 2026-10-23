@@ -635,3 +635,45 @@ Cloud-browser smoke test (PARTIAL, on GitHub Pages, previous commit): Build Mode
 Still to do:
 - Editor affordance: user-facing way to add/move/remove waypoints on a selected wire in the workshop UI (right now waypoints exist in schema + presets + audit only).
 - DONE (follow-up session): routing extended beyond fuel — hydraulic supply AND return lines now follow the wing spar (sparWire), alternator power/ground and hydraulic-pump power/ground feeds follow the belly (routedWire). Presets regenerated: 225 routed wires (fuel 113, power 34, ground 34, hydraulic 44). Client audit's cockpit-clearance rule now covers hydraulic lines as well as fuel (same structure-following rule); committed test covers both. Verified 0 cockpit-box violations across all 24 presets for both kinds, using the exact lifted-endpoint slab geometry the client audit uses.
+
+## AirplaneCraft — 17.10.5 session (2026-10-23): wire physics, water arcing, pressure, glue
+
+Commits: `00603ee` (wire physics), `4c156f1` (glue). Tests: 18 waypoint-wires + 1 e2e
++ 8 server (27 total for this app; `npm test` at repo root is unrelated tooling).
+
+### Wire physics (real gravity/sag — owner request: "wires has no physics")
+- Wires are now **verlet ropes** (`workshopRebuildWireSims` + `workshopStepWirePhysics`,
+  hooked into `workshopFrame` at 60 Hz): subdivided ~0.8 m nodes, gravity −9.81,
+  damping .985, 6 Gauss-Seidel distance-constraint passes per frame. Endpoints and
+  waypoints stay pinned (`workshopWirePinsFor`); free spans sag, swing and settle on
+  the floor (y ≥ .03). Rendering = sim points (LineSegments), so what you see is the
+  physics. Sims are cached by a wire key; dragging a part moves its rope live.
+- **Water-contact arcing:** power/ground wires within 0.5 m of a water line's
+  polyline trigger `workshopSparkAt` — 48-particle additive spark burst at the contact
+  point (per AC 43.13-1B ch.11 wet-location wiring). Also an audit error rule of the
+  same geometry (test: accept separated runs, reject 0.2 m-apart runs).
+- **System pressure** (`workshopSystemPressures`): BFS from hydraulic pumps (3000 psi)
+  and fuel pumps (30 psi) through their own fluid kind only — networks never cross.
+  Shown in the wire inspector route line ("· 3000 psi"). No pressure model in flight
+  yet — workshop-only readout for now.
+
+### Glue (owner request: "add glue and stick things")
+- **Glue tool** (◌ button next to ⌁): click two components → bond; click a glued pair
+  again → unglue; tool switch cancels. Amber strut + blob rendered between bonded
+  parts (`workshopRebuildBonds`, own scene root).
+- **Drag propagation:** moving a part walks the glue graph (`workshopBondedSet`)
+  and shifts every bonded part + its symmetry mirror by the same delta.
+- Inspector: Glue section with per-bond × and "Unglue all". Bonds ride
+  snapshot/undo/redo/export/import/restore; deleting a part cleans its bonds.
+- **Schema:** `bonds: [{from,to}]` validated client-side (max 400, existing parts,
+  no self/duplicates) and mirrored in `server/index.js`; validateDesign returns
+  normalized `bonds`.
+- Flight-time meaning of glue is NOT yet implemented (bonded parts flying as one
+  rigid group in the atoms/damage sim is future work; today the weld flag still
+  governs flight detachment).
+
+### Remaining (unchanged)
+- Fleet path removal (parity unproven), Build Mode UI overhaul (six CSS skins),
+  light fixture models for fleet lamps, Unity/game-engine deep research, Render
+  deploy verification. Live smoke test of this session's features on Pages is
+  still pending (Pages rebuild is slow — use `?debug&fresh=N`).
