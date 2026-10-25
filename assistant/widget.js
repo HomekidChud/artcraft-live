@@ -11,17 +11,26 @@
   const style=document.createElement("style");
   style.textContent=`
     *{box-sizing:border-box}
-    :host{font-family:Inter,system-ui,sans-serif;color-scheme:dark}
+    :host{font-family:Inter,system-ui,sans-serif;color-scheme:light}
     button{min-height:44px;font:600 14px Inter,system-ui,sans-serif;cursor:pointer;border-radius:8px}
-    .tab{display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:50%;background:linear-gradient(160deg,#f3c773,#e5b04a 60%,#c9952f);color:#191307;border:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 26px rgba(0,0,0,.5);transition:transform .16s ease,box-shadow .16s ease}
-    .tab:hover{transform:translateY(-2px) scale(1.04);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 12px 32px rgba(0,0,0,.55)}
+    .tab{display:grid;place-items:center;width:44px;height:44px;padding:0;border-radius:50%;background:#c2491a;color:#fdf6ec;border:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 8px 26px rgba(0,0,0,.35);transition:transform .16s ease,box-shadow .16s ease}
+    .tab:hover{transform:translateY(-2px) scale(1.04);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 12px 32px rgba(0,0,0,.4)}
     .tab:active{transform:translateY(0) scale(1)}
     .tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .panel{position:absolute;right:0;bottom:56px;width:min(360px,calc(100vw - 24px));height:min(560px,calc(100dvh - 90px));border:1px solid #262e3a;border-radius:16px;overflow:hidden;background:#0b0d11;box-shadow:0 24px 80px rgba(0,0,0,.65);display:flex;flex-direction:column}
+    .panel{position:absolute;right:0;bottom:56px;width:min(360px,calc(100vw - 24px));height:min(560px,calc(100dvh - 90px));border:1px solid #e2d9c6;border-radius:16px;overflow:hidden;background:#f4f0e7;box-shadow:0 24px 80px rgba(58,44,22,.28);display:flex;flex-direction:column}
     .panel.expanded{width:min(520px,calc(100vw - 24px));height:min(760px,calc(100dvh - 90px))}
-    .panel[hidden]{display:none}.bar{display:flex;align-items:center;gap:4px;padding:0 4px 0 14px;flex-shrink:0;background:#11151b;color:#eceff3;font-size:13px;border-bottom:1px solid #222a34}
-    .bar span{margin-right:auto;font-weight:650;letter-spacing:-.01em}.bar button{width:44px;background:transparent;color:#a3adb8;border:0;padding:0;font-size:20px;transition:color .15s,background .15s}.bar a{display:grid;place-items:center;width:44px;min-height:44px;color:#e5b04a;font-size:18px;text-decoration:none;transition:color .15s,background .15s}.bar button:hover,.bar a:hover{background:#1c232c;color:#eceff3}
-    iframe{width:100%;flex:1;border:0;min-height:0}button:focus-visible,a:focus-visible{outline:2px solid #e5b04a;outline-offset:2px}
+    .panel[hidden]{display:none}.bar{display:flex;align-items:center;gap:4px;padding:0 4px 0 14px;flex-shrink:0;background:#fbf8f1;color:#272115;font-size:13px;border-bottom:1px solid #e2d9c6}
+    .bar span{margin-right:auto;font-weight:650;letter-spacing:-.01em}.bar button{width:44px;background:transparent;color:#6f6656;border:0;padding:0;font-size:20px;transition:color .15s,background .15s}.bar a{display:grid;place-items:center;width:44px;min-height:44px;color:#b8431a;font-size:18px;text-decoration:none;transition:color .15s,background .15s}.bar button:hover,.bar a:hover{background:#ece5d4;color:#272115}
+    iframe{width:100%;flex:1;border:0;min-height:0}button:focus-visible,a:focus-visible{outline:2px solid #b8431a;outline-offset:2px}
+    @media (prefers-color-scheme:dark){
+      :host{color-scheme:dark}
+      .tab{background:#d96a3c;color:#221103}
+      .panel{background:#17130f;border-color:#372f24;box-shadow:0 24px 80px rgba(0,0,0,.6)}
+      .bar{background:#1e1914;color:#ece4d3;border-bottom-color:#372f24}
+      .bar button{color:#b3a78e}.bar a{color:#ef8354}
+      .bar button:hover,.bar a:hover{background:#302921;color:#ece4d3}
+      button:focus-visible,a:focus-visible{outline-color:#ef8354}
+    }
     @media (prefers-reduced-motion:reduce){.tab{transition:none}}`;
   const tab=document.createElement("button");tab.className="tab";
   tab.setAttribute("aria-label","Open ArtCraft chat");tab.title="ArtCraft chat";

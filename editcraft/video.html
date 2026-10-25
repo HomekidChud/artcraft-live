@@ -7,8 +7,8 @@
 <link rel="icon" href="favicon.svg">
 <style>
   :root{
-    --bg:#0c0e13;--surface:#13161d;--surface-2:#1a1e27;--surface-3:#222733;--border:#262b37;
-    --text:#e8eaf0;--muted:#9aa3b5;--accent:#e5b04a;--accent-ink:#191307;--danger:#e08080;--ok:#7fc98a;
+    --bg:#17130f;--surface:#1e1914;--surface-2:#252019;--surface-3:#302921;--border:#372f24;
+    --text:#ece4d3;--muted:#b3a78e;--accent:#ef8354;--accent-ink:#221103;--danger:#e08574;--ok:#9dc27f;
     --radius:10px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -20,7 +20,7 @@
 
   .topbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;text-decoration:none;color:var(--text)}
-  .brand-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(160deg,#f3c773,#e5b04a 60%,#c9952f);color:var(--accent-ink);font-size:13px;font-weight:800}
+  .brand-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:#d96a3c;color:var(--accent-ink);font-size:13px;font-weight:800}
   .tb{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);font-size:13px;font-weight:600;white-space:nowrap}
   .tb:hover{background:var(--surface-3)}
   .tb.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
@@ -29,7 +29,7 @@
 
   .layout{display:grid;grid-template-columns:1fr 340px;height:calc(100dvh - 53px)}
   .main-col{display:flex;flex-direction:column;min-width:0}
-  .preview-wrap{flex:1;display:grid;place-items:center;background:#07080c;min-height:0;position:relative}
+  .preview-wrap{flex:1;display:grid;place-items:center;background:#100d0a;min-height:0;position:relative}
   canvas.preview{max-width:100%;max-height:100%;background:#000;border-radius:6px}
   .transport{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border-top:1px solid var(--border)}
   .transport .time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);min-width:110px}
