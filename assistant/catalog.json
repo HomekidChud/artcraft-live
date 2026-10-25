@@ -508,6 +508,34 @@
       ]
     },
     {
+      "id": "editcraft",
+      "name": "EditCraft",
+      "topic": "editing notes markdown code editor find replace snippets",
+      "guide": "EditCraft is a browser editing app: rich text, Markdown and plain code modes with find-and-replace, snippets, word counts and export. Start a note, keep editing, and use the AI panel to explain, rewrite or continue your selection.",
+      "export": "Export as HTML, Markdown or plain text from the file menu. Autosave keeps a local copy in this browser; clearing browser data removes it.",
+      "starter": "md",
+      "example": "Make a starter outline for my meeting notes",
+      "examples": [
+        "take notes in the editcraft editor",
+        "take meeting notes in editcraft",
+        "edit markdown pages in the browser",
+        "find and replace words across my notes",
+        "count the words in my notes",
+        "rewrite this paragraph with ai help",
+        "save snippets for my editing workflow",
+        "export a page as markdown",
+        "polish my notes with the ai panel",
+        "organise my notes into pages"
+      ],
+      "checks": [
+        "edit a note in the editcraft editor",
+        "use find and replace in my notes",
+        "take notes and export a markdown file",
+        "polish my notes with the ai panel",
+        "count the words in my notes"
+      ]
+    },
+    {
       "id": "launcher",
       "name": "ArtCraft Launcher",
       "topic": "launcher suite hub apps releases versions downloads status",

@@ -11,7 +11,7 @@ const model=JSON.parse(await readFile(new URL("model.json",root)));
 test("real accepted checkpoint contains two independently initialised MLPs",()=>{
   assert.equal(model.accepted,true);
   assert.equal(model.epochs,1000);
-  assert.equal(model.networks.craft.labels.length,14);
+  assert.equal(model.networks.craft.labels.length,15);
   assert.equal(model.networks.intent.labels.length,7);
   for(const net of Object.values(model.networks)){
     assert.equal(net.w1.length,net.vocab.length);

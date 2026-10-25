@@ -1,0 +1,1001 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EditCraft — a full editor with Claude</title>
+<meta name="description" content="EditCraft — a browser text editor with rich text, Markdown and code modes, find & replace, snippets, sandboxes and a Claude AI panel.">
+<link rel="icon" href="favicon.svg">
+<style>
+  :root{
+    --bg:#0c0e13;--surface:#13161d;--surface-2:#1a1e27;--surface-3:#222733;--border:#262b37;
+    --text:#e8eaf0;--muted:#9aa3b5;--accent:#e5b04a;--accent-ink:#191307;--danger:#e08080;--ok:#7fc98a;
+    --editor-bg:#101318;--gutter:#39404f;--radius:10px;
+  }
+  [data-theme="light"]{
+    --bg:#f4f5f8;--surface:#ffffff;--surface-2:#f0f1f5;--surface-3:#e6e8ee;--border:#d5d9e2;
+    --text:#1c2027;--muted:#5b6472;--accent:#b8860b;--accent-ink:#fff;--danger:#b34040;--ok:#2e7d3a;
+    --editor-bg:#ffffff;--gutter:#c3c8d4;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-text-size-adjust:none;text-size-adjust:none;-webkit-font-smoothing:antialiased}
+  body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);
+    min-height:100dvh;line-height:1.5;overflow:hidden}
+  button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+  button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  ::selection{background:color-mix(in oklab,var(--accent) 40%,transparent)}
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+  /* Top bar */
+  .topbar{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:700;letter-spacing:-.01em;font-size:15px;margin-right:4px}
+  .brand-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(160deg,#f3c773,#e5b04a 60%,#c9952f);color:var(--accent-ink);font-family:"Space Grotesk",sans-serif}
+  .doc-name{flex:1;min-width:120px;max-width:340px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;
+    color:var(--text);padding:6px 10px;font-weight:600}
+  .topbar-actions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .tb{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:8px;border:1px solid var(--border);
+    background:var(--surface-2);font-size:13px;font-weight:600;color:var(--text);white-space:nowrap}
+  .tb:hover{background:var(--surface-3)}
+  .tb.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+  .menu{position:relative}
+  .menu>details{position:relative}
+  .menu summary{list-style:none;display:inline-flex}
+  .menu summary::-webkit-details-marker{display:none}
+  .menu-list{position:absolute;top:calc(100% + 6px);left:0;z-index:50;min-width:230px;background:var(--surface);
+    border:1px solid var(--border);border-radius:10px;box-shadow:0 18px 50px rgba(0,0,0,.45);padding:6px}
+  .menu-list button{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:7px;font-size:13.5px}
+  .menu-list button:hover{background:var(--surface-3)}
+  .menu-list .menu-hint{font-size:11.5px;color:var(--muted);padding:4px 10px 6px;border-bottom:1px solid var(--border);margin-bottom:4px}
+
+  .layout{display:grid;grid-template-columns:212px 1fr 378px;height:calc(100dvh - 53px)}
+  .sidebar{background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:12px 10px;display:flex;flex-direction:column;gap:14px}
+  .side-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:0 6px}
+  .side-add{width:26px;height:26px;border-radius:7px;border:1px solid var(--border);display:grid;place-items:center;font-size:15px;color:var(--muted)}
+  .side-add:hover{color:var(--text);background:var(--surface-3)}
+  .doc-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 8px;border-radius:8px;font-size:13px;color:var(--muted)}
+  .doc-item:hover{background:var(--surface-2);color:var(--text)}
+  .doc-item.active{background:var(--surface-3);color:var(--text);font-weight:600;box-shadow:inset 2px 0 0 var(--accent)}
+  .doc-item .doc-ico{font-size:13px;width:16px;text-align:center;flex-shrink:0}
+  .doc-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .doc-item .doc-del{margin-left:auto;opacity:0;border-radius:5px;width:20px;height:20px;display:grid;place-items:center;font-size:14px}
+  .doc-item:hover .doc-del,.doc-item.active .doc-del{opacity:.7}
+  .doc-item .doc-del:hover{opacity:1;color:var(--danger)}
+  .sandbox-note{font-size:11.5px;color:var(--muted);line-height:1.45;padding:0 6px}
+
+  .editor-col{display:flex;flex-direction:column;min-width:0;background:var(--editor-bg)}
+  .modebar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface);flex-wrap:wrap}
+  .seg{display:inline-flex;border:1px solid var(--border);border-radius:9px;overflow:hidden;background:var(--surface-2)}
+  .seg button{padding:6px 13px;font-size:12.5px;font-weight:600;color:var(--muted)}
+  .seg button[aria-pressed="true"]{background:var(--surface-3);color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+  .modebar-right{margin-left:auto;display:flex;gap:6px;align-items:center}
+
+  .toolbar{display:flex;flex-wrap:wrap;gap:4px;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
+  .tool{min-width:32px;height:32px;padding:0 8px;border-radius:7px;border:1px solid transparent;font-size:13.5px;color:var(--muted);display:inline-flex;align-items:center;gap:4px}
+  .tool:hover{background:var(--surface-3);color:var(--text)}
+  .tool.tsep{border-left:1px solid var(--border);border-radius:0;min-width:0;padding:0;width:0;margin:0 5px;pointer-events:none}
+
+  .findbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border);background:var(--surface-2);flex-wrap:wrap}
+  .findbar[hidden]{display:none}
+  .findbar input{background:var(--editor-bg);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:6px 9px;font-size:13px}
+  .findbar .fb{padding:6px 10px;border-radius:7px;border:1px solid var(--border);font-size:12.5px;font-weight:600}
+  .findbar .fb:hover{background:var(--surface-3)}
+  .find-count{font-size:12.5px;color:var(--muted)}
+
+  .editor-area{flex:1;min-height:0;display:flex;flex-direction:column;position:relative}
+  .editor-area>div,textarea{font-size:15.5px;line-height:1.65}
+  #rich-editor{flex:1;overflow-y:auto;padding:28px 34px;max-width:900px;width:100%;margin:0 auto;outline:none}
+  #rich-editor:focus-visible{outline:none}
+  #rich-editor h1{font-size:1.9em;margin:.4em 0 .3em}#rich-editor h2{font-size:1.5em;margin:.5em 0 .25em}
+  #rich-editor h3{font-size:1.22em;margin:.5em 0 .2em}#rich-editor p{margin:.35em 0}
+  #rich-editor blockquote{border-left:3px solid var(--accent);padding-left:14px;color:var(--muted);margin:.6em 0}
+  #rich-editor ul,#rich-editor ol{padding-left:26px;margin:.4em 0}#rich-editor pre{background:var(--surface-2);padding:12px;border-radius:8px;overflow-x:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em}
+  #rich-editor a{color:var(--accent)}
+  .md-wrap{flex:1;display:flex;min-height:0;gap:0}
+  .md-wrap textarea{flex:1;background:transparent;border:0;color:var(--text);resize:none;padding:24px 26px;outline:none;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;line-height:1.7}
+  #md-preview{flex:1;overflow-y:auto;padding:28px 34px;max-width:900px;border-left:1px solid var(--border)}
+  #md-preview h1{font-size:1.8em;margin:.5em 0 .3em}#md-preview h2{font-size:1.45em}#md-preview h3{font-size:1.2em}
+  #md-preview p{margin:.45em 0}#md-preview ul,#md-preview ol{padding-left:26px;margin:.4em 0}
+  #md-preview blockquote{border-left:3px solid var(--accent);padding-left:14px;color:var(--muted)}
+  #md-preview pre{background:var(--surface-2);padding:12px;border-radius:8px;overflow-x:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em}
+  #md-preview a{color:var(--accent)}#md-preview code{background:var(--surface-2);border-radius:4px;padding:1px 5px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9em}
+  .code-wrap{flex:1;display:flex;min-height:0}
+  #code-gutter{padding:24px 8px 24px 14px;color:var(--gutter);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;line-height:1.7;text-align:right;user-select:none;overflow:hidden;white-space:pre}
+  #code-editor{flex:1;background:transparent;border:0;color:var(--text);resize:none;padding:24px 20px;outline:none;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;line-height:1.7;tab-size:4}
+
+  .statusbar{display:flex;align-items:center;gap:16px;padding:6px 14px;border-top:1px solid var(--border);background:var(--surface);font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+  .statusbar .saved{color:var(--ok);margin-left:auto}
+
+  /* AI panel */
+  .ai-panel{background:var(--surface);border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0}
+  .ai-head{display:flex;align-items:center;gap:9px;padding:10px 14px;border-bottom:1px solid var(--border)}
+  .ai-head .ai-mark{width:26px;height:26px;border-radius:7px;background:var(--surface-3);display:grid;place-items:center;font-size:13px;color:var(--accent)}
+  .ai-head strong{font-size:13.5px;letter-spacing:-.01em}
+  .ai-head .ai-state{font-size:11px;color:var(--muted)}
+  .ai-head button{margin-left:auto;font-size:12px;font-weight:600;color:var(--accent)}
+  .ai-connect{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+  .ai-connect[hidden]{display:none}
+  .ai-connect label{font-size:11.5px;color:var(--muted);font-weight:600;letter-spacing:.03em}
+  .ai-connect input,.ai-connect select{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 9px;font-size:13px;width:100%}
+  .ai-connect .ai-row{display:flex;gap:8px}
+  .ai-connect .ai-row button{flex:1;padding:8px;border-radius:8px;font-weight:600;font-size:13px}
+  .ai-connect .ai-connect-btn{background:var(--accent);color:var(--accent-ink)}
+  .ai-connect .ai-disconnect-btn{border:1px solid var(--border)}
+  .ai-note{font-size:11.5px;color:var(--muted);line-height:1.45}
+  .ai-note strong{color:var(--text)}
+  .ai-body{flex:1;min-height:0;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+  .ai-empty{color:var(--muted);font-size:13px;line-height:1.55;border:1px dashed var(--border);border-radius:10px;padding:14px}
+  .ai-empty strong{color:var(--text)}
+  .ai-msg{font-size:13.5px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere;border-radius:10px;padding:9px 12px}
+  .ai-msg.user{background:var(--surface-3);align-self:flex-end;max-width:92%}
+  .ai-msg.assistant{background:var(--surface-2);align-self:flex-start;max-width:100%}
+  .ai-msg .ai-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+  .ai-msg .ai-actions button{font-size:11.5px;font-weight:600;border:1px solid var(--border);border-radius:7px;padding:4px 9px;color:var(--accent)}
+  .ai-msg .ai-actions button:hover{background:var(--surface-3)}
+  .ai-msg .ai-actions button.danger{color:var(--danger)}
+  .ai-agent-card{border:1px solid var(--border);border-radius:10px;padding:9px 11px;font-size:12.5px;background:var(--surface-2)}
+  .ai-agent-card strong{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--accent)}
+  .ai-agent-card p{margin-top:4px;color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere}
+  .ai-agent-card p.failed{color:var(--danger)}
+  .ai-agent-card .agent-count{font-size:11px;color:var(--muted);margin-top:2px}
+  .ai-status{font-size:12.5px;color:var(--muted);align-self:center}
+  .ai-quick{display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px 2px}
+  .ai-quick button{font-size:12px;font-weight:600;border:1px solid var(--border);border-radius:99px;padding:5px 11px;color:var(--muted)}
+  .ai-quick button:hover{color:var(--text);background:var(--surface-3)}
+  .ai-browser{margin:10px 14px 0;border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+  .ai-browser summary{cursor:pointer;font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.04em}
+  .ai-browser .ab-row{display:flex;gap:6px}
+  .ai-browser input{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:6px 9px;font-size:12.5px;min-width:0}
+  .ai-browser .ab-btn{font-size:12px;font-weight:600;border:1px solid var(--border);border-radius:7px;padding:6px 10px;color:var(--accent);white-space:nowrap}
+  .ai-browser .ab-btn:hover{background:var(--surface-3)}
+  #browser-text{max-height:150px;overflow:auto;background:var(--surface-2);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.5;white-space:pre-wrap}
+  #browser-preview{width:100%;height:200px;border:1px solid var(--border);border-radius:8px;background:var(--surface-2)}
+  .ai-composer{padding:10px 14px 12px;border-top:1px solid var(--border)}
+  .ai-composer .ac-row{display:flex;gap:8px;align-items:flex-end}
+  .ai-composer textarea{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text);padding:9px 11px;font-size:13.5px;resize:none;min-height:44px;max-height:130px;outline:none}
+  .ai-send{width:40px;height:40px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-size:16px;display:grid;place-items:center;flex-shrink:0}
+  .ai-send:disabled{opacity:.4;cursor:default}
+  .ai-hint{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.45}
+
+  .ai-toggle{display:none}
+  .drawer-scrim{display:none}
+
+  /* Keep the shared chat-widget launcher clear of the AI panel and status bar */
+  #artcraft-chat-widget{right:calc(378px + 24px)!important;bottom:46px!important}
+  @media (max-width:1100px){#artcraft-chat-widget{right:calc(330px + 24px)!important}}
+  @media (max-width:900px){
+    #artcraft-chat-widget{right:max(12px,env(safe-area-inset-right))!important;bottom:48px!important}
+    body.ai-drawer-open #artcraft-chat-widget{opacity:0;pointer-events:none}
+    #stat-sentences,#stat-paras{display:none}
+  }
+
+  @media (max-width:1100px){.layout{grid-template-columns:190px 1fr 330px}}
+  @media (max-width:900px){
+    .layout{grid-template-columns:1fr;height:auto;min-height:calc(100dvh - 53px)}
+    .sidebar{flex-direction:row;align-items:center;gap:6px;border-right:0;border-bottom:1px solid var(--border);overflow-x:auto;padding:8px 10px}
+    .side-head{display:none}.doc-item{width:auto;flex-shrink:0}.doc-item .doc-del{opacity:.7}
+    .sandbox-note{display:none}
+    .editor-col{height:62dvh}
+    .ai-panel{position:fixed;inset:53px 0 0 0;z-index:60;transform:translateX(102%);transition:transform .22s ease;box-shadow:0 0 60px rgba(0,0,0,.5)}
+    .ai-panel.open{transform:translateX(0)}
+    .ai-toggle{display:inline-flex}
+    .drawer-scrim{display:block;position:fixed;inset:53px 0 0 0;background:rgba(0,0,0,.5);z-index:55;opacity:0;pointer-events:none;transition:opacity .22s ease}
+    .drawer-scrim.show{opacity:1;pointer-events:auto}
+  }
+  @media print{.topbar,.sidebar,.modebar,.toolbar,.findbar,.statusbar,.ai-panel{display:none!important}
+    .layout{display:block;height:auto}.editor-area{overflow:visible}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="brand-mark" aria-hidden="true">E</span>EditCraft</div>
+  <input id="doc-name" class="doc-name" aria-label="Current document name" maxlength="80">
+  <div class="topbar-actions">
+    <button id="new-doc" class="tb" type="button">New</button>
+    <button id="import-btn" class="tb" type="button">Import</button>
+    <input id="import-input" type="file" accept=".txt,.md,.html,.csv,.json,.js,.py,.css" class="sr-only" aria-label="Import a text file">
+    <div class="menu"><details><summary class="tb">Export ▾</summary>
+      <div class="menu-list">
+        <p class="menu-hint">Export the current document</p>
+        <button type="button" data-export="html">As HTML (.html)</button>
+        <button type="button" data-export="md">As Markdown (.md)</button>
+        <button type="button" data-export="txt">As plain text (.txt)</button>
+      </div>
+    </details></div>
+    <div class="menu"><details><summary class="tb">Snippets ▾</summary>
+      <div class="menu-list" id="snippet-list">
+        <p class="menu-hint">Insert at the cursor</p>
+      </div>
+    </details></div>
+    <button id="theme-toggle" class="tb" type="button" aria-label="Toggle light or dark theme">Theme</button>
+    <button id="print-btn" class="tb" type="button">Print</button>
+    <button id="ai-toggle" class="tb primary" type="button" aria-expanded="false">Claude</button>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar" aria-label="Documents">
+    <div>
+      <div class="side-head"><span>Documents</span><button id="new-doc-side" class="side-add" type="button" aria-label="New document">+</button></div>
+      <div id="doc-list" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></div>
+    </div>
+    <div>
+      <div class="side-head"><span>Sandboxes</span><button id="new-sandbox" class="side-add" type="button" aria-label="New sandbox">+</button></div>
+      <div id="sandbox-list" style="display:flex;flex-direction:column;gap:2px;margin-top:6px"></div>
+      <p class="sandbox-note">Sandboxes are separate scratch documents with their own Claude conversation. They run on the same API key and its normal limits — extra sandboxes do not add credits.</p>
+    </div>
+  </aside>
+
+  <section class="editor-col" aria-label="Editor">
+    <div class="modebar">
+      <div class="seg" role="group" aria-label="Editing mode">
+        <button type="button" data-mode="rich" aria-pressed="true">Rich text</button>
+        <button type="button" data-mode="md" aria-pressed="false">Markdown</button>
+        <button type="button" data-mode="code" aria-pressed="false">Code</button>
+      </div>
+      <div class="modebar-right">
+        <button id="find-toggle" class="tb" type="button" aria-expanded="false">Find & replace</button>
+        <button id="ai-clear-chat" class="tb" type="button">Clear AI chat</button>
+      </div>
+    </div>
+    <div class="toolbar" id="rich-toolbar" aria-label="Rich text tools">
+      <button class="tool" type="button" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+      <button class="tool" type="button" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+      <button class="tool" type="button" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+      <button class="tool" type="button" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+      <span class="tool tsep"></span>
+      <button class="tool" type="button" data-block="h1" title="Heading 1">H1</button>
+      <button class="tool" type="button" data-block="h2" title="Heading 2">H2</button>
+      <button class="tool" type="button" data-block="h3" title="Heading 3">H3</button>
+      <button class="tool" type="button" data-block="p" title="Paragraph text">¶</button>
+      <button class="tool" type="button" data-block="blockquote" title="Quote">❝</button>
+      <span class="tool tsep"></span>
+      <button class="tool" type="button" data-cmd="insertUnorderedList" title="Bulleted list">•≡</button>
+      <button class="tool" type="button" data-cmd="insertOrderedList" title="Numbered list">1≡</button>
+      <span class="tool tsep"></span>
+      <button class="tool" type="button" data-cmd="justifyLeft" title="Align left">⯇</button>
+      <button class="tool" type="button" data-cmd="justifyCenter" title="Align center">≡</button>
+      <button class="tool" type="button" data-cmd="justifyRight" title="Align right">⯈</button>
+      <span class="tool tsep"></span>
+      <button class="tool" type="button" data-cmd="createLink" title="Insert link" id="link-btn">🔗</button>
+      <button class="tool" type="button" data-cmd="insertHorizontalRule" title="Divider">—</button>
+      <button class="tool" type="button" id="code-block-btn" title="Code block">{}{}#</button>
+      <span class="tool tsep"></span>
+      <button class="tool" type="button" data-cmd="undo" title="Undo (Ctrl+Z)">↶</button>
+      <button class="tool" type="button" data-cmd="redo" title="Redo (Ctrl+Y)">↷</button>
+      <button class="tool" type="button" data-cmd="removeFormat" title="Clear formatting">⌫f</button>
+    </div>
+    <div class="findbar" id="findbar" hidden>
+      <input id="find-input" type="text" placeholder="Find" aria-label="Find text" style="width:180px">
+      <input id="replace-input" type="text" placeholder="Replace with" aria-label="Replace with text" style="width:180px">
+      <label style="font-size:12.5px;color:var(--muted);display:flex;gap:5px;align-items:center"><input id="match-case" type="checkbox"> Match case</label>
+      <button class="fb" id="find-next" type="button">Find</button>
+      <button class="fb" id="replace-one" type="button">Replace</button>
+      <button class="fb" id="replace-all" type="button">Replace all</button>
+      <span class="find-count" id="find-count" role="status"></span>
+      <button class="fb" id="find-close" type="button" style="margin-left:auto">Close</button>
+    </div>
+    <div class="editor-area">
+      <div id="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Rich text document" spellcheck="true"></div>
+      <div class="md-wrap" id="md-wrap" hidden>
+        <textarea id="md-editor" aria-label="Markdown source" spellcheck="true" placeholder="# Markdown…"></textarea>
+        <div id="md-preview" aria-label="Markdown preview"></div>
+      </div>
+      <div class="code-wrap" id="code-wrap" hidden>
+        <div id="code-gutter" aria-hidden="true">1</div>
+        <textarea id="code-editor" aria-label="Code document" spellcheck="false" placeholder="// code…"></textarea>
+      </div>
+    </div>
+    <div class="statusbar">
+      <span id="stat-words">0 words</span>
+      <span id="stat-chars">0 characters</span>
+      <span id="stat-sentences">0 sentences</span>
+      <span id="stat-paras">0 paragraphs</span>
+      <span id="stat-read">0 min read</span>
+      <span class="saved" id="stat-saved" role="status">Saved</span>
+    </div>
+  </section>
+
+  <aside class="ai-panel" id="ai-panel" aria-label="Claude AI panel">
+    <div class="ai-head">
+      <span class="ai-mark" aria-hidden="true">✦</span>
+      <div><strong>Claude in EditCraft</strong><div class="ai-state" id="ai-state">Not connected</div></div>
+      <button id="ai-connect-toggle" type="button">Connect</button>
+    </div>
+    <form class="ai-connect" id="ai-connect-form">
+      <label for="ai-key">Anthropic API key</label>
+      <input id="ai-key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter key — kept in this tab only" maxlength="300">
+      <label for="ai-model">Model</label>
+      <select id="ai-model">
+        <option value="claude-sonnet-5-5">claude-sonnet-5-5 (balanced)</option>
+        <option value="claude-haiku-5-5">claude-haiku-5-5 (fast, cheaper)</option>
+        <option value="claude-opus-5-5">claude-opus-5-5 (strongest)</option>
+      </select>
+      <div class="ai-row">
+        <button class="ai-connect-btn" id="ai-connect" type="submit">Connect</button>
+        <button class="ai-disconnect-btn" id="ai-disconnect" type="button" hidden>Disconnect</button>
+      </div>
+      <p class="ai-note">This page is a public static site: the key stays in this tab's memory only, is never saved to storage, and is sent directly to Anthropic with the browser-access header. Use a restricted, low-limit key you can revoke. <strong>API use costs money on your key</strong> — every agent in an agent team is a separate paid call.</p>
+    </form>
+    <div class="ai-quick" id="ai-quick">
+      <button type="button" data-quick="explain">Explain selection</button>
+      <button type="button" data-quick="rewrite">Rewrite</button>
+      <button type="button" data-quick="fix">Fix grammar</button>
+      <button type="button" data-quick="summarize">Summarize</button>
+      <button type="button" data-quick="expand">Expand</button>
+      <button type="button" data-quick="continue">Continue writing</button>
+    </div>
+    <details class="ai-browser">
+      <summary>Browser — fetch a page's text</summary>
+      <div class="ab-row">
+        <input id="browser-url" type="text" placeholder="https://example.com" aria-label="URL to fetch" inputmode="url">
+        <button class="ab-btn" id="browser-fetch" type="button">Fetch text</button>
+      </div>
+      <div class="ab-row">
+        <button class="ab-btn" id="browser-preview-toggle" type="button">Preview in frame</button>
+        <button class="ab-btn" id="browser-ask" type="button" disabled>Ask Claude about this page</button>
+      </div>
+      <div id="browser-text" hidden></div>
+      <iframe id="browser-preview" hidden sandbox="allow-same-origin" title="Fetched page preview"></iframe>
+      <p class="ai-note" id="browser-note">Reads a public page's text from your browser. Many sites block browser fetches; that is reported honestly. This is not a controllable browser — no clicking, scrolling or logging in.</p>
+    </details>
+    <div class="ai-body" id="ai-body" aria-live="polite">
+      <div class="ai-empty" id="ai-empty">
+        <strong>Claude is off until you connect.</strong><br>
+        Connect an Anthropic API key, then use the quick actions on your selection, chat about the open document, share a URL to read its text, or ask for an agent team — for example <em>“use 4 agents to draft release notes from this document”</em>. Nothing is sent anywhere while disconnected.
+      </div>
+    </div>
+    <form class="ai-composer" id="ai-composer">
+      <div class="ac-row">
+        <textarea id="ai-message" rows="1" placeholder="Ask Claude… or “use 3 agents to …”" aria-label="Message Claude"></textarea>
+        <button id="ai-send" class="ai-send" type="submit" aria-label="Send message to Claude">↑</button>
+      </div>
+      <p class="ai-hint">Enter sends · Shift+Enter new line · the open document is included as context.</p>
+    </form>
+  </aside>
+</div>
+<div class="drawer-scrim" id="drawer-scrim"></div>
+
+<style>.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}</style>
+<script type="module">
+import {callClaude,runAgentTeam,parseAgentCount,browserReadUrl} from "../assistant/claude.js";
+
+const $=id=>document.getElementById(id);
+const STORE_KEY="editcraft.docs.v1";
+const MAX_DOC_CHARS=200000;
+
+/* ---------- state ---------- */
+let docs=[],activeId=null,aiKey="",aiBusy=false,browserPage=null;
+let conversations={};          // docId -> [{role,content}] — in memory only
+let saveTimer=null;
+
+function uid(){return "d"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function activeDoc(){return docs.find(d=>d.id===activeId)||null;}
+
+function newDoc(sandbox=false,mode="rich",name=null){
+  const doc={id:uid(),name:name||(sandbox?"Sandbox":"Untitled"),mode,sandbox,
+    html:sandbox?"":"<h1>Untitled document</h1><p>Start writing…</p>",text:"",updated:Date.now()};
+  docs.unshift(doc);activeId=doc.id;return doc;
+}
+function loadState(){
+  try{
+    const saved=JSON.parse(localStorage.getItem(STORE_KEY)||"null");
+    if(saved&&Array.isArray(saved.docs)&&saved.docs.length){docs=saved.docs;activeId=saved.activeId&&docs.some(d=>d.id===saved.activeId)?saved.activeId:docs[0].id;}
+    else{newDoc();}
+  }catch{newDoc();}
+}
+function saveState(){
+  clearTimeout(saveTimer);
+  $("stat-saved").textContent="Saving…";
+  saveTimer=setTimeout(()=>{
+    try{localStorage.setItem(STORE_KEY,JSON.stringify({docs,activeId}));$("stat-saved").textContent="Saved";}
+    catch{$("stat-saved").textContent="Not saved (storage blocked)";}
+  },350);
+}
+
+/* ---------- sanitising ---------- */
+function sanitizeHtml(html){
+  const box=document.createElement("div");
+  box.innerHTML=String(html||"").slice(0,MAX_DOC_CHARS);
+  box.querySelectorAll("script,iframe,object,embed,link,meta,style").forEach(node=>node.remove());
+  box.querySelectorAll("*").forEach(node=>{
+    for(const attr of [...node.attributes]){
+      const name=attr.name.toLowerCase(),value=String(attr.value||"").trim().toLowerCase();
+      if(name.startsWith("on")||(name==="href"&&value.startsWith("javascript:")))node.removeAttribute(attr.name);
+    }
+  });
+  return box.innerHTML;
+}
+
+/* ---------- rendering ---------- */
+function renderLists(){
+  const make=(list,filter)=>{
+    list.replaceChildren();
+    for(const doc of docs.filter(filter)){
+      const item=document.createElement("button");
+      item.type="button";item.className="doc-item"+(doc.id===activeId?" active":"");
+      item.dataset.id=doc.id;
+      const ico=document.createElement("span");ico.className="doc-ico";ico.textContent=doc.sandbox?"◇":"📄";
+      const label=document.createElement("span");label.textContent=doc.name;
+      const del=document.createElement("span");del.className="doc-del";del.textContent="×";del.setAttribute("role","button");del.tabIndex=-1;
+      item.append(ico,label,del);
+      item.addEventListener("click",event=>{
+        if(event.target===del){deleteDoc(doc.id);return;}
+        switchDoc(doc.id);
+      });
+      list.append(item);
+    }
+  };
+  make($("doc-list"),d=>!d.sandbox);
+  make($("sandbox-list"),d=>d.sandbox);
+}
+function switchDoc(id){
+  activeId=id;conversations[id]=conversations[id]||[];
+  const doc=activeDoc();if(!doc)return;
+  // No commit here: input handlers already commit every change, and committing
+  // before the new document is rendered would clobber its stored content.
+  $("doc-name").value=doc.name;
+  setMode(doc.mode,true);
+  renderLists();updateStats();saveState();
+  $("ai-body").scrollTop=$("ai-body").scrollHeight;
+}
+function commitCurrent(){
+  const doc=activeDoc();if(!doc)return;
+  if(doc.mode==="rich")doc.html=$("rich-editor").innerHTML;
+  else doc.text=doc.mode==="md"?$("md-editor").value:$("code-editor").value;
+  doc.updated=Date.now();
+}
+function deleteDoc(id){
+  if(docs.length===1)return;
+  docs=docs.filter(d=>d.id!==id);
+  delete conversations[id];
+  if(activeId===id)activeId=docs[0].id;
+  switchDoc(activeId);
+}
+function setMode(mode,silent=false){
+  const doc=activeDoc();if(!doc)return;
+  doc.mode=mode;
+  if(!silent)commitCurrent();
+  document.querySelectorAll(".seg button").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.mode===mode)));
+  $("rich-editor").hidden=mode!=="rich";
+  $("rich-toolbar").style.display=mode==="rich"?"flex":"none";
+  $("md-wrap").hidden=mode!=="md";
+  $("code-wrap").hidden=mode!=="code";
+  if(mode==="rich"){$("rich-editor").innerHTML=sanitizeHtml(doc.html);}
+  if(mode==="md"){$("md-editor").value=doc.text||"";renderMarkdown();}
+  if(mode==="code"){$("code-editor").value=doc.text||"";renderGutter();}
+  if(!silent)saveState();
+  updateStats();
+}
+function renderMarkdown(){
+  const text=$("md-editor").value;
+  let html=text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  html=html.replace(/^###### (.*)$/gm,"<h6>$1</h6>").replace(/^##### (.*)$/gm,"<h5>$1</h5>")
+    .replace(/^#### (.*)$/gm,"<h4>$1</h4>").replace(/^### (.*)$/gm,"<h3>$1</h3>")
+    .replace(/^## (.*)$/gm,"<h2>$1</h2>").replace(/^# (.*)$/gm,"<h1>$1</h1>");
+  html=html.replace(/^> (.*)$/gm,"<blockquote>$1</blockquote>");
+  html=html.replace(/^---$/gm,"<hr>");
+  html=html.replace(/```([\s\S]*?)```/g,(m,code)=>`<pre><code>${code}</code></pre>`);
+  html=html.replace(/`([^`\n]+)`/g,"<code>$1</code>");
+  html=html.replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/\*([^*\n]+)\*/g,"<em>$1</em>");
+  html=html.replace(/\[([^\]]+)\]\((https?:[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  html=html.replace(/^(?:-|\*) (.*)$/gm,"<li>$1</li>");
+  html=html.replace(/(<li>[\s\S]*?<\/li>)(?!\s*<li>)/g,"<ul>$1</ul>");
+  html=html.replace(/^(?:\d+)\. (.*)$/gm,"<oli>$1</oli>");
+  html=html.replace(/(<oli>[\s\S]*?<\/oli>)(?!\s*<oli>)/g,"<ol>$1</ol>");
+  html=html.replace(/<\/oli>/g,"</li>").replace(/<oli>/g,"<li>");
+  html=html.split(/\n{2,}/).map(block=>/^\s*<(h\d|ul|ol|blockquote|pre|hr)/.test(block)?block:`<p>${block.replace(/\n/g,"<br>")}</p>`).join("\n");
+  $("md-preview").innerHTML=html;
+}
+function renderGutter(){
+  const lines=$("code-editor").value.split("\n").length;
+  $("code-gutter").textContent=Array.from({length:lines},(_,i)=>i+1).join("\n");
+}
+
+/* ---------- stats ---------- */
+function currentText(){
+  const doc=activeDoc();if(!doc)return"";
+  return doc.mode==="rich"?$("rich-editor").innerText:$("md-editor").value||$("code-editor").value||"";
+}
+function updateStats(){
+  const text=currentText();
+  const words=text.trim()?text.trim().split(/\s+/).length:0;
+  const sentences=(text.match(/[.!?]+(\s|$)/g)||[]).length;
+  const paras=text.trim()?text.trim().split(/\n\s*\n/).filter(Boolean).length:0;
+  $("stat-words").textContent=`${words} words`;
+  $("stat-chars").textContent=`${text.length} characters`;
+  $("stat-sentences").textContent=`${sentences} sentences`;
+  $("stat-paras").textContent=`${paras} paragraphs`;
+  $("stat-read").textContent=`${Math.max(1,Math.round(words/220))} min read`;
+}
+
+/* ---------- find & replace ---------- */
+function matchFlags(){return $("match-case").checked?"g":"gi";}
+function findAllMatches(haystack,needle,caseSensitive){
+  if(!needle)return[];
+  const out=[];const flags=caseSensitive?"g":"gi";
+  let match;const regex=new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),flags);
+  while((match=regex.exec(haystack))&&out.length<10000){out.push({index:match.index,end:match.index+match[0].length});if(match.index===regex.lastIndex)regex.lastIndex++;}
+  return out;
+}
+function plainFindNext(){
+  const area=$("md-editor").value!==undefined&&activeDoc()?.mode==="md"?$("md-editor"):$("code-editor");
+  const text=area.value,needle=$("find-input").value;
+  if(!needle){$("find-count").textContent="";return;}
+  const matches=findAllMatches(text,needle,$("match-case").checked);
+  $("find-count").textContent=matches.length?`${matches.length} match(es)`:"No matches";
+  const from=area.selectionEnd||0;
+  const next=matches.find(m=>m.index>=from)||matches[0];
+  if(next){area.focus();area.setSelectionRange(next.index,next.end);}
+}
+function plainReplaceAll(){
+  const area=activeDoc()?.mode==="md"?$("md-editor"):$("code-editor");
+  const needle=$("find-input").value,replacement=$("replace-input").value;
+  if(!needle)return;
+  const matches=findAllMatches(area.value,needle,$("match-case").checked);
+  if(!matches.length){$("find-count").textContent="No matches";return;}
+  const flags=$("match-case").checked?"g":"gi";
+  area.value=area.value.replace(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),flags),replacement);
+  commitCurrent();updateStats();saveState();
+  $("find-count").textContent=`Replaced ${matches.length} match(es)`;
+}
+function textNodesUnder(root){
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);const nodes=[];let node;
+  while(node=walker.nextNode())nodes.push(node);
+  return nodes;
+}
+function richFindNext(){
+  const needle=$("find-input").value;
+  if(!needle){$("find-count").textContent="";return;}
+  const matches=[];
+  for(const node of textNodesUnder($("rich-editor"))){
+    for(const m of findAllMatches(node.textContent||"",needle,$("match-case").checked))
+      matches.push({node,index:m.index,end:m.end});
+  }
+  $("find-count").textContent=matches.length?`${matches.length} match(es)`:"No matches";
+  const selection=window.getSelection();
+  const current=selection.rangeCount?selection.getRangeAt(0):null;
+  let start=0;
+  if(current&&!current.collapsed&&current.startContainer.nodeType===3)
+    start=matches.findIndex(m=>m.node===current.startContainer&&m.index===current.startOffset)+1;
+  const next=matches[start]||matches[0];
+  if(!next)return;
+  const range=document.createRange();
+  range.setStart(next.node,next.index);range.setEnd(next.node,next.end);
+  selection.removeAllRanges();selection.addRange(range);
+  const rect=range.getBoundingClientRect();
+  $("rich-editor").scrollTop+=rect.top-140;
+}
+function richReplaceAll(){
+  const needle=$("find-input").value,replacement=$("replace-input").value;
+  if(!needle)return;
+  let count=0;
+  const flags=matchFlags();
+  for(const node of textNodesUnder($("rich-editor"))){
+    const matches=findAllMatches(node.textContent||"",needle,$("match-case").checked);
+    if(!matches.length)continue;
+    node.textContent=node.textContent.replace(new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),flags),replacement);
+    count+=matches.length;
+  }
+  commitCurrent();updateStats();saveState();
+  $("find-count").textContent=`Replaced ${count} match(es)`;
+}
+
+/* ---------- import/export ---------- */
+function download(filename,blob){
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);link.download=filename;
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(link.href),4000);
+}
+function slug(name){return name.trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"document";}
+function exportDoc(kind){
+  const doc=activeDoc();if(!doc)return;
+  if(kind==="txt")download(`${slug(doc.name)}.txt`,new Blob([currentText()],{type:"text/plain"}));
+  else if(kind==="md")download(`${slug(doc.name)}.md`,new Blob([doc.mode==="md"?doc.text:htmlToMarkdown($("rich-editor"))],{type:"text/markdown"}));
+  else{
+    const body=doc.mode==="rich"?$("rich-editor").innerHTML:doc.mode==="md"?renderMarkdownToHtmlString():`<pre>${escapeHtml(doc.text)}</pre>`;
+    download(`${slug(doc.name)}.html`,new Blob([`<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8"><title>${escapeHtml(doc.name)}</title></head>\n<body style="max-width:800px;margin:40px auto;font-family:system-ui,sans-serif;line-height:1.6">\n${body}\n</body>\n</html>`],{type:"text/html"}));
+  }
+}
+function escapeHtml(text){return String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}
+function renderMarkdownToHtmlString(){return $("md-preview").innerHTML;}
+function htmlToMarkdown(root){
+  let out="";
+  const walk=(node,depth=0)=>{
+    for(const child of node.children){
+      const tag=child.tagName.toLowerCase();
+      if(/^h[1-6]$/.test(tag))out+=`${"#".repeat(Number(tag[1]))} ${child.textContent.trim()}\n\n`;
+      else if(tag==="p")out+=`${inlineMd(child)}\n\n`;
+      else if(tag==="blockquote")out+=child.textContent.trim().split("\n").map(l=>`> ${l}`).join("\n")+"\n\n";
+      else if(tag==="ul"||tag==="ol"){let i=1;for(const li of child.children){out+=`${tag==="ol"?`${i++}. `:"- "}${inlineMd(li)}\n`;}out+="\n";}
+      else if(tag==="pre")out+="```\n"+child.textContent+"\n```\n\n";
+      else if(tag==="hr")out+="---\n\n";
+      else if(tag==="a")out+=`[${child.textContent}](${child.getAttribute("href")||""})`;
+      else walk(child,depth+1);
+    }
+  };
+  const inlineMd=node=>{
+    let text="";
+    for(const part of node.childNodes){
+      if(part.nodeType===3)text+=part.textContent;
+      else if(part.tagName==="STRONG"||part.tagName==="B")text+=`**${inlineMd(part)}**`;
+      else if(part.tagName==="EM"||part.tagName==="I")text+=`*${inlineMd(part)}*`;
+      else if(part.tagName==="CODE")text+=`\`${part.textContent}\``;
+      else text+=inlineMd(part);
+    }
+    return text;
+  };
+  walk(root);
+  return out.trim()+"\n";
+}
+async function importFile(file){
+  const text=(await file.text()).slice(0,MAX_DOC_CHARS);
+  const isHtml=/\.html?$/i.test(file.name)||/^\s*<(!doctype|html|body|div|h1)/i.test(text);
+  const isMd=/\.md$/i.test(file.name);
+  const doc=newDoc(false,isHtml?"rich":"md",file.name.replace(/\.[^.]+$/,""));
+  if(isHtml)doc.html=sanitizeHtml(text);
+  else doc.text=text;
+  switchDoc(doc.id);
+}
+
+/* ---------- snippets ---------- */
+const SNIPPETS=[
+  {name:"Meeting notes",text:"## Meeting notes — {date}\n\n**Attendees:** \n\n### Agenda\n1. \n\n### Decisions\n- \n\n### Action items\n- [ ] "},
+  {name:"To-do checklist",text:"## To-do\n\n- [ ] \n- [ ] \n- [ ] "},
+  {name:"Email signature",text:"\n— \n[Your name]\n[Role] · [Company]"},
+  {name:"Code block",text:"```js\n\n```"},
+  {name:"Table of contents",text:"## Contents\n\n1. Introduction\n2. \n3. \n"},
+  {name:"Date stamp",text:"{date}"}
+];
+function fillSnippets(text){return text.replace(/\{date\}/g,new Date().toLocaleDateString(undefined,{year:"numeric",month:"long",day:"numeric"}));}
+function insertAtCursor(text){
+  const doc=activeDoc();if(!doc)return;
+  const value=fillSnippets(text);
+  if(doc.mode==="rich"){
+    $("rich-editor").focus();
+    document.execCommand("insertText",false,value.replace(/\n/g,"<br>"));
+  }else{
+    const area=doc.mode==="md"?$("md-editor"):$("code-editor");
+    const start=area.selectionStart??area.value.length;
+    area.setRangeText(value,start,area.selectionEnd??start,"end");
+    area.focus();
+    area.dispatchEvent(new Event("input",{bubbles:true}));
+  }
+  commitCurrent();updateStats();saveState();
+}
+function renderSnippets(){
+  const list=$("snippet-list");
+  list.querySelectorAll("button[data-snippet]").forEach(b=>b.remove());
+  for(const snippet of SNIPPETS){
+    const button=document.createElement("button");
+    button.type="button";button.dataset.snippet=snippet.name;button.textContent=snippet.name;
+    button.addEventListener("click",()=>{insertAtCursor(snippet.text);button.closest("details").removeAttribute("open");});
+    list.append(button);
+  }
+}
+
+/* ---------- AI (Claude) ---------- */
+const QUICK_PROMPTS={
+  explain:"Explain the following text clearly. Keep the original language. Text:\n\n",
+  rewrite:"Rewrite the following text to be clearer and better structured while keeping its meaning and language. Output only the rewritten text:\n\n",
+  fix:"Fix grammar, spelling and punctuation in the following text while preserving meaning, tone and language. Output only the corrected text:\n\n",
+  summarize:"Summarize the following text in 3-5 short bullets:\n\n",
+  expand:"Expand the following text with more detail and better flow, keeping its language and intent:\n\n",
+  continue:"Continue writing from where this text ends, matching its style, tone and language. Output only the continuation:\n\n"
+};
+function selectionOrDocument(){
+  const doc=activeDoc();if(!doc)return"";
+  let selected="";
+  if(doc.mode==="rich"){selected=String(window.getSelection());}
+  else{const area=doc.mode==="md"?$("md-editor"):$("code-editor");selected=area.value.slice(area.selectionStart,area.selectionEnd);}
+  return{selected,full:currentText().slice(0,12000)};
+}
+function aiSystem(){
+  const doc=activeDoc();
+  return ["You are Claude inside EditCraft, a browser text editor. Help the user write, edit, explain, fix and improve their text.",
+    "Rules: answer in the user's language; be concise; when asked to rewrite or fix text, output only the new text without preamble or code fences unless the format requires it.",
+    "You cannot control the editor: the user applies your suggestions with the Insert or Replace buttons. Do not claim you edited the document yourself.",
+    doc?`The open document is "${doc.name}" (${doc.mode} mode). Its current text is included in the conversation when relevant.`:""].filter(Boolean).join("\n\n");
+}
+function aiConnected(){return Boolean(aiKey);}
+function setAiState(state){$("ai-state").textContent=state;}
+function addAiMessage(role,text,{applyable=false}={}){
+  $("ai-empty")?.remove();
+  const message=document.createElement("div");
+  message.className=`ai-msg ${role}`;
+  message.textContent=text;
+  if(applyable&&role==="assistant"){
+    const actions=document.createElement("div");actions.className="ai-actions";
+    const insert=document.createElement("button");insert.type="button";insert.textContent="Insert at cursor";
+    insert.addEventListener("click",()=>{insertAtCursor(text);});
+    const replace=document.createElement("button");replace.type="button";replace.className="danger";replace.textContent="Replace selection";
+    replace.addEventListener("click",()=>{replaceSelection(text);});
+    actions.append(insert,replace);
+    message.append(actions);
+  }
+  $("ai-body").append(message);
+  $("ai-body").scrollTop=$("ai-body").scrollHeight;
+  return message;
+}
+function replaceSelection(text){
+  const doc=activeDoc();if(!doc)return;
+  if(doc.mode==="rich"){
+    $("rich-editor").focus();
+    document.execCommand("insertText",false,text.replace(/\n/g,"<br>"));
+  }else{
+    const area=doc.mode==="md"?$("md-editor"):$("code-editor");
+    area.setRangeText(text,area.selectionStart,area.selectionEnd,"end");
+    area.dispatchEvent(new Event("input",{bubbles:true}));
+  }
+  commitCurrent();updateStats();saveState();
+}
+async function quickAction(kind){
+  if(!aiConnected()){addAiMessage("assistant","Connect an Anthropic API key first (Connect button above).");return;}
+  if(aiBusy)return;
+  const {selected,full}=selectionOrDocument();
+  const source=selected&&selected.length>20?selected:full;
+  if(!source.trim()){addAiMessage("assistant","There is no text to work on yet — write or paste something first.");return;}
+  aiBusy=true;$("ai-send").disabled=true;setAiState("Working…");
+  const status=addAiMessage("assistant","…");
+  try{
+    const answer=await callClaude({apiKey:aiKey,model:$("ai-model").value,system:aiSystem(),
+      messages:[{role:"user",content:QUICK_PROMPTS[kind]+source}]});
+    status.remove();
+    addAiMessage("assistant",answer,{applyable:true});
+    setAiState("Connected");
+  }catch(error){
+    status.remove();
+    addAiMessage("assistant",`Claude could not reply. ${error?.message||"Check the key, quota, and connection."}`);
+    setAiState("Error");
+  }finally{aiBusy=false;$("ai-send").disabled=false;}
+}
+async function sendAiChat(){
+  if(aiBusy)return;
+  const text=$("ai-message").value.trim();
+  if(!text)return;
+  $("ai-message").value="";
+  if(!aiConnected()){addAiMessage("assistant","Connect an Anthropic API key first (Connect button above).");return;}
+  const docId=activeId;
+  conversations[docId]=conversations[docId]||[];
+  const agentCount=parseAgentCount(text);
+  addAiMessage("user",text);
+  aiBusy=true;$("ai-send").disabled=true;setAiState("Working…");
+  const status=addAiMessage("assistant","…");
+  try{
+    if(agentCount){
+      status.textContent=`Running ${agentCount} Claude agent(s)…`;
+      const team=await runAgentTeam({apiKey:aiKey,model:$("ai-model").value,count:agentCount,task:text,history:conversations[docId]});
+      status.remove();
+      const card=document.createElement("div");card.className="ai-agent-card";
+      const head=document.createElement("strong");head.textContent=`Agent team — ${team.agents.length} agents`;
+      const count=document.createElement("div");count.className="agent-count";count.textContent="Each agent was a separate API call on your key.";
+      card.append(head,count);
+      for(const agent of team.agents){
+        const p=document.createElement("p");
+        if(agent.status==="failed"){p.className="failed";p.textContent=`${agent.index}. ${agent.name}: failed — ${agent.error}`;}
+        else p.textContent=`${agent.index}. ${agent.name}: ${agent.text}`;
+        card.append(p);
+      }
+      $("ai-body").append(card);
+      addAiMessage("assistant",team.text,{applyable:true});
+      conversations[docId].push({role:"user",content:text},{role:"assistant",content:team.text});
+    }else{
+      const context=selectionOrDocument().full;
+      const includeContext=context&&!conversations[docId].length;
+      const messages=[...conversations[docId].slice(-12),
+        {role:"user",content:(includeContext?`Document "${activeDoc()?.name}":\n${context}\n\n`:"")+text}];
+      const answer=await callClaude({apiKey:aiKey,model:$("ai-model").value,system:aiSystem(),messages});
+      status.remove();
+      addAiMessage("assistant",answer,{applyable:true});
+      conversations[docId].push({role:"user",content:text},{role:"assistant",content:answer});
+    }
+    setAiState("Connected");
+  }catch(error){
+    status.remove();
+    addAiMessage("assistant",`Claude could not reply. ${error?.message||"Check the key, quota, and connection."}`);
+    setAiState("Error");
+  }finally{aiBusy=false;$("ai-send").disabled=false;}
+}
+
+/* ---------- browser tool ---------- */
+async function fetchPage(){
+  const url=$("browser-url").value.trim();
+  if(!url){addAiMessage("assistant","Enter a URL to fetch.");return;}
+  $("browser-note").textContent="Fetching…";
+  const page=await browserReadUrl(url);
+  browserPage=page.ok?page:null;
+  $("browser-text").hidden=false;
+  if(page.ok){
+    $("browser-text").textContent=page.text.slice(0,6000);
+    $("browser-note").textContent=`Read ${page.text.length} characters. Text only — not a controllable browser.`;
+    $("browser-ask").disabled=false;
+  }else{
+    $("browser-text").textContent="";
+    $("browser-note").textContent=page.error;
+    $("browser-ask").disabled=true;
+  }
+}
+async function askAboutPage(){
+  if(!browserPage)return;
+  const question=prompt("Ask Claude about this page:");
+  if(!question)return;
+  if(!aiConnected()){addAiMessage("assistant","Connect an Anthropic API key first.");return;}
+  addAiMessage("user",`${question}\n(page: ${browserPage.url})`);
+  aiBusy=true;setAiState("Working…");
+  const status=addAiMessage("assistant","…");
+  try{
+    const answer=await callClaude({apiKey:aiKey,model:$("ai-model").value,
+      system:"You answer questions about a web page's text that was fetched into the editor. Use only the provided page text; if the answer is not in it, say so.",
+      messages:[{role:"user",content:`Page (${browserPage.url}):\n${browserPage.text.slice(0,9000)}\n\nQuestion: ${question}`}]});
+    status.remove();
+    addAiMessage("assistant",answer);
+    setAiState("Connected");
+  }catch(error){
+    status.remove();
+    addAiMessage("assistant",`Claude could not reply. ${error?.message||""}`);
+  }finally{aiBusy=false;}
+}
+
+/* ---------- events ---------- */
+$("new-doc").addEventListener("click",()=>{const doc=newDoc();switchDoc(doc.id);});
+$("new-doc-side").addEventListener("click",()=>{const doc=newDoc();switchDoc(doc.id);});
+$("new-sandbox").addEventListener("click",()=>{const doc=newDoc(true);conversations[doc.id]=[];switchDoc(doc.id);});
+$("doc-name").addEventListener("input",()=>{const doc=activeDoc();if(doc){doc.name=$("doc-name").value.trim()||"Untitled";renderLists();saveState();}});
+$("doc-name").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();(activeDoc()?.mode==="rich"?$("rich-editor"):$("md-editor")).focus();}});
+document.querySelectorAll(".seg button").forEach(button=>button.addEventListener("click",()=>setMode(button.dataset.mode)));
+$("md-editor").addEventListener("input",()=>{commitCurrent();renderMarkdown();updateStats();saveState();});
+$("code-editor").addEventListener("input",()=>{commitCurrent();renderGutter();updateStats();saveState();});
+$("code-editor").addEventListener("scroll",()=>{$("code-gutter").scrollTop=$("code-editor").scrollTop;});
+$("code-editor").addEventListener("keydown",event=>{
+  if(event.key==="Tab"){event.preventDefault();const area=event.target;const start=area.selectionStart;
+    area.setRangeText("  ",start,area.selectionEnd,"end");}
+});
+$("rich-editor").addEventListener("input",()=>{commitCurrent();updateStats();saveState();});
+$("rich-editor").addEventListener("paste",event=>{
+  event.preventDefault();
+  const html=event.clipboardData?.getData("text/html");
+  const text=event.clipboardData?.getData("text/plain");
+  if(html)document.execCommand("insertHTML",false,sanitizeHtml(html));
+  else if(text)document.execCommand("insertText",false,text);
+});
+$("rich-toolbar").addEventListener("click",event=>{
+  const button=event.target.closest("button");if(!button)return;
+  $("rich-editor").focus();
+  const cmd=button.dataset.cmd,block=button.dataset.block;
+  if(cmd==="createLink"){
+    const url=prompt("Link URL (https://…):");
+    if(url&&/^(https?:|mailto:)/i.test(url))document.execCommand("createLink",false,url);
+    return;
+  }
+  if(cmd)document.execCommand(cmd,false,null);
+  if(block==="p")document.execCommand("formatBlock",false,"p");
+  if(block==="h1")document.execCommand("formatBlock",false,"h1");
+  if(block==="h2")document.execCommand("formatBlock",false,"h2");
+  if(block==="h3")document.execCommand("formatBlock",false,"h3");
+  if(block==="blockquote")document.execCommand("formatBlock",false,"blockquote");
+  if(button.id==="code-block-btn"){
+    const text=prompt("Code to insert:");if(text)document.execCommand("insertHTML",false,`<pre>${escapeHtml(text)}</pre>`);
+  }
+});
+$("find-toggle").addEventListener("click",()=>{
+  const open=$("findbar").hidden;
+  $("findbar").hidden=!open;$("find-toggle").setAttribute("aria-expanded",String(open));
+  if(open)$("find-input").focus();
+});
+$("find-close").addEventListener("click",()=>{$("findbar").hidden=true;$("find-toggle").setAttribute("aria-expanded","false");});
+$("find-next").addEventListener("click",()=>{activeDoc()?.mode==="rich"?richFindNext():plainFindNext();});
+$("replace-one").addEventListener("click",()=>{
+  if(activeDoc()?.mode!=="rich"){
+    const area=activeDoc()?.mode==="md"?$("md-editor"):$("code-editor");
+    if(window.getSelection().toString()===$("find-input").value){replaceSelection($("replace-input").value);}
+    plainFindNext();
+  }else richFindNext();
+});
+$("replace-all").addEventListener("click",()=>{activeDoc()?.mode==="rich"?richReplaceAll():plainReplaceAll();});
+$("find-input").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();$("find-next").click();}});
+$("import-btn").addEventListener("click",()=>$("import-input").click());
+$("import-input").addEventListener("change",async event=>{
+  for(const file of [...event.target.files])await importFile(file);
+  event.target.value="";
+});
+document.querySelectorAll("[data-export]").forEach(button=>button.addEventListener("click",()=>{
+  exportDoc(button.dataset.export);button.closest("details").removeAttribute("open");
+}));
+$("print-btn").addEventListener("click",()=>window.print());
+$("theme-toggle").addEventListener("click",()=>{
+  const light=document.documentElement.dataset.theme==="light";
+  document.documentElement.dataset.theme=light?"dark":"light";
+});
+$("ai-connect-form").addEventListener("submit",event=>{
+  event.preventDefault();
+  const key=$("ai-key").value.trim();
+  if(!key)return;
+  aiKey=key;$("ai-key").value="";
+  $("ai-connect-form").hidden=true;
+  $("ai-disconnect").hidden=false;
+  setAiState("Connected");
+  addAiMessage("assistant","Connected. The key lives in this tab only. Ask about your document, pick a quick action on a selection, or say “use 3 agents to …” for an agent team.");
+});
+$("ai-connect-toggle").addEventListener("click",()=>{
+  const form=$("ai-connect-form");
+  const opening=form.hidden;
+  form.hidden=!opening;
+  if(opening)$("ai-key").focus();else if(aiKey){form.hidden=true;}
+});
+$("ai-disconnect").addEventListener("click",()=>{
+  aiKey="";browserPage=null;$("browser-ask").disabled=true;
+  $("ai-connect-form").hidden=false;$("ai-disconnect").hidden=true;
+  setAiState("Not connected");
+  addAiMessage("assistant","Disconnected — the key was cleared from this page's memory.");
+});
+$("ai-clear-chat").addEventListener("click",()=>{
+  if(activeId)conversations[activeId]=[];
+  $("ai-body").replaceChildren();
+  const empty=document.createElement("div");empty.className="ai-empty";
+  empty.innerHTML="<strong>AI chat cleared.</strong> The conversation is not stored anywhere — reload always starts fresh.";
+  $("ai-body").append(empty);
+});
+document.querySelectorAll("[data-quick]").forEach(button=>button.addEventListener("click",()=>quickAction(button.dataset.quick)));
+$("ai-composer").addEventListener("submit",event=>{event.preventDefault();sendAiChat();});
+$("ai-message").addEventListener("keydown",event=>{
+  if(event.key==="Enter"&&!event.shiftKey&&!event.isComposing){event.preventDefault();sendAiChat();}
+});
+$("browser-fetch").addEventListener("click",fetchPage);
+$("browser-url").addEventListener("keydown",event=>{if(event.key==="Enter"){event.preventDefault();fetchPage();}});
+$("browser-preview-toggle").addEventListener("click",()=>{
+  const frame=$("browser-preview");
+  frame.hidden=!frame.hidden;
+  if(!frame.hidden&&$("browser-url").value.trim())frame.src=$("browser-url").value.trim();
+});
+$("browser-ask").addEventListener("click",askAboutPage);
+$("ai-toggle").addEventListener("click",()=>{
+  const open=$("ai-panel").classList.toggle("open");
+  $("ai-toggle").setAttribute("aria-expanded",String(open));
+  document.body.classList.toggle("ai-drawer-open",open);
+  $("drawer-scrim").classList.toggle("show",open);
+  syncInspectorFab(open);
+});
+$("drawer-scrim").addEventListener("click",()=>{
+  $("ai-panel").classList.remove("open");$("drawer-scrim").classList.remove("show");
+  document.body.classList.remove("ai-drawer-open");
+  syncInspectorFab(false);
+});
+document.addEventListener("keydown",event=>{
+  if(!(event.ctrlKey||event.metaKey))return;
+  const key=event.key.toLowerCase();
+  if(key==="f"){event.preventDefault();$("findbar").hidden=false;$("find-toggle").setAttribute("aria-expanded","true");$("find-input").focus();}
+  if(key==="s"){event.preventDefault();commitCurrent();$("stat-saved").textContent="Saved locally";saveState();}
+});
+window.addEventListener("beforeunload",commitCurrent);
+
+/* The shared inspector's floating button is fixed at the viewport's bottom-right
+   and lives inside a shadow root, so page CSS cannot move it. Nudge it via JS
+   so it stays clear of the AI panel (desktop) and the status bar (mobile). */
+let inspectorFab=null;
+function restyleInspectorFab(){
+  if(!inspectorFab){
+    const host=document.getElementById("acpi-host");
+    const fab=host?.shadowRoot?.querySelector(".fab");
+    if(fab)inspectorFab=fab;
+  }
+  if(!inspectorFab)return;
+  const mobile=window.matchMedia("(max-width: 900px)").matches;
+  inspectorFab.style.right=mobile?"14px":"calc(378px + 78px)";
+  inspectorFab.style.bottom=mobile?"96px":"51px";
+}
+window.addEventListener("load",()=>setTimeout(restyleInspectorFab,400));
+window.addEventListener("resize",restyleInspectorFab);
+function syncInspectorFab(open){
+  if(inspectorFab)inspectorFab.style.visibility=open?"hidden":"visible";
+}
+
+/* ---------- boot ---------- */
+loadState();
+renderSnippets();
+renderLists();
+switchDoc(activeId);
+</script>
+<script src="../inspector/inspector.js" defer></script>
+<script src="../assistant/widget.js" data-craft="editcraft" defer></script>
+</body>
+</html>

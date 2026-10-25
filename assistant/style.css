@@ -477,3 +477,14 @@ body.embedded #online-dialog { width: min(520px, calc(100vw - 16px)); max-height
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* Claude agent team report */
+.agent-report { margin: 10px 0 4px; border: 1px solid var(--border, #262b37); border-radius: 10px; background: rgba(255,255,255,.02); padding: 8px 12px; }
+.agent-report summary { cursor: pointer; font-size: 12.5px; color: #9aa3b5; }
+.agent-report-item { padding: 8px 0 2px; border-top: 1px dashed #262b37; font-size: 13.5px; }
+.agent-report-item:first-of-type { border-top: 0; }
+.agent-report-item strong { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #e5b04a; }
+.agent-report-item p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.agent-report-item .agent-failed { color: #e08080; }
+.agent-answer { margin: 8px 0 0; padding: 10px 12px; border-radius: 10px; background: rgba(229,176,74,.07); white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .agent-report { transition: none; } }

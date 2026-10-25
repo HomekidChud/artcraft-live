@@ -3,6 +3,7 @@ import {readAttachment, attachmentReply, formatSize, MAX_FILES} from "./files.js
 import {recognizeImage, formatVision, MATCH_THRESHOLD} from "./vision.js";
 import {loadMemory, setMemoryEnabled, addMemoryItem, clearMemory, forgetMemory, setLastCraft, parseMemoryCommand} from "./memory.js";
 import {runOnlineTurn,DEFAULT_MODEL} from "./online.js";
+import {runClaudeTurn,runAgentTeam,parseAgentCount,CLAUDE_DEFAULT_MODEL} from "./claude.js";
 
 const $ = id => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -39,6 +40,44 @@ function updateMemoryControls() {
       ? `On this browser only: ${memory.entries.length} explicitly saved note(s)${memory.lastCraft?" and your last Craft" : ""}. Chats and files are not stored. Use “forget all” or the button below to erase notes.`
     : `Off. Chat and files are not stored. ${memory.entries.length?`${memory.entries.length} saved note(s) remain on this browser but are not used until memory is enabled.`:"Enable it to save only notes you explicitly ask it to remember."}`;
 }
+function providerDefaults(provider) {
+  return provider === "claude"
+    ? {model:CLAUDE_DEFAULT_MODEL,modelLabel:"Claude model",keyLabel:"Your Anthropic API key",providerName:"Anthropic (Claude)",
+       consent:"I understand this page can access the key and my messages will be sent to Anthropic when I use Online AI with Claude",
+       data:"When connected, your message, selected Craft and up to 12 recent turns go to Anthropic's Claude API. If a local Craft/starter skill is used, its result (curated guidance text or starter metadata) is included in a follow-up request. Claude can fetch a public page's text with the browser tool when you share a URL; many sites block browser fetches and that is reported honestly. Local memory, attachments and editor contents are not sent. Provider data policies apply.",
+       skills:"Page text reading · Craft guidance · Starter downloads · Local file checks · Agent teams (say “use N agents”)",
+       help:["https://console.anthropic.com/settings/keys","Anthropic API keys ↗","https://docs.anthropic.com/en/docs/about-claude/security/best-practices","Key safety ↗"],
+       warning:"This public static page cannot keep an API key secret from its own scripts. The key is held in memory only and is not saved to browser storage or the repository, but a server-side proxy is safer. Use a restricted, low-limit key you can revoke. API use may cost extra — every agent in an agent team is a separate paid call on your key."}
+    : {model:DEFAULT_MODEL,modelLabel:"OpenAI model",keyLabel:"Your OpenAI API key",providerName:"OpenAI",
+       consent:"I understand this page can access the key and my messages will be sent to OpenAI when I use Online AI",
+       data:"When connected, your message, selected Craft and up to 12 recent turns go to OpenAI. If a local Craft/starter skill is used, its result (curated guidance text or starter metadata) is included in a follow-up request. Local memory, attachments and editor contents are not sent. Web search is optional; search activity and sources come from OpenAI. Provider data policies apply.",
+       skills:"Web research · Craft guidance · Starter downloads · Local file checks",
+       help:["https://platform.openai.com/api-keys","OpenAI API keys ↗","https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety","Key safety ↗"],
+       warning:"This public static page cannot keep an API key secret from its own scripts. The key is held in memory only and is not saved to browser storage or the repository, but a server-side proxy is safer. Use a restricted, low-limit key you can revoke. API use may cost extra."};
+}
+function updateProviderDialog() {
+  const provider=$("online-provider").value;
+  const info=providerDefaults(provider);
+  $("online-model-label").textContent=info.modelLabel;
+  $("online-key-label").textContent=info.keyLabel;
+  $("online-consent-text").textContent=info.consent;
+  $("online-data").textContent=info.data;
+  $("online-skills-list").textContent=info.skills;
+  $("online-warning").textContent=info.warning;
+  const help=$("online-help");
+  help.replaceChildren();
+  for(let index=0;index<info.help.length;index+=2){
+    const link=document.createElement("a");
+    link.href=info.help[index];link.target="_blank";link.rel="noopener";link.textContent=info.help[index+1];
+    help.append(link);
+    if(index===0)help.append(" · ");
+  }
+  if(!onlineConfig){
+    $("online-model").value=info.model;
+    $("online-key").value="";
+  }
+  $("online-search").disabled=provider==="claude";
+}
 function updateOnlineControls() {
   const connected=Boolean(onlineConfig);
   const button=$("online-toggle");
@@ -46,13 +85,13 @@ function updateOnlineControls() {
   button.setAttribute("aria-pressed",String(connected));
   button.disabled=!model||sending;
   $("connection-label").textContent=connected
-    ? `Online AI · web search ${onlineConfig.webSearch?"on":"off"} · key stays in this tab`
+    ? `Online AI · ${onlineConfig.provider==="claude"?"Claude":"OpenAI"} · web search ${onlineConfig.provider==="openai"&&onlineConfig.webSearch?"on":"off"} · key stays in this tab`
     : "Local chat · starter files are templates";
   $("online-disconnect").hidden=!connected;
   $("online-connect").textContent=connected?"Update connection":"Connect for this tab";
   $("online-key").required=!connected;
   $("online-consent").required=!connected;
-  $("online-model").value=onlineConfig?.model||DEFAULT_MODEL;
+  $("online-model").value=onlineConfig?onlineConfig.model:providerDefaults($("online-provider").value).model;
   $("online-search").checked=onlineConfig?.webSearch??true;
   $("online-key").placeholder=connected?"Connected for this tab; key not shown":"Enter for this tab only";
 }
@@ -273,20 +312,61 @@ async function submit(text) {
   const craftChoice = (images.length && recognizedCraft && $("craft").value === "auto" && !namesCraft) ? recognizedCraft : $("craft").value;
   if(text&&onlineConfig){
     sending=true;updateControls();
-    const article=append("ArtCraft · Online AI","Connecting…");
+    const isClaude=onlineConfig.provider==="claude";
+    const agentCount=isClaude?parseAgentCount(text):null;
+    const article=append(agentCount?"ArtCraft · Claude agent team":isClaude?"ArtCraft · Claude":"ArtCraft · Online AI","Connecting…");
     const body=article.querySelector(".body");
     const trace=createTrace(article,"online",true),traceActions=[];
     const scroll=()=>embedded?$("messages").scrollTop=$("messages").scrollHeight:article.scrollIntoView({block:"nearest"});
     const recordAction=action=>{traceActions.push(action);addTraceAction(trace,action);scroll();};
     try{
-      const result=await runOnlineTurn({apiKey:onlineConfig.apiKey,model:onlineConfig.model,webSearch:onlineConfig.webSearch,
-        history:onlineHistory,text,catalog,selectedCraft:$("craft").value,onAction:recordAction,
-        onStatus:status=>{body.textContent=status;scroll();}});
-      onlineHistory.push({role:"user",content:text},{role:"assistant",content:result.text});
-      onlineHistory=onlineHistory.slice(-24);
+      let result;
+      if(agentCount){
+        const team=await runAgentTeam({apiKey:onlineConfig.apiKey,model:onlineConfig.model,count:agentCount,task:text,
+          history:onlineHistory,catalog,selectedCraft:$("craft").value,onAction:recordAction,
+          onStatus:status=>{body.textContent=status;scroll();}});
+        result={text:team.text,actions:team.actions,artifacts:[]};
+        const panel=document.createElement("details");
+        panel.className="agent-report";
+        const summary=document.createElement("summary");
+        summary.textContent=`Agent team · ${team.agents.length} Claude agent(s) — each was a separate API call on your key`;
+        panel.append(summary);
+        for(const agent of team.agents){
+          const item=document.createElement("div");
+          item.className="agent-report-item";
+          const label=document.createElement("strong");
+          label.textContent=`${agent.index}. ${agent.name}`;
+          item.append(label);
+          const output=document.createElement("p");
+          if(agent.status==="failed"){output.className="agent-failed";output.textContent=`Failed: ${agent.error}`;}
+          else output.textContent=agent.text;
+          item.append(output);
+          panel.append(item);
+        }
+        article.querySelector(".body").replaceChildren();
+        article.append(panel);
+        onlineHistory.push({role:"user",content:text},{role:"assistant",content:team.text});
+        onlineHistory=onlineHistory.slice(-24);
+        const answer=document.createElement("div");
+        answer.className="agent-answer";
+        answer.textContent=team.text;
+        article.append(answer);
+      }else if(isClaude){
+        result=await runClaudeTurn({apiKey:onlineConfig.apiKey,model:onlineConfig.model,
+          history:onlineHistory,text,catalog,selectedCraft:$("craft").value,onAction:recordAction,
+          onStatus:status=>{body.textContent=status;scroll();}});
+        onlineHistory.push({role:"user",content:text},{role:"assistant",content:result.text});
+        onlineHistory=onlineHistory.slice(-24);
+      }else{
+        result=await runOnlineTurn({apiKey:onlineConfig.apiKey,model:onlineConfig.model,webSearch:onlineConfig.webSearch,
+          history:onlineHistory,text,catalog,selectedCraft:$("craft").value,onAction:recordAction,
+          onStatus:status=>{body.textContent=status;scroll();}});
+        onlineHistory.push({role:"user",content:text},{role:"assistant",content:result.text});
+        onlineHistory=onlineHistory.slice(-24);
+      }
       body.textContent=result.text;
-      article.querySelector(".speaker").textContent=result.webSearched?"ArtCraft · Web answer":"ArtCraft · Online AI";
-      renderOnlineCitations(article,result);
+      article.querySelector(".speaker").textContent=agentCount?"ArtCraft · Agent team":result.webSearched?"ArtCraft · Web answer":isClaude?"ArtCraft · Claude":"ArtCraft · Online AI";
+      if(!agentCount)renderOnlineCitations(article,result);
       appendArtifact(article,result.artifacts?.[0]);
       finishTrace(trace);
     }catch(error){
@@ -377,9 +457,11 @@ $("memory-clear").addEventListener("click",()=>{
 });
 $("online-toggle").addEventListener("click",()=>{
   updateOnlineControls();
+  updateProviderDialog();
   $("online-dialog").showModal();
   $("online-model").focus();
 });
+$("online-provider").addEventListener("change",updateProviderDialog);
 $("online-close").addEventListener("click",()=>$("online-dialog").close());
 $("online-dialog").addEventListener("close",()=>{
   $("online-key").value="";
@@ -388,15 +470,16 @@ $("online-dialog").addEventListener("close",()=>{
 $("online-form").addEventListener("submit",event=>{
   event.preventDefault();
   const apiKey=$("online-key").value.trim()||onlineConfig?.apiKey||"";
-  const modelName=$("online-model").value.trim()||DEFAULT_MODEL;
+  const provider=$("online-provider").value==="claude"?"claude":"openai";
+  const modelName=$("online-model").value.trim()||providerDefaults(provider).model;
   if(!apiKey||(!onlineConfig&&!$("online-consent").checked))return;
-  onlineConfig={apiKey,model:modelName,webSearch:$("online-search").checked};
+  onlineConfig={provider,apiKey,model:modelName,webSearch:provider==="openai"&&$("online-search").checked};
   onlineHistory=[];
   $("online-key").value="";
   updateOnlineControls();
   $("online-dialog").close();
   $("reset").click();
-  $("attachment-status").textContent=`Online AI connected for this tab. ${onlineConfig.webSearch?"Web search is allowed; citations will be shown.":"Web search is off."}`;
+  $("attachment-status").textContent=`Online AI connected for this tab (${provider==="claude"?"Claude by Anthropic":"OpenAI"}). ${provider==="openai"&&onlineConfig.webSearch?"Web search is allowed; citations will be shown.":provider==="claude"?"Claude can read public page text when you share a URL, and you can ask for an agent team (for example, “use 3 agents …”).":"Web search is off."}`;
 });
 $("online-disconnect").addEventListener("click",()=>{
   onlineConfig=null;onlineHistory=[];updateOnlineControls();
