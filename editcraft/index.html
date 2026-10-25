@@ -123,7 +123,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
 .ai-head button{margin-left:auto;font-size:12px;font-weight:600;color:var(--accent)}
 .ai-connect{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
 .ai-connect[hidden]{display:none}
-.ai-connect label{font-family:var(--mono);font-size:10px;color:var(--muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.ai-connect label{font-family:var(--mono);font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.08em;text-transform:uppercase}
 .ai-connect input,.ai-connect select{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 9px;font-size:13px;width:100%}
 .ai-connect .ai-row{display:flex;gap:8px}
 .ai-connect .ai-row button{flex:1;padding:8px;border-radius:8px;font-weight:600;font-size:13px}
@@ -208,7 +208,6 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   .side-head span{font-size:12.5px;color:var(--muted);font-weight:600}
   .side-add{height:28px;width:28px}
   .doc-item{width:auto;flex-shrink:0;height:34px;align-items:center}.doc-item .doc-del{opacity:.7}
-  .doc-item:not(.active){display:none}
   .sandbox-note{display:none}
   .layout{display:flex;flex-direction:column}
   .editor-col{flex:1;min-height:0;height:auto}
@@ -714,11 +713,21 @@ const SNIPPETS=[
   {name:"Date stamp",text:"{date}"}
 ];
 function fillSnippets(text){return text.replace(/\{date\}/g,new Date().toLocaleDateString(undefined,{year:"numeric",month:"long",day:"numeric"}));}
+/* Remember the last caret/selection inside the rich editor so menu clicks don't reset it */
+let lastRichRange=null;
+document.addEventListener("selectionchange",()=>{
+  const sel=getSelection();
+  if(sel.rangeCount&&$("rich-editor").contains(sel.anchorNode))lastRichRange=sel.getRangeAt(0).cloneRange();
+});
+function restoreRichSelection(){
+  $("rich-editor").focus();
+  if(lastRichRange){try{const sel=getSelection();sel.removeAllRanges();sel.addRange(lastRichRange);}catch(_){/* fall back to default caret */}}
+}
 function insertAtCursor(text){
   const doc=activeDoc();if(!doc)return;
   const value=fillSnippets(text);
   if(doc.mode==="rich"){
-    $("rich-editor").focus();
+    restoreRichSelection();
     document.execCommand("insertText",false,value.replace(/\n/g,"<br>"));
   }else{
     const area=doc.mode==="md"?$("md-editor"):$("code-editor");
@@ -786,7 +795,7 @@ function addAiMessage(role,text,{applyable=false}={}){
 function replaceSelection(text){
   const doc=activeDoc();if(!doc)return;
   if(doc.mode==="rich"){
-    $("rich-editor").focus();
+    restoreRichSelection();
     document.execCommand("insertText",false,text.replace(/\n/g,"<br>"));
   }else{
     const area=doc.mode==="md"?$("md-editor"):$("code-editor");

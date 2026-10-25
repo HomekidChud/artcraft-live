@@ -304,14 +304,14 @@ select:hover { border-color: var(--text-3); background-color: var(--surface-3); 
 }
 .suggestions button:hover { transform: translateY(-2px); border-color: var(--accent-line); background: var(--surface-2); box-shadow: var(--shadow-2); }
 .suggestions button:active { transform: translateY(0); }
-.prompt-label { display: block; margin-bottom: 6px; color: var(--accent); font-family: var(--mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.11em; }
+.prompt-label { display: block; margin-bottom: 6px; color: var(--accent); font-family: var(--mono); font-size: 11px; font-weight: 600; letter-spacing: 0.11em; }
 
 /* ---------- Composer ---------- */
 
 .composer-area { padding-top: 10px; background: linear-gradient(180deg, transparent, var(--bg) 22%); }
 .attachments { display: flex; flex-wrap: wrap; gap: 6px; max-height: 108px; overflow: auto; }
 .attachments:empty { display: none; }
-.attachment-chip { display: flex; align-items: center; min-width: 0; max-width: 100%; padding: 0 4px 0 11px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; font-size: 10.5px; color: var(--text-2); }
+.attachment-chip { display: flex; align-items: center; min-width: 0; max-width: 100%; padding: 0 4px 0 11px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; font-size: 11px; color: var(--text-2); }
 .attachment-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .attachment-chip button { flex-shrink: 0; min-width: 30px; min-height: 30px; border: 0; background: transparent; color: var(--text-2); font-size: 17px; border-radius: 50%; transition: color 0.15s; }
 .attachment-chip button:hover { color: var(--text); }
@@ -454,9 +454,9 @@ body.embedded main { width: 100%; height: 100dvh; min-height: 360px; padding: 8p
 body.embedded main { grid-template-rows: auto auto minmax(0, 1fr) auto; }
 body.embedded .context-bar { min-height: 44px; padding: 5px 7px; gap: 6px; flex-wrap: nowrap; border-radius: var(--r-md); }
 body.embedded .context-bar label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
-body.embedded select { min-width: 0; max-width: 46vw; flex: 1; height: 31px; padding-right: 24px; font-size: 10.5px; }
-body.embedded .memory-toggle, body.embedded .online-toggle { min-height: 30px; padding: 0 8px; font-size: 10px; }
-body.embedded .context-bar .quiet-button { min-height: 30px; padding: 0 9px; font-size: 10px; }
+body.embedded select { min-width: 0; max-width: 46vw; flex: 1; height: 31px; padding-right: 24px; font-size: 11px; }
+body.embedded .memory-toggle, body.embedded .online-toggle { min-height: 30px; padding: 0 8px; font-size: 11px; }
+body.embedded .context-bar .quiet-button { min-height: 30px; padding: 0 9px; font-size: 11px; }
 body.embedded .editor-link { display: none; }
 body.embedded .status { min-height: 27px; }
 body.embedded .messages { overscroll-behavior: contain; padding: 6px 0 24px; }
@@ -465,7 +465,7 @@ body.embedded .welcome-mark { width: 38px; height: 38px; margin-bottom: 15px; }
 body.embedded .welcome h2 { font-size: 21px; }
 body.embedded .welcome-copy { margin-bottom: 18px; }
 body.embedded .suggestions { gap: 7px; }
-body.embedded .suggestions button { min-width: 0; padding: 9px 10px; font-size: 10.5px; }
+body.embedded .suggestions button { min-width: 0; padding: 9px 10px; font-size: 11px; }
 body.embedded .message { margin: 11px 0; }
 body.embedded .message.user { padding: 9px 12px; }
 body.embedded .composer-area { padding-top: 6px; }
@@ -473,7 +473,7 @@ body.embedded #composer { border-radius: 14px; }
 body.embedded #message { min-height: 52px; }
 body.embedded #send { min-width: 64px; height: 34px; border-radius: 10px; }
 body.embedded .file-toolbar { min-height: 29px; }
-body.embedded .footline { font-size: 10px; }
+body.embedded .footline { font-size: 11px; }
 body.embedded .details-panel { bottom: 20px; }
 body.embedded #online-dialog { width: min(520px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); padding: 15px; border-radius: 14px; }
 
@@ -486,8 +486,8 @@ body.embedded #online-dialog { width: min(520px, calc(100vw - 16px)); max-height
   .context-bar { gap: 6px; padding: 6px; }
   .context-bar label { display: none; }
   select { min-width: 0; max-width: 42vw; flex: 1 1 130px; height: 33px; padding-left: 9px; font-size: 11px; }
-  .memory-toggle, .online-toggle { padding: 0 9px; font-size: 10px; }
-  .editor-link { padding: 7px 4px; font-size: 10px; }
+  .memory-toggle, .online-toggle { padding: 0 9px; font-size: 11px; }
+  .editor-link { padding: 7px 4px; font-size: 11px; }
   .status { min-height: 30px; }
   .welcome { padding: 20px 0; }
   .welcome-mark { width: 44px; height: 44px; margin-bottom: 17px; }
@@ -499,9 +499,11 @@ body.embedded #online-dialog { width: min(520px, calc(100vw - 16px)); max-height
   #composer { gap: 6px; padding: 7px 7px 7px 11px; }
   #message { min-height: 40px; padding: 8px 6px 8px 2px; font-size: 13px; }
   #send { min-width: 62px; padding: 0 11px; }
-  .footline { font-size: 10px; }
+  .footline { font-size: 11px; }
   body.embedded main { min-height: 360px; padding: 5px 7px; }
   body.embedded .suggestions button { min-width: 0; }
+  body.embedded .context-bar { flex-wrap: wrap; row-gap: 5px; }
+  body.embedded select { flex: 1 1 150px; max-width: none; }
 }
 @media (max-height: 500px) and (max-width: 760px) {
   body.embedded .composer-area { max-height: 65%; overflow: auto; }

@@ -17,7 +17,7 @@
     .tab:hover{transform:translateY(-2px) scale(1.04);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 12px 32px rgba(0,0,0,.4)}
     .tab:active{transform:translateY(0) scale(1)}
     .tab svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-    .panel{position:absolute;right:0;bottom:56px;width:min(360px,calc(100vw - 24px));height:min(560px,calc(100dvh - 90px));border:1px solid #e2d9c6;border-radius:16px;overflow:hidden;background:#f4f0e7;box-shadow:0 24px 80px rgba(58,44,22,.28);display:flex;flex-direction:column}
+    .panel{position:absolute;right:0;bottom:56px;width:min(400px,calc(100vw - 24px));height:min(560px,calc(100dvh - 90px));border:1px solid #e2d9c6;border-radius:16px;overflow:hidden;background:#f4f0e7;box-shadow:0 24px 80px rgba(58,44,22,.28);display:flex;flex-direction:column}
     .panel.expanded{width:min(520px,calc(100vw - 24px));height:min(760px,calc(100dvh - 90px))}
     .panel[hidden]{display:none}.bar{display:flex;align-items:center;gap:4px;padding:0 4px 0 14px;flex-shrink:0;background:#fbf8f1;color:#272115;font-size:13px;border-bottom:1px solid #e2d9c6}
     .bar span{margin-right:auto;font-weight:650;letter-spacing:-.01em}.bar button{width:44px;background:transparent;color:#6f6656;border:0;padding:0;font-size:20px;transition:color .15s,background .15s}.bar a{display:grid;place-items:center;width:44px;min-height:44px;color:#b8431a;font-size:18px;text-decoration:none;transition:color .15s,background .15s}.bar button:hover,.bar a:hover{background:#ece5d4;color:#272115}
