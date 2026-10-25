@@ -123,6 +123,10 @@
   .ai-connect .ai-row button{flex:1;padding:8px;border-radius:8px;font-weight:600;font-size:13px}
   .ai-connect .ai-connect-btn{background:var(--accent);color:var(--accent-ink)}
   .ai-connect .ai-disconnect-btn{border:1px solid var(--border)}
+  .ai-note{margin:0}
+  .ai-note summary{cursor:pointer;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.02em}
+  .ai-note p{margin-top:6px}
+  .ai-note[open] summary{margin-bottom:0}
   .ai-note{font-size:11.5px;color:var(--muted);line-height:1.45}
   .ai-note strong{color:var(--text)}
   .ai-body{flex:1;min-height:0;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:12px}
@@ -342,7 +346,10 @@
         <button class="ai-connect-btn" id="ai-connect" type="submit">Connect</button>
         <button class="ai-disconnect-btn" id="ai-disconnect" type="button" hidden>Disconnect</button>
       </div>
-      <p class="ai-note">This page is a public static site: the key stays in this tab's memory only, is never saved to storage, and is sent directly to Anthropic with the browser-access header. Use a restricted, low-limit key you can revoke. <strong>API use costs money on your key</strong> — every agent in an agent team is a separate paid call.</p>
+      <details class="ai-note">
+        <summary>How your key and costs work</summary>
+        <p>This page is a public static site: the key stays in this tab's memory only, is never saved to storage, and is sent directly to Anthropic with the browser-access header. Use a restricted, low-limit key you can revoke. <strong>API use costs money on your key</strong> — every agent in an agent team is a separate paid call.</p>
+      </details>
     </form>
     <div class="ai-quick" id="ai-quick">
       <button type="button" data-quick="explain">Explain selection</button>
@@ -478,7 +485,6 @@ function switchDoc(id){
   $("doc-name").value=doc.name;
   setMode(doc.mode,true);
   renderLists();updateStats();saveState();
-  $("ai-body").scrollTop=$("ai-body").scrollHeight;
 }
 function commitCurrent(){
   const doc=activeDoc();if(!doc)return;
