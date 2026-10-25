@@ -55,12 +55,12 @@
       <form id="composer">
         <label class="sr-only" for="message">Message the ArtCraft assistant</label>
         <textarea id="message" rows="2" maxlength="2000" placeholder="Ask a question or describe a starter…" disabled></textarea>
+        <button id="attach" type="button" class="attach-button" disabled aria-label="Attach files"><span aria-hidden="true">＋</span></button>
         <button id="send" type="submit" disabled aria-label="Send message">Send <span aria-hidden="true">↑</span></button>
       </form>
       <div class="file-toolbar">
         <input id="file-input" class="sr-only" type="file" multiple aria-label="Choose local files to attach">
-        <button id="attach" type="button" class="attach-button" disabled><span aria-hidden="true">＋</span> Attach</button>
-        <span>Files stay on this device · up to 3</span>
+        <span>Files stay on this device · up to 3 · they are never uploaded</span>
       </div>
       <div class="footline">
         <span id="connection-label">Local chat · starter files are templates</span>
