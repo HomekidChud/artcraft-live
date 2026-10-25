@@ -1025,7 +1025,13 @@ function restyleInspectorFab(){
   inspectorFab.style.right=mobile?"14px":"calc(378px + 78px)";
   inspectorFab.style.bottom=mobile?"96px":"51px";
 }
-window.addEventListener("load",()=>setTimeout(restyleInspectorFab,400));
+/* the inspector host is created by a later deferred script — poll briefly until it exists */
+let fabTries=0;
+(function tryRestyle(){
+  restyleInspectorFab();
+  if(!inspectorFab&&++fabTries<20)setTimeout(tryRestyle,100);
+})();
+window.addEventListener("load",restyleInspectorFab);
 window.addEventListener("resize",restyleInspectorFab);
 window.addEventListener("resize",syncTopbarHeight);
 syncTopbarHeight();
