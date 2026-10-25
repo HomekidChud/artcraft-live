@@ -69,7 +69,9 @@
   .seg button[aria-pressed="true"]{background:var(--surface-3);color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
   .modebar-right{margin-left:auto;display:flex;gap:6px;align-items:center}
 
-  .toolbar{display:flex;flex-wrap:wrap;gap:4px;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--surface)}
+  .toolbar{display:flex;flex-wrap:nowrap;gap:4px;padding:7px 12px;border-bottom:1px solid var(--border);background:var(--surface);overflow-x:auto;scrollbar-width:none}
+  .toolbar::-webkit-scrollbar{display:none}
+  .toolbar .tool{flex-shrink:0}
   .tool{min-width:32px;height:32px;padding:0 8px;border-radius:7px;border:1px solid transparent;font-size:13.5px;color:var(--muted);display:inline-flex;align-items:center;gap:4px}
   .tool:hover{background:var(--surface-3);color:var(--text)}
   .tool.tsep{border-left:1px solid var(--border);border-radius:0;min-width:0;padding:0;width:0;margin:0 5px;pointer-events:none}
@@ -156,6 +158,7 @@
   .ai-send{width:40px;height:40px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-size:16px;display:grid;place-items:center;flex-shrink:0}
   .ai-send:disabled{opacity:.4;cursor:default}
   .ai-hint{font-size:11px;color:var(--muted);margin-top:7px;line-height:1.45}
+  .ai-composer{padding-bottom:max(16px,calc(env(safe-area-inset-bottom) + 10px))}
 
   .ai-toggle{display:none}
   .drawer-scrim{display:none}
@@ -198,7 +201,9 @@
     .sandbox-note{display:none}
     .layout{display:flex;flex-direction:column}
     .editor-col{flex:1;min-height:0;height:auto}
-    .ai-panel{position:fixed;inset:var(--tbh,53px) 0 0 0;z-index:60;transform:translateX(102%);transition:transform .22s ease;box-shadow:0 0 60px rgba(0,0,0,.5)}
+    .ai-panel{position:fixed;inset:var(--tbh,53px) 0 0 0;z-index:60;transform:translateX(102%);transition:transform .22s ease;box-shadow:0 0 60px rgba(0,0,0,.5);overflow-y:auto}
+    .ai-composer{position:sticky;bottom:0;background:var(--surface);z-index:1}
+    .ai-body{flex:1 1 auto;min-height:140px}
     .ai-panel.open{transform:translateX(0)}
     .ai-toggle{display:inline-flex}
     .drawer-scrim{display:block;position:fixed;inset:var(--tbh,53px) 0 0 0;background:rgba(0,0,0,.5);z-index:55;opacity:0;pointer-events:none;transition:opacity .22s ease}
@@ -281,7 +286,7 @@
       <span class="tool tsep"></span>
       <button class="tool" type="button" data-cmd="createLink" title="Insert link" id="link-btn">🔗</button>
       <button class="tool" type="button" data-cmd="insertHorizontalRule" title="Divider">—</button>
-      <button class="tool" type="button" id="code-block-btn" title="Code block">{}{}#</button>
+      <button class="tool" type="button" id="code-block-btn" title="Code block">‹/›</button>
       <span class="tool tsep"></span>
       <button class="tool" type="button" data-cmd="undo" title="Undo (Ctrl+Z)">↶</button>
       <button class="tool" type="button" data-cmd="redo" title="Redo (Ctrl+Y)">↷</button>
@@ -369,7 +374,7 @@
     </div>
     <form class="ai-composer" id="ai-composer">
       <div class="ac-row">
-        <textarea id="ai-message" rows="1" placeholder="Ask Claude… or “use 3 agents to …”" aria-label="Message Claude"></textarea>
+        <textarea id="ai-message" rows="1" placeholder="Ask Claude… e.g. “use 3 agents”" aria-label="Message Claude"></textarea>
         <button id="ai-send" class="ai-send" type="submit" aria-label="Send message to Claude">↑</button>
       </div>
       <p class="ai-hint">Enter sends · Shift+Enter new line · the open document is included as context.</p>
@@ -1024,6 +1029,9 @@ function restyleInspectorFab(){
   const mobile=window.matchMedia("(max-width: 900px)").matches;
   inspectorFab.style.right=mobile?"14px":"calc(378px + 78px)";
   inspectorFab.style.bottom=mobile?"96px":"51px";
+  /* also enforce visibility from the current drawer state, in case the
+     drawer was opened before the inspector host existed */
+  inspectorFab.style.visibility=document.body.classList.contains("ai-drawer-open")?"hidden":"visible";
 }
 /* the inspector host is created by a later deferred script — poll briefly until it exists */
 let fabTries=0;
