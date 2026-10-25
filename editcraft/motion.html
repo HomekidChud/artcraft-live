@@ -7,8 +7,8 @@
 <link rel="icon" href="favicon.svg">
 <style>
   :root{
-    --bg:#0c0e13;--surface:#13161d;--surface-2:#1a1e27;--surface-3:#222733;--border:#262b37;
-    --text:#e8eaf0;--muted:#9aa3b5;--accent:#e5b04a;--accent-ink:#191307;--danger:#e08080;--ok:#7fc98a;
+    --bg:#17130f;--surface:#1e1914;--surface-2:#252019;--surface-3:#302921;--border:#372f24;
+    --text:#ece4d3;--muted:#b3a78e;--accent:#ef8354;--accent-ink:#221103;--danger:#e08574;--ok:#9dc27f;
     --radius:10px;
   }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -20,7 +20,7 @@
 
   .topbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
   .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;text-decoration:none;color:var(--text)}
-  .brand-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(160deg,#f3c773,#e5b04a 60%,#c9952f);color:var(--accent-ink);font-size:13px;font-weight:800}
+  .brand-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:#d96a3c;color:var(--accent-ink);font-size:13px;font-weight:800}
   .tb{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);font-size:13px;font-weight:600;white-space:nowrap}
   .tb:hover{background:var(--surface-3)}
   .tb.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
@@ -32,7 +32,7 @@
   .col-right{border-left:1px solid var(--border);overflow-y:auto;background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:10px}
   .pane-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:4px 0 6px}
   .stage-wrap{display:grid;place-items:center;background:
-    repeating-conic-gradient(#151821 0% 25%, #10131a 0% 50%) 50%/24px 24px;position:relative;min-height:0}
+    repeating-conic-gradient(#241d16 0% 25%, #1c1712 0% 50%) 50%/24px 24px;position:relative;min-height:0}
   canvas.scene{max-width:100%;max-height:100%;border-radius:6px;touch-action:none;cursor:default}
   .empty-hint{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:20px;font-size:14px;pointer-events:none}
   .empty-hint strong{color:var(--text)}
@@ -189,8 +189,8 @@ function addObject(obj) {
 }
 
 $("#add-text").addEventListener("click", () => addObject(makeObject("text", { text: "Your title", fontSize: 96, color: "#ffffff", fontFamily: "Inter, system-ui, sans-serif" })));
-$("#add-rect").addEventListener("click", () => addObject(makeObject("rect", { w: 420, h: 240, color: "#e5b04a" })));
-$("#add-ellipse").addEventListener("click", () => addObject(makeObject("ellipse", { w: 260, h: 260, color: "#7fc98a" })));
+$("#add-rect").addEventListener("click", () => addObject(makeObject("rect", { w: 420, h: 240, color: "#d96a3c" })));
+$("#add-ellipse").addEventListener("click", () => addObject(makeObject("ellipse", { w: 260, h: 260, color: "#9dc27f" })));
 $("#add-image").addEventListener("click", () => $("#img-input").click());
 $("#img-input").addEventListener("change", e => {
   const f = e.target.files[0];
@@ -264,7 +264,7 @@ function draw() {
     }
     if (obj.id === selectedId && !playing) {
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = "#e5b04a"; ctx.lineWidth = 2 / s.scale;
+      ctx.strokeStyle = "#d96a3c"; ctx.lineWidth = 2 / s.scale;
       const bw = (obj.type === "text" ? ctx.measureText(obj.text).width : obj.type === "image" ? obj.w * Math.min(1, 900 / obj.w) : obj.w) + 16;
       const bh = (obj.type === "text" ? obj.fontSize : obj.type === "image" ? obj.h * Math.min(1, 900 / obj.w) : obj.h) + 16;
       ctx.strokeRect(-bw / 2, -bh / 2, bw, bh);

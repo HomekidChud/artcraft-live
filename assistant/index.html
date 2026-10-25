@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0b0d11">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23e5b04a'/%3E%3Cpath d='M32 14l4.9 13.1L50 32l-13.1 4.9L32 50l-4.9-13.1L14 32l13.1-4.9z' fill='%23191307'/%3E%3C/svg%3E">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f0e7">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#17130f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23c2491a'/%3E%3Cpath d='M32 14l4.9 13.1L50 32l-13.1 4.9L32 50l-4.9-13.1L14 32l13.1-4.9z' fill='%23fbf6ec'/%3E%3C/svg%3E">
 <title>ArtCraft · Assistant</title>
 <link rel="stylesheet" href="style.css">
 <script type="module" src="app.js"></script>
@@ -32,10 +33,10 @@
     <section id="messages" class="messages" aria-label="Conversation" aria-live="polite" aria-relevant="additions">
       <div class="welcome" id="welcome">
         <div class="welcome-mark" aria-hidden="true">
-          <svg viewBox="0 0 64 64" fill="none">
-            <rect x="1.5" y="1.5" width="61" height="61" rx="17" fill="#161b22" stroke="#6e5726"/>
-            <path d="M32 13l5.4 14.6L52 33l-14.6 5.4L32 53l-5.4-14.6L12 33l14.6-5.4z" fill="#e5b04a"/>
-            <circle cx="48.5" cy="15.5" r="3.5" fill="#f3c773"/>
+          <svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <rect x="1.5" y="1.5" width="61" height="61" rx="17" fill="var(--mark-bg)" stroke="var(--mark-line)"/>
+            <path d="M32 13l5.4 14.6L52 33l-14.6 5.4L32 53l-5.4-14.6L12 33l14.6-5.4z" fill="var(--mark-accent)"/>
+            <circle cx="48.5" cy="15.5" r="3.5" fill="var(--mark-dot)"/>
           </svg>
         </div>
         <p class="welcome-kicker">A GOOD PLACE TO START</p>
@@ -54,12 +55,12 @@
       <form id="composer">
         <label class="sr-only" for="message">Message the ArtCraft assistant</label>
         <textarea id="message" rows="2" maxlength="2000" placeholder="Ask a question or describe a starter…" disabled></textarea>
+        <button id="attach" type="button" class="attach-button" disabled aria-label="Attach files"><span aria-hidden="true">＋</span></button>
         <button id="send" type="submit" disabled aria-label="Send message">Send <span aria-hidden="true">↑</span></button>
       </form>
       <div class="file-toolbar">
         <input id="file-input" class="sr-only" type="file" multiple aria-label="Choose local files to attach">
-        <button id="attach" type="button" class="attach-button" disabled><span aria-hidden="true">＋</span> Attach</button>
-        <span>Files stay on this device · up to 3</span>
+        <span>Files stay on this device · up to 3 · they are never uploaded</span>
       </div>
       <div class="footline">
         <span id="connection-label">Local chat · starter files are templates</span>
