@@ -205,6 +205,15 @@
   var fab = el('button', 'fab', root);
   fab.title = 'Inspect (Ctrl+Shift+I)';
   fab.textContent = '◎';
+  /* the host page can reposition the button via data attributes on the
+     script tag (applied at creation, before first paint, no timing race) */
+  try {
+    var tag = document.currentScript;
+    if (tag && tag.dataset.fabRight) {
+      fab.style.right = tag.dataset.fabRight;
+      if (tag.dataset.fabBottom) fab.style.bottom = tag.dataset.fabBottom;
+    }
+  } catch (e) {}
   fab.addEventListener('click', function () { toggle(); });
 
   /* ---------------- toolbar ---------------- */

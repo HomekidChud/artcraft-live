@@ -294,7 +294,7 @@
       <span class="tool tsep"></span>
       <button class="tool" type="button" data-cmd="undo" title="Undo (Ctrl+Z)">↶</button>
       <button class="tool" type="button" data-cmd="redo" title="Redo (Ctrl+Y)">↷</button>
-      <button class="tool" type="button" data-cmd="removeFormat" title="Clear formatting">⌫f</button>
+      <button class="tool" type="button" data-cmd="removeFormat" title="Clear formatting"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true" style="vertical-align:-2px"><path d="M2 4h12M8 4v9" stroke="currentColor" stroke-width="1.6"/><path d="M11 10l4 4m0-4l-4 4" stroke="currentColor" stroke-width="1.6"/></svg></button>
     </div>
     <div class="findbar" id="findbar" hidden>
       <input id="find-input" type="text" placeholder="Find" aria-label="Find text" style="width:180px">
@@ -1025,34 +1025,49 @@ function syncTopbarHeight(){
   const tb=document.querySelector(".topbar");
   if(tb)document.documentElement.style.setProperty("--tbh",tb.offsetHeight+"px");
 }
+function findInspectorFab(){
+  if(inspectorFab)return inspectorFab;
+  const host=document.getElementById("acpi-host");
+  const fab=host?.shadowRoot?.querySelector(".fab");
+  if(fab)inspectorFab=fab;
+  return inspectorFab;
+}
 function restyleInspectorFab(){
-  if(!inspectorFab){
-    const host=document.getElementById("acpi-host");
-    const fab=host?.shadowRoot?.querySelector(".fab");
-    if(fab)inspectorFab=fab;
-  }
-  if(!inspectorFab)return;
+  const fab=findInspectorFab();
+  if(!fab)return;
   const mobile=window.matchMedia("(max-width: 900px)").matches;
-  inspectorFab.style.right=mobile?"14px":"calc(378px + 78px)";
-  inspectorFab.style.bottom=mobile?"96px":"51px";
+  fab.style.right=mobile?"14px":"calc(378px + 78px)";
+  fab.style.bottom=mobile?"96px":"51px";
   /* also enforce visibility from the current drawer state, in case the
      drawer was opened before the inspector host existed */
-  inspectorFab.style.visibility=document.body.classList.contains("ai-drawer-open")?"hidden":"visible";
+  fab.style.visibility=document.body.classList.contains("ai-drawer-open")?"hidden":"visible";
 }
-/* the inspector host is created by a later deferred script — poll briefly until it exists */
+function syncInspectorFab(open){
+  const fab=findInspectorFab();
+  if(fab)fab.style.visibility=open?"hidden":"visible";
+}
+/* the inspector host is created by a later deferred script — restyle the
+   moment it is inserted (MutationObserver fires synchronously with the DOM
+   change, before any screenshot can catch the default position), with a
+   long poll as a belt-and-braces fallback for slow/throttled environments */
+const fabObserver=new MutationObserver(()=>{
+  if(findInspectorFab()){
+    restyleInspectorFab();
+    fabObserver.disconnect();
+  }
+});
+fabObserver.observe(document.body,{childList:true,subtree:false});
 let fabTries=0;
 (function tryRestyle(){
   restyleInspectorFab();
-  if(!inspectorFab&&++fabTries<20)setTimeout(tryRestyle,100);
+  if(!inspectorFab&&++fabTries<240)setTimeout(tryRestyle,250);
 })();
+document.addEventListener("DOMContentLoaded",restyleInspectorFab);
 window.addEventListener("load",restyleInspectorFab);
 window.addEventListener("resize",restyleInspectorFab);
 window.addEventListener("resize",syncTopbarHeight);
 syncTopbarHeight();
 window.addEventListener("load",()=>setTimeout(syncTopbarHeight,50));
-function syncInspectorFab(open){
-  if(inspectorFab)inspectorFab.style.visibility=open?"hidden":"visible";
-}
 
 /* ---------- boot ---------- */
 loadState();
@@ -1060,7 +1075,7 @@ renderSnippets();
 renderLists();
 switchDoc(activeId);
 </script>
-<script src="../inspector/inspector.js" defer></script>
+<script src="../inspector/inspector.js" defer data-fab-right="calc(378px + 78px)" data-fab-bottom="51px"></script>
 <script src="../assistant/widget.js" data-craft="editcraft" defer></script>
 </body>
 </html>
