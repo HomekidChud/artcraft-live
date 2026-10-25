@@ -333,7 +333,7 @@ async function addClip(file) {
   tc.width = 148; tc.height = 88;
   tc.getContext("2d").drawImage(el, 0, 0, 148, 88);
   clip.thumb = tc.toDataURL("image/jpeg", .6);
-  el.currentTime = 0;
+  await new Promise(res => { el.currentTime = 0; el.onseeked = res; }); // first frame decoded before import resolves
   el.onseeked = null;
 }
 
@@ -511,7 +511,7 @@ async function exportVideo() {
     haltPlayback(); // stop playback state synchronously, before awaiting the recorder
     if (recorder.state !== "inactive") recorder.stop();
     await stopped;
-    stream.getTracks().forEach(t => t.stop());
+    mixed.getTracks().forEach(t => t.stop()); // canvas track + audio clones — the destination's own tracks stay live
     recording = false;
     $("#export-overlay").hidden = true;
     if (cancelExport) { chunks.length = 0; return; }
