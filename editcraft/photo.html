@@ -298,7 +298,7 @@ mainCanvas.addEventListener("pointerdown", e => {
   mainCanvas.setPointerCapture(e.pointerId);
   const p = toImageCoords(e);
   if (tool === "brush") {
-    drag = { stroke: { color: "#e5b04a", size: 6, points: [p] } };
+    drag = { pre: snapshot(), stroke: { color: "#e5b04a", size: 6, points: [p] } };
     strokes.push(drag.stroke);
   } else if (tool === "crop") {
     crop = { x: p.x, y: p.y, w: 0, h: 0 };
@@ -314,23 +314,34 @@ mainCanvas.addEventListener("pointerdown", e => {
       const w = ctx.measureText(it.text).width;
       return p.x >= it.x - 8 && p.x <= it.x + w + 8 && p.y >= it.y - it.size * .75 && p.y <= it.y + it.size * .75;
     });
-    if (hit) { selectedId = hit.id; drag = { item: hit, dx: p.x - hit.x, dy: p.y - hit.y }; showTextProps(hit); render(); renderLayers(); }
+    if (hit) { selectedId = hit.id; drag = { pre: snapshot(), item: hit, dx: p.x - hit.x, dy: p.y - hit.y }; showTextProps(hit); render(); renderLayers(); }
     else if (selectedId) { selectedId = null; $("#text-props").hidden = true; render(); renderLayers(); }
   }
 });
 mainCanvas.addEventListener("pointermove", e => {
   if (!drag || !base) return;
   const p = toImageCoords(e);
-  if (drag.stroke) { drag.stroke.points.push(p); render(); }
+  const commitPending = () => {
+    // push the pointerdown snapshot once an actual edit happens
+    if (drag.pre && !drag.pushed) {
+      undoStack.push(drag.pre);
+      if (undoStack.length > 30) undoStack.shift();
+      redoStack.length = 0;
+      drag.pushed = true;
+      updateHistoryButtons();
+    }
+  };
+  if (drag.stroke) { commitPending(); drag.stroke.points.push(p); render(); }
   else if (drag.cropStart) {
     crop = { x: Math.min(p.x, drag.cropStart.x), y: Math.min(p.y, drag.cropStart.y),
              w: Math.abs(p.x - drag.cropStart.x), h: Math.abs(p.y - drag.cropStart.y) };
     render();
-  } else if (drag.item) { drag.item.x = p.x - drag.dx; drag.item.y = p.y - drag.dy; dirty = true; render(); }
+  }
+  else if (drag.item) { commitPending(); drag.item.x = p.x - drag.dx; drag.item.y = p.y - drag.dy; dirty = true; render(); }
 });
 mainCanvas.addEventListener("pointerup", () => {
   if (drag) {
-    if (drag.stroke || drag.item) { pushUndo(); dirty = true; }
+    if (drag.stroke || drag.item) dirty = true; // history was captured on pointerdown, before the mutation
     if (drag.cropStart && crop && (crop.w < 12 || crop.h < 12)) { crop = null; render(); }
     drag = null;
   }
@@ -450,9 +461,15 @@ const bindTextProp = (sel, key, parse) => {
   $(sel).addEventListener("input", e => {
     const it = items.find(i => i.id === selectedId);
     if (!it) return;
+    if (!e.target.dataset.histMarked || e.target.dataset.histItem !== selectedId) {
+      pushUndo(); // snapshot before the first edit of this item
+      e.target.dataset.histMarked = "1";
+      e.target.dataset.histItem = selectedId;
+    }
     it[key] = parse ? parse(e.target.value) : e.target.value;
     dirty = true; render(); renderLayers();
   });
+  $(sel).addEventListener("change", e => { delete e.target.dataset.histMarked; });
 };
 bindTextProp("#txt-content", "text");
 bindTextProp("#txt-size", "size", v => Math.max(8, Math.min(400, +v || 8)));
@@ -548,7 +565,7 @@ window.addEventListener("beforeunload", e => {
 mountAIPanel({
   container: $("#ai-panel"),
   toolLabel: "Photo",
-  systemPrompt: "You are Claude helping inside EditCraft Photo, a browser-based photo editor. Adjustments available: brightness, contrast, saturation, hue (degrees), blur (px), sepia, grayscale (0-100). When the user asks for a look, reply ONLY with a compact JSON object of the parameters to change, e.g. {\"contrast\":120,\"saturation\":80,\"sepia\":15}. Numeric bounds: brightness/contrast/saturation 0-250, hue 0-360, blur 0-12, sepia/grayscale 0-100. Otherwise answer briefly and practically.",
+  systemPrompt: "You are Claude helping inside EditCraft Photo, a browser-based photo editor. You cannot see the user's image — never claim you have looked at it. Adjustments available: brightness, contrast, saturation, hue (degrees), blur (px), sepia, grayscale (0-100). When the user asks for a look, reply ONLY with a compact JSON object of the parameters to change, e.g. {\"contrast\":120,\"saturation\":80,\"sepia\":15}. Numeric bounds: brightness/contrast/saturation 0-250, hue 0-360, blur 0-12, sepia/grayscale 0-100. Otherwise answer briefly and practically.",
   quickActions: [
     { label: "Cinematic", prompt: "Suggest a cinematic color grade as JSON only (contrast up, saturation slightly down, slight sepia)." },
     { label: "B&W", prompt: "Suggest a black-and-white grade as JSON only." },

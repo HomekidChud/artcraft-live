@@ -79,12 +79,16 @@ export function mountAIPanel({ container, toolLabel, systemPrompt, quickActions 
     setStatus("Key cleared.");
   });
 
-  async function askClaude(text, systemOverride) {
+  async function askClaude(extraText, systemOverride) {
     if (!apiKey) throw new Error("Connect a Claude API key first (BYOK — your key, direct to Anthropic).");
+    // chat turns already live in history; quick-action prompts are passed in
+    // explicitly so they are always part of the request
+    const messages = history.slice(-8);
+    if (extraText) messages.push({ role: "user", content: extraText });
     const answer = await callClaude({
       apiKey, model: model.value || CLAUDE_DEFAULT_MODEL,
       system: systemOverride || systemPrompt,
-      messages: history.slice(-8),
+      messages,
       maxTokens: 800
     });
     return answer;
@@ -128,7 +132,7 @@ export function mountAIPanel({ container, toolLabel, systemPrompt, quickActions 
     history.push({ role: "user", content: text });
     setStatus("Thinking…");
     try {
-      const answer = await askClaude(text);
+      const answer = await askClaude(null); // the user's turn is already in history
       history.push({ role: "assistant", content: answer });
       bubble("bot", answer);
     } catch (err) {

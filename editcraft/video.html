@@ -54,6 +54,7 @@
   .caption-row select{background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 6px;font-size:12.5px}
   .add-caption{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
   .add-caption input[type=text]{flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 9px;font-size:13px}
+  .add-caption input[type=number],.add-caption select{background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px;font-size:13px}
   .empty-hint{color:var(--muted);text-align:center;padding:20px;font-size:14px}
   .empty-hint strong{color:var(--text)}
 
@@ -259,8 +260,7 @@ function startPlayback(fromTime) {
   rafId = requestAnimationFrame(tick);
 }
 function stopPlayback() {
-  if (recording) { // pausing during export ends the recording instead
-    cancelExport = false;
+  if (recording) { // pausing during export finalizes the recording instead
     if (window.__finishExport) window.__finishExport();
     return;
   }
@@ -467,6 +467,9 @@ async function exportVideo() {
   const mime = pickMime();
   if (mime === null) { alert("This browser cannot record video (MediaRecorder unavailable)."); return; }
   stopPlayback();
+  // set up the audio graph BEFORE building the recording stream, so a
+  // first-use export (no preview played yet) still captures clip audio
+  initAudio();
   recording = true; cancelExport = false;
   $("#export-overlay").hidden = false;
   const total = totalDuration();
@@ -485,7 +488,10 @@ async function exportVideo() {
     $("#export-progress").style.width = (total ? t / total * 100 : 0) + "%";
     $("#export-status").textContent = "Recording " + fmt(t) + " of " + fmt(total) + " — plays through in real time";
   }, 200);
+  let finishStarted = false;
   const finish = async () => {
+    if (finishStarted) return; // idempotent: natural end, pause and cancel all land here once
+    finishStarted = true;
     clearInterval(progressTimer);
     try { clips.forEach(c => c.el.pause()); } catch (e) {}
     if (recorder.state !== "inactive") recorder.stop();
@@ -494,15 +500,16 @@ async function exportVideo() {
     recording = false;
     $("#export-overlay").hidden = true;
     if (cancelExport) { chunks.length = 0; return; }
-    const blob = new Blob(chunks, { type: "video/webm" });
+    const isMp4 = /mp4/.test(recorder.mimeType || "");
+    const ext = isMp4 ? "mp4" : "webm";
+    const blob = new Blob(chunks, { type: isMp4 ? "video/mp4" : "video/webm" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "editcraft-video.webm";
+    a.download = "editcraft-video." + ext;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 8000);
   };
   window.__finishExport = finish;
-  initAudio();
   startPlayback(0);
   if (!playing) await finish();
 }
@@ -533,12 +540,13 @@ mountAIPanel({
   ],
   onPatch: patch => {
     const map = { grayscale: "grayscale(1)", sepia: "sepia(.7)", vivid: "saturate(1.6) contrast(1.1)", cold: "hue-rotate(180deg) saturate(.8)" };
+    const valid = Object.keys(map).filter(k => patch[k] === true || patch[k] === "true");
+    if (!valid.length) return "no known grade in that suggestion — existing grades left unchanged";
     let applied = [];
     for (const c of clips) {
       c.filter = "none";
-      for (const k of Object.keys(map)) if (patch[k]) { c.filter = map[k]; applied.push(k); break; }
+      for (const k of valid) { c.filter = map[k]; applied.push(k); break; }
     }
-    if (!applied.length) return "no known grade in that suggestion";
     refreshUI(); drawFrame();
     return applied.join(", ") + " applied to all clips";
   },

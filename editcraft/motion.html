@@ -34,6 +34,8 @@
   .stage-wrap{display:grid;place-items:center;background:
     repeating-conic-gradient(#151821 0% 25%, #10131a 0% 50%) 50%/24px 24px;position:relative;min-height:0}
   canvas.scene{max-width:100%;max-height:100%;border-radius:6px;touch-action:none;cursor:default}
+  .empty-hint{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);text-align:center;padding:20px;font-size:14px;pointer-events:none}
+  .empty-hint strong{color:var(--text)}
   .transport{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border-top:1px solid var(--border)}
   .transport .time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);min-width:100px}
   .transport input[type=range]{flex:1;accent-color:var(--accent)}
@@ -115,6 +117,7 @@
   </nav>
   <section class="stage-wrap" id="stage-wrap">
     <canvas class="scene" id="scene" width="1280" height="720" data-testid="motion-canvas"></canvas>
+    <div class="empty-hint" id="empty-hint"><div><strong>Empty scene</strong><br>Add a text, shape or image to start animating.</div></div>
     <div class="export-overlay" id="export-overlay" hidden>
       <div class="export-card">
         <h2>Recording export…</h2>
@@ -224,7 +227,8 @@ function keyframeAt(obj, t, create) {
   if (existing) return existing;
   if (!create) return null;
   const cur = stateAt(obj, t);
-  const kf = { t, ...cur, easing: "ease" };
+  // spread first so the requested time is never overwritten by a returned keyframe's own t
+  const kf = { ...cur, t, easing: "ease" };
   obj.keyframes.push(kf);
   obj.keyframes.sort((p, q) => p.t - q.t);
   return kf;
@@ -354,7 +358,7 @@ canvas.addEventListener("pointermove", e => {
 canvas.addEventListener("pointerup", () => { if (dragObj) { dragObj = null; renderAll(); } });
 
 /* ---------- object list & props ---------- */
-function renderAll() { draw(); renderObjList(); renderProps(); renderKfList(); renderTransport(); }
+function renderAll() { draw(); renderObjList(); renderProps(); renderKfList(); renderTransport(); $("#empty-hint").hidden = objects.length > 0; }
 function renderObjList() {
   const box = $("#obj-list");
   box.innerHTML = "";
@@ -429,7 +433,7 @@ function renderProps() {
   if (kf) {
     addField("Scale", mkText(Math.round(kf.scale * 100), v => { kf.scale = Math.max(.05, Math.min(10, (+v || 100) / 100)); dirty = true; draw(); }, "number"));
     addField("Rotate°", mkText(Math.round(kf.rot), v => { kf.rot = +v || 0; dirty = true; draw(); }, "number"));
-    addField("Opacity", mkText(Math.round(kf.opacity * 100), v => { kf.opacity = Math.max(0, Math.min(1, (+v || 100) / 100)); dirty = true; draw(); }, "number"));
+    addField("Opacity", mkText(Math.round(kf.opacity * 100), v => { kf.opacity = Math.max(0, Math.min(1, (parseFloat(v) || 0) / 100)); dirty = true; draw(); }, "number"));
     addField("Easing", mkSelect(kf.easing, [["ease", "Smooth"], ["linear", "Linear"]], v => { kf.easing = v; dirty = true; draw(); }));
   }
 }
