@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EditCraft Video</title>
+<link rel="icon" href="favicon.svg">
+<style>
+  :root{
+    --bg:#0c0e13;--surface:#13161d;--surface-2:#1a1e27;--surface-3:#222733;--border:#262b37;
+    --text:#e8eaf0;--muted:#9aa3b5;--accent:#e5b04a;--accent-ink:#191307;--danger:#e08080;--ok:#7fc98a;
+    --radius:10px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-text-size-adjust:none;text-size-adjust:none}
+  body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;line-height:1.5;overflow:hidden}
+  button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  [hidden]{display:none!important}
+
+  .topbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;text-decoration:none;color:var(--text)}
+  .brand-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(160deg,#f3c773,#e5b04a 60%,#c9952f);color:var(--accent-ink);font-size:13px;font-weight:800}
+  .tb{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);font-size:13px;font-weight:600;white-space:nowrap}
+  .tb:hover{background:var(--surface-3)}
+  .tb.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+  .tb.danger{color:var(--danger)}
+  .spacer{flex:1}
+
+  .layout{display:grid;grid-template-columns:1fr 340px;height:calc(100dvh - 53px)}
+  .main-col{display:flex;flex-direction:column;min-width:0}
+  .preview-wrap{flex:1;display:grid;place-items:center;background:#07080c;min-height:0;position:relative}
+  canvas.preview{max-width:100%;max-height:100%;background:#000;border-radius:6px}
+  .transport{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border-top:1px solid var(--border)}
+  .transport .time{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);min-width:110px}
+  .transport input[type=range]{flex:1;accent-color:var(--accent)}
+  .timeline{background:var(--surface);border-top:1px solid var(--border);padding:10px 12px;max-height:42vh;overflow-y:auto}
+  .pane-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:8px 0 6px}
+  .clip-row{display:flex;gap:10px;align-items:center;padding:8px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);margin-bottom:8px;flex-wrap:wrap}
+  .clip-thumb{width:74px;height:44px;border-radius:6px;object-fit:cover;background:#000;flex:none}
+  .clip-info{flex:1;min-width:130px}
+  .clip-name{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .clip-meta{font-size:11.5px;color:var(--muted)}
+  .clip-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .clip-controls label{font-size:11.5px;color:var(--muted)}
+  .clip-controls input[type=number]{width:64px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:4px 6px;font-size:12.5px}
+  .clip-controls select{background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:4px 6px;font-size:12.5px}
+  .mini-btn{padding:4px 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface);font-size:12px;font-weight:600}
+  .mini-btn:hover{background:var(--surface-3)}
+  .mini-btn.danger{color:var(--danger)}
+  .caption-row{display:flex;gap:6px;align-items:center;padding:6px 8px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2);margin-bottom:6px;flex-wrap:wrap}
+  .caption-row input[type=text]{flex:1;min-width:120px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 8px;font-size:13px}
+  .caption-row input[type=number]{width:64px;background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 6px;font-size:12.5px}
+  .caption-row select{background:var(--surface);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 6px;font-size:12.5px}
+  .add-caption{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+  .add-caption input[type=text]{flex:1;min-width:120px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 9px;font-size:13px}
+  .empty-hint{color:var(--muted);text-align:center;padding:20px;font-size:14px}
+  .empty-hint strong{color:var(--text)}
+
+  .col-right{border-left:1px solid var(--border);overflow-y:auto;background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:12px}
+  .ai-box{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-2);padding:10px;display:flex;flex-direction:column;gap:8px;max-height:52vh}
+  .ai-head{font-weight:700;font-size:13px}
+  .ai-key{display:flex;flex-direction:column;gap:6px}
+  .ai-key-input,.ai-model{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 9px;font-size:13px;width:100%}
+  .ai-connect,.ai-disconnect{padding:7px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:13px}
+  .ai-disconnect{background:var(--surface-3);color:var(--text)}
+  .ai-note{font-size:11.5px;color:var(--muted)}
+  .ai-note summary{cursor:pointer;font-weight:600}
+  .ai-note p{margin-top:5px}
+  .ai-quick{display:flex;flex-wrap:wrap;gap:6px}
+  .ai-quick button{padding:5px 9px;border-radius:14px;border:1px solid var(--border);background:var(--surface);font-size:12px}
+  .ai-quick button:hover{border-color:var(--accent)}
+  .ai-log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:60px}
+  .ai-msg{font-size:12.5px;padding:7px 9px;border-radius:9px;white-space:pre-wrap;word-break:break-word}
+  .ai-msg.user{background:var(--surface-3);align-self:flex-end;max-width:90%}
+  .ai-msg.bot{background:var(--surface)}
+  .ai-msg.err{background:color-mix(in oklab,var(--danger) 18%,var(--surface));color:var(--danger)}
+  .ai-status{font-size:12px;color:var(--muted);min-height:16px}
+  .ai-compose{display:flex;gap:6px;align-items:flex-end}
+  .ai-input{flex:1;resize:vertical;min-height:38px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 9px;font-size:13px}
+  .ai-send{padding:8px 12px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:13px}
+
+  .export-overlay{position:absolute;inset:0;background:rgba(5,6,9,.82);display:grid;place-items:center;z-index:30}
+  .export-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px 26px;text-align:center;min-width:280px}
+  .export-card h2{font-size:16px;margin-bottom:8px}
+  .export-card p{font-size:12.5px;color:var(--muted);margin-bottom:14px}
+  .export-bar{height:8px;border-radius:4px;background:var(--surface-3);overflow:hidden;margin-bottom:14px}
+  .export-bar div{height:100%;background:var(--accent);width:0%}
+  @media (max-width:900px){
+    body{overflow:auto}
+    .layout{grid-template-columns:1fr;height:auto}
+    .preview-wrap{height:44vh;flex:none}
+    .col-right{border-left:0;border-top:1px solid var(--border)}
+    .ai-box{max-height:none}
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./"><span class="brand-mark">E</span>EditCraft <span style="color:var(--muted);font-weight:600">Video</span></a>
+  <button class="tb" id="btn-import" data-testid="video-import">Import clips</button>
+  <span class="spacer"></span>
+  <button class="tb" id="btn-ai-toggle" aria-expanded="false">Claude ▾</button>
+  <button class="tb primary" id="btn-export" data-testid="video-export" disabled>Export WebM</button>
+</header>
+<main class="layout">
+  <div class="main-col">
+    <div class="preview-wrap" id="preview-wrap">
+      <canvas class="preview" id="preview" width="1280" height="720" data-testid="video-canvas"></canvas>
+      <div class="empty-hint" id="empty-hint" style="position:absolute">
+        <strong>No clips yet</strong><br>Import video files — everything stays on your device.
+      </div>
+      <div class="export-overlay" id="export-overlay" hidden>
+        <div class="export-card">
+          <h2>Recording export…</h2>
+          <p id="export-status">Playing through the sequence in real time</p>
+          <div class="export-bar"><div id="export-progress"></div></div>
+          <button class="tb danger" id="export-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <div class="transport">
+      <button class="tb primary" id="btn-play" data-testid="video-play" disabled>▶ Play</button>
+      <span class="time" id="time-display">0:00 / 0:00</span>
+      <input type="range" id="scrub" min="0" max="1000" value="0" data-testid="video-scrub" aria-label="Scrub timeline" disabled>
+    </div>
+    <div class="timeline">
+      <div class="pane-label">Sequence</div>
+      <div id="clip-list" data-testid="video-clip-list"></div>
+      <div class="pane-label">Captions</div>
+      <div class="add-caption">
+        <input type="text" id="cap-text" placeholder="Caption text" aria-label="Caption text">
+        <input type="number" id="cap-start" placeholder="start s" min="0" step="0.1" value="0" aria-label="Caption start seconds">
+        <input type="number" id="cap-end" placeholder="end s" min="0" step="0.1" value="2" aria-label="Caption end seconds">
+        <select id="cap-pos" aria-label="Caption position">
+          <option value="bottom">Bottom</option><option value="center">Center</option><option value="top">Top</option>
+        </select>
+        <button class="tb" id="cap-add" data-testid="video-caption-add">Add</button>
+      </div>
+      <div id="caption-list" data-testid="video-caption-list"></div>
+    </div>
+  </div>
+  <aside class="col-right">
+    <div id="ai-panel" data-testid="video-ai-panel" hidden></div>
+    <div class="ai-note" id="engine-note">
+      <p><strong>How export works:</strong> the sequence is recorded in real time (a 30-second edit takes ~30 seconds to export) with your clips' audio mixed in. WebM output plays in most modern players. This is a lightweight, private, in-browser editor — not a full NLE: no transitions or multitrack compositing yet.</p>
+    </div>
+  </aside>
+</main>
+<input type="file" id="file-input" accept="video/*" multiple hidden>
+
+<script type="module">
+import { mountAIPanel } from "./aipanel.mjs";
+
+const $ = s => document.querySelector(s);
+const canvas = $("#preview");
+const ctx = canvas.getContext("2d");
+const W = 1280, H = 720;
+
+let clips = [];        // {id,name,url,el,in,out,filter,dur,thumb}
+let captions = [];    // {id,text,start,end,pos}
+let playing = false;
+let rafId = null;
+let activeIdx = -1;
+let audioCtx = null, masterGain = null, recDest = null;
+const audioSources = new Map();
+let recorder = null, recording = false, cancelExport = false;
+
+const totalDuration = () => clips.reduce((sum, c) => sum + (c.out - c.in), 0);
+const fmt = t => Math.floor(t / 60) + ":" + String(Math.floor(t % 60)).padStart(2, "0");
+
+function clipAt(time) {
+  let acc = 0;
+  for (let i = 0; i < clips.length; i++) {
+    const len = clips[i].out - clips[i].in;
+    if (time < acc + len + 1e-4) return { idx: i, local: time - acc };
+    acc += len;
+  }
+  return null;
+}
+const timeOfIdx = i => clips.slice(0, i).reduce((s, c) => s + (c.out - c.in), 0);
+
+function drawFrame() {
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  const clip = clips[activeIdx];
+  if (clip && clip.el.readyState >= 2) {
+    const vw = clip.el.videoWidth || 16, vh = clip.el.videoHeight || 9;
+    const scale = Math.min(W / vw, H / vh);
+    const dw = vw * scale, dh = vh * scale;
+    ctx.filter = clip.filter || "none";
+    ctx.drawImage(clip.el, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    ctx.filter = "none";
+  }
+  // captions
+  const t = currentTime();
+  for (const c of captions) {
+    if (t < c.start || t > c.end) continue;
+    ctx.font = "600 44px Inter, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = "rgba(0,0,0,.55)";
+    const y = c.pos === "top" ? 90 : c.pos === "center" ? H / 2 : H - 80;
+    const tw = ctx.measureText(c.text).width;
+    ctx.fillRect(W / 2 - tw / 2 - 14, y - 32, tw + 28, 56);
+    ctx.fillStyle = "#fff";
+    ctx.fillText(c.text, W / 2, y + 15);
+    ctx.textAlign = "left";
+  }
+}
+
+function currentTime() {
+  if (activeIdx < 0 || !clips[activeIdx]) return 0;
+  const el = clips[activeIdx].el;
+  if (el.paused) return lastScrubTime;
+  return timeOfIdx(activeIdx) + Math.max(0, el.currentTime - clips[activeIdx].in);
+}
+let lastScrubTime = 0;
+
+function tick() {
+  if (!playing) return;
+  const clip = clips[activeIdx];
+  if (clip && clip.el.currentTime >= clip.out - 0.02) {
+    clip.el.pause();
+    if (activeIdx < clips.length - 1) {
+      activeIdx++;
+      const next = clips[activeIdx];
+      next.el.currentTime = next.in;
+      next.el.play().catch(() => {});
+    } else {
+      if (recording) finishExport();
+      stopPlayback();
+      renderTransport();
+      return;
+    }
+  }
+  drawFrame();
+  renderTransport();
+  rafId = requestAnimationFrame(tick);
+}
+
+function renderTransport() {
+  const total = totalDuration();
+  const t = Math.min(currentTime(), total);
+  $("#time-display").textContent = fmt(t) + " / " + fmt(total);
+  if (!scrubbing) $("#scrub").value = total ? Math.round(t / total * 1000) : 0;
+}
+
+function startPlayback(fromTime) {
+  if (!clips.length) return;
+  initAudio();
+  const at = clipAt(fromTime ?? currentTime());
+  if (!at) return;
+  clips.forEach(c => c.el.pause());
+  activeIdx = at.idx;
+  const clip = clips[activeIdx];
+  clip.el.currentTime = clip.in + at.local;
+  clip.el.play().catch(() => {});
+  playing = true;
+  $("#btn-play").textContent = "⏸ Pause";
+  rafId = requestAnimationFrame(tick);
+}
+function stopPlayback() {
+  if (recording) { // pausing during export ends the recording instead
+    cancelExport = false;
+    if (window.__finishExport) window.__finishExport();
+    return;
+  }
+  playing = false;
+  cancelAnimationFrame(rafId);
+  clips.forEach(c => c.el.pause());
+  $("#btn-play").textContent = "▶ Play";
+}
+
+let scrubbing = false;
+$("#scrub").addEventListener("pointerdown", () => { scrubbing = true; if (playing) stopPlayback(); });
+$("#scrub").addEventListener("input", e => {
+  const total = totalDuration();
+  const t = (+e.target.value / 1000) * total;
+  lastScrubTime = t;
+  const at = clipAt(t);
+  if (at) {
+    clips.forEach(c => c.el.pause());
+    activeIdx = at.idx;
+    clips[activeIdx].el.currentTime = clips[activeIdx].in + at.local;
+  }
+  drawFrame();
+  renderTransport();
+});
+$("#scrub").addEventListener("pointerup", () => { scrubbing = false; });
+
+$("#btn-play").addEventListener("click", () => {
+  if (playing) { stopPlayback(); renderTransport(); }
+  else { initAudio(); startPlayback(); }
+});
+
+/* ---------- import ---------- */
+$("#btn-import").addEventListener("click", () => $("#file-input").click());
+$("#file-input").addEventListener("change", async e => {
+  const files = [...e.target.files];
+  e.target.value = "";
+  for (const f of files) await addClip(f);
+  refreshUI();
+});
+async function addClip(file) {
+  const url = URL.createObjectURL(file);
+  const el = document.createElement("video");
+  el.src = url; el.preload = "auto"; el.muted = false; el.playsInline = true;
+  await new Promise((res, rej) => {
+    el.onloadedmetadata = res;
+    el.onerror = () => rej(new Error("could not read " + file.name));
+  });
+  // MediaRecorder blobs report Infinity duration until seeked to the end
+  if (!isFinite(el.duration)) {
+    await new Promise(res => { el.currentTime = 1e9; el.onseeked = res; });
+    el.currentTime = 0;
+  }
+  const dur = isFinite(el.duration) ? el.duration : 10;
+  const clip = {
+    id: "c" + Date.now() + Math.random().toString(36).slice(2, 6),
+    name: file.name, url, el, dur,
+    in: 0, out: Math.min(dur, 3600), filter: "none",
+  };
+  clips.push(clip);
+  // thumbnail
+  el.onseeked = null;
+  await new Promise(res => { el.currentTime = Math.min(0.1, dur / 2); el.onseeked = res; });
+  const tc = document.createElement("canvas");
+  tc.width = 148; tc.height = 88;
+  tc.getContext("2d").drawImage(el, 0, 0, 148, 88);
+  clip.thumb = tc.toDataURL("image/jpeg", .6);
+  el.currentTime = 0;
+  el.onseeked = null;
+}
+
+/* ---------- timeline UI ---------- */
+const FILTERS = { none: "None", "grayscale(1)": "B&W", "sepia(.7)": "Sepia", "saturate(1.6) contrast(1.1)": "Vivid", "hue-rotate(180deg) saturate(.8)": "Cold" };
+function refreshUI() {
+  renderClipList(); renderCaptionList(); renderTransport();
+  $("#empty-hint").hidden = clips.length > 0;
+  $("#btn-play").disabled = $("#scrub").disabled = !clips.length;
+  $("#btn-export").disabled = !clips.length;
+}
+function renderClipList() {
+  const box = $("#clip-list");
+  box.innerHTML = "";
+  clips.forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "clip-row";
+    row.dataset.testid = "video-clip-row";
+    const thumb = document.createElement("img");
+    thumb.className = "clip-thumb"; thumb.src = c.thumb || ""; thumb.alt = "";
+    const info = document.createElement("div");
+    info.className = "clip-info";
+    const nm = document.createElement("div");
+    nm.className = "clip-name"; nm.textContent = (i + 1) + ". " + c.name; nm.title = c.name;
+    const meta = document.createElement("div");
+    meta.className = "clip-meta";
+    meta.textContent = (c.out - c.in).toFixed(1) + "s used · " + c.dur.toFixed(1) + "s source";
+    info.append(nm, meta);
+    const controls = document.createElement("div");
+    controls.className = "clip-controls";
+    const mkLabel = t => { const l = document.createElement("label"); l.textContent = t; return l; };
+    controls.append(mkLabel("in"));
+    const inF = document.createElement("input");
+    inF.type = "number"; inF.min = 0; inF.max = c.dur; inF.step = 0.1; inF.value = c.in;
+    inF.dataset.testid = "video-trim-in";
+    inF.addEventListener("change", () => { c.in = Math.max(0, Math.min(c.out - 0.2, +inF.value || 0)); refreshUI(); });
+    controls.append(inF, mkLabel("out"));
+    const outF = document.createElement("input");
+    outF.type = "number"; outF.min = 0; outF.max = c.dur; outF.step = 0.1; outF.value = c.out;
+    outF.dataset.testid = "video-trim-out";
+    outF.addEventListener("change", () => { c.out = Math.min(c.dur, Math.max(c.in + 0.2, +outF.value || c.dur)); refreshUI(); });
+    controls.append(outF);
+    const sel = document.createElement("select");
+    sel.dataset.testid = "video-filter";
+    for (const [v, l] of Object.entries(FILTERS)) {
+      const o = document.createElement("option"); o.value = v; o.textContent = l;
+      if (v === c.filter) o.selected = true;
+      sel.appendChild(o);
+    }
+    sel.addEventListener("change", () => { c.filter = sel.value; drawFrame(); });
+    controls.append(sel);
+    const left = document.createElement("button");
+    left.className = "mini-btn"; left.textContent = "←"; left.title = "Move earlier";
+    left.addEventListener("click", () => { if (i > 0) { [clips[i - 1], clips[i]] = [clips[i], clips[i - 1]]; refreshUI(); } });
+    const right = document.createElement("button");
+    right.className = "mini-btn"; right.textContent = "→"; right.title = "Move later";
+    right.addEventListener("click", () => { if (i < clips.length - 1) { [clips[i + 1], clips[i]] = [clips[i], clips[i + 1]]; refreshUI(); } });
+    const del = document.createElement("button");
+    del.className = "mini-btn danger"; del.textContent = "✕"; del.title = "Remove clip";
+    del.addEventListener("click", () => {
+      stopPlayback();
+      clips = clips.filter(x => x !== c);
+      c.el.src = ""; URL.revokeObjectURL(c.url);
+      activeIdx = -1; refreshUI(); drawFrame();
+    });
+    controls.append(left, right, del);
+    row.append(thumb, info, controls);
+    box.appendChild(row);
+  });
+}
+$("#cap-add").addEventListener("click", () => {
+  const text = $("#cap-text").value.trim();
+  if (!text) return;
+  const start = Math.max(0, +$("#cap-start").value || 0);
+  const end = Math.max(start + 0.2, +$("#cap-end").value || 2);
+  captions.push({ id: "k" + Date.now(), text, start, end, pos: $("#cap-pos").value });
+  $("#cap-text").value = "";
+  renderCaptionList(); drawFrame();
+});
+function renderCaptionList() {
+  const box = $("#caption-list");
+  box.innerHTML = "";
+  captions.forEach((c, i) => {
+    const row = document.createElement("div");
+    row.className = "caption-row";
+    row.dataset.testid = "video-caption-row";
+    const t = document.createElement("input");
+    t.type = "text"; t.value = c.text; t.setAttribute("aria-label", "Caption text");
+    t.addEventListener("change", () => { c.text = t.value; drawFrame(); });
+    const st = document.createElement("input");
+    st.type = "number"; st.value = c.start; st.min = 0; st.step = 0.1; st.setAttribute("aria-label", "Start seconds");
+    st.addEventListener("change", () => { c.start = Math.max(0, +st.value || 0); drawFrame(); });
+    const en = document.createElement("input");
+    en.type = "number"; en.value = c.end; en.min = 0; en.step = 0.1; en.setAttribute("aria-label", "End seconds");
+    en.addEventListener("change", () => { c.end = Math.max(c.start + 0.2, +en.value || 1); drawFrame(); });
+    const del = document.createElement("button");
+    del.className = "mini-btn danger"; del.textContent = "✕";
+    del.addEventListener("click", () => { captions.splice(i, 1); renderCaptionList(); drawFrame(); });
+    row.append(t, st, en, del);
+    box.appendChild(row);
+  });
+}
+
+/* ---------- audio ---------- */
+function initAudio() {
+  if (audioCtx) { audioCtx.resume().catch(() => {}); return; }
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 1;
+    recDest = audioCtx.createMediaStreamDestination();
+    masterGain.connect(audioCtx.destination);  // monitoring
+    masterGain.connect(recDest);               // recording path
+    for (const c of clips) hookClipAudio(c);
+  } catch (e) { /* audio optional: silent export */ }
+}
+function hookClipAudio(clip) {
+  if (audioSources.has(clip.id) || !audioCtx) return;
+  try {
+    const src = audioCtx.createMediaElementSource(clip.el);
+    src.connect(masterGain);
+    audioSources.set(clip.id, src);
+  } catch (e) {}
+}
+const origAddClip = addClip;
+addClip = async function (file) { await origAddClip(file); if (audioCtx) hookClipAudio(clips[clips.length - 1]); };
+
+/* ---------- export ---------- */
+const MIME_CANDIDATES = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", ""];
+function pickMime() {
+  if (typeof MediaRecorder === "undefined") return null;
+  for (const m of MIME_CANDIDATES) if (!m || MediaRecorder.isTypeSupported(m)) return m;
+  return null;
+}
+async function exportVideo() {
+  if (!clips.length || recording) return;
+  const mime = pickMime();
+  if (mime === null) { alert("This browser cannot record video (MediaRecorder unavailable)."); return; }
+  stopPlayback();
+  recording = true; cancelExport = false;
+  $("#export-overlay").hidden = false;
+  const total = totalDuration();
+  const startedAt = performance.now();
+  const stream = canvas.captureStream(30);
+  const tracks = [...stream.getVideoTracks()];
+  if (recDest) tracks.push(...recDest.stream.getAudioTracks());
+  const mixed = new MediaStream(tracks);
+  recorder = new MediaRecorder(mixed, mime ? { mimeType: mime } : undefined);
+  const chunks = [];
+  recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  const stopped = new Promise(res => { recorder.onstop = res; });
+  recorder.start(200);
+  const progressTimer = setInterval(() => {
+    const t = Math.min((performance.now() - startedAt) / 1000, total);
+    $("#export-progress").style.width = (total ? t / total * 100 : 0) + "%";
+    $("#export-status").textContent = "Recording " + fmt(t) + " of " + fmt(total) + " — plays through in real time";
+  }, 200);
+  const finish = async () => {
+    clearInterval(progressTimer);
+    try { clips.forEach(c => c.el.pause()); } catch (e) {}
+    if (recorder.state !== "inactive") recorder.stop();
+    await stopped;
+    stream.getTracks().forEach(t => t.stop());
+    recording = false;
+    $("#export-overlay").hidden = true;
+    if (cancelExport) { chunks.length = 0; return; }
+    const blob = new Blob(chunks, { type: "video/webm" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "editcraft-video.webm";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+  };
+  window.__finishExport = finish;
+  initAudio();
+  startPlayback(0);
+  if (!playing) await finish();
+}
+function finishExport() {
+  if (window.__finishExport) window.__finishExport();
+}
+$("#btn-export").addEventListener("click", exportVideo);
+$("#export-cancel").addEventListener("click", () => {
+  cancelExport = true;
+  stopPlayback();
+  if (window.__finishExport) window.__finishExport();
+});
+
+window.addEventListener("beforeunload", e => {
+  if (clips.length) { e.preventDefault(); e.returnValue = ""; }
+});
+
+/* ---------- AI panel ---------- */
+mountAIPanel({
+  container: $("#ai-panel"),
+  toolLabel: "Video",
+  systemPrompt: "You are Claude helping inside EditCraft Video, a browser-based video editor. You can suggest caption text, color grades (JSON with keys from: grayscale, sepia, vivid, cold — values true/false), and trim ideas. When asked for a grade, reply ONLY with JSON like {\"vivid\":true}. Keep answers short and practical. You cannot see the video — never claim you have watched it.",
+  quickActions: [
+    { label: "Vivid grade", prompt: "Reply with JSON {\"vivid\":true} only." },
+    { label: "B&W grade", prompt: "Reply with JSON {\"grayscale\":true} only." },
+    { label: "Cold grade", prompt: "Reply with JSON {\"cold\":true} only." },
+    { label: "Caption ideas", prompt: "Suggest 3 short caption texts for a video titled by the user's clips. Plain text, one per line, max 6 words each." },
+  ],
+  onPatch: patch => {
+    const map = { grayscale: "grayscale(1)", sepia: "sepia(.7)", vivid: "saturate(1.6) contrast(1.1)", cold: "hue-rotate(180deg) saturate(.8)" };
+    let applied = [];
+    for (const c of clips) {
+      c.filter = "none";
+      for (const k of Object.keys(map)) if (patch[k]) { c.filter = map[k]; applied.push(k); break; }
+    }
+    if (!applied.length) return "no known grade in that suggestion";
+    refreshUI(); drawFrame();
+    return applied.join(", ") + " applied to all clips";
+  },
+});
+$("#btn-ai-toggle").addEventListener("click", () => {
+  const panel = $("#ai-panel");
+  panel.hidden = !panel.hidden;
+  $("#btn-ai-toggle").setAttribute("aria-expanded", String(!panel.hidden));
+});
+
+/* boot */
+drawFrame();
+refreshUI();
+</script>
+</body>
+</html>

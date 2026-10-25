@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EditCraft Photo</title>
+<link rel="icon" href="favicon.svg">
+<style>
+  :root{
+    --bg:#0c0e13;--surface:#13161d;--surface-2:#1a1e27;--surface-3:#222733;--border:#262b37;
+    --text:#e8eaf0;--muted:#9aa3b5;--accent:#e5b04a;--accent-ink:#191307;--danger:#e08080;--ok:#7fc98a;
+    --radius:10px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-text-size-adjust:none;text-size-adjust:none}
+  body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;line-height:1.5;overflow:hidden}
+  button{font:inherit;color:inherit;cursor:pointer;background:none;border:0}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  [hidden]{display:none!important}
+
+  .topbar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;text-decoration:none;color:var(--text)}
+  .brand-mark{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:linear-gradient(160deg,#f3c773,#e5b04a 60%,#c9952f);color:var(--accent-ink);font-size:13px;font-weight:800}
+  .tb{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);font-size:13px;font-weight:600;white-space:nowrap}
+  .tb:hover{background:var(--surface-3)}
+  .tb.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+  .tb.danger{color:var(--danger)}
+  .spacer{flex:1}
+
+  .layout{display:grid;grid-template-columns:132px 1fr 340px;height:calc(100dvh - 53px)}
+  .col{overflow-y:auto;background:var(--surface)}
+  .col-left{border-right:1px solid var(--border);padding:10px;display:flex;flex-direction:column;gap:6px}
+  .col-right{border-left:1px solid var(--border);padding:12px;display:flex;flex-direction:column;gap:12px}
+  .pane-label{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+  .tool-btn{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:8px;border:1px solid transparent;font-size:13px;font-weight:600;text-align:left}
+  .tool-btn:hover{background:var(--surface-3)}
+  .tool-btn.active{background:var(--surface-3);border-color:var(--accent)}
+  .stage{position:relative;display:grid;place-items:center;overflow:auto;background:
+    repeating-conic-gradient(#151821 0% 25%, #10131a 0% 50%) 50%/24px 24px}
+  canvas.main{max-width:100%;max-height:100%;box-shadow:0 10px 40px rgba(0,0,0,.5);border-radius:4px;touch-action:none;cursor:crosshair}
+  .empty-hint{color:var(--muted);text-align:center;padding:30px}
+  .empty-hint strong{color:var(--text)}
+
+  .slider-row{display:grid;grid-template-columns:88px 1fr 42px;align-items:center;gap:8px;font-size:12.5px;margin-bottom:7px}
+  .slider-row input[type=range]{width:100%;accent-color:var(--accent)}
+  .slider-row .val{text-align:right;color:var(--muted);font-variant-numeric:tabular-nums}
+  .adj-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .adj-grid .tb{justify-content:center}
+  .ai-box{border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-2);padding:10px;display:flex;flex-direction:column;gap:8px;max-height:46vh}
+  .ai-head{font-weight:700;font-size:13px}
+  .ai-key{display:flex;flex-direction:column;gap:6px}
+  .ai-key-input,.ai-model{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 9px;font-size:13px;width:100%}
+  .ai-connect,.ai-disconnect{padding:7px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:13px}
+  .ai-disconnect{background:var(--surface-3);color:var(--text)}
+  .ai-note{font-size:11.5px;color:var(--muted)}
+  .ai-note summary{cursor:pointer;font-weight:600}
+  .ai-note p{margin-top:5px}
+  .ai-quick{display:flex;flex-wrap:wrap;gap:6px}
+  .ai-quick button{padding:5px 9px;border-radius:14px;border:1px solid var(--border);background:var(--surface);font-size:12px}
+  .ai-quick button:hover{border-color:var(--accent)}
+  .ai-log{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:60px}
+  .ai-msg{font-size:12.5px;padding:7px 9px;border-radius:9px;max-width:100%;white-space:pre-wrap;word-break:break-word}
+  .ai-msg.user{background:var(--surface-3);align-self:flex-end;max-width:90%}
+  .ai-msg.bot{background:var(--surface)}
+  .ai-msg.err{background:color-mix(in oklab,var(--danger) 18%,var(--surface));color:var(--danger)}
+  .ai-status{font-size:12px;color:var(--muted);min-height:16px}
+  .ai-compose{display:flex;gap:6px;align-items:flex-end}
+  .ai-input{flex:1;resize:vertical;min-height:38px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 9px;font-size:13px}
+  .ai-send{padding:8px 12px;border-radius:8px;background:var(--accent);color:var(--accent-ink);font-weight:700;font-size:13px}
+
+  .layers{display:flex;flex-direction:column;gap:4px}
+  .layer-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:7px;background:var(--surface-2);font-size:12.5px;border:1px solid transparent}
+  .layer-item.selected{border-color:var(--accent)}
+  .layer-item .del{margin-left:auto;color:var(--danger);font-size:12px}
+  .prop-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:12.5px}
+  .prop-row input[type=text],.prop-row input[type=number],.prop-row select{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:5px 8px;font-size:13px}
+  .prop-row input[type=color]{width:36px;height:28px;border:1px solid var(--border);border-radius:6px;background:none}
+  .crop-actions{display:flex;gap:6px}
+  .crop-actions .tb{flex:1;justify-content:center}
+  .ai-toggle-wrap{display:flex;justify-content:flex-end}
+  @media (max-width:900px){
+    body{overflow:auto}
+    .layout{grid-template-columns:1fr;height:auto}
+    .col-left{flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--border)}
+    .tool-btn{width:auto}
+    .stage{height:52vh;order:-1}
+    .col-right{border-left:0}
+    .ai-box{max-height:none}
+  }
+</style>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="./"><span class="brand-mark">E</span>EditCraft <span style="color:var(--muted);font-weight:600">Photo</span></a>
+  <button class="tb" id="btn-open" data-testid="photo-open">Open image</button>
+  <button class="tb" id="btn-undo" data-testid="photo-undo" disabled>↶ Undo</button>
+  <button class="tb" id="btn-redo" data-testid="photo-redo" disabled>↷ Redo</button>
+  <span class="spacer"></span>
+  <button class="tb primary" id="btn-export-png" data-testid="photo-export-png" disabled>Export PNG</button>
+  <button class="tb" id="btn-export-jpg" data-testid="photo-export-jpg" disabled>Export JPEG</button>
+</header>
+<main class="layout">
+  <nav class="col col-left" aria-label="Tools">
+    <div class="pane-label">Tools</div>
+    <button class="tool-btn active" data-tool="move" data-testid="tool-move">✥ Move</button>
+    <button class="tool-btn" data-tool="crop" data-testid="tool-crop">⌖ Crop</button>
+    <button class="tool-btn" data-tool="brush" data-testid="tool-brush">✎ Brush</button>
+    <button class="tool-btn" data-tool="text" data-testid="tool-text">T Text</button>
+    <div class="pane-label" style="margin-top:10px">Layers</div>
+    <div class="layers" id="layers" data-testid="photo-layers"></div>
+  </nav>
+  <section class="stage" id="stage" data-testid="photo-stage">
+    <div class="empty-hint" id="empty-hint">
+      <strong>No image yet</strong><br>
+      Open a file, drag & drop one here, or paste from the clipboard.<br><br>
+      Everything runs locally in your browser — nothing is uploaded.
+    </div>
+    <canvas class="main" id="main" data-testid="photo-canvas" hidden></canvas>
+  </section>
+  <aside class="col col-right">
+    <section>
+      <div class="pane-label">Adjustments</div>
+      <div id="adjustments">
+        <div class="slider-row"><label for="adj-brightness">Brightness</label><input type="range" id="adj-brightness" min="0" max="200" value="100"><span class="val" id="v-brightness">100</span></div>
+        <div class="slider-row"><label for="adj-contrast">Contrast</label><input type="range" id="adj-contrast" min="0" max="200" value="100"><span class="val" id="v-contrast">100</span></div>
+        <div class="slider-row"><label for="adj-saturation">Saturation</label><input type="range" id="adj-saturation" min="0" max="250" value="100"><span class="val" id="v-saturation">100</span></div>
+        <div class="slider-row"><label for="adj-hue">Hue</label><input type="range" id="adj-hue" min="0" max="360" value="0"><span class="val" id="v-hue">0</span></div>
+        <div class="slider-row"><label for="adj-blur">Blur</label><input type="range" id="adj-blur" min="0" max="12" value="0"><span class="val" id="v-blur">0</span></div>
+        <div class="slider-row"><label for="adj-sepia">Sepia</label><input type="range" id="adj-sepia" min="0" max="100" value="0"><span class="val" id="v-sepia">0</span></div>
+        <div class="slider-row"><label for="adj-grayscale">Grayscale</label><input type="range" id="adj-grayscale" min="0" max="100" value="0"><span class="val" id="v-grayscale">0</span></div>
+      </div>
+    </section>
+    <section>
+      <div class="pane-label">Transform</div>
+      <div class="adj-grid">
+        <button class="tb" id="btn-rot-cw" data-testid="photo-rot-cw">⟳ Rotate</button>
+        <button class="tb" id="btn-rot-ccw" data-testid="photo-rot-ccw">⟲ Rotate</button>
+        <button class="tb" id="btn-flip-h" data-testid="photo-flip-h">⇄ Flip</button>
+        <button class="tb" id="btn-flip-v" data-testid="photo-flip-v">⇅ Flip</button>
+      </div>
+    </section>
+    <section id="crop-section" hidden>
+      <div class="pane-label">Crop</div>
+      <div class="crop-actions">
+        <button class="tb primary" id="btn-crop-apply" data-testid="photo-crop-apply">Apply crop</button>
+        <button class="tb" id="btn-crop-cancel">Cancel</button>
+      </div>
+    </section>
+    <section id="text-props" hidden>
+      <div class="pane-label">Selected text</div>
+      <div class="prop-row"><input type="text" id="txt-content" placeholder="Text" aria-label="Text content"></div>
+      <div class="prop-row">
+        <input type="number" id="txt-size" min="8" max="400" value="48" aria-label="Font size">
+        <input type="color" id="txt-color" value="#ffffff" aria-label="Text color">
+        <select id="txt-font" aria-label="Font">
+          <option value="sans-serif">Sans</option>
+          <option value="serif">Serif</option>
+          <option value="monospace">Mono</option>
+        </select>
+      </div>
+      <div class="prop-row">
+        <button class="tb danger" id="txt-delete" data-testid="photo-text-delete">Delete text</button>
+      </div>
+    </section>
+    <section class="ai-toggle-wrap">
+      <button class="tb" id="btn-ai-toggle" data-testid="photo-ai-toggle" aria-expanded="false">Claude ▾</button>
+    </section>
+    <div id="ai-panel" data-testid="photo-ai-panel" hidden></div>
+  </aside>
+</main>
+<input type="file" id="file-input" accept="image/*" hidden>
+
+<script type="module">
+import { mountAIPanel } from "./aipanel.mjs";
+
+const $ = s => document.querySelector(s);
+const stage = $("#stage"), mainCanvas = $("#main"), emptyHint = $("#empty-hint");
+const ctx = mainCanvas.getContext("2d");
+
+let base = null;          // {canvas, width, height} — the (possibly cropped/rotated) source image
+let adj = { brightness:100, contrast:100, saturation:100, hue:0, blur:0, sepia:0, grayscale:0 };
+let strokes = [];         // [{color,size,points:[{x,y}]}]
+let items = [];           // text items {id,text,x,y,size,color,font}
+let selectedId = null;
+let tool = "move";
+let crop = null;          // {x,y,w,h} in image coords while cropping
+let dirty = false;
+let undoStack = [], redoStack = [];
+
+const filterString = () => {
+  const p = [];
+  if (adj.brightness !== 100) p.push(`brightness(${adj.brightness}%)`);
+  if (adj.contrast !== 100) p.push(`contrast(${adj.contrast}%)`);
+  if (adj.saturation !== 100) p.push(`saturate(${adj.saturation}%)`);
+  if (adj.hue) p.push(`hue-rotate(${adj.hue}deg)`);
+  if (adj.blur) p.push(`blur(${adj.blur}px)`);
+  if (adj.sepia) p.push(`sepia(${adj.sepia}%)`);
+  if (adj.grayscale) p.push(`grayscale(${adj.grayscale}%)`);
+  return p.length ? p.join(" ") : "none";
+};
+
+function render() {
+  if (!base) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.filter = filterString();
+  ctx.drawImage(base.canvas, 0, 0);
+  ctx.filter = "none";
+  // brush strokes
+  for (const s of strokes) {
+    ctx.strokeStyle = s.color; ctx.lineWidth = s.size;
+    ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath();
+    s.points.forEach((pt, i) => i ? ctx.lineTo(pt.x, pt.y) : ctx.moveTo(pt.x, pt.y));
+    if (s.points.length === 1) { ctx.lineTo(s.points[0].x + .01, s.points[0].y); }
+    ctx.stroke();
+  }
+  // text items
+  for (const it of items) {
+    ctx.font = `600 ${it.size}px ${it.font}`;
+    ctx.fillStyle = it.color;
+    ctx.textBaseline = "middle";
+    ctx.fillText(it.text, it.x, it.y);
+    if (it.id === selectedId) {
+      const w = ctx.measureText(it.text).width;
+      ctx.strokeStyle = "var(--accent)"; ctx.strokeStyle = "#e5b04a"; ctx.lineWidth = 1.5;
+      ctx.strokeRect(it.x - 4, it.y - it.size * .7, w + 8, it.size * 1.4);
+    }
+  }
+  if (crop && tool === "crop") {
+    ctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.fillRect(0, 0, base.width, base.height);
+    ctx.clearRect(crop.x, crop.y, crop.w, crop.h);
+    ctx.filter = filterString();
+    ctx.drawImage(base.canvas, 0, 0);
+    ctx.filter = "none";
+    ctx.strokeStyle = "#e5b04a"; ctx.lineWidth = 2;
+    ctx.strokeRect(crop.x, crop.y, crop.w, crop.h);
+  }
+}
+
+function loadImage(source) {
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement("canvas");
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext("2d").drawImage(img, 0, 0);
+    base = { canvas: c, width: c.width, height: c.height };
+    mainCanvas.width = c.width; mainCanvas.height = c.height;
+    mainCanvas.hidden = false; emptyHint.hidden = true;
+    strokes = []; items = []; selectedId = null;
+    undoStack = []; redoStack = []; updateHistoryButtons();
+    dirty = false;
+    render(); renderLayers();
+    $("#btn-export-png").disabled = $("#btn-export-jpg").disabled = false;
+  };
+  img.src = source;
+}
+
+$("#btn-open").addEventListener("click", () => $("#file-input").click());
+$("#file-input").addEventListener("change", e => {
+  const f = e.target.files[0];
+  if (f) loadImage(URL.createObjectURL(f));
+  e.target.value = "";
+});
+stage.addEventListener("dragover", e => e.preventDefault());
+stage.addEventListener("drop", e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith("image/")) loadImage(URL.createObjectURL(f));
+});
+window.addEventListener("paste", e => {
+  for (const item of e.clipboardData?.items || []) {
+    if (item.type.startsWith("image/")) { loadImage(URL.createObjectURL(item.getAsFile())); break; }
+  }
+});
+
+/* ---------- tools ---------- */
+document.querySelectorAll(".tool-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tool-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    tool = btn.dataset.tool;
+    crop = null;
+    $("#crop-section").hidden = tool !== "crop";
+    if (tool !== "text" && tool !== "move") selectedId = selectedId; // keep selection in move
+    render();
+  });
+});
+
+const toImageCoords = e => {
+  const r = mainCanvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * (mainCanvas.width / r.width), y: (e.clientY - r.top) * (mainCanvas.height / r.height) };
+};
+
+let drag = null;
+mainCanvas.addEventListener("pointerdown", e => {
+  if (!base) return;
+  mainCanvas.setPointerCapture(e.pointerId);
+  const p = toImageCoords(e);
+  if (tool === "brush") {
+    drag = { stroke: { color: "#e5b04a", size: 6, points: [p] } };
+    strokes.push(drag.stroke);
+  } else if (tool === "crop") {
+    crop = { x: p.x, y: p.y, w: 0, h: 0 };
+    drag = { cropStart: p };
+  } else if (tool === "text") {
+    pushUndo();
+    const it = { id: "t" + Date.now(), text: "Your text", x: p.x, y: p.y, size: Math.max(24, Math.round(base.height / 12)), color: "#ffffff", font: "sans-serif" };
+    items.push(it); selectedId = it.id; dirty = true;
+    showTextProps(it); render(); renderLayers();
+  } else { // move — hit-test text items
+    const hit = [...items].reverse().find(it => {
+      ctx.font = `600 ${it.size}px ${it.font}`;
+      const w = ctx.measureText(it.text).width;
+      return p.x >= it.x - 8 && p.x <= it.x + w + 8 && p.y >= it.y - it.size * .75 && p.y <= it.y + it.size * .75;
+    });
+    if (hit) { selectedId = hit.id; drag = { item: hit, dx: p.x - hit.x, dy: p.y - hit.y }; showTextProps(hit); render(); renderLayers(); }
+    else if (selectedId) { selectedId = null; $("#text-props").hidden = true; render(); renderLayers(); }
+  }
+});
+mainCanvas.addEventListener("pointermove", e => {
+  if (!drag || !base) return;
+  const p = toImageCoords(e);
+  if (drag.stroke) { drag.stroke.points.push(p); render(); }
+  else if (drag.cropStart) {
+    crop = { x: Math.min(p.x, drag.cropStart.x), y: Math.min(p.y, drag.cropStart.y),
+             w: Math.abs(p.x - drag.cropStart.x), h: Math.abs(p.y - drag.cropStart.y) };
+    render();
+  } else if (drag.item) { drag.item.x = p.x - drag.dx; drag.item.y = p.y - drag.dy; dirty = true; render(); }
+});
+mainCanvas.addEventListener("pointerup", () => {
+  if (drag) {
+    if (drag.stroke || drag.item) { pushUndo(); dirty = true; }
+    if (drag.cropStart && crop && (crop.w < 12 || crop.h < 12)) { crop = null; render(); }
+    drag = null;
+  }
+});
+
+$("#btn-crop-apply").addEventListener("click", () => {
+  if (!crop || !base || crop.w < 8 || crop.h < 8) return;
+  pushUndo();
+  const c = document.createElement("canvas");
+  c.width = Math.round(crop.w); c.height = Math.round(crop.h);
+  c.getContext("2d").drawImage(base.canvas, crop.x, crop.y, crop.w, crop.h, 0, 0, c.width, c.height);
+  base = { canvas: c, width: c.width, height: c.height };
+  mainCanvas.width = c.width; mainCanvas.height = c.height;
+  for (const s of strokes) s.points.forEach(pt => { pt.x -= crop.x; pt.y -= crop.y; });
+  for (const it of items) { it.x -= crop.x; it.y -= crop.y; }
+  crop = null; dirty = true;
+  render();
+});
+$("#btn-crop-cancel").addEventListener("click", () => { crop = null; render(); });
+
+/* ---------- transform ---------- */
+function rotate(dir) {
+  if (!base) return;
+  pushUndo();
+  const src = base.canvas;
+  const c = document.createElement("canvas");
+  c.width = src.height; c.height = src.width;
+  const cx = c.getContext("2d");
+  if (dir === "cw") { cx.translate(c.width, 0); cx.rotate(Math.PI / 2); }
+  else { cx.translate(0, c.height); cx.rotate(-Math.PI / 2); }
+  cx.drawImage(src, 0, 0);
+  base = { canvas: c, width: c.width, height: c.height };
+  mainCanvas.width = c.width; mainCanvas.height = c.height;
+  const ow = src.width, oh = src.height;
+  const map = dir === "cw" ? (x, y) => ({ x: oh - y, y: x }) : (x, y) => ({ x: y, y: ow - x });
+  for (const s of strokes) s.points = s.points.map(p => map(p.x, p.y));
+  for (const it of items) { const m = map(it.x, it.y); it.x = m.x; it.y = m.y; }
+  dirty = true; render();
+}
+function flip(horizontal) {
+  if (!base) return;
+  pushUndo();
+  const src = base.canvas;
+  const c = document.createElement("canvas");
+  c.width = src.width; c.height = src.height;
+  const cx = c.getContext("2d");
+  if (horizontal) { cx.translate(c.width, 0); cx.scale(-1, 1); }
+  else { cx.translate(0, c.height); cx.scale(1, -1); }
+  cx.drawImage(src, 0, 0);
+  base = { canvas: c, width: c.width, height: c.height };
+  const map = horizontal ? (x, y) => ({ x: c.width - x, y }) : (x, y) => ({ x, y: c.height - y });
+  for (const s of strokes) s.points = s.points.map(p => map(p.x, p.y));
+  for (const it of items) { const m = map(it.x, it.y); it.x = m.x; it.y = m.y; }
+  dirty = true; render();
+}
+$("#btn-rot-cw").addEventListener("click", () => rotate("cw"));
+$("#btn-rot-ccw").addEventListener("click", () => rotate("ccw"));
+$("#btn-flip-h").addEventListener("click", () => flip(true));
+$("#btn-flip-v").addEventListener("click", () => flip(false));
+
+/* ---------- adjustments ---------- */
+const adjKeys = ["brightness", "contrast", "saturation", "hue", "blur", "sepia", "grayscale"];
+let adjDirty = false;
+for (const key of adjKeys) {
+  $("#adj-" + key).addEventListener("input", e => {
+    if (!adjDirty) { pushUndo(); adjDirty = true; } // one history entry per drag, captured before the change
+    adj[key] = +e.target.value;
+    $("#v-" + key).textContent = e.target.value;
+    dirty = true;
+    render();
+  });
+  $("#adj-" + key).addEventListener("change", () => { adjDirty = false; });
+}
+function setAdjustments(next) {
+  adj = { ...adj, ...next };
+  for (const key of adjKeys) {
+    $("#adj-" + key).value = adj[key];
+    $("#v-" + key).textContent = adj[key];
+  }
+  dirty = true; render();
+}
+
+/* ---------- layers / text props ---------- */
+function renderLayers() {
+  const box = $("#layers");
+  box.innerHTML = "";
+  if (!base) return;
+  const entries = [
+    ...items.map(it => ({ id: it.id, label: "T " + (it.text.slice(0, 14) || "text"), type: "text" })),
+    ...strokes.map((s, i) => ({ id: "s" + i, label: "✎ stroke " + (i + 1), type: "stroke" })),
+  ];
+  for (const en of entries) {
+    const div = document.createElement("div");
+    div.className = "layer-item" + (en.id === selectedId ? " selected" : "");
+    div.dataset.testid = "photo-layer";
+    div.textContent = en.label;
+    const del = document.createElement("button");
+    del.className = "del"; del.textContent = "✕"; del.title = "Delete";
+    del.addEventListener("click", () => {
+      pushUndo();
+      if (en.type === "text") items = items.filter(i => i.id !== en.id);
+      else strokes.splice(+en.id.slice(1), 1);
+      dirty = true; render(); renderLayers();
+    });
+    div.appendChild(del);
+    box.appendChild(div);
+  }
+}
+function showTextProps(it) {
+  $("#text-props").hidden = false;
+  $("#txt-content").value = it.text;
+  $("#txt-size").value = it.size;
+  $("#txt-color").value = it.color;
+  $("#txt-font").value = it.font;
+}
+const bindTextProp = (sel, key, parse) => {
+  $(sel).addEventListener("input", e => {
+    const it = items.find(i => i.id === selectedId);
+    if (!it) return;
+    it[key] = parse ? parse(e.target.value) : e.target.value;
+    dirty = true; render(); renderLayers();
+  });
+};
+bindTextProp("#txt-content", "text");
+bindTextProp("#txt-size", "size", v => Math.max(8, Math.min(400, +v || 8)));
+bindTextProp("#txt-color", "color");
+bindTextProp("#txt-font", "font");
+$("#txt-delete").addEventListener("click", () => {
+  if (!selectedId) return;
+  pushUndo();
+  items = items.filter(i => i.id !== selectedId);
+  selectedId = null; $("#text-props").hidden = true;
+  dirty = true; render(); renderLayers();
+});
+
+/* ---------- history ---------- */
+function snapshot() {
+  return { base, adj: { ...adj }, items: JSON.parse(JSON.stringify(items)), strokes: JSON.parse(JSON.stringify(strokes)) };
+}
+function pushUndo() {
+  undoStack.push(snapshot());
+  if (undoStack.length > 30) undoStack.shift();
+  redoStack.length = 0;
+  updateHistoryButtons();
+}
+function restore(s) {
+  base = s.base;
+  mainCanvas.width = base.width; mainCanvas.height = base.height;
+  mainCanvas.hidden = false; emptyHint.hidden = true;
+  setAdjustments(s.adj);
+  items = JSON.parse(JSON.stringify(s.items));
+  strokes = JSON.parse(JSON.stringify(s.strokes));
+  selectedId = null; $("#text-props").hidden = true;
+  render(); renderLayers();
+  $("#btn-export-png").disabled = $("#btn-export-jpg").disabled = false;
+}
+$("#btn-undo").addEventListener("click", () => {
+  if (!undoStack.length) return;
+  redoStack.push(snapshot());
+  restore(undoStack.pop());
+  updateHistoryButtons();
+});
+$("#btn-redo").addEventListener("click", () => {
+  if (!redoStack.length) return;
+  undoStack.push(snapshot());
+  restore(redoStack.pop());
+  updateHistoryButtons();
+});
+function updateHistoryButtons() {
+  $("#btn-undo").disabled = !undoStack.length;
+  $("#btn-redo").disabled = !redoStack.length;
+}
+
+/* ---------- export ---------- */
+function exportImage(type, quality) {
+  if (!base) return;
+  const c = document.createElement("canvas");
+  c.width = base.width; c.height = base.height;
+  const done = c.getContext("2d");
+  done.filter = filterString();
+  done.drawImage(base.canvas, 0, 0);
+  done.filter = "none";
+  const tmp = {};
+  for (const s of strokes) {
+    done.strokeStyle = s.color; done.lineWidth = s.size;
+    done.lineCap = "round"; done.lineJoin = "round";
+    done.beginPath();
+    s.points.forEach((pt, i) => i ? done.lineTo(pt.x, pt.y) : done.moveTo(pt.x, pt.y));
+    if (s.points.length === 1) done.lineTo(s.points[0].x + .01, s.points[0].y);
+    done.stroke();
+  }
+  for (const it of items) {
+    done.font = `600 ${it.size}px ${it.font}`;
+    done.fillStyle = it.color; done.textBaseline = "middle";
+    done.fillText(it.text, it.x, it.y);
+  }
+  c.toBlob(blob => {
+    if (!blob) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "editcraft-photo." + (type === "image/jpeg" ? "jpg" : "png");
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    dirty = false;
+  }, type, quality);
+}
+$("#btn-export-png").addEventListener("click", () => exportImage("image/png"));
+$("#btn-export-jpg").addEventListener("click", () => exportImage("image/jpeg", .92));
+
+window.addEventListener("beforeunload", e => {
+  if (dirty) { e.preventDefault(); e.returnValue = ""; }
+});
+
+/* ---------- AI panel ---------- */
+mountAIPanel({
+  container: $("#ai-panel"),
+  toolLabel: "Photo",
+  systemPrompt: "You are Claude helping inside EditCraft Photo, a browser-based photo editor. Adjustments available: brightness, contrast, saturation, hue (degrees), blur (px), sepia, grayscale (0-100). When the user asks for a look, reply ONLY with a compact JSON object of the parameters to change, e.g. {\"contrast\":120,\"saturation\":80,\"sepia\":15}. Numeric bounds: brightness/contrast/saturation 0-250, hue 0-360, blur 0-12, sepia/grayscale 0-100. Otherwise answer briefly and practically.",
+  quickActions: [
+    { label: "Cinematic", prompt: "Suggest a cinematic color grade as JSON only (contrast up, saturation slightly down, slight sepia)." },
+    { label: "B&W", prompt: "Suggest a black-and-white grade as JSON only." },
+    { label: "Vivid", prompt: "Suggest a vivid punchy grade as JSON only." },
+    { label: "Soft dreamy", prompt: "Suggest a soft dreamy look as JSON only (slight blur, brightness up)." },
+  ],
+  onPatch: patch => {
+    const allow = { brightness:[0,250], contrast:[0,250], saturation:[0,250], hue:[0,360], blur:[0,12], sepia:[0,100], grayscale:[0,100] };
+    const clean = {};
+    for (const k of Object.keys(allow)) {
+      if (patch[k] !== undefined && Number.isFinite(+patch[k])) {
+        clean[k] = Math.round(Math.max(allow[k][0], Math.min(allow[k][1], +patch[k])));
+      }
+    }
+    if (!Object.keys(clean).length) return "no valid parameters in that suggestion";
+    pushUndo();
+    setAdjustments(clean);
+    return Object.entries(clean).map(([k, v]) => k + "=" + v).join(", ");
+  },
+});
+$("#btn-ai-toggle").addEventListener("click", () => {
+  const panel = $("#ai-panel");
+  panel.hidden = !panel.hidden;
+  $("#btn-ai-toggle").setAttribute("aria-expanded", String(!panel.hidden));
+});
+</script>
+</body>
+</html>
