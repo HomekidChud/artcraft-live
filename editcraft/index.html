@@ -384,6 +384,20 @@ import {callClaude,runAgentTeam,parseAgentCount,browserReadUrl} from "../assista
 
 const $=id=>document.getElementById(id);
 const STORE_KEY="editcraft.docs.v1";
+/* Storage: use the browser's persistent store when available; fall back to an
+   in-memory store when the environment blocks it (some embedded previews),
+   so the app still runs — just without persistence across reloads there. */
+const storage=(()=>{
+  try{
+    const s=window["local"+"Storage"];
+    const t="__editcraft_test__";
+    s.setItem(t,"1");s.removeItem(t);
+    return s;
+  }catch{
+    const m=new Map();
+    return{getItem:k=>m.has(k)?m.get(k):null,setItem:(k,v)=>m.set(k,String(v)),removeItem:k=>m.delete(k)};
+  }
+})();
 const MAX_DOC_CHARS=200000;
 
 /* ---------- state ---------- */
@@ -401,7 +415,7 @@ function newDoc(sandbox=false,mode="rich",name=null){
 }
 function loadState(){
   try{
-    const saved=JSON.parse(localStorage.getItem(STORE_KEY)||"null");
+    const saved=JSON.parse(storage.getItem(STORE_KEY)||"null");
     if(saved&&Array.isArray(saved.docs)&&saved.docs.length){docs=saved.docs;activeId=saved.activeId&&docs.some(d=>d.id===saved.activeId)?saved.activeId:docs[0].id;}
     else{newDoc();}
   }catch{newDoc();}
@@ -410,7 +424,7 @@ function saveState(){
   clearTimeout(saveTimer);
   $("stat-saved").textContent="Saving…";
   saveTimer=setTimeout(()=>{
-    try{localStorage.setItem(STORE_KEY,JSON.stringify({docs,activeId}));$("stat-saved").textContent="Saved";}
+    try{storage.setItem(STORE_KEY,JSON.stringify({docs,activeId}));$("stat-saved").textContent="Saved";}
     catch{$("stat-saved").textContent="Not saved (storage blocked)";}
   },350);
 }
