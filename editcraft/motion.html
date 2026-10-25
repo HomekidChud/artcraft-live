@@ -289,16 +289,20 @@ function tick() {
 }
 function startPlayback() {
   if (!objects.length) return;
-  if (time >= duration) time = 0;
+  if (time >= duration - 0.05) time = 0; // replay from the start when at the end
   playStart = performance.now() - time * 1000;
   playing = true;
   $("#btn-play").textContent = "⏸ Pause";
   rafId = requestAnimationFrame(tick);
 }
-function stopPlayback() {
+function haltPlayback() {
   playing = false;
   cancelAnimationFrame(rafId);
   $("#btn-play").textContent = "▶ Play";
+}
+function stopPlayback() {
+  if (recording) { if (window.__finishExport) window.__finishExport(); return; }
+  haltPlayback();
 }
 $("#btn-play").addEventListener("click", () => { playing ? stopPlayback() : startPlayback(); });
 $("#scrub").addEventListener("input", e => {
@@ -498,19 +502,24 @@ async function exportVideo() {
     $("#export-progress").style.width = (time / duration * 100) + "%";
     $("#export-status").textContent = "Recording " + time.toFixed(1) + "s of " + duration.toFixed(1) + "s — keep this tab visible";
   }, 150);
+  let finishStarted = false;
   const finish = async () => {
+    if (finishStarted) return;
+    finishStarted = true;
     clearInterval(progressTimer);
-    stopPlayback();
+    haltPlayback();
     if (recorder.state !== "inactive") recorder.stop();
     await stopped;
     stream.getTracks().forEach(t => t.stop());
     recording = false;
     $("#export-overlay").hidden = true;
     if (cancelExport) { chunks.length = 0; return; }
-    const blob = new Blob(chunks, { type: "video/webm" });
+    const isMp4 = /mp4/.test(recorder.mimeType || "");
+    const ext = isMp4 ? "mp4" : "webm";
+    const blob = new Blob(chunks, { type: isMp4 ? "video/mp4" : "video/webm" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "editcraft-motion.webm";
+    a.download = "editcraft-motion." + ext;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 8000);
   };

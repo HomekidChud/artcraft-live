@@ -209,10 +209,10 @@ function drawFrame() {
 }
 
 function currentTime() {
-  if (activeIdx < 0 || !clips[activeIdx]) return 0;
-  const el = clips[activeIdx].el;
-  if (el.paused) return lastScrubTime;
-  return timeOfIdx(activeIdx) + Math.max(0, el.currentTime - clips[activeIdx].in);
+  if (activeIdx < 0 || !clips[activeIdx]) return lastScrubTime;
+  const clip = clips[activeIdx];
+  // works while paused too: the element keeps its position after pause
+  return timeOfIdx(activeIdx) + Math.max(0, Math.min(clip.el.currentTime, clip.out) - clip.in);
 }
 let lastScrubTime = 0;
 
@@ -248,7 +248,9 @@ function renderTransport() {
 function startPlayback(fromTime) {
   if (!clips.length) return;
   initAudio();
-  const at = clipAt(fromTime ?? currentTime());
+  let t0 = fromTime ?? currentTime();
+  if (t0 >= totalDuration() - 0.05) t0 = 0; // replay from the start when at the end
+  const at = clipAt(t0);
   if (!at) return;
   clips.forEach(c => c.el.pause());
   activeIdx = at.idx;
@@ -259,15 +261,19 @@ function startPlayback(fromTime) {
   $("#btn-play").textContent = "⏸ Pause";
   rafId = requestAnimationFrame(tick);
 }
+function haltPlayback() {
+  // pure playback shutdown — safe to call from anywhere, including the export finisher
+  playing = false;
+  cancelAnimationFrame(rafId);
+  clips.forEach(c => c.el.pause());
+  $("#btn-play").textContent = "▶ Play";
+}
 function stopPlayback() {
   if (recording) { // pausing during export finalizes the recording instead
     if (window.__finishExport) window.__finishExport();
     return;
   }
-  playing = false;
-  cancelAnimationFrame(rafId);
-  clips.forEach(c => c.el.pause());
-  $("#btn-play").textContent = "▶ Play";
+  haltPlayback();
 }
 
 let scrubbing = false;
@@ -470,6 +476,10 @@ async function exportVideo() {
   // set up the audio graph BEFORE building the recording stream, so a
   // first-use export (no preview played yet) still captures clip audio
   initAudio();
+  if (!recDest) {
+    alert("Audio could not be initialized in this browser, so the export would be silent. Export cancelled — preview still works.");
+    return;
+  }
   recording = true; cancelExport = false;
   $("#export-overlay").hidden = false;
   const total = totalDuration();
@@ -493,7 +503,7 @@ async function exportVideo() {
     if (finishStarted) return; // idempotent: natural end, pause and cancel all land here once
     finishStarted = true;
     clearInterval(progressTimer);
-    try { clips.forEach(c => c.el.pause()); } catch (e) {}
+    haltPlayback(); // stop playback state synchronously, before awaiting the recorder
     if (recorder.state !== "inactive") recorder.stop();
     await stopped;
     stream.getTracks().forEach(t => t.stop());
