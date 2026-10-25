@@ -75,7 +75,7 @@
   .ai-msg{font-size:12.5px;padding:7px 9px;border-radius:9px;white-space:pre-wrap;word-break:break-word}
   .ai-msg.user{background:var(--surface-3);align-self:flex-end;max-width:90%}
   .ai-msg.bot{background:var(--surface)}
-  .ai-msg.err{background:color-mix(in oklab,var(--danger) 18%,var(--surface));color:var(--danger)}
+  .ai-msg.err{background:color-mix(in oklab,var(--danger) 16%,var(--surface));color:#f2a3a3}
   .ai-status{font-size:12px;color:var(--muted);min-height:16px}
   .ai-compose{display:flex;gap:6px;align-items:flex-end}
   .ai-input{flex:1;resize:vertical;min-height:38px;background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 9px;font-size:13px}
@@ -163,7 +163,7 @@ let captions = [];    // {id,text,start,end,pos}
 let playing = false;
 let rafId = null;
 let activeIdx = -1;
-let audioCtx = null, masterGain = null, recDest = null;
+let audioCtx = null, masterGain = null, recDest = null, audioHookFails = 0;
 const audioSources = new Map();
 let recorder = null, recording = false, cancelExport = false;
 
@@ -183,7 +183,7 @@ const timeOfIdx = i => clips.slice(0, i).reduce((s, c) => s + (c.out - c.in), 0)
 
 function drawFrame() {
   ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
-  const clip = clips[activeIdx];
+  const clip = clips[activeIdx >= 0 ? activeIdx : 0]; // before the first play activeIdx is -1 — still show a frame
   if (clip && clip.el.readyState >= 2) {
     const vw = clip.el.videoWidth || 16, vh = clip.el.videoHeight || 9;
     const scale = Math.min(W / vw, H / vh);
@@ -344,6 +344,7 @@ function refreshUI() {
   $("#empty-hint").hidden = clips.length > 0;
   $("#btn-play").disabled = $("#scrub").disabled = !clips.length;
   $("#btn-export").disabled = !clips.length;
+  drawFrame(); // refresh the preview so it never sits black after import/edit changes
 }
 function renderClipList() {
   const box = $("#clip-list");
@@ -456,7 +457,10 @@ function hookClipAudio(clip) {
     const src = audioCtx.createMediaElementSource(clip.el);
     src.connect(masterGain);
     audioSources.set(clip.id, src);
-  } catch (e) {}
+  } catch (e) {
+    audioHookFails++;
+    console.warn("audio hook failed for", clip.name, e);
+  }
 }
 const origAddClip = addClip;
 addClip = async function (file) { await origAddClip(file); if (audioCtx) hookClipAudio(clips[clips.length - 1]); };
@@ -482,11 +486,12 @@ async function exportVideo() {
   }
   recording = true; cancelExport = false;
   $("#export-overlay").hidden = false;
+  if (audioHookFails) alert(`Note: ${audioHookFails} clip(s) could not be connected for audio export — those will be silent in the recording.`);
   const total = totalDuration();
   const startedAt = performance.now();
   const stream = canvas.captureStream(30);
   const tracks = [...stream.getVideoTracks()];
-  if (recDest) tracks.push(...recDest.stream.getAudioTracks());
+  if (recDest) for (const t of recDest.stream.getAudioTracks()) tracks.push(t.clone()); // clones only — the destination's own tracks stay live for the next export
   const mixed = new MediaStream(tracks);
   recorder = new MediaRecorder(mixed, mime ? { mimeType: mime } : undefined);
   const chunks = [];
