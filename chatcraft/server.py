@@ -481,39 +481,66 @@ def parse_blocks(text):
         fname_next = i + 1 < n and re.match(
             r"^[\w./-]+\.[\w+#-]+$", lines[i + 1].strip())
         if run_open:
-            flush()
             j = i + 1
             cmd = []
             while j < n and not lines[j].strip().startswith("```"):
                 cmd.append(lines[j])
                 j += 1
+            if j >= n:
+                # unterminated (e.g. truncated mid-stream): keep as text,
+                # never execute a partial command
+                cur.append(ln)
+                i += 1
+                continue
+            flush()
             blocks.append(("run", "\n".join(cmd).strip()))
             i = j + 1
             continue
         if file_open:
-            flush()
             lang, name = file_open.group(1) or "", file_open.group(2)
             j = i + 1
             content = []
             while j < n and not lines[j].strip().startswith("```"):
                 content.append(lines[j])
                 j += 1
+            if j >= n:
+                # unterminated: keep as text, never write a partial file
+                cur.append(ln)
+                i += 1
+                continue
+            flush()
             blocks.append(("file", lang, name, "\n".join(content)))
             # merged fence: the closing line is itself a ```run opener -
             # close the file but reprocess that line as a run block
             i = j if (j < n and re.match(r"^```run", lines[j], re.I)) else j + 1
             continue
-        if bare_open and fname_next:
-            flush()
-            lang = bare_open.group(1) or ""
-            name = lines[i + 1].strip()
-            j = i + 2
-            content = []
+        if bare_open:
+            if fname_next:
+                lang = bare_open.group(1) or ""
+                name = lines[i + 1].strip()
+                j = i + 2
+                content = []
+                while j < n and not lines[j].strip().startswith("```"):
+                    content.append(lines[j])
+                    j += 1
+                if j >= n:
+                    # unterminated: keep as text
+                    cur.append(ln)
+                    i += 1
+                    continue
+                flush()
+                blocks.append(("file", lang, name, "\n".join(content)))
+                i = j if (j < n and re.match(r"^```run", lines[j], re.I)) else j + 1
+                continue
+            # ordinary code block: consume it through its closing fence as
+            # inert text so a filename-like line after the closer is never
+            # reinterpreted as a file block opener
+            j = i + 1
             while j < n and not lines[j].strip().startswith("```"):
-                content.append(lines[j])
                 j += 1
-            blocks.append(("file", lang, name, "\n".join(content)))
-            i = j if (j < n and re.match(r"^```run", lines[j], re.I)) else j + 1
+            end = j + 1 if j < n else n
+            cur.extend(lines[i:end])
+            i = end
             continue
         cur.append(ln)
         i += 1

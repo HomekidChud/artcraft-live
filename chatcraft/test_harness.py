@@ -90,6 +90,27 @@ check("rest honestly not run", report.count("not run"), 3)
 # --- run block with a fake prompt flows through normalized ---
 check("prompt run normalized", server.extract_runs("```run\n$ ls\n```"), ["ls"])
 
+# --- ordinary code fence followed by a filename-like prose line ---
+# the closing fence must not be reinterpreted as a file-block opener
+text_code = '```python\nprint("hi")\n```\nnotes.md\nThis is prose, not file content.'
+blocks = server.parse_blocks(text_code)
+check("code fence: no file block", [b for b in blocks if b[0] == "file"], [])
+check("code fence: no run block", [b for b in blocks if b[0] == "run"], [])
+check("code fence: all text", [b[0] for b in blocks], ["text"])
+check("code fence: content preserved",
+      blocks[0][1], '```python\nprint("hi")\n```\nnotes.md\nThis is prose, not file content.')
+
+# --- unterminated blocks (truncated mid-stream) never act ---
+text_unterm_file = "Here you go:\n```markdown draft.md\nsome partial content"
+blocks = server.parse_blocks(text_unterm_file)
+check("unterminated file: no file block", [b for b in blocks if b[0] == "file"], [])
+text_unterm_run = "```run\nrm -rf /very/bad"
+blocks = server.parse_blocks(text_unterm_run)
+check("unterminated run: no run block", [b for b in blocks if b[0] == "run"], [])
+text_unterm_name = "```markdown\ndraft.md\npartial"
+blocks = server.parse_blocks(text_unterm_name)
+check("unterminated next-line name: no file", [b for b in blocks if b[0] == "file"], [])
+
 if FAILURES:
     print(f"\n{len(FAILURES)} FAILURE(S): {FAILURES}")
     sys.exit(1)
