@@ -76,7 +76,7 @@ CATALOG = [
              "env": "GEMINI_API_KEY"}},
     {"id": "gemini_3_flash", "label": "Gemini 3 Flash", "provider": "Google",
      "tier": "fast", "in": 0.10, "out": 0.40,
-     "api": {"kind": "openai", "model": "gemini-3-flash",
+     "api": {"kind": "openai", "model": "gemini-3-flash-preview",
              "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
              "env": "GEMINI_API_KEY"}},
     {"id": "grok_4_3", "label": "Grok 4.3", "provider": "xAI",
@@ -290,6 +290,8 @@ def stream_anthropic(api, messages, system, max_tokens, temperature, api_key="")
     """Anthropic Messages API (honours a custom base_url). Yields
     ('text', delta), ('usage', {...}) and ('model', reported name)."""
     base = (api.get("base_url") or "https://api.anthropic.com").rstrip("/")
+    if base.endswith("/v1"):  # users often paste .../v1; we append /v1/... ourselves
+        base = base[:-3]
     body = {"model": api["model"], "messages": messages,
             "max_tokens": max_tokens, "stream": True}
     if system:
@@ -370,6 +372,8 @@ def advisor_pass(m, messages):
     try:
         if api.get("kind") == "anthropic":
             base = (api.get("base_url") or "https://api.anthropic.com").rstrip("/")
+            if base.endswith("/v1"):
+                base = base[:-3]
             status, body = http_json(
                 base + "/v1/messages",
                 {"model": api["model"], "system": ADVISOR_SYSTEM, "messages": trimmed,
@@ -467,6 +471,18 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _origin_ok(self):
+        """Reject cross-origin mutations: browsers always send Origin on
+        cross-site requests; same-origin/curl/tools send none or a matching one."""
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True
+        host = self.headers.get("Host", "")
+        try:
+            return urllib.parse.urlparse(origin).netloc == host
+        except Exception:
+            return False
+
     def _body(self):
         n = int(self.headers.get("Content-Length") or 0)
         if not n:
@@ -524,6 +540,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, {"error": "not found"})
 
     def do_DELETE(self):
+        if not self._origin_ok():
+            return self._send(403, {"error": "cross-origin request rejected"})
         path = urllib.parse.urlparse(self.path).path
         if path.startswith("/api/files/"):
             name = Path(urllib.parse.unquote(path.split("/api/files/")[1])).name
@@ -538,6 +556,8 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):
+        if not self._origin_ok():
+            return self._send(403, {"error": "cross-origin request rejected"})
         path = urllib.parse.urlparse(self.path).path
         if path == "/api/custom-models":
             m = self._body()
@@ -598,13 +618,27 @@ class Handler(BaseHTTPRequestHandler):
                 # 1. read the conversation
                 yield step("read", f"Read conversation ({len(messages)} messages)", "done")
 
-                # 2. list the workspace files (names + sizes into context)
+                # 2. list the workspace files; bounded-read any file the user references
                 files_now = [p for p in FILES_DIR.iterdir() if p.is_file()]
                 if files_now:
                     listing = ", ".join(f"{p.name} ({p.stat().st_size}B)" for p in files_now[:30])
                     yield step("workspace", "Listing workspace files", "done", listing)
                 else:
                     yield step("workspace", "Workspace empty", "done")
+                last_user = next((m["content"] for m in reversed(messages)
+                                  if m["role"] == "user"), "") or ""
+                file_contents = {}
+                for p in files_now:
+                    if p.name in last_user and p.stat().st_size <= 8192:
+                        sid = "read-" + p.name
+                        yield step(sid, f"Reading {p.name}", "run")
+                        try:
+                            file_contents[p.name] = p.read_text(encoding="utf-8")[:8000]
+                            yield step(sid, f"Read {p.name}", "done",
+                                       f"{p.stat().st_size}B into context")
+                        except Exception:
+                            yield step(sid, f"Couldn't read {p.name}", "fail",
+                                       "not readable as text")
 
                 # 3. advisor pass — always on, runs live inside the stream
                 advisor_usage, advisor_cost = {"in": 0, "out": 0}, 0.0
@@ -632,6 +666,8 @@ class Handler(BaseHTTPRequestHandler):
                 if files_now:
                     system += ("\n\nWORKSPACE: the user's workspace already contains: "
                                + ", ".join(p.name for p in files_now[:30]) + ".")
+                for fname, fcontent in file_contents.items():
+                    system += (f"\n\nFILE {fname} (current contents):\n{fcontent}")
                 if advisor_note:
                     system += (f"\n\nYour advisor reviewed this conversation and suggests: "
                                f"\"{advisor_note}\" Follow the advisor's guidance where it helps.")
@@ -670,30 +706,32 @@ class Handler(BaseHTTPRequestHandler):
                         yield step(sid, f"Wrote {f['name']}", "done")
                     yield ev("files", {"files": saved, "cleaned_text": cleaned})
 
-                # 6. run commands the reply contains
-                ran_any = False
+                # 6. run commands the reply contains (max 5 per turn)
+                results = {}  # cmd -> returncode, only for commands actually run
                 for i, cmd in enumerate(runs[:5]):
                     sid = f"cmd-{i + 1}"
                     if not ALLOW_CMDS:
-                        yield step(sid, "Commands disabled", "done",
+                        yield step(sid, "Commands disabled", "skip",
                                    "set CHATCRAFT_ALLOW_CMDS=1 to enable")
-                        break
+                        continue
                     yield step(sid, f"Running: {cmd[:60]}", "run")
                     rc, out = run_command(cmd)
                     first = (out.strip().splitlines() or [""])[0][:120]
-                    label = f"Ran: {cmd[:60]} (exit {rc})" if rc == 0 else f"Failed: {cmd[:60]} (exit {rc})"
-                    yield step(sid, label, "done", first)
+                    state = "done" if rc == 0 else "fail"
+                    label = (f"Ran: {cmd[:60]} (exit {rc})" if rc == 0
+                             else f"Failed: {cmd[:60]} (exit {rc})")
+                    yield step(sid, label, state, first)
                     yield ev("command", {"command": cmd, "returncode": rc, "output": out[:2000]})
-                    ran_any = True
-                if runs and not ALLOW_CMDS:
-                    # mark skipped commands honestly in the final text
-                    cleaned = RUN_BLOCK_RE.sub(lambda m: "skipped: commands disabled", cleaned)
-                elif runs and ALLOW_CMDS:
-                    def _after(m):
-                        cmd_txt = m.group(1).strip()[:60]
-                        return f"ran: {cmd_txt}" if ran_any else f"not run: {cmd_txt}"
-                    cleaned = RUN_BLOCK_RE.sub(_after, cleaned)
+                    results[cmd] = rc
                 if runs:
+                    def _after(m):
+                        c = m.group(1).strip()
+                        if c in results:
+                            return (f"ran: {c[:60]}" if results[c] == 0
+                                    else f"failed (exit {results[c]}): {c[:60]}")
+                        return ("skipped: commands disabled" if not ALLOW_CMDS
+                                else f"not run (over the 5-command limit): {c[:60]}")
+                    cleaned = RUN_BLOCK_RE.sub(_after, cleaned)
                     yield ev("clean", {"text": cleaned})
 
                 custom = bool(model.get("custom"))

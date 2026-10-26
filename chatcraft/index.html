@@ -1272,6 +1272,16 @@
   .cm-row .del { all: unset; cursor: pointer; color: var(--faint); font-size: 0.85rem; padding: 0 4px; }
   .cm-row .del:hover { color: #e0567a; }
 
+  /* chat thread readability over the photographic wallpaper */
+  body:has(#t-otto:checked) .view-chat .thread {
+    background: rgba(13, 16, 20, 0.82);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  body:has(#t-otto:checked) .view-chat .composer-wrap {
+    background: rgba(13, 16, 20, 0.86);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  }
+  body:has(#t-otto:checked) .composer-foot { color: #c9cdd3; }
   /* legibility over the photographic wallpaper (ChatCraft theme) */
   body:has(#t-otto:checked) .space-note,
   body:has(#t-otto:checked) .home-hero .home-sub,
@@ -1389,8 +1399,8 @@
 
   /* ============ TOAST ============ */
   .toast {
-    position: fixed; left: 50%; bottom: 96px;
-    transform: translate(-50%, 16px); z-index: 90;
+    position: fixed; left: 50%; top: 62px;
+    transform: translate(-50%, -12px); z-index: 90;
     background: var(--surface); color: var(--text);
     border: 1px solid var(--border); border-radius: 12px;
     box-shadow: var(--shadow-lg);
@@ -2130,7 +2140,7 @@
 
           <div class="set-section" id="custom-models-section">
             <h3>Custom models (plugin)</h3>
-            <div class="set-sub">Bring your own endpoint: any OpenAI-compatible or Anthropic-compatible API. Keys are kept server-side for this session and never shown again.</div>
+            <div class="set-sub">Add any OpenAI-compatible or Anthropic-compatible endpoint (base URL + model name + optional key). It then appears in every model menu. Local servers (Ollama at localhost:11434, LM Studio) need no key.</div>
             <div class="cm-form">
               <div class="h-field"><label for="cm-label">Label</label><input type="text" id="cm-label" placeholder="My model"></div>
               <div class="h-field"><label for="cm-provider">API type</label><select id="cm-provider"><option value="openai-compat">OpenAI-compatible</option><option value="anthropic-compat">Anthropic-compatible</option></select></div>
@@ -2140,6 +2150,13 @@
             </div>
             <button class="btn" id="cm-add" style="margin-top:10px;">Add model</button>
             <div class="cm-list" id="cm-list"></div>
+
+            <h3 style="margin-top:26px;">Backend URL</h3>
+            <div class="set-sub">If this page is hosted somewhere else, point it at your own ChatCraft backend (run <span style="font-family:'JetBrains Mono',monospace">python server.py</span> on your machine, then enter e.g. <span style="font-family:'JetBrains Mono',monospace">http://localhost:8000</span>). Leave empty for same-origin. The page reloads after saving.</div>
+            <div class="h-grid">
+              <div class="h-field"><label for="api-base-input">Backend URL</label><input type="text" id="api-base-input" placeholder="http://localhost:8000"></div>
+            </div>
+            <button class="btn" id="api-base-save" style="margin-top:10px;">Save backend URL</button>
           </div>
 
           <div class="set-section">
@@ -2398,9 +2415,11 @@
   })();
 
   /* ---------- API base (real chat) ---------- */
+  // Priority: saved Backend URL (Settings) > inline __API_BASE__ > file:// fallback.
   // Empty = same origin (python server.py serves both the UI and the API).
-  // Opened straight from disk? Fall back to the default local backend.
-  var rawApiBase = window.__API_BASE__ || "";
+  var savedApiBase = "";
+  try { savedApiBase = localStorage.getItem("cc_api_base") || ""; } catch (e) {}
+  var rawApiBase = savedApiBase || window.__API_BASE__ || "";
   var API = rawApiBase || (location.protocol === "file:" ? "http://localhost:8000" : "");
 
   var chatState = {
@@ -2466,8 +2485,11 @@
 
   var STEP_ICONS = {
     run: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 109 9"/></svg>',
-    done: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>'
+    done: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>',
+    fail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    skip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M5 12h14"/></svg>'
   };
+  var STEP_ICON_KEY = { done: "done", fail: "fail", skip: "skip" };
   function handleStep(shellEl, data) {
     var bar = shellEl.querySelector(".steps-bar");
     if (!bar) return;
@@ -2479,7 +2501,7 @@
       bar.appendChild(pill);
     }
     pill.className = "step " + (data.state || "run");
-    pill.innerHTML = (data.state === "done" ? STEP_ICONS.done : STEP_ICONS.run) + "<span></span>";
+    pill.innerHTML = (STEP_ICON_KEY[data.state] ? STEP_ICONS[STEP_ICON_KEY[data.state]] : STEP_ICONS.run) + "<span></span>";
     pill.querySelector("span").textContent = data.label || data.id;
     // optional mono detail line (e.g. command output, file listing)
     if (data.detail != null && data.detail !== "") {
@@ -2657,8 +2679,11 @@
     var total = data.total_cost_usd != null ? data.total_cost_usd : mainCost + advCost;
     function fmt(c) { return c < 0.0001 ? c.toFixed(6) : c.toFixed(4); }
     if (data.local) {
-      d.textContent = model + " · local model · $0.00 (runs on your machine)" +
-        (data.reported_model ? " · served as " + data.reported_model : "");
+      var lparts = [model + " · local model · main $0.00"];
+      if (advCost) lparts.push("advisor ~$" + fmt(advCost) + ", total ~$" + fmt(total));
+      else lparts.push("total $0.00 (runs on your machine)");
+      if (data.reported_model) lparts.push("served as " + data.reported_model);
+      d.textContent = lparts.join(" · ");
       return d;
     }
     if (data.reported_model && data.reported_model !== model) {
@@ -2671,8 +2696,10 @@
         (advCost ? " · advisor ~$" + fmt(advCost) : "");
       return d;
     }
-    var parts = [model + " · " + ((data.usage && data.usage.in) || 0) + " in / " +
-      ((data.usage && data.usage.out) || 0) + " out tokens"];
+    var u = data.usage || {};
+    var usageTxt = u.estimated ? "usage n/a (provider didn't report)"
+      : ((u.in || 0) + " in / " + (u.out || 0) + " out tokens");
+    var parts = [model + " · " + usageTxt];
     if (data.advisor_usage && (data.advisor_usage.in || data.advisor_usage.out)) {
       parts.push("advisor " + data.advisor_usage.in + "/" + data.advisor_usage.out + " tokens");
     }
@@ -3114,6 +3141,18 @@
       })
       .catch(function () { toast("Couldn't add the model"); });
   });
+
+  /* ---------- settings: backend URL (for hosted copies of this page) ---------- */
+  var apiBaseInput = $("#api-base-input"), apiBaseSave = $("#api-base-save");
+  if (apiBaseInput && apiBaseSave) {
+    try { apiBaseInput.value = localStorage.getItem("cc_api_base") || ""; } catch (e) {}
+    apiBaseSave.addEventListener("click", function () {
+      var v = (apiBaseInput.value || "").trim().replace(/\/+$/, "");
+      try { localStorage.setItem("cc_api_base", v); } catch (e) {}
+      toast(v ? "Backend URL saved — reloading" : "Backend URL cleared — reloading");
+      setTimeout(function () { location.reload(); }, 600);
+    });
+  }
 
   /* ---------- library dropdown: close after picking ---------- */
   $$(".lib-picker label").forEach(function (label) {
