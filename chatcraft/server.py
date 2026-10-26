@@ -126,14 +126,25 @@ ADVISOR_SYSTEM = (
 
 # ```lang filename.ext ... ```   (also accepts ```lang:filename.ext)
 # and the variant small local models often emit: ```lang\nfilename.ext\n...```
+# The last two alternatives close on a \x00CMDn\x00 mark (a run block that
+# was already extracted) — this is the "merged fence" case where a model
+# writes ...content```run\ncmd``` with one shared fence.
 FILE_BLOCK_RE = re.compile(
     r"```([\w+#-]*)[ \t]*:?[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*\n(.*?)```"
-    r"|```([\w+#-]*)[ \t]*\n[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*\n(.*?)```",
+    r"|```([\w+#-]*)[ \t]*\n[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*\n(.*?)```"
+    r"|```([\w+#-]*)[ \t]*:?[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*\n(.*?)(?=\x00CMD\d+\x00)"
+    r"|```([\w+#-]*)[ \t]*\n[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*\n(.*?)(?=\x00CMD\d+\x00)",
     re.S)
 # ```run\n command \n```
 RUN_BLOCK_RE = re.compile(r"```run[ \t]*\n(.*?)```", re.S | re.I)
 # placeholder left where a run block was, before file blocks are extracted
 CMD_MARK_RE = re.compile(r"\x00CMD(\d+)\x00")
+# narrowly-anchored fake shell prompts (never a mid-command "$"): a lone
+# "$/# prompt at line start, or the user@host ... $ form
+PROMPT_NOISE_RE = re.compile(
+    r"^\$[ \t]+"
+    r"|^#[ \t]+"
+    r"|^[\w.@-]+@[^\n$]*\$[ \t]+")
 
 
 # ------------------------------------------------------------ model records ---
@@ -446,10 +457,12 @@ def extract_files(text):
     files = []
 
     def repl(m):
-        if m.group(1) is not None:  # ```lang filename.ext\n...
-            lang, name, content = m.group(1), m.group(2), m.group(3)
-        else:  # ```lang\nfilename.ext\n... (common from small local models)
-            lang, name, content = m.group(4), m.group(5), m.group(6)
+        g = m.groups()
+        lang = name = content = None
+        for i in (0, 3, 6, 9):  # four alternative spellings, groups of 3
+            if g[i] is not None:
+                lang, name, content = g[i], g[i + 1], g[i + 2]
+                break
         files.append({"name": Path(name).name, "lang": lang or "text",
                       "content": content.rstrip("\n")})
         return f"wrote file: {Path(name).name}"
@@ -457,21 +470,23 @@ def extract_files(text):
     return FILE_BLOCK_RE.sub(repl, text), files
 
 
-PROMPT_NOISE_RE = re.compile(r"^[^\n\r]*?[$#][ \t]+(?=[A-Za-z_.\\/])")
+def normalize_cmd(cmd):
+    """Strip narrowly-anchored fake shell prompts (\"$ ls\",
+    \"user@host:~$ ls\") that small local models prepend. Only forms anchored
+    at the line start are touched, so ordinary commands (echo $HOME,\n    echo '$ x') are never rewritten."""
+    cmd = cmd.strip()
+    first, sep, rest = cmd.partition("\n")
+    if PROMPT_NOISE_RE.match(first):
+        stripped = PROMPT_NOISE_RE.sub("", first, count=1).lstrip()
+        if stripped:
+            cmd = stripped + (sep + rest if sep else "")
+    return cmd.strip()
 
 
 def extract_runs(text):
     runs = []
     for m in RUN_BLOCK_RE.finditer(text):
-        cmd = m.group(1).strip()
-        # small local models often prefix commands with a fake shell prompt
-        # ("$ ls", "user@host:~$ ls"); strip that noise before executing
-        first, sep, rest = cmd.partition("\n")
-        if "$" in first or first.rstrip().endswith("#"):
-            stripped = PROMPT_NOISE_RE.sub("", first, count=1).lstrip()
-            if stripped:
-                cmd = stripped + (sep + rest if sep else "")
-        cmd = cmd.strip()
+        cmd = normalize_cmd(m.group(1))
         if cmd:
             runs.append(cmd)
     return runs
@@ -740,12 +755,15 @@ class Handler(BaseHTTPRequestHandler):
                 # file regex swallow the run block. The final `clean` event
                 # replaces the marks with an honest ran/not-run/skipped marker
                 # AFTER the commands actually execute.
-                runs = extract_runs(full_text)
+                runs = [normalize_cmd(m.group(1)) for m in RUN_BLOCK_RE.finditer(full_text)]
+                runs = [r for r in runs if r]
                 _cmd_marks = {}
 
                 def _mark(m):
                     i = len(_cmd_marks)
-                    _cmd_marks[i] = m.group(1).strip()
+                    # store the NORMALIZED command so the ran/not-run lookup
+                    # below uses the same string the executor used
+                    _cmd_marks[i] = normalize_cmd(m.group(1))
                     return "\x00CMD%d\x00" % i
 
                 marked = RUN_BLOCK_RE.sub(_mark, full_text)

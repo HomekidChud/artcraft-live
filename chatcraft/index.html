@@ -1207,8 +1207,8 @@
     background: var(--card); border: 1px solid var(--border); border-radius: 16px;
     box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden;
   }
-  .fv-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--border-soft); }
-  .fv-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+  .fv-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--border-soft); flex-wrap: wrap; }
+  .fv-title { flex: 1; min-width: 140px; display: flex; align-items: baseline; gap: 10px; }
   .fv-name { font-weight: 700; font-size: 0.95rem; }
   .fv-meta { font-size: 0.72rem; color: var(--faint); }
   .fv-actions { display: flex; gap: 6px; }
@@ -2785,7 +2785,7 @@
     var typing = buildTypingMsg();
     conv.appendChild(typing);
     scrollThread();
-    var shell = null, txtEl = null;
+    var shell = null, txtEl = null, fullText = "", finalized = false;
 
     if (API === null) {
       typing.replaceWith(buildAiMsg(
@@ -2855,6 +2855,7 @@
                 txtEl = shell.querySelector(".txt");
                 typing.replaceWith(shell);
               }
+              fullText += data.delta;
               txtEl.appendChild(document.createTextNode(data.delta));
               scrollThread();
             } else if (ev === "command" && data.command) {
@@ -2877,11 +2878,13 @@
               }
             } else if (ev === "clean" && typeof data.text === "string") {
               // final honest text after commands ran (ran / not run / skipped markers)
+              finalized = true;
               if (txtEl) txtEl.innerHTML = renderMarkdown(data.text);
               scrollThread();
             } else if (ev === "files" && data.files) {
               // swap the raw code blocks for clean file cards
               if (txtEl && txtEl.parentNode && typeof data.cleaned_text === "string") {
+                finalized = true;
                 txtEl.innerHTML = renderMarkdown(data.cleaned_text);
               }
               if (shell) {
@@ -2891,6 +2894,10 @@
               loadFiles();
             } else if (ev === "done") {
               usage.msgs += 1;
+              // plain replies (no files, no commands) get markdown too
+              if (!finalized && txtEl && fullText) {
+                txtEl.innerHTML = renderMarkdown(fullText);
+              }
               // count only known costs; custom endpoints have no public pricing
               usage.cost += data.total_cost_usd != null ? data.total_cost_usd : (data.advisor_cost_usd || 0);
               updateUsage();
