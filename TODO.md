@@ -977,3 +977,29 @@ and the physics should keep advancing. Two additions, both tested.
 - Not addressed here: user screenshot's wheels-sunk-into-runway did not
   reproduce on the C172 (spawn transient or preset-specific — parked as a
   watch item).
+
+## ChatCraft — status (added 2026-10-26)
+
+Single-file AI workspace app (`chatcraft/`), sibling to the craft apps but
+backend-backed. Update this section in every push that touches it.
+
+- Files: `chatcraft/index.html` (frontend, ~2400 lines, no build step),
+  `chatcraft/server.py` (FastAPI backend: model proxy, advisor pass, SSE
+  chat, file store, custom-model CRUD), `chatcraft/wallpaper.jpg`.
+- Deployed via Perplexity Computer (private URL); backend runs on the sandbox
+  (`python server.py` on :8000, `__PORT_8000__` placeholder in HTML is rewritten
+  at deploy).
+- Live features: 9 platform models + custom endpoints, always-on advisor
+  (server-side, falls back to haiku, empty note = failure), harness step pills
+  (read/advisor/write/files), per-message cost lines, file cards in chat,
+  Documents view file browser + viewer modal (view/copy/delete).
+- Demo purge complete: no scripted replies, no fake agents/automations/docs;
+  unbuilt views show honest "Not built yet" cards. Verified in browser
+  (desktop + 390px mobile) and via curl SSE tests.
+- Known small items: `insertChip` now takes a host param (bug where advisor
+  chips threw `txtEl is not defined` is fixed); file-viewer needs
+  `#file-viewer[hidden]{display:none}` (class display overrides the hidden
+  attribute).
+- Next up: Work mode (APK-only, uses the Computer's models; hidden on web),
+  Android APK packaging (WebView wrapper, `?apk=1` flag), keep the
+  "always push + update this ledger" rule.

@@ -1,0 +1,3114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Otto: AI workspace</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232ed8a2' d='M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* ============ TOKENS ============ */
+  :root {
+    --bg: #faf9f7;
+    --bg-side: #f3f1ee;
+    --surface: #ffffff;
+    --surface-2: #f0eeea;
+    --surface-3: #e9e6e1;
+    --border: #e4e1dc;
+    --border-soft: #edebe7;
+    --text: #26221e;
+    --muted: #6f6a63;
+    --faint: #a49e95;
+    --accent: #b4552d;
+    --accent-hover: #9c4723;
+    --accent-soft: #f7e8df;
+    --ok: #3d7a4e;
+    --shadow-sm: 0 1px 2px rgba(35, 28, 20, 0.06);
+    --shadow-md: 0 4px 14px rgba(35, 28, 20, 0.08);
+    --shadow-lg: 0 12px 40px rgba(35, 28, 20, 0.14);
+    --ease: cubic-bezier(0.25, 0.8, 0.35, 1);
+    --code-bg: #211f1d;
+    --code-text: #e8e5e0;
+  }
+  body:has(#t-dark:checked) {
+    /* Ember dark: charcoal canvas with a warm amber glow, like Otto's slides builder */
+    --bg: #1a1817;
+    --bg-side: #171512;
+    --surface: #252220;
+    --surface-2: #2d2a27;
+    --surface-3: #353230;
+    --border: #3b3835;
+    --border-soft: #322f2c;
+    --text: #ebe8e3;
+    --muted: #a8a29a;
+    --faint: #716c64;
+    --accent: #d0784e;
+    --accent-hover: #de8a61;
+    --accent-soft: #3a2b22;
+    --ok: #6fae7f;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+    --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+    --code-bg: #171512;
+    --code-text: #d8d4ce;
+  }
+
+  /* Otto signature theme: painted wallpaper + floating dark cards + mint accent */
+  body:has(#t-otto:checked) {
+    --bg: rgba(16, 20, 24, 0.6);
+    --bg-side: rgba(17, 21, 26, 0.82);
+    --surface: rgba(19, 23, 29, 0.88);
+    --surface-2: rgba(28, 33, 41, 0.85);
+    --surface-3: rgba(36, 42, 51, 0.85);
+    --border: rgba(255, 255, 255, 0.1);
+    --border-soft: rgba(255, 255, 255, 0.07);
+    --text: #f2f5f7;
+    --muted: #a5b1bc;
+    --faint: #8a939e;
+    --accent: #2ed8a2;
+    --accent-hover: #55e4b4;
+    --accent-soft: rgba(46, 216, 162, 0.15);
+    --ok: #2ed8a2;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.35);
+    --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.45);
+    --code-bg: #0c0f13;
+    --code-text: #d5dbe1;
+    --wallpaper: url("wallpaper.jpg");
+  }
+  body:has(#t-otto:checked) {
+    background: var(--wallpaper) center / cover no-repeat fixed;
+  }
+  body:has(#t-dark:checked) {
+    background:
+      radial-gradient(1100px 480px at 50% -12%, rgba(224, 148, 74, 0.20), rgba(224, 148, 74, 0.07) 45%, transparent 70%),
+      radial-gradient(700px 320px at 85% 8%, rgba(210, 120, 70, 0.10), transparent 65%),
+      #1a1817 fixed;
+  }
+  body:has(#t-light:checked) {
+    background: linear-gradient(180deg, #f6f3ec, #efeade) fixed;
+  }
+  /* Spaces: each space has its own look */
+  body:has(#sp-work:checked) { --accent: #5b9bf5; --accent-hover: #7cb0f8; --accent-soft: rgba(91, 155, 245, 0.16); }
+  body:has(#sp-side:checked) { --accent: #eda45c; --accent-hover: #f6b877; --accent-soft: rgba(237, 164, 92, 0.16); }
+  body:has(#sp-personal:checked) { --accent: #15b389; --accent-hover: #2ed8a2; --accent-soft: rgba(46, 216, 162, 0.15); }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  input, textarea, button, label { font: inherit; color: inherit; }
+  input[type="text"], input[type="email"], input[type="password"], input[type="search"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 140ms var(--ease);
+  }
+  input:focus, textarea:focus { border-color: var(--accent); }
+  button { background: none; border: 0; cursor: pointer; }
+  a { color: var(--accent); }
+  ::selection { background: color-mix(in srgb, var(--accent) 22%, transparent); }
+
+  .state { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+
+  /* ============ APP SHELL ============ */
+  .app { display: flex; height: 100dvh; overflow: hidden; }
+  .scrim { display: none; }
+
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    width: 268px; flex: none;
+    background: var(--bg-side);
+    border-right: 1px solid var(--border-soft);
+    display: flex; flex-direction: column;
+    min-height: 0;
+    transition: transform 260ms var(--ease);
+  }
+  .side-top {
+    display: flex; align-items: center; gap: 8px;
+    padding: 14px 12px 10px;
+  }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 1.02rem; letter-spacing: -0.01em; }
+  .brand-mark {
+    width: 26px; height: 26px; border-radius: 8px;
+    background: var(--accent); color: #fff;
+    display: grid; place-items: center; flex: none;
+  }
+  .side-top .icon-btn { margin-left: auto; }
+
+  .side-btn {
+    display: flex; align-items: center; gap: 10px;
+    margin: 2px 10px; padding: 8px 10px;
+    border-radius: 10px; font-weight: 500; font-size: 0.9rem;
+    color: var(--text); cursor: pointer;
+    transition: background 120ms var(--ease);
+  }
+  .side-btn:hover { background: var(--surface-2); }
+  .side-btn svg { color: var(--muted); flex: none; }
+
+  .side-search { position: relative; margin: 6px 12px 4px; }
+  .side-search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--faint); pointer-events: none; }
+  .side-search input {
+    width: 100%; background: transparent; border: 1px solid transparent;
+    padding: 7px 10px 7px 32px; border-radius: 10px; font-size: 0.88rem;
+    transition: background 120ms, border-color 120ms;
+  }
+  .side-search input:hover { background: var(--surface-2); }
+  .side-search input:focus { background: var(--surface); border-color: var(--border); }
+
+  .side-scroll { flex: 1 1 0; overflow-y: auto; padding-bottom: 14px; min-height: 0; }
+  .side-label {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--faint); padding: 16px 22px 5px;
+  }
+  .nav-item, .chat-item, .proj-item {
+    display: flex; align-items: center; gap: 10px;
+    margin: 1px 10px; padding: 7px 10px;
+    border-radius: 10px; font-size: 0.885rem; font-weight: 500;
+    color: var(--muted); cursor: pointer;
+    transition: background 110ms var(--ease), color 110ms;
+  }
+  .nav-item:hover, .chat-item:hover, .proj-item:hover { background: var(--surface-2); color: var(--text); }
+  .nav-item svg { flex: none; color: var(--faint); }
+  .nav-item:hover svg { color: var(--muted); }
+
+  /* active view */
+  #v-home:checked ~ .app label.nav-item[for="v-home"],
+  #v-chat-1:checked ~ .app label.nav-item[for="v-chat-1"],
+  #v-chat-2:checked ~ .app label.nav-item[for="v-chat-1"],
+  #v-chat-3:checked ~ .app label.nav-item[for="v-chat-1"],
+  #v-canvas:checked ~ .app label.nav-item[for="v-canvas"],
+  #v-video:checked ~ .app label.nav-item[for="v-video"],
+  #v-browser:checked ~ .app label.nav-item[for="v-browser"],
+  #v-agents:checked ~ .app label.nav-item[for="v-agents"],
+  #v-automations:checked ~ .app label.nav-item[for="v-automations"],
+  #v-dashboards:checked ~ .app label.nav-item[for="v-dashboards"],
+  #v-docs:checked ~ .app label.nav-item[for="v-docs"],
+  #v-projects:checked ~ .app label.nav-item[for="v-projects"],
+  #v-skills:checked ~ .app label.nav-item[for="v-skills"],
+  #v-plugins:checked ~ .app label.nav-item[for="v-plugins"],
+  #v-settings:checked ~ .app label.nav-item[for="v-settings"],
+  #v-signin:checked ~ .app label.nav-item[for="v-settings"],
+  #v-signup:checked ~ .app label.nav-item[for="v-settings"] {
+    background: var(--surface-3); color: var(--text);
+  }
+  #v-home:checked ~ .app label.nav-item[for="v-home"] svg,
+  #v-chat-1:checked ~ .app label.nav-item[for="v-chat-1"] svg,
+  #v-chat-2:checked ~ .app label.nav-item[for="v-chat-1"] svg,
+  #v-chat-3:checked ~ .app label.nav-item[for="v-chat-1"] svg,
+  #v-canvas:checked ~ .app label.nav-item[for="v-canvas"] svg,
+  #v-video:checked ~ .app label.nav-item[for="v-video"] svg,
+  #v-browser:checked ~ .app label.nav-item[for="v-browser"] svg,
+  #v-agents:checked ~ .app label.nav-item[for="v-agents"] svg,
+  #v-automations:checked ~ .app label.nav-item[for="v-automations"] svg,
+  #v-dashboards:checked ~ .app label.nav-item[for="v-dashboards"] svg,
+  #v-docs:checked ~ .app label.nav-item[for="v-docs"] svg,
+  #v-projects:checked ~ .app label.nav-item[for="v-projects"] svg,
+  #v-skills:checked ~ .app label.nav-item[for="v-skills"] svg,
+  #v-plugins:checked ~ .app label.nav-item[for="v-plugins"] svg,
+  #v-settings:checked ~ .app label.nav-item[for="v-settings"] svg,
+  #v-signin:checked ~ .app label.nav-item[for="v-settings"] svg,
+  #v-signup:checked ~ .app label.nav-item[for="v-settings"] svg { color: var(--text); }
+
+  /* active chat in history */
+  #v-chat-1:checked ~ .app label.chat-item[for="v-chat-1"],
+  #v-chat-2:checked ~ .app label.chat-item[for="v-chat-2"],
+  #v-chat-3:checked ~ .app label.chat-item[for="v-chat-3"] {
+    background: var(--surface-3); color: var(--text);
+  }
+  /* active project */
+  #p-1:checked ~ .app label.proj-item[for="p-1"],
+  #p-2:checked ~ .app label.proj-item[for="p-2"] {
+    background: var(--surface-3); color: var(--text);
+  }
+
+  .side-bottom { border-top: 1px solid var(--border-soft); padding: 8px 0 10px; }
+  .user-card {
+    display: flex; align-items: center; gap: 10px;
+    margin: 4px 12px 0; padding: 8px 10px;
+    border-radius: 10px; cursor: pointer;
+    transition: background 120ms;
+  }
+  .user-card:hover { background: var(--surface-2); }
+  .avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex: none;
+    background: var(--surface-3); color: var(--muted);
+    display: grid; place-items: center;
+  }
+  .user-card .u-name { font-size: 0.87rem; font-weight: 500; }
+  .user-card .u-plan { font-size: 0.76rem; color: var(--faint); }
+
+  /* ============ ICON BUTTONS ============ */
+  .icon-btn {
+    width: 32px; height: 32px; border-radius: 8px; flex: none;
+    display: grid; place-items: center; color: var(--muted); cursor: pointer;
+    transition: background 110ms var(--ease), color 110ms;
+  }
+  .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+
+  /* ============ MAIN / TOPBAR ============ */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+  .topbar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; min-height: 52px; flex: none;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .hamburger { display: none; }
+  .side-close { display: none; }
+  .model { position: relative; }
+  .model summary {
+    list-style: none; cursor: pointer; white-space: nowrap;
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 10px; border-radius: 10px;
+    font-weight: 500; font-size: 0.92rem;
+    transition: background 120ms;
+  }
+  .model summary::-webkit-details-marker { display: none; }
+  .model summary:hover { background: var(--surface-2); }
+  .model summary .chev { color: var(--faint); transition: transform 160ms var(--ease); }
+  .model[open] summary .chev { transform: rotate(180deg); }
+  .model summary .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .model-menu {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 40;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: var(--shadow-lg);
+    padding: 6px; min-width: 250px;
+  }
+  .model-menu .option {
+    display: flex; gap: 10px; align-items: flex-start; width: 100%;
+    padding: 8px 10px; border-radius: 9px; text-align: left;
+    transition: background 110ms;
+  }
+  .model-menu .option:hover { background: var(--surface-2); }
+  .model-menu .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; }
+  .opt-name { font-weight: 500; font-size: 0.9rem; }
+  .opt-desc { font-size: 0.78rem; color: var(--muted); }
+
+  .chat-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 46vh; gap: 10px; padding: 24px; }
+  .chat-empty h3 { margin: 0; font-size: 1.05rem; }
+  .chat-empty p { margin: 0; max-width: 46ch; color: var(--muted); font-size: 0.88rem; }
+  .top-spacer { flex: 1; }
+  .theme-picker { position: relative; }
+  .theme-picker summary { list-style: none; }
+  .theme-picker summary::-webkit-details-marker { display: none; }
+  .theme-picker .theme-menu { right: 0; left: auto; }
+  .theme-menu .option { cursor: pointer; }
+
+  /* ============ VIEWS ============ */
+  .views { flex: 1; min-height: 0; position: relative; display: flex; }
+  .view { display: none; flex: 1; min-width: 0; min-height: 0; }
+  #v-home:checked ~ .app .view-home,
+  #v-chat-1:checked ~ .app .view-chat,
+  #v-chat-2:checked ~ .app .view-chat,
+  #v-chat-3:checked ~ .app .view-chat,
+  #v-canvas:checked ~ .app .view-canvas,
+  #v-video:checked ~ .app .view-video,
+  #v-browser:checked ~ .app .view-browser,
+  #v-agents:checked ~ .app .view-agents,
+  #v-automations:checked ~ .app .view-automations,
+  #v-dashboards:checked ~ .app .view-dashboards,
+  #v-docs:checked ~ .app .view-docs,
+  #v-projects:checked ~ .app .view-projects,
+  #v-skills:checked ~ .app .view-skills,
+  #v-plugins:checked ~ .app .view-plugins,
+  #v-settings:checked ~ .app .view-settings,
+  #v-signin:checked ~ .app .view-signin,
+  #v-signup:checked ~ .app .view-signup { display: flex; }
+
+  /* conversation switch */
+  .conversation { display: none; }
+  #v-chat-1:checked ~ .app .conv-1,
+  #v-chat-2:checked ~ .app .conv-2,
+  #v-chat-3:checked ~ .app .conv-3 { display: block; }
+
+  /* ============ CHAT ============ */
+  .view-chat { flex-direction: column; }
+  .thread { flex: 1 1 0; overflow-y: auto; min-height: 0; }
+  .thread-inner { max-width: 748px; margin: 0 auto; padding: 28px 22px 28px; }
+
+  .msg-user { display: flex; justify-content: flex-end; margin: 18px 0 6px; }
+  .msg-user .bubble {
+    background: var(--surface-3);
+    padding: 10px 16px;
+    border-radius: 18px 18px 5px 18px;
+    max-width: 78%;
+    font-size: 0.95rem;
+  }
+  .msg-ai { display: flex; gap: 13px; margin: 22px 0 4px; }
+  .who {
+    width: 27px; height: 27px; border-radius: 50%; flex: none;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; margin-top: 2px;
+  }
+  .ai-col { min-width: 0; flex: 1; }
+  .ai-col .txt { font-size: 0.95rem; line-height: 1.65; }
+  .ai-col .txt p { margin: 0 0 12px; }
+  .ai-col .txt :last-child { margin-bottom: 0; }
+  .ai-col .txt h4 { font-size: 0.92rem; margin: 18px 0 8px; }
+  .ai-col .txt ul, .ai-col .txt ol { margin: 0 0 12px 20px; }
+  .ai-col .txt li { margin-bottom: 6px; }
+  .ai-col .txt strong { font-weight: 700; }
+
+  .codeblock {
+    background: var(--code-bg); color: var(--code-text);
+    border-radius: 12px; overflow: hidden; margin: 4px 0 14px;
+    font-family: "JetBrains Mono", monospace; font-size: 0.8rem; line-height: 1.6;
+  }
+  .code-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 14px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    color: #8f8a82; font-size: 0.72rem;
+  }
+  .code-head .copy { display: flex; align-items: center; gap: 5px; color: #8f8a82; font-size: 0.72rem; }
+  .codeblock pre { padding: 13px 16px; overflow-x: auto; }
+
+  .sources { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 12px; }
+  .src-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.75rem; color: var(--muted);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 7px; padding: 3px 8px;
+  }
+  .src-chip .n {
+    width: 14px; height: 14px; border-radius: 4px; flex: none;
+    background: var(--accent-soft); color: var(--accent);
+    font-size: 0.62rem; font-weight: 700; display: grid; place-items: center;
+  }
+
+  .actions { display: flex; gap: 2px; margin-top: 2px; }
+  .actions button {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: grid; place-items: center; color: var(--faint);
+    transition: background 110ms, color 110ms;
+  }
+  .actions button:hover { background: var(--surface-2); color: var(--text); }
+
+  .followups { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px 40px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 0.84rem; font-weight: 500; color: var(--muted);
+    border: 1px solid var(--border); border-radius: 99px;
+    padding: 7px 14px; cursor: pointer;
+    transition: background 120ms, color 120ms, border-color 120ms;
+  }
+  .chip:hover { background: var(--surface-2); color: var(--text); }
+  .chip svg { color: var(--faint); }
+
+  .typing { display: flex; align-items: center; gap: 9px; color: var(--muted); font-size: 0.9rem; }
+  .dots { display: inline-flex; gap: 4px; }
+  .dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); animation: blink 1.2s infinite; }
+  .dots span:nth-child(2) { animation-delay: 0.15s; }
+  .dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes blink { 0%, 70%, 100% { opacity: 0.35; } 40% { opacity: 1; } }
+
+  /* composer */
+  .composer-wrap { flex: none; padding: 6px 22px 14px; }
+  .composer-inner { max-width: 748px; margin: 0 auto; }
+  .composer {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    box-shadow: var(--shadow-sm);
+    padding: 12px 14px 10px;
+    transition: border-color 140ms, box-shadow 140ms;
+  }
+  .composer:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); box-shadow: var(--shadow-md); }
+  .composer textarea {
+    width: 100%; background: transparent; border: 0; outline: none; resize: none;
+    font-size: 0.95rem; line-height: 1.5; max-height: 160px; min-height: 24px;
+    font-family: inherit; color: inherit;
+  }
+  .composer textarea::placeholder { color: var(--faint); }
+  .composer-bar { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+  .send {
+    width: 32px; height: 32px; border-radius: 50%; margin-left: auto;
+    background: var(--accent); color: #fff;
+    display: grid; place-items: center;
+    transition: background 120ms;
+  }
+  .send:hover { background: var(--accent-hover); }
+  .composer-foot {
+    text-align: center; font-size: 0.72rem; color: var(--faint);
+    margin-top: 9px;
+  }
+
+  /* ============ GENERIC PAGE ============ */
+  .page { width: 100%; max-width: 880px; margin: 0 auto; padding: 26px 24px 60px; overflow-y: auto; }
+  .page-head { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .page-head h2 { font-size: 1.22rem; letter-spacing: -0.01em; margin-right: auto; }
+  .page-head .sub { font-size: 0.85rem; color: var(--muted); width: 100%; margin-top: -10px; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 8px 15px; border-radius: 10px;
+    font-size: 0.88rem; font-weight: 500;
+    background: var(--accent); color: #fff;
+    box-shadow: var(--shadow-sm);
+    transition: background 120ms var(--ease);
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn-ghost {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border); box-shadow: none;
+  }
+  .btn-ghost:hover { background: var(--surface-2); }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+  }
+
+  .status-badge {
+    font-size: 0.74rem; font-weight: 600;
+    border-radius: 99px; padding: 3px 10px;
+  }
+  .st-ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 13%, transparent); }
+  .st-run { color: var(--accent); background: var(--accent-soft); }
+  .st-queue { color: var(--muted); background: var(--surface-2); }
+
+  .meter { height: 6px; border-radius: 99px; background: var(--surface-3); overflow: hidden; flex: 1; }
+  .meter > span { display: block; height: 100%; border-radius: 99px; background: var(--accent); }
+
+  .spinner {
+    width: 15px; height: 15px; flex: none;
+    border: 2px solid var(--surface-3); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ============ CANVAS ============ */
+  .view-canvas { min-height: 0; }
+  .canvas-split { flex: 1; display: flex; min-width: 0; min-height: 0; }
+  .pane { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .pane-code { border-right: 1px solid var(--border-soft); }
+  .pane-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 14px; border-bottom: 1px solid var(--border-soft); flex: none;
+  }
+  .file-tab { display: inline-flex; align-items: center; gap: 7px; font-size: 0.82rem; font-weight: 500; color: var(--muted); }
+  .file-tab svg { color: var(--faint); }
+  .pane-body { flex: 1; min-height: 0; overflow: auto; }
+  .editor {
+    font-family: "JetBrains Mono", monospace; font-size: 0.78rem; line-height: 1.7;
+    padding: 14px 0; min-width: 100%;
+  }
+  .cl { padding: 0 18px; white-space: pre; }
+  .tk-t { color: #7fa06a; }
+  .tk-a { color: #8b8478; }
+  .tk-p { color: #b08d57; }
+  .preview-frame { width: 100%; height: 100%; border: 0; background: #fff; }
+
+  /* ============ VIDEO ============ */
+  .prompt-bar { display: flex; gap: 10px; margin-bottom: 22px; }
+  .prompt-bar input { flex: 1; padding: 11px 15px; font-size: 0.92rem; }
+  .vid-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+  .vid-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+  }
+  .thumb { position: relative; aspect-ratio: 16 / 10; background: var(--surface-3); overflow: hidden; }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .play {
+    position: absolute; inset: 0; margin: auto; width: 40px; height: 40px;
+    border-radius: 50%; background: rgba(20, 16, 12, 0.55); color: #fff;
+    display: grid; place-items: center; backdrop-filter: blur(2px);
+  }
+  .dur {
+    position: absolute; right: 8px; bottom: 8px;
+    background: rgba(20, 16, 12, 0.7); color: #fff;
+    font-size: 0.7rem; font-weight: 600; border-radius: 5px; padding: 2px 6px;
+  }
+  .vid-meta { padding: 12px 14px 14px; }
+  .vid-meta .t { font-size: 0.9rem; font-weight: 500; margin-bottom: 3px; }
+  .vid-meta .m { font-size: 0.77rem; color: var(--faint); }
+  .thumb-render { position: relative; }
+  .thumb-render::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.16) 50%, transparent 70%);
+    background-size: 220% 100%;
+    animation: shimmer 1.6s linear infinite;
+  }
+  @keyframes shimmer { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+  .render-bar { padding: 12px 14px 4px; }
+  .render-bar .label { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--muted); margin-bottom: 7px; }
+  .render-bar .meter { flex: none; }
+
+  /* ============ BROWSER ============ */
+  .browser-split { display: grid; grid-template-columns: minmax(0,1.6fr) minmax(0,1fr); gap: 18px; align-items: start; }
+  .browser { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .br-bar { display: flex; align-items: center; gap: 4px; padding: 8px 10px; border-bottom: 1px solid var(--border-soft); }
+  .url-pill {
+    flex: 1; display: flex; align-items: center; gap: 7px; margin-left: 4px;
+    background: var(--surface-2); border-radius: 99px; padding: 6px 13px;
+    font-size: 0.82rem; color: var(--muted);
+  }
+  .url-pill svg { color: var(--faint); flex: none; }
+  .br-frame { height: 420px; }
+  .br-frame iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+  .agent-panel .card + .card { margin-top: 14px; }
+  .agent-head { display: flex; align-items: center; gap: 9px; font-weight: 500; font-size: 0.92rem; }
+  .steps { list-style: none; margin-top: 14px; display: flex; flex-direction: column; gap: 4px; }
+  .step { display: flex; align-items: center; gap: 10px; font-size: 0.86rem; padding: 5px 2px; }
+  .step .txt { flex: 1; }
+  .step .txt.done { color: var(--muted); }
+  .step .time { font-size: 0.75rem; color: var(--faint); }
+  .ic { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; flex: none; }
+  .ic-ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+  .agent-foot { font-size: 0.78rem; color: var(--faint); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+  .usage-item .u-label { display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 8px; }
+  .usage-item .u-label .val { color: var(--muted); }
+  .usage-item + .usage-item { margin-top: 16px; }
+
+  /* ============ AGENTS ============ */
+  .run-card { margin-bottom: 16px; }
+  .run-top { display: flex; align-items: center; gap: 12px; }
+  .run-top h3 { font-size: 0.98rem; margin-right: auto; }
+  .run-meta { font-size: 0.8rem; color: var(--muted); margin-top: 6px; }
+  .agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .ac-top { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; }
+  .ac-top .who { width: 24px; height: 24px; margin-top: 0; }
+  .ac-name { font-weight: 500; font-size: 0.9rem; }
+  .ac-role { font-size: 0.78rem; color: var(--muted); }
+  .ac-stats { display: flex; gap: 14px; font-size: 0.78rem; color: var(--muted); margin-top: 9px; flex-wrap: wrap; }
+  .ac-stats b { color: var(--text); font-weight: 600; }
+  .agent-card .meter { margin-top: 10px; }
+  .usage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 18px; }
+
+  /* ============ PROJECTS ============ */
+  .projects-split { display: grid; grid-template-columns: 280px 1fr; gap: 18px; align-items: start; }
+  .proj-list { display: flex; flex-direction: column; gap: 10px; }
+  .proj-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 15px 16px; cursor: pointer;
+    transition: border-color 130ms;
+  }
+  .proj-card:hover { border-color: var(--faint); }
+  .p-name { display: flex; align-items: center; gap: 9px; font-weight: 500; font-size: 0.92rem; margin-bottom: 10px; }
+  .p-name svg { color: var(--faint); flex: none; }
+  .p-meta { font-size: 0.78rem; color: var(--muted); margin-bottom: 8px; }
+  .proj-card .meter { flex: none; }
+  #p-1:checked ~ .app label.proj-card[for="p-1"],
+  #p-2:checked ~ .app label.proj-card[for="p-2"] { border-color: var(--accent); }
+
+  .tasks-pane { padding: 20px 22px; }
+  .tasks-1, .tasks-2 { display: none; }
+  #p-1:checked ~ .app .tasks-1,
+  #p-2:checked ~ .app .tasks-2 { display: block; }
+  .task-list { display: flex; flex-direction: column; }
+  .task {
+    display: flex; align-items: center; gap: 11px;
+    padding: 10px 2px; font-size: 0.9rem; cursor: pointer;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .task:last-child { border-bottom: 0; }
+  .task input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .task .cb {
+    width: 18px; height: 18px; border-radius: 6px; flex: none;
+    border: 1.5px solid var(--border); color: transparent;
+    display: grid; place-items: center;
+    transition: background 140ms, border-color 140ms;
+  }
+  .task input:checked ~ .cb { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .task input:checked ~ .txt { text-decoration: line-through; color: var(--faint); }
+  .task .txt { flex: 1; }
+  .task .who { font-size: 0.74rem; color: var(--faint); flex: none; }
+
+  /* ============ SKILLS ============ */
+  .skills-list { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .skill-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 15px 18px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .skill-row:last-child { border-bottom: 0; }
+  .skill-ic {
+    width: 36px; height: 36px; border-radius: 10px; flex: none;
+    background: var(--surface-2); color: var(--muted);
+    display: grid; place-items: center;
+  }
+  .skill-info { flex: 1; min-width: 0; }
+  .skill-name { font-weight: 500; font-size: 0.92rem; display: flex; align-items: center; gap: 8px; }
+  .skill-kind { font-size: 0.66rem; font-weight: 700; letter-spacing: 0.05em; color: var(--faint); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; }
+  .skill-desc { font-size: 0.83rem; color: var(--muted); margin-top: 2px; }
+  .skill-used { font-size: 0.77rem; color: var(--faint); flex: none; }
+  .new-skill {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 15px; margin-top: 14px;
+    border: 1.5px dashed var(--border); border-radius: 14px;
+    color: var(--muted); font-weight: 500; font-size: 0.9rem;
+    transition: border-color 130ms, color 130ms;
+  }
+  .new-skill:hover { border-color: var(--faint); color: var(--text); }
+
+  /* switches */
+  .switch { position: relative; display: inline-block; flex: none; cursor: pointer; }
+  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .switch .track {
+    display: block; width: 36px; height: 21px; border-radius: 99px;
+    background: var(--surface-3); border: 1px solid var(--border);
+    transition: background 160ms var(--ease), border-color 160ms;
+    position: relative;
+  }
+  .switch .knob {
+    position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
+    border-radius: 50%; background: #fff; box-shadow: var(--shadow-sm);
+    transition: transform 160ms var(--ease);
+  }
+  .switch input:checked ~ .track { background: var(--accent); border-color: var(--accent); }
+  .switch input:checked ~ .track .knob { transform: translateX(15px); }
+  .switch input:focus-visible ~ .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* ============ PLUGINS ============ */
+  .plugin-list { display: flex; flex-direction: column; gap: 10px; }
+  .plugin-row {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 13px 16px;
+  }
+  .plugin-ic {
+    width: 38px; height: 38px; border-radius: 10px; flex: none;
+    background: var(--surface-2);
+    display: grid; place-items: center;
+  }
+  .plugin-ic svg { width: 20px; height: 20px; }
+  .plugin-info { flex: 1; min-width: 0; }
+  .pn { font-weight: 500; font-size: 0.92rem; }
+  .pd { font-size: 0.82rem; color: var(--muted); margin-top: 1px; }
+  .plugin-state { flex: none; }
+  .state-on { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--muted); }
+  .state-on::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+
+  /* ============ SETTINGS ============ */
+  .settings-page { max-width: 720px; }
+  .set-section {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px 22px; margin-bottom: 16px;
+  }
+  .set-section h3 { font-size: 1rem; margin-bottom: 3px; }
+  .set-sub { font-size: 0.83rem; color: var(--muted); margin-bottom: 6px; }
+  .set-row {
+    display: flex; align-items: center; gap: 18px;
+    padding: 14px 0; border-bottom: 1px solid var(--border-soft);
+  }
+  .set-row:last-child { border-bottom: 0; padding-bottom: 2px; }
+  .sr-info { flex: 1; min-width: 0; }
+  .sr-title { font-size: 0.9rem; font-weight: 500; }
+  .sr-desc { font-size: 0.79rem; color: var(--muted); margin-top: 1px; }
+  .field { margin: 14px 0; }
+  .field label { display: block; font-size: 0.82rem; font-weight: 500; margin-bottom: 6px; }
+  .field input { width: 100%; }
+  .segment {
+    display: inline-flex; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: 10px; padding: 3px;
+  }
+  .segment label {
+    padding: 5px 13px; border-radius: 7px; font-size: 0.83rem; font-weight: 500;
+    color: var(--muted); cursor: pointer; transition: background 120ms, color 120ms;
+  }
+  .segment input { position: absolute; opacity: 0; pointer-events: none; }
+  #t-otto:checked ~ .app .theme-seg label[for="t-otto"],
+  #t-light:checked ~ .app .theme-seg label[for="t-light"],
+  #t-dark:checked ~ .app .theme-seg label[for="t-dark"],
+  .agentmode-seg #am-off:checked + label,
+  .agentmode-seg #am-bal:checked + label,
+  .agentmode-seg #am-max:checked + label {
+    background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm);
+  }
+  input[type="range"] { accent-color: var(--accent); width: 170px; }
+  .radio-row {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 11px 0; cursor: pointer;
+  }
+  .radio-row input { position: absolute; opacity: 0; }
+  .rdot {
+    width: 18px; height: 18px; border-radius: 50%; flex: none; margin-top: 2px;
+    border: 1.5px solid var(--border);
+    display: grid; place-items: center;
+    transition: border-color 130ms;
+  }
+  .rdot::after { content: ""; width: 9px; height: 9px; border-radius: 50%; background: transparent; transition: background 130ms; }
+  .radio-row input:checked ~ .rdot { border-color: var(--accent); }
+  .radio-row input:checked ~ .rdot::after { background: var(--accent); }
+  .r-main { font-size: 0.9rem; font-weight: 500; }
+  .r-sub { font-size: 0.79rem; color: var(--muted); }
+
+  /* ============ AUTH ============ */
+  .auth-wrap { flex: 1; display: grid; place-items: center; padding: 24px; overflow-y: auto; }
+  .auth-card {
+    width: min(392px, 100%);
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 18px; padding: 30px 28px;
+    box-shadow: var(--shadow-md);
+    display: flex; flex-direction: column; gap: 13px;
+  }
+  .auth-logo { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 1.05rem; }
+  .auth-card h2 { font-size: 1.2rem; letter-spacing: -0.01em; }
+  .auth-sub { font-size: 0.86rem; color: var(--muted); margin-top: -6px; }
+  .oauth { display: flex; flex-direction: column; gap: 8px; }
+  .oauth .btn { justify-content: center; }
+  .oauth svg { width: 16px; height: 16px; flex: none; }
+  .oauth svg { flex: none; }
+  .auth-divider { display: flex; align-items: center; gap: 12px; color: var(--faint); font-size: 0.76rem; }
+  .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .auth-note { font-size: 0.74rem; color: var(--faint); text-align: center; }
+  .auth-switch { font-size: 0.85rem; color: var(--muted); text-align: center; }
+  .auth-link { color: var(--accent); font-weight: 500; cursor: pointer; }
+  .auth-link:hover { text-decoration: underline; }
+  .auth-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--muted); font-size: 0.84rem; cursor: pointer; align-self: center;
+  }
+  .auth-back:hover { color: var(--text); }
+  .check-row { display: flex; align-items: center; gap: 10px; font-size: 0.84rem; color: var(--muted); cursor: pointer; }
+  .check-row input { position: absolute; opacity: 0; }
+  .check-row .cb {
+    width: 17px; height: 17px; border-radius: 5px; flex: none;
+    border: 1.5px solid var(--border); color: transparent;
+    display: grid; place-items: center;
+    transition: background 140ms, border-color 140ms;
+  }
+  .check-row input:checked ~ .cb { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ============ HOME (Otto style) ============ */
+  .view-home { flex-direction: column; }
+  .home-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+  .home-inner { max-width: 860px; margin: 0 auto; padding: 26px 24px 48px; }
+
+  .space-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .space-pill {
+    padding: 7px 15px; border-radius: 999px; font-size: 0.86rem; font-weight: 500;
+    color: var(--muted); cursor: pointer;
+    border: 1px solid var(--border); transition: all 130ms var(--ease);
+  }
+  .space-pill:hover { color: var(--text); border-color: var(--muted); }
+  #sp-personal:checked ~ .app .space-pill[for="sp-personal"],
+  #sp-work:checked ~ .app .space-pill[for="sp-work"],
+  #sp-side:checked ~ .app .space-pill[for="sp-side"] {
+    background: var(--accent); border-color: var(--accent); color: #fff;
+  }
+  .space-note { font-size: 0.76rem; color: var(--faint); margin-left: auto; }
+
+  .home-hero { text-align: center; padding: 34px 0 22px; }
+  .date-tag {
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--faint);
+  }
+  .home-hero h1 { font-size: 1.9rem; letter-spacing: -0.02em; margin: 6px 0 4px; }
+  .home-hero .home-sub { color: var(--muted); font-size: 0.92rem; }
+
+  .ask-box {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 18px; box-shadow: var(--shadow-md); overflow: hidden;
+    transition: border-color 140ms var(--ease);
+  }
+  .ask-box:focus-within { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+  .ask-box input[type="text"] {
+    width: 100%; border: 0; background: transparent; border-radius: 0;
+    padding: 17px 18px 8px; font-size: 0.98rem;
+  }
+  .ask-box input[type="text"]:focus { border: 0; }
+  .ask-bar { display: flex; align-items: center; gap: 10px; padding: 6px 10px 10px 14px; }
+  .agent-pick {
+    display: flex; align-items: center; gap: 7px; cursor: pointer;
+    font-size: 0.85rem; font-weight: 500; color: var(--muted);
+    padding: 5px 9px; border-radius: 999px; transition: background 120ms;
+  }
+  .agent-pick:hover { background: var(--surface-2); color: var(--text); }
+  .agent-pick .mini-avatar {
+    width: 20px; height: 20px; border-radius: 50%; flex: none;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-size: 0.68rem; font-weight: 700;
+  }
+  .ask-status { font-size: 0.76rem; color: var(--faint); margin-left: auto; }
+  .ask-send {
+    width: 32px; height: 32px; border-radius: 9px; flex: none;
+    background: var(--accent); color: #fff; display: grid; place-items: center; cursor: pointer;
+    transition: background 120ms;
+  }
+  .ask-send:hover { background: var(--accent-hover); }
+
+  .quick-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; padding: 14px 0 4px; }
+  .quick-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 0.82rem; font-weight: 500; color: var(--muted); cursor: pointer;
+    padding: 7px 14px; border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 70%, transparent);
+    border: 1px solid var(--border-soft);
+    transition: all 130ms;
+  }
+  .quick-pill:hover { color: var(--text); border-color: var(--border); }
+  .quick-pill svg { color: var(--faint); }
+
+  .home-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 14px; padding-top: 18px;
+  }
+  .home-card {
+    background: var(--surface); border: 1px solid var(--border-soft);
+    border-radius: 16px; padding: 16px 18px; box-shadow: var(--shadow-sm);
+  }
+  .home-card.wide { grid-column: 1 / -1; }
+  .hc-head {
+    display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px;
+  }
+  .hc-head h3 { font-size: 0.95rem; letter-spacing: -0.01em; }
+  .hc-head .hc-sub { font-size: 0.76rem; color: var(--faint); }
+  .hc-head .hc-meta { margin-left: auto; font-size: 0.72rem; font-weight: 600; color: var(--accent); }
+
+  .check-row { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; font-size: 0.88rem; }
+  .check-row input { accent-color: var(--accent); margin-top: 3px; }
+  .check-row .cr-label { flex: 1; }
+  .check-row .cr-hint { display: block; font-size: 0.76rem; color: var(--faint); margin-top: 1px; }
+  .check-row .cr-link { color: var(--accent); font-weight: 500; cursor: pointer; }
+  .check-row.done .cr-label { color: var(--faint); text-decoration: line-through; text-decoration-color: var(--faint); }
+
+  .prog { height: 5px; border-radius: 999px; background: var(--surface-3); overflow: hidden; margin: 8px 0 2px; }
+  .prog i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+
+  .sys-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 0.86rem; }
+  .sys-row .sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); flex: none; box-shadow: 0 0 6px color-mix(in srgb, var(--ok) 60%, transparent); }
+  .sys-row .sdot.idle { background: var(--faint); box-shadow: none; }
+  .sys-row .sr-label { flex: 1; }
+  .sys-row .sr-time { font-size: 0.75rem; color: var(--faint); }
+  .sys-row .prog { flex: 1; margin: 0; max-width: 110px; }
+
+  .avatar-row { display: flex; gap: 14px; flex-wrap: wrap; padding: 4px 0; }
+  .agent-avatar {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    width: 74px; cursor: default;
+  }
+  .agent-avatar .face {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: var(--surface-3); color: var(--text);
+    display: grid; place-items: center; font-weight: 700; font-size: 0.9rem;
+    border: 2px solid var(--accent);
+  }
+  .agent-avatar .an { font-size: 0.74rem; color: var(--muted); }
+  .agent-avatar .ast { font-size: 0.68rem; color: var(--ok); }
+
+  .feed-row { display: flex; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); font-size: 0.86rem; }
+  .feed-row:last-child { border-bottom: 0; }
+  .feed-row .favatar {
+    width: 26px; height: 26px; border-radius: 50%; flex: none;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-size: 0.7rem; font-weight: 700;
+  }
+  .feed-row .f-time { margin-left: auto; font-size: 0.73rem; color: var(--faint); flex: none; }
+
+  .needs-card { border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .needs-card .hc-head h3 { color: var(--accent); }
+  .needs-actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .btn-mini {
+    padding: 7px 14px; border-radius: 9px; font-size: 0.82rem; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border); transition: all 120ms;
+  }
+  .btn-mini:hover { border-color: var(--muted); }
+  .btn-mini.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-mini.primary:hover { background: var(--accent-hover); }
+
+  /* space content switching */
+  .space-content { display: none; }
+  #sp-personal:checked ~ .app .sc-personal,
+  #sp-work:checked ~ .app .sc-work,
+  #sp-side:checked ~ .app .sc-side { display: block; }
+
+  /* ============ AUTOMATIONS ============ */
+  .auto-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 13px 0; border-bottom: 1px solid var(--border-soft);
+  }
+  .auto-row:last-child { border-bottom: 0; }
+  .auto-what { flex: 1; min-width: 0; }
+  .auto-what .aw-title { font-size: 0.92rem; font-weight: 500; }
+  .auto-what .aw-sched { font-size: 0.78rem; color: var(--faint); display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+  .auto-what .aw-sched svg { flex: none; }
+  .auto-badge {
+    font-size: 0.72rem; font-weight: 600; color: var(--accent);
+    background: var(--accent-soft); padding: 3px 9px; border-radius: 999px; flex: none;
+  }
+  .auto-run { font-size: 0.75rem; color: var(--faint); flex: none; }
+
+  /* ============ DASHBOARDS ============ */
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+  .dash-card {
+    background: var(--surface); border: 1px solid var(--border-soft);
+    border-radius: 16px; padding: 16px 18px; box-shadow: var(--shadow-sm);
+  }
+  .dash-card.wide { grid-column: 1 / -1; }
+  .dash-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+  .dash-head .dlogo { width: 30px; height: 30px; border-radius: 8px; background: var(--surface-3); display: grid; place-items: center; flex: none; }
+  .dash-head h3 { font-size: 0.95rem; }
+  .dash-head .d-sub { font-size: 0.75rem; color: var(--faint); }
+  .dash-big { font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; }
+  .dash-delta { font-size: 0.8rem; font-weight: 600; color: var(--ok); }
+  .dash-sub { font-size: 0.78rem; color: var(--faint); }
+  .spark { width: 100%; height: 46px; margin-top: 8px; display: block; }
+  .post-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border-soft); font-size: 0.86rem; }
+  .post-row:last-child { border-bottom: 0; }
+  .post-row .pr-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .post-row .pr-metric { font-size: 0.78rem; color: var(--muted); flex: none; }
+  .post-row .pr-delta { font-size: 0.78rem; font-weight: 600; color: var(--ok); flex: none; }
+
+  /* ============ DOCS / SHEETS / SLIDES ============ */
+  .doc-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+  .doc-tab {
+    padding: 7px 16px; border-radius: 9px; font-size: 0.86rem; font-weight: 500;
+    color: var(--muted); cursor: pointer; border: 1px solid transparent;
+  }
+  .doc-tab:hover { color: var(--text); }
+  #dt-doc:checked ~ .app .doc-tab[for="dt-doc"],
+  #dt-sheet:checked ~ .app .doc-tab[for="dt-sheet"],
+  #dt-slide:checked ~ .app .doc-tab[for="dt-slide"] {
+    background: var(--surface); border-color: var(--border); color: var(--text); box-shadow: var(--shadow-sm);
+  }
+  .doc-pane, .sheet-pane, .slide-pane { display: none; }
+  #dt-doc:checked ~ .app .doc-pane,
+  #dt-sheet:checked ~ .app .sheet-pane,
+  #dt-slide:checked ~ .app .slide-pane { display: flex; gap: 14px; align-items: stretch; }
+
+  .doc-main {
+    flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border-soft);
+    border-radius: 16px; padding: 28px 34px; box-shadow: var(--shadow-sm);
+    overflow-y: auto; max-height: 100%;
+  }
+  .doc-main h2 { font-size: 1.35rem; letter-spacing: -0.01em; margin-bottom: 14px; }
+  .doc-main p { font-size: 0.92rem; color: var(--muted); margin-bottom: 12px; }
+  .ai-panel {
+    width: 250px; flex: none; background: var(--surface); border: 1px solid var(--border-soft);
+    border-radius: 16px; padding: 16px; box-shadow: var(--shadow-sm);
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .ai-panel h4 {
+    font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--faint); display: flex; align-items: center; gap: 7px;
+  }
+  .ai-panel .ai-btn {
+    text-align: left; padding: 9px 12px; border-radius: 10px; font-size: 0.84rem; font-weight: 500;
+    border: 1px solid var(--border); cursor: pointer; transition: all 120ms;
+    color: var(--text);
+  }
+  .ai-panel .ai-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .ai-panel .ai-note { font-size: 0.73rem; color: var(--faint); margin-top: auto; }
+
+  .sheet-wrap { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+  .sheet-bar { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+  .fx-label { font-family: "JetBrains Mono", monospace; font-size: 0.72rem; color: var(--faint); padding: 4px 8px; background: var(--surface-3); border-radius: 6px; }
+  .fx-input {
+    flex: 1; font-family: "JetBrains Mono", monospace; font-size: 0.78rem;
+    padding: 6px 10px; border-radius: 8px;
+  }
+  .sheet-tabs { display: flex; gap: 4px; padding: 6px 0 10px; }
+  .stab { font-size: 0.78rem; font-weight: 500; color: var(--muted); padding: 5px 13px; border-radius: 8px 8px 0 0; cursor: pointer; border: 1px solid transparent; }
+  .stab.on { background: var(--surface); border-color: var(--border-soft); color: var(--text); }
+  .sheet-grid { flex: 1; overflow: auto; border: 1px solid var(--border-soft); border-radius: 12px; }
+  .sheet-grid table { border-collapse: collapse; width: 100%; font-size: 0.8rem; background: var(--surface); }
+  .sheet-grid th, .sheet-grid td { border: 1px solid var(--border-soft); padding: 7px 11px; text-align: left; white-space: nowrap; }
+  .sheet-grid th { background: var(--surface-2); font-weight: 600; font-size: 0.74rem; color: var(--muted); }
+  .sheet-grid td.fx { font-family: "JetBrains Mono", monospace; font-size: 0.72rem; color: var(--accent); }
+
+  .slide-stage {
+    flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--border-soft);
+    border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow-sm);
+  }
+  .slide-canvas { flex: 1; display: grid; place-items: center; padding: 30px; }
+  .slide-frame {
+    width: min(100%, 560px); aspect-ratio: 16/9; border-radius: 12px;
+    background: linear-gradient(135deg, #10141a, #1b2230); color: #fff;
+    padding: 34px 38px; display: flex; flex-direction: column; justify-content: center;
+    box-shadow: var(--shadow-lg);
+  }
+  .slide-frame .sf-kicker { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: #2ed8a2; font-weight: 700; }
+  .slide-frame .sf-title { font-size: 1.5rem; letter-spacing: -0.02em; margin: 8px 0; }
+  .slide-frame .sf-body { font-size: 0.85rem; color: #b8c2cd; line-height: 1.5; }
+  .slide-nav { display: flex; align-items: center; gap: 12px; padding: 12px 18px; border-top: 1px solid var(--border-soft); }
+  .slide-count { font-size: 0.78rem; color: var(--faint); margin-left: auto; }
+  .export-btns { display: flex; gap: 8px; }
+
+  .needs-you-strip {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    max-width: 748px; margin: 0 auto 8px;
+  }
+  .needs-you-strip .nu-hint { font-size: 0.73rem; color: var(--faint); margin-left: auto; }
+
+  /* mobile-only chrome */
+  .tabbar { display: none; }
+
+  /* ============ MOBILE ============ */
+  @media (max-width: 880px) {
+    .sidebar {
+      position: fixed; inset: 0 auto 0 0; z-index: 60; width: 288px;
+      transform: translateX(-104%);
+      box-shadow: none;
+    }
+    #nav-toggle:checked ~ .app .sidebar { transform: none; box-shadow: var(--shadow-lg); }
+    #nav-toggle:checked ~ .app .scrim {
+      display: block; position: fixed; inset: 0; z-index: 50;
+      background: rgba(15, 12, 9, 0.45);
+    }
+    .topbar .hamburger { display: grid; }
+    .side-top .side-close { display: grid; }
+    
+    
+    .thread-inner { padding: 18px 16px 8px; }
+    .composer-wrap { padding: 6px 14px calc(12px + 58px + env(safe-area-inset-bottom)); }
+    .followups { margin-left: 0; }
+    .page { padding: 20px 16px 96px; }
+    .browser-split, .projects-split { grid-template-columns: 1fr; }
+    .pane-code { border-right: 0; border-bottom: 1px solid var(--border-soft); }
+    .canvas-split { flex-direction: column; }
+    .skill-used { display: none; }
+    .set-row { flex-wrap: wrap; }
+
+    /* mobile companion: bottom tab bar */
+    .tabbar {
+      display: grid; grid-template-columns: repeat(5, 1fr);
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+      background: color-mix(in srgb, var(--bg-side) 92%, transparent);
+      -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+      border-top: 1px solid var(--border-soft);
+      padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    }
+    .tabbar label {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      font-size: 0.64rem; font-weight: 500; color: var(--faint);
+      padding: 5px 2px; border-radius: 10px; cursor: pointer;
+    }
+    .tabbar label svg { pointer-events: none; }
+    #v-home:checked ~ .app .tabbar label[for="v-home"],
+    #v-chat-1:checked ~ .app .tabbar label[for="v-chat-1"],
+    #v-chat-2:checked ~ .app .tabbar label[for="v-chat-1"],
+    #v-chat-3:checked ~ .app .tabbar label[for="v-chat-1"],
+    #v-agents:checked ~ .app .tabbar label[for="v-agents"],
+    #v-automations:checked ~ .app .tabbar label[for="v-automations"] { color: var(--accent); }
+
+    .needs-you-strip .nu-hint { display: none; }
+    .home-inner { padding: 20px 16px 110px; }
+    .home-hero h1 { font-size: 1.5rem; }
+    .ai-panel { width: 100%; }
+    .doc-pane, .sheet-pane, .slide-pane { flex-direction: column; }
+    .doc-main { max-height: none; }
+    .auto-row { flex-wrap: wrap; }
+  }
+  /* tablet: two-column home, tighter cards */
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .home-inner { max-width: 640px; }
+    .sidebar { width: 228px; }
+  }
+
+  /* ============ AGENT SANDBOX ============ */
+  .sandbox-card { margin-top: 18px; }
+  .sandbox-sub { font-size: 0.82rem; color: var(--muted); margin-bottom: 12px; max-width: 60ch; }
+  .term {
+    background: var(--code-bg); color: var(--code-text);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; max-height: 230px; overflow-y: auto;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 0.78rem; line-height: 1.75;
+  }
+  .term .t-prompt { color: var(--accent); }
+  .term .t-ok { color: var(--ok); }
+  .term .t-dim { color: var(--faint); }
+  .term .t-line { white-space: pre-wrap; word-break: break-word; }
+  .sandbox-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+  /* ---------- harness steps + files ---------- */
+  .steps-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .step {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.72rem; font-weight: 600; letter-spacing: 0.01em;
+    padding: 3px 11px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--faint);
+    background: var(--surface); transition: all 150ms var(--ease);
+  }
+  .step svg { width: 11px; height: 11px; flex: none; }
+  .step.run { color: var(--text); border-color: var(--accent); animation: stepPulse 1.1s ease-in-out infinite; }
+  .step.run svg { color: var(--accent); }
+  .step.done { color: var(--accent); border-color: transparent; background: var(--accent-soft); }
+  @keyframes stepPulse { 50% { opacity: 0.5; } }
+  .file-card {
+    display: flex; align-items: center; gap: 10px; margin-top: 10px;
+    padding: 9px 12px; border: 1px solid var(--border); border-radius: 11px;
+    background: var(--surface); cursor: pointer; transition: border-color 130ms;
+  }
+  .file-card:hover { border-color: var(--accent); }
+  .file-card .f-ic { width: 30px; height: 30px; border-radius: 8px; background: var(--accent-soft);
+    color: var(--accent); display: flex; align-items: center; justify-content: center; flex: none; }
+  .file-card .f-ic svg { width: 15px; height: 15px; }
+  .file-card .f-mid { flex: 1; min-width: 0; }
+  .file-card .f-name { font-size: 0.85rem; font-weight: 600; }
+  .file-card .f-meta { font-size: 0.7rem; color: var(--faint); margin-top: 1px; }
+  .file-card .f-view { all: unset; font-size: 0.72rem; font-weight: 600; color: var(--accent);
+    padding: 5px 10px; border-radius: 8px; cursor: pointer; }
+  .file-card .f-view:hover { background: var(--accent-soft); }
+
+  /* files browser (Documents view) */
+  .files-card { margin-bottom: 18px; }
+  .files-head { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
+  .files-head svg { width: 15px; height: 15px; color: var(--accent); }
+  .files-sub { font-size: 0.78rem; color: var(--faint); margin: 4px 0 12px; }
+  .files-empty {
+    font-size: 0.8rem; color: var(--faint); border: 1px dashed var(--border);
+    border-radius: 11px; padding: 16px; text-align: center;
+  }
+  .file-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 6px;
+    border-bottom: 1px solid var(--border-soft); cursor: pointer;
+  }
+  .file-row:last-child { border-bottom: 0; }
+  .file-row:hover { background: var(--hover); }
+  .file-row .f-mid { flex: 1; min-width: 0; }
+  .file-row .f-name { font-size: 0.86rem; font-weight: 600; }
+  .file-row .f-meta { font-size: 0.7rem; color: var(--faint); }
+  .file-row .f-del { all: unset; color: var(--faint); font-size: 0.8rem; padding: 4px 6px; cursor: pointer; border-radius: 7px; }
+  .file-row .f-del:hover { color: #e0567a; background: rgba(224,86,122,0.1); }
+
+  /* file viewer modal */
+  .file-viewer { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; }
+  #file-viewer[hidden] { display: none; }
+  .fv-scrim { position: absolute; inset: 0; background: rgba(10,12,10,0.62); backdrop-filter: blur(3px); }
+  .fv-panel {
+    position: relative; width: min(860px, calc(100vw - 28px)); height: min(76vh, 720px);
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    box-shadow: var(--shadow-lg); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .fv-head { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--border-soft); }
+  .fv-title { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+  .fv-name { font-weight: 700; font-size: 0.95rem; }
+  .fv-meta { font-size: 0.72rem; color: var(--faint); }
+  .fv-actions { display: flex; gap: 6px; }
+  .fv-btn { all: unset; font-size: 0.76rem; font-weight: 600; padding: 6px 12px; border-radius: 9px;
+    cursor: pointer; border: 1px solid var(--border); color: var(--muted); }
+  .fv-btn:hover { background: var(--hover); }
+  .fv-btn.danger { color: #e0567a; }
+  .fv-btn.danger:hover { background: rgba(224,86,122,0.1); }
+  .fv-body { flex: 1; overflow: auto; margin: 0; padding: 16px; font: 0.78rem/1.55 'JetBrains Mono', monospace;
+    white-space: pre-wrap; word-break: break-word; color: var(--text); background: var(--surface); }
+
+  /* ---------- model picker menus ---------- */
+  #top-model-menu .m-group, #comp-model-menu .m-group {
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--faint); padding: 10px 12px 4px; font-weight: 700;
+  }
+  #top-model-menu .option, #comp-model-menu .option { display: flex; align-items: center; gap: 10px; }
+  #top-model-menu .m-price, #comp-model-menu .m-price { color: var(--faint); font-size: 0.7rem; }
+  #top-model-menu .opt-name, #comp-model-menu .opt-name { font-weight: 600; }
+  #top-model-menu .m-check, #comp-model-menu .m-check { margin-left: auto; color: var(--accent); font-weight: 700; }
+
+  /* ---------- advisor chip + cost line ---------- */
+  .advisor-chip {
+    display: flex; align-items: baseline; gap: 8px; margin: 10px 0 2px 36px;
+    font-size: 0.82rem; color: var(--muted);
+  }
+  .advisor-chip .a-tag {
+    flex: none; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 2px 8px;
+  }
+  .cost-line {
+    margin-top: 8px; font-size: 0.72rem; color: var(--faint);
+    border-top: 1px dashed var(--border); padding-top: 6px;
+  }
+  .advisor-chip.advisor-error .a-tag { color: #e0a24e; background: rgba(224,162,78,0.15); }
+
+  /* ---------- browser view sidebar ---------- */
+  .browser-shell { display: flex; gap: 14px; }
+  .browser-shell .browser { flex: 1; min-width: 0; }
+  .br-side {
+    width: 172px; flex: none; overflow-y: auto;
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px 12px;
+  }
+  .br-side .group-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--faint); margin: 14px 0 6px; }
+  .br-side .group-label:first-child { margin-top: 0; }
+  .br-side button { all: unset; display: flex; align-items: center; gap: 10px; width: 100%;
+    box-sizing: border-box; padding: 7px 9px; border-radius: 9px; font-size: 0.85rem;
+    color: var(--text); cursor: pointer; }
+  .br-side button:hover { background: var(--hover); }
+  .br-side button svg { width: 15px; height: 15px; color: var(--faint); flex: none; }
+
+  /* ---------- harness + usage ---------- */
+  .usage-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 14px; }
+  .usage-box { background: var(--hover); border-radius: 12px; padding: 12px 14px; }
+  .usage-box .u-num { font-size: 1.35rem; font-weight: 700; color: var(--accent); }
+  .usage-box .u-lab { font-size: 0.72rem; color: var(--faint); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 2px; }
+  .adv-status {
+    flex: none; align-self: center; font-size: 0.72rem; font-weight: 600;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: 999px; padding: 4px 10px; white-space: nowrap;
+  }
+
+  /* ---------- custom models list ---------- */
+  .cm-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .cm-row { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; color: var(--muted);
+    padding: 6px 10px; background: var(--hover); border-radius: 9px; }
+  .cm-row span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cm-row .del { all: unset; cursor: pointer; color: var(--faint); font-size: 0.85rem; padding: 0 4px; }
+  .cm-row .del:hover { color: #e0567a; }
+
+  /* legibility over the photographic wallpaper (Otto theme) */
+  body:has(#t-otto:checked) .space-note,
+  body:has(#t-otto:checked) .home-hero .home-sub,
+  body:has(#t-otto:checked) .home-date,
+  body:has(#t-otto:checked) .composer-foot,
+  body:has(#t-otto:checked) .home-hero .home-sub { display: inline-block; }
+  body:has(#t-otto:checked) .space-note {
+    background: rgba(12, 18, 14, 0.72); color: #e7e3da;
+    padding: 4px 12px; border-radius: 99px; backdrop-filter: blur(4px);
+  }
+  body:has(#t-otto:checked) .home-hero h1 { text-shadow: 0 1px 3px rgba(10, 16, 12, 0.5); }
+
+  /* ============ LIBRARY PICKER ============ */
+  .lib-picker summary { gap: 7px; }
+  .lib-menu { min-width: 262px; }
+  .lib-head {
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--faint); margin: 4px 12px 6px; font-weight: 700;
+  }
+
+  /* ============ COMPOSER MODEL PICKER ============ */
+  .comp-model { position: relative; }
+  .comp-model summary {
+    list-style: none; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.78rem; font-weight: 600; color: var(--muted);
+    border: 1px solid var(--border-soft); border-radius: 99px;
+    padding: 5px 11px; cursor: pointer; white-space: nowrap;
+  }
+  .comp-model summary::-webkit-details-marker { display: none; }
+  .comp-model summary:hover { background: var(--surface-2); color: var(--text); }
+  .comp-model .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+  .comp-model .model-menu {
+    position: absolute; bottom: calc(100% + 10px); left: 0; top: auto; z-index: 70;
+    max-height: 320px; max-width: calc(100vw - 24px); overflow-y: auto;
+  }
+  .m-group {
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--faint); margin: 8px 12px 4px; font-weight: 700;
+  }
+  .m-price { font-size: 0.68rem; color: var(--faint); }
+  .m-check { margin-left: auto; color: var(--accent); font-weight: 700; }
+
+  /* ============ ADVISOR + COST ============ */
+  .advisor-chip {
+    display: flex; gap: 8px; align-items: flex-start;
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    border-radius: 10px; padding: 8px 12px; margin: 2px 0 10px;
+    font-size: 0.78rem; line-height: 1.5; color: var(--muted);
+  }
+  .advisor-chip .a-tag {
+    flex: none; font-size: 0.64rem; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--accent); padding-top: 2px;
+  }
+  .cost-line {
+    font-size: 0.7rem; color: var(--faint); margin-top: 6px;
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+
+  /* ============ HARNESS SETTINGS ============ */
+  .harness-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+  .h-field { display: flex; flex-direction: column; gap: 6px; }
+  .h-field label { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+  .h-field select, .h-field textarea {
+    background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 10px; font-size: 0.84rem; font-family: inherit;
+  }
+  .h-field textarea { resize: vertical; min-height: 64px; }
+  .h-field input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .h-val { font-size: 0.74rem; color: var(--accent); font-weight: 700; }
+  .h-switch { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+  .h-switch .txt { font-size: 0.82rem; }
+  .h-switch .txt small { display: block; color: var(--faint); font-size: 0.72rem; margin-top: 2px; }
+  .switch { position: relative; width: 38px; height: 22px; flex: none; cursor: pointer; }
+  .switch input { position: absolute; opacity: 0; inset: 0; }
+  .switch .track {
+    position: absolute; inset: 0; border-radius: 99px; background: var(--border);
+    transition: background 160ms var(--ease);
+  }
+  .switch .knob {
+    position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    transition: transform 160ms var(--ease);
+  }
+  .switch input:checked ~ .track { background: var(--accent); }
+  .switch input:checked ~ .knob { transform: translateX(16px); }
+  .usage-row { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; font-size: 0.78rem; color: var(--muted); }
+  .usage-row b { color: var(--text); }
+  .cm-form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .cm-list { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .cm-row {
+    display: flex; align-items: center; gap: 10px; font-size: 0.8rem;
+    padding: 8px 12px; border: 1px solid var(--border-soft); border-radius: 9px;
+  }
+  .cm-row .del { margin-left: auto; color: var(--faint); cursor: pointer; background: none; border: 0; font-size: 0.95rem; }
+  .cm-row .del:hover { color: #e5484d; }
+
+  /* ============ BROWSER SIDEBAR ============ */
+  .browser-shell { display: flex; min-height: 0; flex: 1; }
+  .br-side {
+    width: 172px; flex: none; border-right: 1px solid var(--border-soft);
+    padding: 10px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;
+  }
+  .br-side h5 {
+    font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--faint); margin: 8px 6px 4px; font-weight: 700;
+  }
+  .br-side a, .br-side .bm {
+    display: flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--muted);
+    padding: 6px 8px; border-radius: 8px; cursor: pointer; text-decoration: none;
+  }
+  .br-side a:hover, .br-side .bm:hover { background: var(--surface-2); color: var(--text); }
+  .br-side .bm .fav { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+
+  /* ============ TOAST ============ */
+  .toast {
+    position: fixed; left: 50%; bottom: 28px;
+    transform: translate(-50%, 16px); z-index: 90;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    padding: 9px 16px; font-size: 0.84rem; font-weight: 500;
+    opacity: 0; pointer-events: none;
+    transition: opacity 200ms var(--ease), transform 200ms var(--ease);
+    max-width: min(88vw, 420px); text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  @media (max-width: 880px) {
+    .toast { bottom: auto; top: 62px; transform: translate(-50%, -12px); }
+    .toast.show { transform: translate(-50%, 0); }
+  }
+
+  /* typing indicator reuse for new messages */
+  .msg.new-msg { animation: msg-in 260ms var(--ease); }
+  @keyframes msg-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  /* ============ MOBILE POLISH ============ */
+  @media (max-width: 880px) {
+    /* stop iOS zoom-on-focus */
+    .composer textarea, .side-search input, .ask-box input,
+    .auth-card input, .field input { font-size: 16px; }
+
+    /* tab bar: active pill + press feedback */
+    .tabbar label { transition: background 140ms var(--ease), color 140ms, transform 100ms; padding: 6px 2px; }
+    .tabbar label:active { transform: scale(0.93); }
+    #v-home:checked ~ .app .tabbar label[for="v-home"],
+    #v-chat-1:checked ~ .app .tabbar label[for="v-chat-1"],
+    #v-chat-2:checked ~ .app .tabbar label[for="v-chat-1"],
+    #v-chat-3:checked ~ .app .tabbar label[for="v-chat-1"],
+    #v-agents:checked ~ .app .tabbar label[for="v-agents"],
+    #v-automations:checked ~ .app .tabbar label[for="v-automations"] {
+      color: var(--accent); background: var(--accent-soft);
+    }
+    #nav-toggle:checked ~ .app .tabbar label[for="nav-toggle"] { color: var(--accent); background: var(--accent-soft); }
+
+    /* roomier composer + thread on phones */
+    .composer { border-radius: 16px; }
+    .composer textarea { padding: 12px 14px; }
+    .thread-inner { padding: 16px 14px 6px; }
+    .quick-row { flex-wrap: wrap; gap: 8px; }
+    .quick-pill { padding: 9px 13px; }
+    .nav-item, .chat-item, .proj-item { padding: 10px; }
+    .side-btn { padding: 11px 10px; }
+    .term { font-size: 0.72rem; max-height: 190px; }
+  }
+  /* ---------- mobile reorganization: PC-only bits move or hide ---------- */
+  @media (max-width: 880px) {
+    #top-model-picker { display: none; } /* the composer chip is the mobile model picker */
+    .browser-split { grid-template-columns: 1fr; }
+    .br-side { display: none; }
+    .browser-shell .browser { min-width: 0; }
+    .browser { min-height: 400px; }
+    .settings-grid { grid-template-columns: 1fr; }
+    .agent-panel { margin-top: 14px; }
+    .usage-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .msg-ai .txt { font-size: 0.9rem; }
+    .advisor-chip { margin-left: 36px; font-size: 0.78rem; }
+    .cm-grid { grid-template-columns: 1fr; }
+    .harness-grid { grid-template-columns: 1fr; }
+  }
+
+</style>
+</head>
+<body>
+
+<input type="radio" name="view" id="v-home" class="state" checked>
+<input type="radio" name="view" id="v-chat-1" class="state">
+<input type="radio" name="view" id="v-chat-2" class="state">
+<input type="radio" name="view" id="v-chat-3" class="state">
+<input type="radio" name="view" id="v-canvas" class="state">
+<input type="radio" name="view" id="v-video" class="state">
+<input type="radio" name="view" id="v-browser" class="state">
+<input type="radio" name="view" id="v-agents" class="state">
+<input type="radio" name="view" id="v-automations" class="state">
+<input type="radio" name="view" id="v-dashboards" class="state">
+<input type="radio" name="view" id="v-docs" class="state">
+<input type="radio" name="view" id="v-projects" class="state">
+<input type="radio" name="view" id="v-skills" class="state">
+<input type="radio" name="view" id="v-plugins" class="state">
+<input type="radio" name="view" id="v-settings" class="state">
+<input type="radio" name="view" id="v-signin" class="state">
+<input type="radio" name="view" id="v-signup" class="state">
+<input type="radio" name="theme" id="t-otto" class="state" checked>
+<input type="radio" name="theme" id="t-light" class="state">
+<input type="radio" name="theme" id="t-dark" class="state">
+<input type="radio" name="space" id="sp-personal" class="state" checked>
+<input type="radio" name="space" id="sp-work" class="state">
+<input type="radio" name="space" id="sp-side" class="state">
+<input type="radio" name="docstab" id="dt-doc" class="state" checked>
+<input type="radio" name="docstab" id="dt-sheet" class="state">
+<input type="radio" name="docstab" id="dt-slide" class="state">
+<input type="checkbox" id="nav-toggle" class="state">
+<input type="radio" name="project" id="p-1" class="state" checked>
+<input type="radio" name="project" id="p-2" class="state">
+
+<div class="app">
+
+  <label class="scrim" for="nav-toggle" aria-hidden="true"></label>
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="side-top">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z"/></svg>
+        </span>
+        Otto
+      </div>
+      <label class="icon-btn side-close" for="nav-toggle" aria-label="Close menu" title="Close menu">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </label>
+    </div>
+
+    <label class="side-btn" for="v-chat-1">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      New chat
+    </label>
+
+    <div class="side-search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input type="search" placeholder="Search chats" aria-label="Search chats">
+    </div>
+
+    <div class="side-scroll">
+      <nav aria-label="Workspace">
+        <h3 class="side-label">Workspace</h3>
+        <label class="nav-item" for="v-home">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+          Home
+        </label>
+        <label class="nav-item" for="v-chat-1">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+          Chats
+        </label>
+        <label class="nav-item" for="v-canvas">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M13 5l-2 14"/></svg>
+          Canvas
+        </label>
+        <label class="nav-item" for="v-video">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>
+          Video
+        </label>
+        <label class="nav-item" for="v-browser">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg>
+          Browser
+        </label>
+        <label class="nav-item" for="v-agents">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M8 7.5l6 9M16 7.5l-6 9"/></svg>
+          Agents
+        </label>
+        <label class="nav-item" for="v-automations">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          Automations
+        </label>
+        <label class="nav-item" for="v-dashboards">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M7 15l4-6 3 4 4-7"/></svg>
+          Dashboards
+        </label>
+        <label class="nav-item" for="v-docs">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4M9 12h6M9 16h6"/></svg>
+          Documents
+        </label>
+        <label class="nav-item" for="v-projects">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Projects
+        </label>
+      </nav>
+
+      <nav aria-label="Projects">
+        <h3 class="side-label">Projects</h3>
+        <label class="proj-item" for="p-1">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Otto UI kit
+        </label>
+        <label class="proj-item" for="p-2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+          Sourdough log
+        </label>
+      </nav>
+
+      <nav aria-label="Sessions">
+        <h3 class="side-label">Bots</h3>
+        <label class="nav-item" for="v-agents">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M8.5 10.5L6 21M15.5 10.5L18 21M10 6h4"/></svg>
+          Research Team
+        </label>
+        <h3 class="side-label" style="margin-top:10px;">Sessions</h3>
+        <h4 class="side-label" style="padding-top:4px; font-size:0.7rem; letter-spacing:0.03em; text-transform:none; font-weight:600;">Today</h4>
+        <label class="chat-item" for="v-chat-1">New chat</label>
+        <label class="chat-item" for="v-chat-2">Second thread</label>
+        <h4 class="side-label" style="padding-top:8px; font-size:0.7rem; letter-spacing:0.03em; text-transform:none; font-weight:600;">Yesterday</h4>
+        <label class="chat-item" for="v-chat-3">Third thread</label>
+      </nav>
+    </div>
+
+    <div class="side-bottom">
+      <label class="nav-item" for="v-chat-1">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3M8 22h8"/></svg>
+        Voice: Off
+      </label>
+      <label class="nav-item" for="v-skills">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5zM19 14l.8 2.2L22 17l-2.2.8L19 20l-.8-2.2L16 17l2.2-.8z"/></svg>
+        Skills
+      </label>
+      <label class="nav-item" for="v-plugins">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v3a4 4 0 004 4h3M14 21v-3a4 4 0 00-4-4H7M4 7h3a4 4 0 014 4v3a4 4 0 004 4h3"/></svg>
+        Plugins
+      </label>
+      <label class="nav-item" for="v-settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3h.1a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5h.1a1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9v.1a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+        Settings
+      </label>
+      <label class="user-card" for="v-signin">
+        <span class="avatar">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+        </span>
+        <span>
+          <span class="u-name">You</span><br>
+          <span class="u-plan">Free plan · Sign in</span>
+        </span>
+      </label>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+
+    <header class="topbar">
+      <label class="icon-btn hamburger" for="nav-toggle" aria-label="Open menu" title="Open menu">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </label>
+
+      <details class="model" id="top-model-picker">
+        <summary>
+          <span class="dot" aria-hidden="true"></span>
+          <span id="top-model-name">Sonnet 5.5</span>
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="model-menu" id="top-model-menu"></div>
+      </details>
+
+      <details class="model lib-picker">
+        <summary>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 016.5 17H20M4 19.5A2.5 2.5 0 016.5 22H20V2H6.5A2.5 2.5 0 004 4.5v15z"/></svg>
+          Library
+          <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+        </summary>
+        <div class="model-menu lib-menu">
+          <h4 class="lib-head">Workspace</h4>
+          <label class="option" for="v-canvas"><span class="dot" style="background:#8a7cf5"></span><span><span class="opt-name">Artifacts</span><br><span class="opt-desc">Docs, sheets and canvases</span></span></label>
+          <label class="option" for="v-docs"><span class="dot" style="background:#e8a04c"></span><span><span class="opt-name">Files</span><br><span class="opt-desc">Written docs and notes</span></span></label>
+          <label class="option" for="v-video"><span class="dot" style="background:#ef6c6c"></span><span><span class="opt-name">Videos</span><br><span class="opt-desc">Rendered clips and reels</span></span></label>
+          <label class="option" for="v-dashboards"><span class="dot" style="background:#4cc2a0"></span><span><span class="opt-name">Images and charts</span><br><span class="opt-desc">Dashboards and galleries</span></span></label>
+          <label class="option" for="v-projects"><span class="dot" style="background:#5b9bf5"></span><span><span class="opt-name">Projects</span><br><span class="opt-desc">Files by project folder</span></span></label>
+          <label class="option" for="v-browser"><span class="dot" style="background:#b08bd6"></span><span><span class="opt-name">Browser</span><br><span class="opt-desc">Saved pages and history</span></span></label>
+        </div>
+      </details>
+
+      <span class="top-spacer"></span>
+      <details class="theme-picker">
+        <summary class="icon-btn" aria-label="Change theme" title="Change theme">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 019 9c0 1.6-.9 2.6-2.4 2.6h-2.2a2 2 0 00-1.5 3.3c.4.5.5 1 .2 1.6-.3.5-1 .9-1.9.9a9 9 0 01-9-9 9 9 0 018-8.4z"/><circle cx="8.5" cy="10.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="10.5" r="1" fill="currentColor" stroke="none"/></svg>
+        </summary>
+        <div class="model-menu theme-menu">
+          <label class="option" for="t-otto"><span class="dot" style="background:#2ed8a2"></span><span><span class="opt-name">Otto</span><br><span class="opt-desc">Wallpaper, dark cards, mint accent</span></span></label>
+          <label class="option" for="t-light"><span class="dot" style="background:#e8c46a"></span><span><span class="opt-name">Light</span><br><span class="opt-desc">Warm paper, terracotta accent</span></span></label>
+          <label class="option" for="t-dark"><span class="dot" style="background:#d9992e"></span><span><span class="opt-name">Ember</span><br><span class="opt-desc">Charcoal canvas, warm amber glow</span></span></label>
+        </div>
+      </details>
+      <button class="icon-btn" aria-label="Share" title="Share">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a1 1 0 001 1h14a1 1 0 001-1v-7M12 3v13M7 8l5-5 5 5"/></svg>
+      </button>
+    </header>
+
+    <div class="views">
+
+      <!-- ============ VIEW: HOME ============ -->
+      <section class="view view-home" aria-label="Home">
+        <div class="home-scroll">
+          <div class="home-inner">
+
+            <div class="space-row">
+              <label class="space-pill" for="sp-personal">Personal</label>
+              <label class="space-pill" for="sp-work">Work</label>
+              <label class="space-pill" for="sp-side">Side project</label>
+              <span class="space-note">Each space has its own memory, agents and look</span>
+            </div>
+
+            <div class="home-hero">
+              <div class="date-tag">Monday 26 October</div>
+              <h1>Good evening</h1>
+              <p class="home-sub">Live chat · advisor on every message · files land in Documents</p>
+            </div>
+
+            <div class="ask-box">
+              <input type="text" placeholder="Ask, make, or explore something..." aria-label="Ask anything">
+              <div class="ask-bar">
+                <label class="agent-pick" for="v-chat-1">
+                  <span class="mini-avatar">+</span>
+                  New chat
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+                </label>
+                <span class="ask-status">Enter to send</span>
+                <label class="ask-send" for="v-chat-1" aria-label="Send" title="Send">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                </label>
+              </div>
+            </div>
+
+            <div class="quick-row">
+              <label class="quick-pill" for="v-docs">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 11.5l2 2 4-5"/><rect x="3" y="4" width="18" height="17" rx="3"/></svg>
+                To-do
+              </label>
+              <label class="quick-pill" for="v-docs">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h8l4 4v16H6z"/><path d="M14 2v4h4M9 12h6M9 16h6"/></svg>
+                Files & notes
+              </label>
+              <label class="quick-pill" for="v-automations">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+                Automations
+              </label>
+              <label class="quick-pill" for="v-settings">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12a7 7 0 0 1 14 0"/><path d="M2.5 12a9.5 9.5 0 0 1 19 0M8 18h8M12 19v2"/></svg>
+                Cloud
+              </label>
+            </div>
+
+            <div class="home-grid">
+              <div class="home-card">
+                <div class="hc-head"><h3>Getting started</h3><span class="hc-sub">Make it yours</span></div>
+                <label class="check-row" for="v-chat-1">
+                  <input type="checkbox">
+                  <span class="cr-label">Send your first chat<span class="cr-hint">The advisor reviews it, then the model you picked answers</span></span>
+                </label>
+                <label class="check-row" for="v-chat-1">
+                  <input type="checkbox">
+                  <span class="cr-label">Write a file from chat<span class="cr-hint">Ask for one by name, like "create notes.md with a to-do list"</span></span>
+                </label>
+                <label class="check-row" for="v-settings">
+                  <input type="checkbox">
+                  <span class="cr-label">Pick your models<span class="cr-hint">Main model, advisor model and reply budget live in Settings</span></span>
+                </label>
+                <label class="check-row" for="v-settings">
+                  <input type="checkbox">
+                  <span class="cr-label">Add your own model endpoint<span class="cr-hint">Any OpenAI- or Anthropic-compatible API works</span></span>
+                </label>
+                <label class="check-row" for="v-docs">
+                  <input type="checkbox">
+                  <span class="cr-label">Browse your files<span class="cr-hint">Everything chat writes lands in Documents</span></span>
+                </label>
+              </div>
+
+              <div class="home-card">
+                <div class="hc-head"><h3>What's live</h3><span class="hc-sub">Honest status</span></div>
+                <div class="sys-row"><span class="sdot"></span><span class="sr-label">Multi-model chat</span><span class="sr-time">live</span></div>
+                <div class="sys-row"><span class="sdot"></span><span class="sr-label">Advisor pass</span><span class="sr-time">always on</span></div>
+                <div class="sys-row"><span class="sdot"></span><span class="sr-label">Files written by chat</span><span class="sr-time">live</span></div>
+                <div class="sys-row"><span class="sdot idle"></span><span class="sr-label">Agents & automations</span><span class="sr-time">not built yet</span></div>
+                <div class="sys-row"><span class="sdot idle"></span><span class="sr-label">Canvas, video & dashboards</span><span class="sr-time">not built yet</span></div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: CHAT ============ -->
+      <section class="view view-chat" aria-label="Chat">
+
+        <div class="thread">
+          <div class="thread-inner">
+
+            <!-- Conversation 1 -->
+            <div class="conversation conv-1">
+              <div class="chat-empty">
+                <h3>New chat</h3>
+                <p>Ask anything. The advisor reviews every message first, then your selected model answers with live steps and per-message costs.</p>
+              </div>
+            </div>
+
+            <div class="conversation conv-2">
+              <div class="chat-empty">
+                <h3>Second thread</h3>
+                <p>Each chat keeps its own history. Ask for a file, like "create notes.md with a to-do list", and it lands in Documents.</p>
+              </div>
+            </div>
+
+            <div class="conversation conv-3">
+              <div class="chat-empty">
+                <h3>Third thread</h3>
+                <p>Switch models any time from the picker below. Every reply shows what it cost.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="composer-wrap">
+          <div class="composer-inner">
+            <div class="composer">
+              <textarea rows="1" placeholder="Message Otto…" aria-label="Message Otto"></textarea>
+              <div class="composer-bar">
+                <details class="model comp-model" id="comp-model-picker">
+                  <summary>
+                    <span class="dot" aria-hidden="true"></span>
+                    <span class="m-name" id="comp-model-name">Sonnet 5.5</span>
+                    <svg class="chev" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+                  </summary>
+                  <div class="model-menu" id="comp-model-menu"></div>
+                </details>
+                <button class="icon-btn" aria-label="Attach file" title="Attach file">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.4l-8.5 8.5a5.5 5.5 0 01-7.8-7.8l8.9-8.9a3.7 3.7 0 015.2 5.2l-8.9 8.9a1.8 1.8 0 01-2.6-2.6l8.2-8.1"/></svg>
+                </button>
+                <button class="icon-btn" aria-label="Voice input" title="Voice input">
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3"/></svg>
+                </button>
+                <button class="send" aria-label="Send message" title="Send message">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="composer-foot">Otto can make mistakes: check important info. Chat runs on your selected model with the advisor pass.</div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ============ VIEW: CANVAS ============ -->
+      <section class="view view-canvas" aria-label="Canvas">
+        <div class="page">
+          <div class="page-head"><h2>Canvas</h2></div>
+          <div class="card">
+            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
+            <p class="sandbox-sub">A live code canvas with preview is planned. For now, ask chat to write files and open them in the Documents viewer.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============ VIEW: VIDEO ============ -->
+      <section class="view view-video" aria-label="Video studio">
+        <div class="page">
+          <div class="page-head">
+            <h2>Video studio</h2>
+            <button class="btn btn-ghost">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6h6M20 20v-6h-6"/><path d="M20 9a8 8 0 00-14.9-2M4 15a8 8 0 0014.9 2"/></svg>
+              Refresh
+            </button>
+          </div>
+          <div class="card">
+            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
+            <p class="sandbox-sub">Video generation is not wired up yet. When it lands, prompts will render here.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: BROWSER AGENT ============ -->
+      <section class="view view-browser" aria-label="Browser agent">
+        <div class="page">
+          <div class="page-head"><h2>Browser agent</h2></div>
+          <div class="card">
+            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
+            <p class="sandbox-sub">A browser the agent can drive, with bookmarks and history on the side, is planned. Chat is the live way to work today.</p>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============ VIEW: AGENTS ============ -->
+      <section class="view view-agents" aria-label="Agents">
+        <div class="page">
+          <div class="page-head">
+            <h2>Agents</h2>
+            <button class="btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              Hire a bot
+            </button>
+          </div>
+          <p class="page-sub">Give it a name, a description, and a model. That's the whole hiring process.</p>
+          <div class="card">
+            <div class="run-top">
+              <h3>Agents aren't live yet</h3>
+              <span class="status-badge st-queue">Planned</span>
+            </div>
+            <p class="sandbox-sub">Chat, the advisor pass, file writing and the model harness are live. Hiring bots that run on schedules or work together is the next milestone — this view will hold them.</p>
+          </div>
+
+          <div class="card">
+            <div class="run-top" style="margin-bottom: 10px;">
+              <h3 style="font-size: 0.95rem;">What you can do now</h3>
+            </div>
+            <div class="feed-row"><span class="favatar">1</span><span>Chat with any of the 9 built-in models or your own endpoints</span></div>
+            <div class="feed-row"><span class="favatar">2</span><span>Watch every turn's steps: read, advisor, reply, files</span></div>
+            <div class="feed-row"><span class="favatar">3</span><span>Ask chat to write files and manage them in Documents</span></div>
+            <div class="feed-row"><span class="favatar">4</span><span>Tune cost and quality in Settings</span></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ============ VIEW: PROJECTS ============ -->
+      <section class="view view-projects" aria-label="Projects">
+        <div class="page">
+          <div class="page-head">
+            <h2>Projects</h2>
+            <button class="btn">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              New project
+            </button>
+          </div>
+          <div class="card">
+            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
+            <p class="sandbox-sub">Projects that group files and chats are planned. Your files live in Documents for now.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: SKILLS ============ -->
+      <section class="view view-skills" aria-label="Skills">
+        <div class="page">
+          <div class="page-head">
+            <h2>Skills</h2>
+            <button class="btn btn-ghost">Manage</button>
+          </div>
+          <div class="card">
+            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
+            <p class="sandbox-sub">Custom skills are not installable yet. The model harness and settings are live.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: PLUGINS ============ -->
+      <section class="view view-plugins" aria-label="Plugins">
+        <div class="page">
+          <div class="page-head">
+            <h2>Plugins</h2>
+            <button class="btn btn-ghost">Browse directory</button>
+          </div>
+          <div class="card">
+            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
+            <p class="sandbox-sub">No plugins are connected yet. Custom model endpoints are the live integration today.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: AUTOMATIONS ============ -->
+      <section class="view view-automations" aria-label="Automations">
+        <div class="page">
+          <div class="page-head"><h2>Automations</h2></div>
+          <div class="card">
+            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
+            <p class="sandbox-sub">Scheduled and trigger-based runs are the next milestone. Chat is live today; automations that fire on a timer or an event will live here.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: DASHBOARDS ============ -->
+      <section class="view view-dashboards" aria-label="Dashboards">
+        <div class="page">
+          <div class="page-head"><h2>Dashboards</h2></div>
+          <div class="card">
+            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
+            <p class="sandbox-sub">No data pipelines are connected yet. Dashboards will chart your real usage once there is history to chart.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: DOCS ============ -->
+      <section class="view view-docs" aria-label="Docs, sheets and slides">
+        <div class="page">
+          <div class="page-head"><h2>Documents</h2></div>
+          <p class="page-sub">Docs, sheets and slides you write with your agents. Saved in this space's Documents folder.</p>
+
+          <div class="card files-card" id="files-card">
+            <h3 class="files-head">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>
+              Files written by chats
+              <span class="files-count" id="files-count"></span>
+            </h3>
+            <p class="files-sub">Every file the models write in chat lands here. Click one to view, copy or delete it.</p>
+            <div class="files-list" id="files-list"></div>
+            <div class="files-empty" id="files-empty">No files yet. Ask a chat to write one, like "create a file called notes.md with a to-do list".</div>
+          </div>
+
+          <div class="card" style="margin-top:4px;font-size:0.8rem;color:var(--faint);">Doc editing, sheets and slides aren't built yet. For now this view lists every file your chats write.</div>
+
+        </div>
+      </section>
+
+      <!-- ============ VIEW: SETTINGS ============ -->
+      <section class="view view-settings" aria-label="Settings">
+        <div class="page settings-page">
+          <div class="page-head"><h2>Settings</h2></div>
+
+          <div class="set-section">
+            <h3>Profile</h3>
+            <div class="set-sub">How you appear in shared chats.</div>
+            <div class="field">
+              <label for="set-name">Display name</label>
+              <input type="text" id="set-name" value="You">
+            </div>
+            <div class="field">
+              <label for="set-email">Email</label>
+              <input type="email" id="set-email" value="you@example.com">
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Plan</span>
+                <span class="sr-desc">Free: 100 messages a week</span>
+              </span>
+              <span class="sr-control"><button class="btn">Upgrade to Pro</button></span>
+            </div>
+          </div>
+
+          <div class="set-section">
+            <h3>Accounts</h3>
+            <div class="set-sub">Runs on the AI subscriptions you already pay for. Local by default.</div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Claude Code</span>
+                <span class="sr-desc">2 accounts · tokens stored locally</span>
+              </span>
+              <span class="sr-control"><span class="status-badge st-ok">Connected</span></span>
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Codex</span>
+                <span class="sr-desc">1 account</span>
+              </span>
+              <span class="sr-control"><span class="status-badge st-ok">Connected</span></span>
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Cursor · Grok · OpenCode</span>
+                <span class="sr-desc">Detected on this device</span>
+              </span>
+              <span class="sr-control"><span class="status-badge st-queue">Optional</span></span>
+            </div>
+          </div>
+
+          <div class="set-section">
+            <h3>Devices</h3>
+            <div class="set-sub">Your Mac is the engine: everything else is a window onto it.</div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">MacBook Pro</span>
+                <span class="sr-desc">This device · agents run here, even offline</span>
+              </span>
+              <span class="sr-control"><span class="status-badge st-ok">Active</span></span>
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">iPhone</span>
+                <span class="sr-desc">Text your agents from anywhere · push when something needs you</span>
+              </span>
+              <span class="sr-control"><button class="btn">Pair</button></span>
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Windows PC</span>
+                <span class="sr-desc">Windows version in the works</span>
+              </span>
+              <span class="sr-control"><span class="status-badge st-queue">Coming soon</span></span>
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Cloud sync</span>
+                <span class="sr-desc">Keep agents running when your Mac is asleep</span>
+              </span>
+              <span class="sr-control"><span class="status-badge st-queue">Later this year</span></span>
+            </div>
+          </div>
+
+          <div class="set-section">
+            <h3>Appearance</h3>
+            <div class="set-sub">Applies instantly across the workspace.</div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Theme</span>
+                <span class="sr-desc">Otto wallpaper, light paper, or ember dark</span>
+              </span>
+              <span class="sr-control segment theme-seg">
+                <label for="t-otto">Otto</label>
+                <label for="t-light">Light</label>
+                <label for="t-dark">Ember</label>
+              </span>
+            </div>
+          </div>
+
+          <div class="set-section" id="harness-section">
+            <h3>Chat harness</h3>
+            <div class="set-sub">Tune the pipeline for cost vs quality. Every chat uses these settings.</div>
+
+            <div class="harness-grid">
+              <div class="h-field">
+                <label for="hs-model">Main model</label>
+                <select id="hs-model"></select>
+              </div>
+              <div class="h-field">
+                <label for="hs-advisor-model">Advisor model <span class="h-val">(runs first, always)</span></label>
+                <select id="hs-advisor-model"></select>
+              </div>
+              <div class="h-field">
+                <label>Temperature <span class="h-val">not adjustable on this platform's models</span></label>
+                <input type="range" id="hs-temp" min="0" max="1" step="0.1" value="0.7" disabled>
+              </div>
+              <div class="h-field">
+                <label for="hs-max">Reply budget <span class="h-val" id="hs-max-val">1024 tokens</span></label>
+                <input type="range" id="hs-max" min="256" max="4096" step="128" value="1024">
+              </div>
+            </div>
+
+            <div class="h-field" style="margin-top:12px;">
+              <label for="hs-system">System prompt</label>
+              <textarea id="hs-system" rows="3" placeholder="Empty = Otto's default personality"></textarea>
+            </div>
+
+            <div class="h-switch" style="margin-top:12px;">
+              <span class="txt">Advisor pass<small>A cheap model reviews every message before the main model answers. Always on.</small></span>
+              <span class="adv-status" id="adv-status">Always on</span>
+            </div>
+
+            <div class="usage-row" id="usage-row">
+              <span>Messages this session: <b id="us-msgs">0</b></span>
+              <span>Completed-turn cost estimates (failed turns and unpriced custom calls excluded): <b id="us-cost">$0.0000</b></span>
+              <span>Default advisor: <b>Claude Haiku 4.5</b> (about $0.001 per review)</span>
+            </div>
+          </div>
+
+          <div class="set-section" id="custom-models-section">
+            <h3>Custom models (plugin)</h3>
+            <div class="set-sub">Bring your own endpoint: any OpenAI-compatible or Anthropic-compatible API. Keys are kept server-side for this session and never shown again.</div>
+            <div class="cm-form">
+              <div class="h-field"><label for="cm-label">Label</label><input type="text" id="cm-label" placeholder="My model"></div>
+              <div class="h-field"><label for="cm-provider">API type</label><select id="cm-provider"><option value="openai-compat">OpenAI-compatible</option><option value="anthropic-compat">Anthropic-compatible</option></select></div>
+              <div class="h-field"><label for="cm-base">Base URL</label><input type="text" id="cm-base" placeholder="https://api.example.com/v1"></div>
+              <div class="h-field"><label for="cm-name">Model name</label><input type="text" id="cm-name" placeholder="gpt-custom"></div>
+              <div class="h-field" style="grid-column:1/-1"><label for="cm-key">API key</label><input type="password" id="cm-key" placeholder="sk-…" autocomplete="off"></div>
+            </div>
+            <button class="btn" id="cm-add" style="margin-top:10px;">Add model</button>
+            <div class="cm-list" id="cm-list"></div>
+          </div>
+
+          <div class="set-section">
+            <h3>Agents & usage</h3>
+            <div class="set-sub">Controls how Otto runs multiple agents in parallel.</div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Multi-agent mode</span>
+                <span class="sr-desc">How eagerly Otto spins up extra agents</span>
+              </span>
+              <span class="sr-control segment agentmode-seg">
+                <input type="radio" name="agentmode" id="am-off"><label for="am-off">Off</label>
+                <input type="radio" name="agentmode" id="am-bal" checked><label for="am-bal">Balanced</label>
+                <input type="radio" name="agentmode" id="am-max"><label for="am-max">Max</label>
+              </span>
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Max parallel agents</span>
+                <span class="sr-desc">Upper limit per run</span>
+              </span>
+              <span class="sr-control">
+                <input type="range" min="1" max="5" value="3" aria-label="Max parallel agents">
+              </span>
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Auto-approve browser actions</span>
+                <span class="sr-desc">Let the browser agent act without asking</span>
+              </span>
+              <span class="sr-control">
+                <label class="switch"><input type="checkbox" aria-label="Auto-approve browser actions"><span class="track"><span class="knob"></span></span></label>
+              </span>
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Show agent activity</span>
+                <span class="sr-desc">Live steps while agents work</span>
+              </span>
+              <span class="sr-control">
+                <label class="switch"><input type="checkbox" checked aria-label="Show agent activity"><span class="track"><span class="knob"></span></span></label>
+              </span>
+            </div>
+            <div class="set-row">
+              <span class="sr-info">
+                <span class="sr-title">Weekly agent tokens</span>
+                <span class="sr-desc">128k of 500k used</span>
+              </span>
+              <span class="sr-control" style="width: 170px;"><span class="meter"><span style="width: 26%;"></span></span></span>
+            </div>
+          </div>
+
+          <div class="set-section">
+            <h3>Default model</h3>
+            <div class="set-sub">Used for new chats unless you switch in the top bar.</div>
+            <label class="radio-row">
+              <input type="radio" name="defmodel" checked>
+              <span class="rdot"></span>
+              <span><span class="r-main">Claude Code</span><br><span class="r-sub">Best for complex reasoning and code</span></span>
+            </label>
+            <label class="radio-row">
+              <input type="radio" name="defmodel">
+              <span class="rdot"></span>
+              <span><span class="r-main">Codex</span><br><span class="r-sub">Fastest replies for everyday tasks</span></span>
+            </label>
+            <label class="radio-row">
+              <input type="radio" name="defmodel">
+              <span class="rdot"></span>
+              <span><span class="r-main">Grok Mini</span><br><span class="r-sub">Lightweight, great on mobile</span></span>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: SIGN IN ============ -->
+      <section class="view view-signin" aria-label="Sign in">
+        <div class="auth-wrap">
+          <div class="auth-card">
+            <div class="auth-logo">
+              <span class="brand-mark" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z"/></svg>
+              </span>
+              Otto
+            </div>
+            <h2>Welcome back</h2>
+            <p class="auth-sub">Sign in to sync your chats, projects, and agents.</p>
+            <div class="oauth">
+              <button class="btn btn-ghost">
+                <svg fill="currentColor" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg>
+                Continue with Google
+              </button>
+              <button class="btn btn-ghost">
+                <svg fill="currentColor" role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+                Continue with Apple
+              </button>
+            </div>
+            <div class="auth-divider">or</div>
+            <div class="field">
+              <label for="si-email">Email</label>
+              <input type="email" id="si-email" placeholder="you@example.com">
+            </div>
+            <div class="field">
+              <label for="si-pass">Password</label>
+              <input type="password" id="si-pass" placeholder="••••••••">
+            </div>
+            <label class="btn auth-submit" for="v-chat-1">Sign in</label>
+            <div class="auth-switch">New here? <label class="auth-link" for="v-signup">Create an account</label></div>
+            <div class="auth-note">Sign-in isn't wired up yet. The workspace works without an account.</div>
+            <label class="auth-back" for="v-chat-1">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+              Back to Otto
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: SIGN UP ============ -->
+      <section class="view view-signup" aria-label="Create account">
+        <div class="auth-wrap">
+          <div class="auth-card">
+            <div class="auth-logo">
+              <span class="brand-mark" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z"/></svg>
+              </span>
+              Otto
+            </div>
+            <h2>Create your account</h2>
+            <p class="auth-sub">Free plan: 100 messages a week, 3 agents per run.</p>
+            <div class="field">
+              <label for="su-name">Full name</label>
+              <input type="text" id="su-name" placeholder="Alex Morgan">
+            </div>
+            <div class="field">
+              <label for="su-email">Email</label>
+              <input type="email" id="su-email" placeholder="you@example.com">
+            </div>
+            <div class="field">
+              <label for="su-pass">Password</label>
+              <input type="password" id="su-pass" placeholder="At least 8 characters">
+            </div>
+            <label class="check-row">
+              <input type="checkbox">
+              <span class="cb"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+              I agree to the terms and privacy policy
+            </label>
+            <label class="btn auth-submit" for="v-chat-1">Create account</label>
+            <div class="auth-switch">Already have an account? <label class="auth-link" for="v-signin">Sign in</label></div>
+            <div class="auth-note">Sign-in isn't wired up yet. The workspace works without an account.</div>
+            <label class="auth-back" for="v-chat-1">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+              Back to Otto
+            </label>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- mobile companion: bottom tab bar + voice push-to-talk (hidden on desktop) -->
+    <nav class="tabbar" aria-label="Mobile navigation">
+      <label for="v-home">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg>
+        Home
+      </label>
+      <label for="v-chat-1">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L3 21l1.9-6.4A8 8 0 1 1 21 12z"/></svg>
+        Chats
+      </label>
+      <label for="v-agents">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="7" cy="7" r="3"/><circle cx="17" cy="7" r="3"/><path d="M8.5 10.5L6 21M15.5 10.5L18 21M10 6h4"/></svg>
+        Agents
+      </label>
+      <label for="v-automations">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+        Auto
+      </label>
+      <label for="nav-toggle">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h10"/></svg>
+        More
+      </label>
+    </nav>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+
+<div class="file-viewer" id="file-viewer" hidden>
+  <div class="fv-scrim" id="fv-scrim"></div>
+  <div class="fv-panel" role="dialog" aria-modal="true">
+    <div class="fv-head">
+      <div class="fv-title">
+        <span class="fv-name" id="fv-name"></span>
+        <span class="fv-meta" id="fv-meta"></span>
+      </div>
+      <div class="fv-actions">
+        <button class="fv-btn" id="fv-copy" type="button">Copy</button>
+        <button class="fv-btn danger" id="fv-del" type="button">Delete</button>
+        <button class="fv-btn" id="fv-close" type="button">Close</button>
+      </div>
+    </div>
+    <pre class="fv-body" id="fv-body"></pre>
+  </div>
+</div>
+
+<script>window.__API_BASE__ = "__PORT_8000__";</script>
+<script>
+(function () {
+  "use strict";
+  var $ = function (s, c) { return (c || document).querySelector(s); };
+  var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
+
+  /* ---------- toast ---------- */
+  var toastEl = $("#toast"), toastTimer = null;
+  function toast(msg) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove("show"); }, 2600);
+  }
+
+  /* ---------- state (in-memory for this session) ---------- */
+  var GROUPS = ["view", "theme", "space"];
+  var state = {};
+
+  document.addEventListener("change", function (e) {
+    var t = e.target;
+    if (t && t.name && GROUPS.indexOf(t.name) !== -1 && t.checked) {
+      state[t.name] = t.id;
+    }
+  });
+
+  /* ---------- mobile: close drawer on nav pick, Esc to close, swipe to close ---------- */
+  var navToggle = $("#nav-toggle");
+  function closeDrawer() { if (navToggle.checked) navToggle.checked = false; }
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeDrawer();
+  });
+  $$(".app .tabbar label, .app .sidebar label").forEach(function (label) {
+    label.addEventListener("click", function () {
+      if (label.getAttribute("for") === "nav-toggle") return;
+      closeDrawer();
+    });
+  });
+  (function () { // swipe right-to-left closes the drawer
+    var startX = null;
+    document.addEventListener("touchstart", function (e) {
+      startX = e.touches[0].clientX;
+    }, { passive: true });
+    document.addEventListener("touchend", function (e) {
+      if (startX === null) return;
+      var dx = (e.changedTouches[0].clientX - startX);
+      if (navToggle.checked && dx < -60) closeDrawer();
+      startX = null;
+    }, { passive: true });
+  })();
+
+  /* ---------- API base (real chat) ---------- */
+  var rawApiBase = window.__API_BASE__ || "";
+  var unresolvedApi = rawApiBase.indexOf("__PORT_") === 0;
+  var localHostnames = { "localhost": 1, "127.0.0.1": 1, "[::1]": 1 };
+  var API = unresolvedApi
+    ? (localHostnames[location.hostname] ? "http://localhost:8000" : null)
+    : rawApiBase;
+
+  var chatState = {
+    model: "claude_sonnet_5_5",
+    advisorEnabled: true,
+    advisorModel: "claude_haiku_4_5",
+    temperature: 0.7,
+    maxTokens: 1024,
+    system: ""
+  };
+  var usage = { msgs: 0, cost: 0 };
+  var MODELS = [];
+
+  var whoSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z"/></svg>';
+
+  function activeConversation() {
+    var view = $("input[name='view']:checked");
+    if (!view) return null;
+    var n = view.id.replace("v-chat-", "");
+    var conv = $(".view-chat .conv-" + n);
+    return conv || null;
+  }
+  function scrollThread() {
+    var th = $(".view-chat .thread");
+    if (th) th.scrollTop = th.scrollHeight;
+  }
+  function buildUserMsg(text) {
+    var m = document.createElement("div");
+    m.className = "msg msg-user new-msg";
+    var b = document.createElement("div");
+    b.className = "bubble";
+    b.textContent = text;
+    m.appendChild(b);
+    return m;
+  }
+  function buildTypingMsg() {
+    var m = document.createElement("div");
+    m.className = "msg msg-ai new-msg";
+    m.innerHTML =
+      '<span class="who" aria-hidden="true">' + whoSvg + '</span>' +
+      '<div class="ai-col"><div class="typing"><span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>Otto is thinking…</div></div>';
+    return m;
+  }
+  function buildAiMsg(text) {
+    var m = document.createElement("div");
+    m.className = "msg msg-ai new-msg";
+    m.innerHTML =
+      '<span class="who" aria-hidden="true">' + whoSvg + "</span>" +
+      '<div class="ai-col"><div class="steps-bar"></div><div class="txt"></div></div>';
+    var p = document.createElement("p");
+    p.textContent = text;
+    m.querySelector(".txt").appendChild(p);
+    return m;
+  }
+  function buildAiShell() {
+    var m = document.createElement("div");
+    m.className = "msg msg-ai new-msg";
+    m.innerHTML =
+      '<span class="who" aria-hidden="true">' + whoSvg + "</span>" +
+      '<div class="ai-col"><div class="steps-bar"></div><div class="txt"></div></div>';
+    return m;
+  }
+
+  var STEP_ICONS = {
+    run: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3a9 9 0 109 9"/></svg>',
+    done: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5L20 7"/></svg>'
+  };
+  function handleStep(shellEl, data) {
+    var bar = shellEl.querySelector(".steps-bar");
+    if (!bar) return;
+    var pill = bar.querySelector('.step[data-step="' + data.id + '"]');
+    if (!pill) {
+      pill = document.createElement("div");
+      pill.className = "step";
+      pill.setAttribute("data-step", data.id);
+      bar.appendChild(pill);
+    }
+    pill.className = "step " + (data.state || "run");
+    pill.innerHTML = (data.state === "done" ? STEP_ICONS.done : STEP_ICONS.run) + "<span></span>";
+    pill.querySelector("span").textContent = data.label || data.id;
+  }
+  function buildAdvisorChip(note) {
+    var d = document.createElement("div");
+    d.className = "advisor-chip";
+    d.innerHTML = '<span class="a-tag">Advisor</span><span class="a-note"></span>';
+    d.querySelector(".a-note").textContent = note.replace(/\*+/g, "").replace(/\n+/g, " · ");
+    return d;
+  }
+  function insertChip(chip, host) {
+    // chips sit above the reply: inside the shell if it exists, else above the typing dots
+    if (host && host.parentNode) host.parentNode.insertBefore(chip, host);
+    scrollThread();
+  }
+
+  /* ---------- files: cards, viewer, browser ---------- */
+  function fmtSize(n) {
+    if (n == null) return "";
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1048576).toFixed(1) + " MB";
+  }
+  var FILE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>';
+  function buildFileCard(f) {
+    var card = document.createElement("div");
+    card.className = "file-card";
+    var ic = document.createElement("span");
+    ic.className = "f-ic";
+    ic.innerHTML = FILE_ICON;
+    var mid = document.createElement("span");
+    mid.className = "f-mid";
+    var nm = document.createElement("span");
+    nm.className = "f-name";
+    nm.textContent = f.name;
+    var mt = document.createElement("span");
+    mt.className = "f-meta";
+    mt.textContent = (f.lang || "file") + " · " + fmtSize(f.size);
+    mid.appendChild(nm);
+    mid.appendChild(mt);
+    var view = document.createElement("button");
+    view.type = "button";
+    view.className = "f-view";
+    view.textContent = "View";
+    view.addEventListener("click", function (e) {
+      e.stopPropagation();
+      openFileViewer(f.name);
+    });
+    card.appendChild(ic);
+    card.appendChild(mid);
+    card.appendChild(view);
+    card.addEventListener("click", function () { openFileViewer(f.name); });
+    return card;
+  }
+  function openFileViewer(name) {
+    if (!API) { toast("Backend offline"); return; }
+    fetch(API + "/api/files/" + encodeURIComponent(name), { credentials: "same-origin" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (d) {
+        $("#fv-name").textContent = d.name;
+        $("#fv-meta").textContent = fmtSize(d.size) + " · " + d.content.split("\n").length + " lines";
+        $("#fv-body").textContent = d.content;
+        $("#file-viewer").hidden = false;
+      })
+      .catch(function () { toast("Couldn't open the file"); });
+  }
+  function closeFileViewer() { $("#file-viewer").hidden = true; }
+  function loadFiles() {
+    if (!API) return;
+    fetch(API + "/api/files", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { renderFiles(d.files || []); })
+      .catch(function () {});
+  }
+  function renderFiles(files) {
+    var list = $("#files-list");
+    if (!list) return;
+    list.innerHTML = "";
+    $("#files-empty").style.display = files.length ? "none" : "block";
+    $("#files-count").textContent = files.length ? "(" + files.length + ")" : "";
+    files.forEach(function (f) {
+      var row = document.createElement("div");
+      row.className = "file-row";
+      var mid = document.createElement("span");
+      mid.className = "f-mid";
+      var nm = document.createElement("span");
+      nm.className = "f-name";
+      nm.textContent = f.name;
+      var mt = document.createElement("span");
+      mt.className = "f-meta";
+      mt.textContent = (f.modified || "") + " · " + fmtSize(f.size);
+      mid.appendChild(nm);
+      mid.appendChild(mt);
+      var del = document.createElement("button");
+      del.type = "button";
+      del.className = "f-del";
+      del.title = "Delete";
+      del.textContent = "\u2715";
+      del.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (!API) return;
+        fetch(API + "/api/files/" + encodeURIComponent(f.name), {
+          method: "DELETE", credentials: "same-origin"
+        }).then(function () {
+          toast("Deleted " + f.name);
+          loadFiles();
+        });
+      });
+      row.appendChild(mid);
+      row.appendChild(del);
+      row.addEventListener("click", function () { openFileViewer(f.name); });
+      list.appendChild(row);
+    });
+  }
+  // viewer wiring
+  $("#fv-close").addEventListener("click", closeFileViewer);
+  $("#fv-scrim").addEventListener("click", closeFileViewer);
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && !$("#file-viewer").hidden) closeFileViewer();
+  });
+  $("#fv-copy").addEventListener("click", function () {
+    var body = $("#fv-body").textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(body).then(function () { toast("Copied to clipboard"); });
+    } else {
+      toast("Copy not available here");
+    }
+  });
+  $("#fv-del").addEventListener("click", function () {
+    var name = $("#fv-name").textContent;
+    if (!API || !name) return;
+    fetch(API + "/api/files/" + encodeURIComponent(name), {
+      method: "DELETE", credentials: "same-origin"
+    }).then(function () {
+      closeFileViewer();
+      toast("Deleted " + name);
+      loadFiles();
+    });
+  });
+  function buildCostLine(data) {
+    var d = document.createElement("div");
+    d.className = "cost-line";
+    var model = data.model || "";
+    var known = data.cost_known !== false;
+    var mainCost = data.cost_usd || 0;
+    var advCost = data.advisor_cost_usd || 0;
+    var total = data.total_cost_usd != null ? data.total_cost_usd : mainCost + advCost;
+    function fmt(c) { return c < 0.0001 ? c.toFixed(6) : c.toFixed(4); }
+    if (!known) {
+      d.textContent = model + " · custom endpoint · main cost unavailable (no public pricing)" +
+        (advCost ? " · advisor ~$" + fmt(advCost) : "");
+      return d;
+    }
+    var parts = [model + " · " + ((data.usage && data.usage.in) || 0) + " in / " +
+      ((data.usage && data.usage.out) || 0) + " out tokens"];
+    if (data.advisor_usage && (data.advisor_usage.in || data.advisor_usage.out)) {
+      parts.push("advisor " + data.advisor_usage.in + "/" + data.advisor_usage.out + " tokens");
+    }
+    parts.push("main ~$" + fmt(mainCost) +
+      (advCost ? ", advisor ~$" + fmt(advCost) : "") +
+      ", total ~$" + fmt(total));
+    d.textContent = parts.join(" · ");
+    return d;
+  }
+  function collectHistory(conv) {
+    var out = [];
+    $$(".msg", conv).forEach(function (m) {
+      var isUser = m.classList.contains("msg-user");
+      var txt = m.querySelector(".bubble") || m.querySelector(".txt");
+      if (!txt) return;
+      var t = txt.textContent.trim();
+      if (!t || t.indexOf("Otto is thinking") === 0) return;
+      out.push({ role: isUser ? "user" : "assistant", content: t });
+    });
+    return out;
+  }
+
+
+  function sendMessage(text) {
+    var conv = activeConversation();
+    if (!conv || !text) return;
+    conv.appendChild(buildUserMsg(text));
+    scrollThread();
+    var typing = buildTypingMsg();
+    conv.appendChild(typing);
+    scrollThread();
+    var shell = null, txtEl = null;
+
+    if (!API) {
+      typing.replaceWith(buildAiMsg(
+        "The chat backend isn't reachable, so no model can answer right now. " +
+        "Check the connection and try again."
+      ));
+      scrollThread();
+      toast("Backend offline: no models available");
+      return;
+    }
+
+    var body = JSON.stringify({
+      messages: collectHistory(conv),
+      model: chatState.model,
+      advisor_model: chatState.advisorModel,
+      max_tokens: chatState.maxTokens,
+      system_prompt: chatState.system
+    });
+
+    fetch(API + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body,
+      credentials: "same-origin"
+    }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var buf = "";
+
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) {
+            if (!shell) { // no text events arrived
+              typing.replaceWith(buildAiMsg("(no response received)"));
+            }
+            scrollThread();
+            return;
+          }
+          buf += decoder.decode(r.value, { stream: true });
+          var parts = buf.split("\n\n");
+          buf = parts.pop();
+          parts.forEach(function (chunk) {
+            var evLine = chunk.match(/^event: (.+)$/m);
+            var dataLine = chunk.match(/^data: (.+)$/m);
+            if (!evLine || !dataLine) return;
+            var ev = evLine[1];
+            var data;
+            try { data = JSON.parse(dataLine[1]); } catch (e) { return; }
+
+            if (ev === "step" && data.id) {
+              if (!shell) {
+                shell = buildAiShell();
+                txtEl = shell.querySelector(".txt");
+                typing.replaceWith(shell);
+              }
+              handleStep(shell, data);
+            } else if (ev === "advisor" && data.note) {
+              insertChip(buildAdvisorChip(data.note), txtEl || typing);
+            } else if (ev === "advisor-error" && data.error) {
+              var chipErr = buildAdvisorChip("unavailable right now: " + data.error);
+              chipErr.classList.add("advisor-error");
+              insertChip(chipErr, txtEl || typing);
+            } else if (ev === "text" && data.delta) {
+              if (!shell) {
+                shell = buildAiShell();
+                txtEl = shell.querySelector(".txt");
+                typing.replaceWith(shell);
+              }
+              txtEl.appendChild(document.createTextNode(data.delta));
+              scrollThread();
+            } else if (ev === "files" && data.files) {
+              // swap the raw code blocks for clean file cards
+              if (txtEl && txtEl.parentNode && typeof data.cleaned_text === "string") {
+                txtEl.textContent = data.cleaned_text;
+              }
+              if (shell) {
+                var colF = shell.querySelector(".ai-col");
+                if (colF) data.files.forEach(function (f) { colF.appendChild(buildFileCard(f)); });
+              }
+              loadFiles();
+            } else if (ev === "done") {
+              usage.msgs += 1;
+              // count only known costs; custom endpoints have no public pricing
+              usage.cost += data.total_cost_usd != null ? data.total_cost_usd : (data.advisor_cost_usd || 0);
+              updateUsage();
+              if (shell) {
+                var col = shell.querySelector(".ai-col");
+                if (col) col.appendChild(buildCostLine(data));
+              }
+            } else if (ev === "error") {
+              showStreamError("Something went wrong: " + (data.error || "unknown error") +
+                " · the model or advisor may be unavailable.");
+              toast("Chat error: " + (data.error || "unknown").slice(0, 80));
+            }
+          });
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function (err) {
+      showStreamError("Couldn't reach the chat backend (" + err.message + ").");
+      toast("Backend unreachable");
+    });
+
+    function showStreamError(msg) {
+      if (shell && shell.parentNode) {
+        var errLine = document.createElement("div");
+        errLine.className = "cost-line";
+        errLine.textContent = msg;
+        shell.querySelector(".ai-col").appendChild(errLine);
+      } else if (typing.parentNode) {
+        typing.replaceWith(buildAiMsg(msg));
+      }
+      scrollThread();
+    }
+  }
+
+  var composer = $(".view-chat .composer textarea");
+  if (composer) {
+    var sendBtn = $(".view-chat .composer .send");
+    function submitComposer() {
+      var text = composer.value.trim();
+      if (!text) return;
+      composer.value = "";
+      composer.style.height = "auto";
+      sendMessage(text);
+    }
+    if (sendBtn) sendBtn.addEventListener("click", submitComposer);
+    composer.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        submitComposer();
+      }
+    });
+    composer.addEventListener("input", function () {
+      composer.style.height = "auto";
+      composer.style.height = Math.min(composer.scrollHeight, 180) + "px";
+    });
+  }
+
+  /* ---------- home ask box: routes to chat ---------- */
+  var askInput = $(".ask-box input");
+  if (askInput) {
+    function submitAsk() {
+      var text = askInput.value.trim();
+      var chatRadio = document.getElementById("v-chat-1");
+      if (!text) { chatRadio.checked = true; return; }
+      chatRadio.checked = true;
+      askInput.value = "";
+      setTimeout(function () { sendMessage(text); }, 60);
+    }
+    var askSend = $(".ask-box .ask-send");
+    if (askSend) askSend.addEventListener("click", function (e) {
+      e.preventDefault(); // it's a label for v-chat-1; let JS drive
+      submitAsk();
+    });
+    askInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); submitAsk(); }
+    });
+  }
+
+  /* ---------- model menus (topbar + composer + harness) ---------- */
+  function providerLabel(p) { return p; }
+  function shortName(label) {
+    return label.replace("Claude ", "").replace("GPT-", "").replace("Gemini ", "").replace("Grok ", "");
+  }
+  function fillModelMenu(menuEl, isSelect, platformOnly) {
+    if (!menuEl) return;
+    var models = platformOnly ? MODELS.filter(function (m) { return !m.custom; }) : MODELS;
+    if (isSelect) {
+      menuEl.innerHTML = "";
+      models.forEach(function (m) {
+        var o = document.createElement("option");
+        o.value = m.id;
+        o.textContent = m.label + " · " + m.provider + (m.tier === "cheapest" || m.tier === "fast" ? " (cheap)" : "");
+        menuEl.appendChild(o);
+      });
+      return;
+    }
+    menuEl.innerHTML = "";
+    var groups = {};
+    models.forEach(function (m) {
+      (groups[m.provider] = groups[m.provider] || []).push(m);
+    });
+    Object.keys(groups).forEach(function (p) {
+      var g = document.createElement("div");
+      g.className = "m-group";
+      g.textContent = p;
+      menuEl.appendChild(g);
+      groups[p].forEach(function (m) {
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "option";
+        btn.setAttribute("data-id", m.id);
+        var dot = document.createElement("span");
+        dot.className = "dot";
+        dot.style.background = m.custom ? "#b08bd6" : "var(--accent)";
+        var mid = document.createElement("span");
+        var name = document.createElement("span");
+        name.className = "opt-name";
+        name.textContent = m.label;
+        var price = document.createElement("span");
+        price.className = "m-price";
+        price.textContent = " · " + (m.in ? "$" + m.in + "/M in · $" + m.out + "/M out" : "custom endpoint") +
+          " · " + m.tier;
+        mid.appendChild(name);
+        mid.appendChild(price);
+        var check = document.createElement("span");
+        check.className = "m-check";
+        check.hidden = true;
+        check.textContent = "\u2713";
+        btn.appendChild(dot);
+        btn.appendChild(mid);
+        btn.appendChild(check);
+        btn.addEventListener("click", function () {
+          setModel(btn.getAttribute("data-id"));
+          var det = menuEl.closest("details");
+          if (det) det.open = false;
+        });
+        menuEl.appendChild(btn);
+      });
+    });
+  }
+  function setModel(id) {
+    var m = MODELS.find(function (x) { return x.id === id; });
+    if (!m) { // deleted or unknown: fall back to the default model
+      m = MODELS.find(function (x) { return x.id === "claude_sonnet_5_5"; });
+      if (!m) return;
+      id = m.id;
+    }
+    chatState.model = id;
+    var short = shortName(m.label);
+    $("#top-model-name").textContent = short;
+    $("#comp-model-name").textContent = short;
+    $$("#top-model-menu .option, #comp-model-menu .option").forEach(function (o) {
+      o.querySelector(".m-check").hidden = o.getAttribute("data-id") !== id;
+    });
+    if (hsModel) hsModel.value = id;
+  }
+  function setAdvisorModel(id) {
+    chatState.advisorModel = id;
+    if (hsAdvisorModel) hsAdvisorModel.value = id;
+    var st = $("#adv-status");
+    if (st) {
+      var m = MODELS.find(function (x) { return x.id === id; });
+      st.textContent = "Always on · " + (m ? m.label : id);
+    }
+  }
+
+  var hsModel = $("#hs-model");
+  var hsAdvisorModel = $("#hs-advisor-model");
+
+  function refreshModelUI() {
+    fillModelMenu($("#top-model-menu"), false);
+    fillModelMenu($("#comp-model-menu"), false);
+    fillModelMenu(hsModel, true);
+    fillModelMenu(hsAdvisorModel, true, true); // advisor: platform models only
+    setModel(chatState.model);
+    setAdvisorModel(chatState.advisorModel);
+  }
+
+  function updateUsage() {
+    var msgs = $("#us-msgs"), cost = $("#us-cost");
+    if (msgs) msgs.textContent = usage.msgs;
+    if (cost) cost.textContent = "$" + usage.cost.toFixed(4);
+  }
+
+  function loadModels() {
+    if (!API) return;
+    fetch(API + "/api/models", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        MODELS = d.models || [];
+        refreshModelUI();
+        loadCustomList();
+      })
+      .catch(function () { /* offline: menus stay empty */ });
+  }
+  loadModels();
+  loadFiles();
+  $$('input[name="view"]').forEach(function (r) {
+    r.addEventListener("change", function () {
+      if (r.id === "v-docs") loadFiles();
+    });
+  });
+
+  /* ---------- harness wiring ---------- */
+  if (hsModel) hsModel.addEventListener("change", function () { setModel(hsModel.value); });
+  if (hsAdvisorModel) hsAdvisorModel.addEventListener("change", function () { setAdvisorModel(hsAdvisorModel.value); });
+  var hsMax = $("#hs-max");
+  if (hsMax) {
+    hsMax.addEventListener("input", function () {
+      chatState.maxTokens = parseInt(hsMax.value, 10);
+      $("#hs-max-val").textContent = hsMax.value + " tokens";
+    });
+  }
+  var hsSystem = $("#hs-system");
+  if (hsSystem) hsSystem.addEventListener("input", function () { chatState.system = hsSystem.value; });
+  var hsAdvisor = null; // advisor is always on; no toggle
+
+  /* ---------- custom models (plugin) ---------- */
+  function loadCustomList() {
+    if (!API) return;
+    fetch(API + "/api/custom-models", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { renderCustomList(d.models || []); })
+      .catch(function () {});
+  }
+  function renderCustomList(models) {
+    var list = $("#cm-list");
+    if (!list) return;
+    list.innerHTML = "";
+    models.forEach(function (m) {
+      var row = document.createElement("div");
+      row.className = "cm-row";
+      var dot = document.createElement("span");
+      dot.style.cssText = "width:8px;height:8px;border-radius:50%;background:#b08bd6;flex:none";
+      var mid = document.createElement("span");
+      var b = document.createElement("b");
+      b.textContent = m.label;
+      mid.appendChild(b);
+      mid.appendChild(document.createTextNode(" · " + m.provider + " · " + m.model_name));
+      var del = document.createElement("button");
+      del.type = "button";
+      del.className = "del";
+      del.title = "Remove";
+      del.textContent = "\u2715";
+      del.addEventListener("click", function () {
+        if (!API) return;
+        fetch(API + "/api/custom-models/" + encodeURIComponent(m.id), {
+          method: "DELETE", credentials: "same-origin"
+        }).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          toast("Removed " + m.label);
+          return loadModels();
+        }).catch(function () { toast("Couldn't remove the model"); });
+      });
+      row.appendChild(dot);
+      row.appendChild(mid);
+      row.appendChild(del);
+      list.appendChild(row);
+    });
+  }
+  var cmAdd = $("#cm-add");
+  if (cmAdd) cmAdd.addEventListener("click", function () {
+    if (!API) { toast("Backend offline"); return; }
+    var payload = {
+      id: ($("#cm-label").value || $("#cm-name").value || "custom").trim().toLowerCase().replace(/\s+/g, "-"),
+      label: $("#cm-label").value.trim() || $("#cm-name").value.trim(),
+      provider: $("#cm-provider").value,
+      base_url: $("#cm-base").value.trim(),
+      api_key: $("#cm-key").value.trim(),
+      model_name: $("#cm-name").value.trim()
+    };
+    if (!payload.base_url || !payload.model_name) {
+      toast("Base URL and model name are required");
+      return;
+    }
+    fetch(API + "/api/custom-models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      credentials: "same-origin"
+    }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    })
+      .then(function (d) {
+        if (d.error) { toast(d.error); return; }
+        ["#cm-label", "#cm-base", "#cm-name", "#cm-key"].forEach(function (s) { $(s).value = ""; });
+        toast("Added " + payload.label + " to the model menus");
+        loadModels();
+  loadFiles();
+  $$('input[name="view"]').forEach(function (r) {
+    r.addEventListener("change", function () {
+      if (r.id === "v-docs") loadFiles();
+    });
+  });
+      })
+      .catch(function () { toast("Couldn't add the model"); });
+  });
+
+  /* ---------- library dropdown: close after picking ---------- */
+  $$(".lib-picker label").forEach(function (label) {
+    label.addEventListener("click", function () {
+      setTimeout(function () {
+        var det = document.querySelector(".lib-picker");
+        if (det) det.open = false;
+      }, 0);
+    });
+  });
+
+  /* ---------- sidebar search: filter chats ---------- */
+  var sideSearch = $(".side-search input");
+  if (sideSearch) {
+    sideSearch.addEventListener("input", function () {
+      var q = sideSearch.value.trim().toLowerCase();
+      $$(".side-scroll .chat-item, .side-scroll .proj-item, .side-scroll .nav-item").forEach(function (el) {
+        var match = !q || el.textContent.toLowerCase().indexOf(q) !== -1;
+        el.style.display = match ? "" : "none";
+      });
+    });
+  }
+
+  /* ---------- copy buttons ---------- */
+  $$(".codeblock .copy, .msg .actions button[aria-label='Copy response']").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var block = btn.closest(".codeblock") || btn.closest(".txt");
+      var text = block ? (block.querySelector("pre") ? block.querySelector("pre").innerText : block.innerText) : "";
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { toast("Copied to clipboard"); });
+      } else {
+        toast("Copy isn't available in this browser");
+      }
+    });
+  });
+
+  /* ---------- settings: live range readout + toggles ---------- */
+  $$("input[type='range']").forEach(function (r) {
+    var out = document.createElement("span");
+    out.className = "range-out";
+    out.style.cssText = "font-size:.8rem;color:var(--muted);min-width:2.2ch;text-align:right;margin-left:8px";
+    out.textContent = r.value;
+    r.insertAdjacentElement("afterend", out);
+    r.addEventListener("input", function () { out.textContent = r.value; });
+  });
+  $$(".check-row input[type='checkbox']").forEach(function (cb) {
+    cb.addEventListener("change", function () {
+      var row = cb.closest(".check-row");
+      if (row) row.classList.toggle("done", cb.checked);
+    });
+  });
+  $$(".btn").forEach(function (btn) {
+    if (/pair/i.test(btn.textContent)) btn.addEventListener("click", function () {
+      toast("Pairing isn't wired up yet");
+    });
+  });
+
+  /* ---------- animate meters when the agents view opens ---------- */
+  document.addEventListener("change", function (e) {
+    if (e.target && e.target.name === "view" && e.target.id === "v-agents") {
+      $$(".view-agents .meter span").forEach(function (s) {
+        var w = s.style.width;
+        s.style.transition = "none";
+        s.style.width = "0";
+        void s.offsetWidth;
+        s.style.transition = "width 900ms cubic-bezier(0.25,0.8,0.35,1)";
+        s.style.width = w;
+      });
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
