@@ -149,6 +149,34 @@
   .tpl .art { height: 84px; border-radius: 5px; margin-bottom: 10px; display: grid; place-items: center; font-size: 28px; }
   .tpl .nm { font-weight: 600; color: #e8e8e8; font-size: 13px; }
   .tpl .ds { color: var(--hub-muted); font-size: 11.5px; margin-top: 3px; }
+  /* ---- script editor ---- */
+  #script-editor-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: center; justify-content: center; z-index: 60; }
+  #script-editor-overlay.open { display: flex; }
+  .script-editor { width: min(960px, 92vw); height: min(640px, 86vh); background: #1d1d1d; border: 1px solid #3c3c3c; border-radius: 10px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 18px 60px rgba(0,0,0,.5); }
+  .se-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid #2c2c2c; background: #232323; }
+  .se-head .se-title { color: #e8e8e8; font-weight: 600; font-size: 13px; flex: 1; }
+  .se-dirty { color: #f0b429; font-size: 15px; visibility: hidden; }
+  .se-dirty.on { visibility: visible; }
+  .se-body { display: flex; flex: 1; min-height: 0; }
+  .se-list { width: 190px; border-right: 1px solid #2c2c2c; overflow-y: auto; padding: 8px; background: #191919; }
+  .se-list .se-new { width: 100%; margin-bottom: 8px; }
+  .se-item { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 5px; color: #c9c9c9; font-size: 12px; cursor: pointer; border: 1px solid transparent; }
+  .se-item:hover { background: #242424; }
+  .se-item.sel { background: #2c3138; border-color: #3f5a7d; color: #fff; }
+  .se-item .se-x { margin-left: auto; color: #777; padding: 0 3px; border-radius: 3px; }
+  .se-item .se-x:hover { color: #ff7d6b; background: #2f2220; }
+  .se-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .se-meta { display: flex; gap: 14px; padding: 10px 14px; border-bottom: 1px solid #2c2c2c; }
+  .se-meta label { display: flex; align-items: center; gap: 8px; color: #9a9a9a; font-size: 11.5px; }
+  .se-meta input { background: #141414; border: 1px solid #3a3a3a; border-radius: 4px; color: #d6d6d6; padding: 4px 8px; font-size: 12px; }
+  #se-name-input { width: 150px; }
+  #se-params { width: 300px; font-family: ui-monospace, monospace; }
+  .se-code { flex: 1; display: flex; min-height: 0; background: #141414; }
+  .se-gutter { width: 44px; padding: 10px 6px 10px 0; text-align: right; color: #5a5a5a; font: 12px/1.55 ui-monospace, monospace; user-select: none; overflow: hidden; border-right: 1px solid #262626; }
+  #se-code { flex: 1; resize: none; border: 0; outline: none; background: transparent; color: #d6d6d6; font: 12px/1.55 ui-monospace, monospace; padding: 10px 12px; white-space: pre; overflow: auto; }
+  .se-foot { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid #2c2c2c; background: #232323; }
+  .se-foot .se-hint { flex: 1; color: #777; font-size: 11px; }
+  .se-note { padding: 10px 14px; color: #8f8f8f; font-size: 12px; background: #141414; border-bottom: 1px solid #2c2c2c; }
   .form-row { display: flex; gap: 14px; margin-bottom: 16px; flex-wrap: wrap; }
   .field { flex: 1; min-width: 200px; }
   .field label { display: block; color: var(--hub-muted); font-size: 12px; margin-bottom: 5px; }
@@ -367,6 +395,10 @@
   }
   .asset:hover { background: #2e2e2e; }
   .asset .ico { font-size: 26px; margin-bottom: 4px; display: block; }
+  .asset.row { width: 100%; display: flex; align-items: center; gap: 7px; padding: 5px 8px; text-align: left; }
+  .asset.row .ico { font-size: 15px; margin: 0; }
+  .asset.row .pw-hint { margin-left: auto; align-self: center; }
+  .asset.row .pw-x { margin-left: 0; position: static; }
   .console-line { padding: 4px 12px; font-family: 'Roboto Mono', Consolas, monospace; font-size: 11.5px; border-bottom: 1px solid #242424; color: #b4b4b4; display: flex; gap: 8px; }
   .console-line .t { color: #6f6f6f; flex-shrink: 0; }
   .console-line.warn { color: #d8b93c; }
@@ -474,6 +506,36 @@
   </div>
 </div>
 
+<!-- ===== Script Editor modal ===== -->
+<div id="script-editor-overlay">
+  <div class="script-editor" role="dialog" aria-label="Script Editor">
+    <div class="se-head">
+      <span class="se-title">Script Editor — <span id="se-name"></span></span>
+      <span class="se-dirty" id="se-dirty" title="Unsaved changes">●</span>
+      <button class="btn" id="se-close">Close</button>
+    </div>
+    <div class="se-body">
+      <div class="se-list" id="se-list"></div>
+      <div class="se-main">
+        <div class="se-meta">
+          <label>Name <input id="se-name-input" /></label>
+          <label>Parameters (JSON) <input id="se-params" /></label>
+        </div>
+        <div class="se-code">
+          <div class="se-gutter" id="se-gutter">1</div>
+          <textarea id="se-code" spellcheck="false" aria-label="Script source"></textarea>
+        </div>
+        <div class="se-note" id="se-note" style="display:none"></div>
+        <div class="se-foot">
+          <span class="se-hint">Runs each frame at Play: obj.position / obj.rotation / obj.params, dt (s), t (s). A hung script is terminated by a watchdog — the editor never freezes.</span>
+          <button class="btn" id="se-revert">Revert</button>
+          <button class="btn primary" id="se-apply">Apply (Ctrl+S)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Scene Settings modal (Lighting & Physics) ===== -->
 <div id="settings-overlay">
   <div id="settings-modal" role="dialog" aria-label="Scene Settings">
@@ -537,6 +599,7 @@
     <div class="ed-menu" data-menu="assets"><button>Assets</button>
       <div class="ed-dropdown">
         <button data-act="create-scene-asset">Create ▸ Scene</button>
+        <button data-act="create-script">Create ▸ Script</button>
         <button data-act="create-material">Create ▸ Material</button>
         <button data-act="create-prefab">Create ▸ Prefab From Selection</button>
         <button data-act="show-in-explorer">Show in Explorer</button>
@@ -584,6 +647,7 @@
       <div class="ed-dropdown">
         <button data-act="win-project">General ▸ Project <span>Ctrl+5</span></button>
         <button data-act="win-console">General ▸ Console <span>Ctrl+Shift+C</span></button>
+        <button data-act="win-scripts">General ▸ Script Editor</button>
         <button data-act="win-services">General ▸ Services</button>
         <button data-act="win-stats">General ▸ Statistics</button>
         <button data-act="scene-settings">General ▸ Scene Settings (Lighting & Physics)</button>
@@ -705,14 +769,60 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
    projects / installs / learn / new-project / templates …
    ================================================================ */
 const $ = s => document.querySelector(s);
+/* ---- project registry: projects are real — each owns its scenes, scripts,
+   prefabs and preview, keyed by stable id. Legacy shared saves are migrated
+   into the first project on first run so nothing is lost. ---- */
+const PROJ_DEFAULTS = [
+  { id: 'p-rollaball', name: 'Roll-a-Ball remake', ver: '6000.0.64f1', modified: '2 hours ago', hue: 210, emoji: '🟦', target: 'cube' },
+  { id: 'p-fps', name: 'FPS Playground', ver: '6000.0.64f1', modified: 'yesterday', hue: 130, emoji: '🎯', target: 'sphere' },
+  { id: 'p-lowpoly', name: 'LowPolyIsland', ver: '6000.3.10f1', modified: '4 days ago', hue: 45, emoji: '🏝️', target: 'plane' },
+];
+function migrateLegacyKeys(reg) {
+  // pre-project shared saves move into the first project, then the old keys are
+  // removed so later loads never touch the project's data again. Writes are
+  // non-overwriting: if the project already owns data (e.g. a newer save made
+  // after the registry existed), the stale legacy copy is discarded, not applied.
+  let migrated = false;
+  const first = reg.projects[0];
+  const legacyScenes = (() => { try { return JSON.parse(store.getItem('unitycraft-scenes')) || null; } catch (e) { return null; } })();
+  const legacyQuick = store.getItem('unitycraft-scene');
+  if (legacyScenes && !store.getItem(`unitycraft-proj:${first.id}:scenes`)) { store.setItem(`unitycraft-proj:${first.id}:scenes`, JSON.stringify(legacyScenes)); migrated = true; }
+  if (legacyQuick && !store.getItem(`unitycraft-proj:${first.id}:scene`)) { store.setItem(`unitycraft-proj:${first.id}:scene`, legacyQuick); migrated = true; }
+  const legacyPrefabs = store.getItem('unitycraft-prefabs');
+  if (legacyPrefabs) {
+    for (const p of reg.projects) {
+      if (!store.getItem(`unitycraft-proj:${p.id}:prefabs`)) { store.setItem(`unitycraft-proj:${p.id}:prefabs`, legacyPrefabs); migrated = true; }
+    }
+  }
+  if (legacyScenes || legacyQuick || legacyPrefabs) {
+    store.removeItem('unitycraft-scenes'); store.removeItem('unitycraft-scene'); store.removeItem('unitycraft-prefabs');
+    if (migrated) setTimeout(() => log('sys', `Legacy shared saves migrated to "${first.name}" (projects now own their data)`), 800);
+  }
+  return migrated;
+}
+function loadRegistry() {
+  try {
+    const r = JSON.parse(store.getItem('unitycraft-projects'));
+    if (r && Array.isArray(r.projects) && r.projects.length) {
+      r.favorites = new Set(r.favorites || []);
+      migrateLegacyKeys(r); // legacy keys can appear after the registry exists
+      return r;
+    }
+  } catch (e) { /* fall through to rebuild */ }
+  const reg = { projects: PROJ_DEFAULTS.map(p => ({ ...p })), favorites: new Set(['Roll-a-Ball remake']) };
+  migrateLegacyKeys(reg);
+  saveRegistry(reg);
+  return reg;
+}
+function saveRegistry(reg) {
+  const r = reg || state.registry;
+  store.setItem('unitycraft-projects', JSON.stringify({ projects: r.projects, favorites: [...r.favorites] }));
+}
 const state = {
   hubView: 'projects',
-  favorites: new Set(['Roll-a-Ball remake']),
-  projects: [
-    { name: 'Roll-a-Ball remake', ver: '6000.0.64f1', modified: '2 hours ago', hue: 210, emoji: '🟦', target: 'cube' },
-    { name: 'FPS Playground', ver: '6000.0.64f1', modified: 'yesterday', hue: 130, emoji: '🎯', target: 'sphere' },
-    { name: 'LowPolyIsland', ver: '6000.3.10f1', modified: '4 days ago', hue: 45, emoji: '🏝️', target: 'plane' },
-  ],
+  registry: null, // set below — loadRegistry() needs `store` first
+  favorites: null,
+  projects: [],
   installs: [
     { ver: '6000.0.64f1 (LTS)', date: 'Oct 12, 2026', mods: ['Linux Build Support (IL2CPP)', 'Android Build Support'] },
     { ver: '6000.3.10f1 (LTS)', date: 'Aug 2, 2026', mods: ['WebGL Build Support'] },
@@ -724,6 +834,7 @@ const state = {
     { t: 'Junior Programmer', d: 'Pathway · 40 hrs', emoji: '💻' },
   ],
 };
+state.registry = null; // initialized after `store`/`ed` are defined (loadRegistry persists to storage)
 
 const TEMPLATES = [
   { id: '3d', name: 'Universal 3D', desc: 'URP · Default 3D template', emoji: '🧊', bg: 210 },
@@ -805,8 +916,13 @@ function renderHub() {
 function projectCard(p, recent) {
   const el = document.createElement('div');
   el.className = 'project-card';
+  let thumbStyle = `background:hsl(${p.hue} 28% 22%)`, thumbHTML = p.emoji;
+  try {
+    const url = store.getItem(`unitycraft-proj:${p.id}:preview`);
+    if (url && url.startsWith('data:image/')) { thumbStyle = `background-image:url('${url}');background-size:cover;background-position:center`; thumbHTML = ''; }
+  } catch (e) { /* preview optional */ }
   el.innerHTML = `
-    <div class="thumb" style="background:hsl(${p.hue} 28% 22%)">${p.emoji}</div>
+    <div class="thumb" style="${thumbStyle}">${thumbHTML}</div>
     <h3>${p.name}</h3>
     <div class="row">
       <span class="ver-chip">${p.ver}</span>
@@ -818,9 +934,78 @@ function projectCard(p, recent) {
   el.querySelector('.favorite').onclick = e => {
     e.stopPropagation();
     state.favorites.has(p.name) ? state.favorites.delete(p.name) : state.favorites.add(p.name);
+    saveRegistry();
     renderHub();
   };
   return el;
+}
+/* ---- scene preview: render the actual scene (its objects, materials, sky)
+   through its Main Camera into a small offscreen target and store it as the
+   project's hub thumbnail. Captured on save and when returning to the Hub. */
+let _prevRT = null;
+function captureScenePreview() {
+  try {
+    if (!_prevRT) _prevRT = new THREE.WebGLRenderTarget(320, 180);
+    const cam = ed.objects.find(o => o.userData.type === 'camera') || sceneCamera;
+    const prevAspect = cam.aspect; cam.aspect = 320 / 180; if (cam.updateProjectionMatrix) cam.updateProjectionMatrix();
+    const hidden = [];
+    const stash = (obj) => { if (obj && obj.visible) { obj.visible = false; hidden.push(obj); } };
+    stash(grid);
+    stash(tcontrols);
+    ed.objects.forEach(o => { stash(o.userData.outline); stash(o.userData.helper); });
+    renderer.setRenderTarget(_prevRT);
+    renderer.render(scene, cam);
+    renderer.setRenderTarget(null);
+    cam.aspect = prevAspect; if (cam.updateProjectionMatrix) cam.updateProjectionMatrix();
+    hidden.forEach(h => h.visible = true);
+    store.setItem(pk('preview'), rtToPreviewJpeg());
+    return true;
+  } catch (e) { return false; }
+}
+/* offscreen render target -> flipped JPEG data URL (shared by scene capture
+   and hub preview seeding) */
+function rtToPreviewJpeg() {
+  const buf = new Uint8Array(320 * 180 * 4);
+  renderer.readRenderTargetPixels(_prevRT, 0, 0, 320, 180, buf);
+  const cv = document.createElement('canvas'); cv.width = 320; cv.height = 180;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(320, 180);
+  for (let y = 0; y < 180; y++) img.data.set(buf.subarray((179 - y) * 1280, (180 - y) * 1280), y * 1280); // flip Y
+  ctx.putImageData(img, 0, 0);
+  return cv.toDataURL('image/jpeg', 0.72);
+}
+/* hub cards show a real render from the very first visit: projects that have
+   never been opened get a preview of their default template scene, rendered
+   offscreen at boot (replaced by the actual scene capture on first open/save) */
+/* hub cards show a real render from the very first visit: projects that have
+   never been opened get a preview generated at boot — from their SAVED scene
+   when one exists (so the thumbnail depicts the project's actual content), or
+   from their default template. The seed is replaced by the regular capture on
+   open/save (openEditor always recaptures). */
+function seedProjectPreviews() {
+  try {
+    for (const p of state.registry.projects) {
+      if (store.getItem(`unitycraft-proj:${p.id}:preview`)) continue;
+      ed.projectId = p.id;
+      let loaded = false;
+      const quickRaw = store.getItem(pk('scene'));
+      if (quickRaw) {
+        try {
+          const wrap = JSON.parse(quickRaw);
+          const spec = wrap.spec !== undefined ? wrap.spec : wrap;
+          // accepted save shapes: v2 spec objects (incl. empty scenes) and legacy v1 arrays
+          if (spec && (Array.isArray(spec) || Array.isArray(spec.objects))) { loadSceneFromSpec(spec); loaded = true; }
+        } catch (e) { /* unparsable save - fall back to the template */ }
+      }
+      if (!loaded) resetSceneFor(p);
+      captureScenePreview();
+    }
+    // leave the editor parked on the first project, as openEditor would
+    ed.projectId = state.registry.projects[0].id;
+    const q = store.getItem(pk('scene'));
+    if (q) { try { const w = JSON.parse(q); loadSceneFromSpec(w.spec !== undefined ? w.spec : w); } catch (e) {} }
+    else resetSceneFor(state.registry.projects[0]);
+  } catch (e) { /* previews are cosmetic - never block boot */ }
 }
 function renderProjectCards(sel, favOnly) {
   const grid = $(sel);
@@ -857,8 +1042,10 @@ $('#tpl-create').onclick = () => {
   $('#modal-overlay').classList.remove('open');
   const tpl = TEMPLATES.find(t => t.id === selectedTemplate);
   const ver = $('#proj-ver').value || '6000.0.64f1';
-  state.projects.unshift({ name, ver, modified: 'just now', hue: tpl.bg, emoji: tpl.emoji, target: selectedTemplate === '2d' ? 'plane' : 'cube' });
-  openEditor(state.projects[0]);
+  const proj = { id: 'p-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name, ver, modified: 'just now', hue: tpl.bg, emoji: tpl.emoji, target: selectedTemplate === '2d' ? 'plane' : 'cube' };
+  state.registry.projects.unshift(proj);
+  saveRegistry();
+  openEditor(proj);
 };
 
 function toast(msg) {
@@ -879,10 +1066,22 @@ function openEditor(project) {
   edEl.style.display = 'flex';
   status(`Opening project "${project.name}" (Editor ${project.ver})…`);
   if (!editorReady) { initEditor(); editorReady = true; }
-  resetSceneFor(project);
-  ed.sceneName = 'SampleScene';
-  $('#hier-tab').textContent = 'Hierarchy — SampleScene';
-  status(`Loaded SampleScene — ${project.name} (Editor ${project.ver})`);
+  ed.projectId = project.id;
+  loadProjectAssets(); // scripts + prefabs owned by this project
+  const quickRaw = store.getItem(pk('scene'));
+  if (quickRaw) {
+    try {
+      const wrap = JSON.parse(quickRaw);
+      loadSceneFromSpec(wrap.spec !== undefined ? wrap.spec : wrap); // accept pre-wrap raw spec too
+      ed.sceneName = wrap.name || 'SampleScene';
+    } catch (e) { log('warn', 'Saved scene for this project could not be parsed — starting fresh'); resetSceneFor(project); ed.sceneName = 'SampleScene'; }
+  } else {
+    resetSceneFor(project);
+    ed.sceneName = 'SampleScene';
+  }
+  $('#hier-tab').textContent = 'Hierarchy — ' + ed.sceneName;
+  captureScenePreview(); // hub card always reflects the project's current scene (replaces any boot seed)
+  status(`Loaded ${ed.sceneName} — ${project.name} (Editor ${project.ver})`);
   log('sys', `Project opened: ${project.name} @ ${$('#proj-loc').value || '~/UnityProjects'}`);
 }
 
@@ -904,7 +1103,11 @@ const ed = {
   simTime: 0, playClock: 0, physAcc: 0,
   sceneSettings: { sky: 'solid', skyColor: '#262626', fog: false, fogColor: '#3a4a58', fogDensity: 0.02, ambient: 0.55, gravity: -9.81 },
   shaderMats: new Set(), audioNodes: new Set(), contactPairs: new Set(),
+  projectId: null, scripts: null,
 };
+state.registry = loadRegistry();
+state.favorites = state.registry.favorites;
+state.projects = state.registry.projects;
 
 /* ================================================================
    MATERIAL & SHADER SYSTEM
@@ -1173,7 +1376,12 @@ function addComponent(o, key) {
   else if (key === 'audio') c.audio = COMPONENT_DEFS.audio();
   else if (key === 'particles') { c.particles = COMPONENT_DEFS.particles(); createParticleSystem(o); }
   else if (key === 'animator') c.animator = COMPONENT_DEFS.animator();
-  else if (key.endsWith('Script') || key === 'PlayerController') c.script = key;
+  else if (c.script && (key.endsWith('Script') || key === 'PlayerController' || (ed.scripts && ed.scripts[key]))) return false; // one script per object
+  else if (key.endsWith('Script') || key === 'PlayerController' || (ed.scripts && ed.scripts[key])) {
+    c.script = key;
+    // the script asset's declared params become the object's defaults (like Unity seeding serialized fields)
+    if (ed.scripts && ed.scripts[key] && ed.scripts[key].params) Object.assign(o.userData.scriptParams, ed.scripts[key].params);
+  }
   else return false;
   return true;
 }
@@ -1437,7 +1645,7 @@ function resetSceneFor(project) {
 function initEditor() {
   bindToolbar(); bindMenus(); bindKeys(); bindPanels(); bindSceneSettings();
   applySceneSettings(ed.sceneSettings);
-  try { ed.prefabs = JSON.parse(store.getItem('unitycraft-prefabs')) || {}; } catch (e) { ed.prefabs = {}; }
+  try { ed.prefabs = JSON.parse(store.getItem(pk('prefabs'))) || {}; } catch (e) { ed.prefabs = {}; }
   renderProjectWindow();
   const ro = new ResizeObserver(resize);
   ro.observe(container);
@@ -1744,11 +1952,17 @@ function renderInspector() {
     <div class="comp">
       <div class="comp-header"><span class="fold">▼</span> ${comps.script ? 'Script — ' + comps.script : 'Add Component'} ${comps.script ? '<button class="cx" data-rm="script" title="Remove component">✕</button>' : ''}</div>
       <div class="comp-body">
-        ${comps.script ? `
-        <div class="kv"><span class="k">Script</span><input type="text" value="${comps.script}.cs" disabled /></div>
-        ${comps.script === 'SpinScript' ? `<div class="kv"><span class="k">Speed (deg/s)</span><input type="number" id="insp-speed" step="10" value="${u.scriptParams.speed}" /></div>` : ''}
-        ${comps.script === 'BobScript' ? `<div class="kv"><span class="k">Amplitude</span><input type="number" id="insp-amp" step="0.1" value="${u.scriptParams.amp}" /></div>` : ''}
-        ${comps.script === 'PlayerController' ? `<div class="kv"><span class="k">Move Speed</span><input type="number" id="insp-pspeed" step="0.5" value="${u.scriptParams.playerSpeed ?? 6}" /></div>` : ''}` : `
+        ${comps.script ? (() => {
+          const sa = ed.scripts && ed.scripts[comps.script];
+          const paramRows = sa && sa.params
+            ? Object.entries(sa.params).filter(([, v]) => typeof v === 'number').map(([k, v]) =>
+                `<div class="kv"><span class="k">${k}</span><input type="number" step="0.1" data-sparam="${k}" value="${u.scriptParams[k] ?? v}" /></div>`).join('')
+            : '';
+          return `
+        <div class="kv"><span class="k">Script</span><input type="text" value="${comps.script}.cs" disabled />${sa && !sa.builtin ? `<button class="btn" style="padding:2px 10px;font-size:11px" data-se-open="${comps.script}">Edit…</button>` : ''}</div>
+        ${paramRows}
+        ${!sa ? '<div style="color:#c77;font-size:11px">Script asset missing from this project</div>' : ''}`;
+        })() : `
         <div style="color:#777;font-size:11.5px">Use the Add Component button below, or Component ▸ in the menu bar.</div>`}
       </div>
     </div>
@@ -1765,9 +1979,8 @@ function renderInspector() {
         <div class="ac-cat">Animation</div>
         <button data-acomp="animator">Animator <span class="ac-hint">keyframe tracks</span></button>
         <div class="ac-cat">Scripts</div>
-        <button data-acomp="SpinScript">Spin.cs</button>
-        <button data-acomp="BobScript">Bob (float).cs</button>
-        <button data-acomp="PlayerController">PlayerController (WASD).cs</button>
+        ${Object.keys(ed.scripts || {}).map(n => `<button data-acomp="${escAttr(n)}">${escAttr(n)}.cs</button>`).join('')}
+        <button data-acomp="__new_script__">＋ New Script…</button>
       </div>
     </div>`;
 
@@ -1893,6 +2106,7 @@ function renderInspector() {
   addMenu.querySelectorAll('[data-acomp]').forEach(b => b.onclick = () => {
     addMenu.classList.add('hidden');
     const key = b.dataset.acomp;
+    if (key === '__new_script__') { const n = createNewScript(); if (n) openScriptEditor(n); return; }
     if (addComponent(o, key)) {
       renderInspector();
       log('sys', `Added ${key.endsWith('Script') || key === 'PlayerController' ? key + '.cs' : COMP_LABEL[key]} to ${u.name}`);
@@ -1907,12 +2121,11 @@ function renderInspector() {
   if (near) near.onchange = e => { o.near = Math.max(0.01, parseFloat(e.target.value || 0.1)); o.updateProjectionMatrix(); };
   const inten = $('#insp-intensity');
   if (inten) inten.onchange = e => { o.intensity = parseFloat(e.target.value || 1); };
-  const spd = $('#insp-speed');
-  if (spd) spd.onchange = e => { u.scriptParams.speed = parseFloat(e.target.value || 90); };
-  const amp = $('#insp-amp');
-  if (amp) amp.onchange = e => { u.scriptParams.amp = parseFloat(e.target.value || 0.5); };
-  const pspeed = $('#insp-pspeed');
-  if (pspeed) pspeed.onchange = e => { u.scriptParams.playerSpeed = parseFloat(e.target.value || 6); };
+  /* script params — generic, driven by the script asset's declared params */
+  el.querySelectorAll('[data-sparam]').forEach(inp => inp.onchange = e => {
+    u.scriptParams[inp.dataset.sparam] = parseFloat(e.target.value || 0);
+  });
+  el.querySelectorAll('[data-se-open]').forEach(btn => btn.onclick = () => openScriptEditor(btn.dataset.seOpen));
 }
 function vec3(label, kind, v) {
   return `<div class="vec3"><span class="lbl">${label}</span>${['x', 'y', 'z'].map(ax =>
@@ -1934,32 +2147,264 @@ function bindVec3(kind, o) {
 
 /* ---- project window & console ---- */
 const escAttr = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&' + 'amp;', '<': '&' + 'lt;', '>': '&' + 'gt;', '"': '&' + 'quot;', "'": '&' + '#39;' }[c]));
-function loadScenesMap() {
-  try { return JSON.parse(store.getItem('unitycraft-scenes')) || {}; } catch (e) { return {}; }
+/* project-scoped storage key: each project owns scenes/scripts/prefabs/preview */
+const pk = s => `unitycraft-proj:${ed.projectId}:${s}`;
+function saveQuickScene() { store.setItem(pk('scene'), JSON.stringify({ name: ed.sceneName, spec: JSON.parse(serializeScene()) })); }
+function touchProject() {
+  const p = state.projects.find(x => x.id === ed.projectId);
+  if (p) { p.modified = 'just now'; saveRegistry(); }
 }
+function loadProjectAssets() {
+  try { ed.prefabs = JSON.parse(store.getItem(pk('prefabs'))) || {}; } catch (e) { ed.prefabs = {}; }
+  try { ed.scripts = JSON.parse(store.getItem(pk('scripts'))) || null; } catch (e) { ed.scripts = null; }
+  if (!ed.scripts) { ed.scripts = defaultScripts(); persistScripts(); } // seed built-ins once per project
+  renderProjectWindow();
+}
+function persistScripts() { store.setItem(pk('scripts'), JSON.stringify(ed.scripts)); }
+
+/* ================= SCRIPT SYSTEM =================
+   Scripts are project assets: editable source + JSON params, attached to
+   objects by name. At Play, user scripts execute inside a Web Worker on
+   plain state snapshots — they cannot touch the DOM or Three.js, and a
+   watchdog terminates a hung worker so the editor never freezes.
+   PlayerController stays a native main-thread behavior (it needs scene
+   collision info). */
+function defaultScripts() {
+  return {
+    SpinScript: { params: { speed: 90 }, source:
+`// Rotates the object around its Y axis.
+// obj.params.speed is degrees per second.
+obj.rotation.y += obj.params.speed * Math.PI / 180 * dt;` },
+    BobScript: { params: { amp: 0.5 }, source:
+`// Bobs the object up and down smoothly.
+obj.position.y += Math.sin(t / 0.3) * obj.params.amp * dt * 2;` },
+    PlayerController: { builtin: true, params: { playerSpeed: 6 }, source: null },
+  };
+}
+const NEW_SCRIPT_TEMPLATE =
+`// Runs every frame while in Play mode.
+// obj.position / obj.rotation are {x,y,z}; obj.params is the JSON below.
+// dt = seconds since last frame, t = seconds since Play started.
+obj.rotation.y += 0.5 * dt;`;
+
+/* ---- worker runtime ---- */
+const WORKER_SRC = `self.__fns = {};
+self.onmessage = function (e) {
+  const d = e.data, out = [], errors = [];
+  for (const item of d.batch) {
+    const a = d.scripts[item.script];
+    if (!a || !a.source) continue;
+    try {
+      if (self.__fns[item.script] !== a.source) self.__fns[item.script] = new Function('obj', 'dt', 't', 'input', a.source);
+      self.__fns[item.script](item.state, d.dt, d.t, item.input);
+      out.push({ id: item.id, state: item.state });
+    } catch (err) { errors.push({ script: item.script, message: String(err && err.message || err) }); }
+  }
+  self.postMessage({ out: out, errors: errors });
+};`;
+let scriptWorker = null, workerBusy = false, workerDead = false, scriptWatchdog = null;
+const scriptErrors = new Set();
+function ensureScriptWorker() {
+  if (scriptWorker) return true;
+  try {
+    scriptWorker = new Worker(URL.createObjectURL(new Blob([WORKER_SRC], { type: 'application/javascript' })));
+  } catch (e) { log('warn', 'Script worker unavailable in this browser — user scripts disabled'); workerDead = true; return false; }
+  scriptWorker.onmessage = e => {
+    workerBusy = false; clearTimeout(scriptWatchdog);
+    for (const u of e.data.out) {
+      const o = objById(u.id);
+      if (!o || !ed.playing) continue;
+      o.position.set(u.state.position.x, u.state.position.y, u.state.position.z);
+      o.rotation.set(u.state.rotation.x, u.state.rotation.y, u.state.rotation.z);
+    }
+    for (const er of e.data.errors) {
+      if (!scriptErrors.has(er.script)) { scriptErrors.add(er.script); log('error', `Script error in ${er.script}.cs: ${er.message} (script disabled until next Play)`); }
+    }
+  };
+  return true;
+}
+function killScriptWorker(reason) {
+  if (scriptWorker) { scriptWorker.terminate(); scriptWorker = null; }
+  workerBusy = false; workerDead = true; clearTimeout(scriptWatchdog);
+  if (reason) log('error', reason);
+}
+function resetScriptRuntime() {
+  scriptErrors.clear();
+  if (scriptWorker || workerDead) killScriptWorker();
+  workerDead = false; // fresh worker on next Play
+}
+function plainState(o) {
+  return {
+    position: { x: o.position.x, y: o.position.y, z: o.position.z },
+    rotation: { x: o.rotation.x, y: o.rotation.y, z: o.rotation.z },
+    scale: { x: o.scale.x, y: o.scale.y, z: o.scale.z },
+    params: { ...(o.userData.scriptParams || {}) },
+  };
+}
+function stepScripts(dt) {
+  if (workerDead || !ed.playing) return;
+  const batch = [];
+  for (const o of ed.objects) {
+    const sc = o.userData.components.script;
+    if (!sc) continue;
+    const rb = o.userData.components.rigidbody;
+    if (rb && !rb.isKinematic) continue; // physics owns the transform
+    const a = ed.scripts && ed.scripts[sc];
+    if (!a || !a.source || scriptErrors.has(sc)) continue; // native/broken scripts skipped
+    batch.push({ id: o.userData.id, script: sc, state: plainState(o), input: { ...(ed.keys || {}) } });
+  }
+  if (!batch.length || workerBusy) return;
+  if (!ensureScriptWorker()) return;
+  workerBusy = true;
+  scriptWorker.postMessage({ scripts: ed.scripts, batch, dt, t: ed.playClock });
+  scriptWatchdog = setTimeout(() => killScriptWorker('Script worker unresponsive (infinite loop?) — scripts disabled for this Play session'), 1500);
+}
+
+/* ---- script editor ---- */
+let seOpen = null;
+function openScriptEditor(name) {
+  if (!ed.scripts) loadProjectAssets();
+  const first = (name && ed.scripts[name]) ? name : Object.keys(ed.scripts)[0];
+  $('#script-editor-overlay').classList.add('open');
+  seSelect(first);
+}
+function seSelect(name) {
+  seOpen = name;
+  const a = ed.scripts[name];
+  $('#se-name').textContent = name + (a.builtin ? ' (built-in)' : '');
+  $('#se-name-input').value = name;
+  $('#se-params').value = JSON.stringify(a.params || {});
+  const code = $('#se-code');
+  code.value = a.source != null ? a.source : '// PlayerController is a native built-in behavior (WASD + jump + collisions) — its logic is not user-editable.';
+  code.readOnly = !!a.builtin;
+  $('#se-params').readOnly = !!a.builtin;
+  seMarkClean(); seNote(''); seRenderList(); seGutter();
+}
+function seRenderList() {
+  const list = $('#se-list');
+  list.innerHTML = '<button class="btn se-new" id="se-new">＋ New Script</button>';
+  for (const [name, a] of Object.entries(ed.scripts)) {
+    const el = document.createElement('div');
+    el.className = 'se-item' + (name === seOpen ? ' sel' : '');
+    el.innerHTML = `<span>📜</span>${escAttr(name)}.cs${a.builtin ? '' : '<span class="se-x" title="Delete script">✕</span>'}`;
+    el.onclick = () => seSelect(name);
+    const x = el.querySelector('.se-x');
+    if (x) x.onclick = e => {
+      e.stopPropagation();
+      if (!confirm(`Delete script "${name}.cs"? Objects using it will lose the component.`)) return;
+      delete ed.scripts[name]; persistScripts();
+      ed.objects.forEach(o => { if (o.userData.components.script === name) o.userData.components.script = null; });
+      renderProjectWindow(); renderInspector();
+      seSelect(Object.keys(ed.scripts)[0]);
+    };
+    list.appendChild(el);
+  }
+  $('#se-new').onclick = () => {
+    const name = (prompt('Script name', 'MyScript') || '').trim().replace(/\.cs$/, '');
+    if (!name) return;
+    if (ed.scripts[name]) { toast('A script with that name already exists'); return; }
+    ed.scripts[name] = { params: {}, source: NEW_SCRIPT_TEMPLATE };
+    persistScripts(); renderProjectWindow();
+    seSelect(name);
+  };
+}
+function seDirty() { $('#se-dirty').classList.add('on'); }
+function seMarkClean() { $('#se-dirty').classList.remove('on'); }
+function seNote(msg, isError) {
+  const n = $('#se-note');
+  n.textContent = msg; n.style.display = msg ? '' : 'none';
+  n.style.color = isError ? '#ff7d6b' : '#8f8f8f';
+}
+function seGutter() {
+  const lines = $('#se-code').value.split('\n').length;
+  $('#se-gutter').innerHTML = Array.from({ length: lines }, (_, i) => i + 1).join('<br>');
+}
+function seApply() {
+  const name = $('#se-name-input').value.trim().replace(/\.cs$/, '');
+  if (!name) { seNote('Script name cannot be empty', true); return; }
+  const a = ed.scripts[seOpen];
+  const renaming = name !== seOpen;
+  if (renaming && ed.scripts[name]) { seNote('A script with that name already exists', true); return; }
+  let params = a.params || {};
+  const pj = $('#se-params').value.trim();
+  if (pj) { try { params = JSON.parse(pj); } catch (e) { seNote('Parameters are not valid JSON: ' + e.message, true); return; } }
+  const src = $('#se-code').value;
+  if (!a.builtin) {
+    try { new Function('obj', 'dt', 't', 'input', src); } // compile-only syntax check
+    catch (e) { seNote('Syntax error: ' + e.message, true); log('error', `Script ${name}.cs failed to compile: ${e.message}`); return; }
+  }
+  if (renaming) {
+    delete ed.scripts[seOpen];
+    ed.objects.forEach(o => { if (o.userData.components.script === seOpen) o.userData.components.script = name; });
+    ed.scripts[name] = a;
+  }
+  a.params = params;
+  if (!a.builtin) a.source = src;
+  persistScripts();
+  ed.objects.forEach(o => { if (o.userData.components.script === name) Object.assign(o.userData.scriptParams, params); });
+  seSelect(name);
+  seNote('Applied — changes take effect next Play');
+  renderProjectWindow();
+  log('sys', `Script ${name}.cs saved`);
+}
+$('#se-close').onclick = () => $('#script-editor-overlay').classList.remove('open');
+$('#se-apply').onclick = seApply;
+$('#se-revert').onclick = () => seSelect(seOpen);
+$('#se-code').addEventListener('input', () => { seDirty(); seGutter(); });
+$('#se-code').addEventListener('scroll', () => { $('#se-gutter').scrollTop = $('#se-code').scrollTop; });
+$('#se-params').addEventListener('input', seDirty);
+$('#se-name-input').addEventListener('input', seDirty);
+document.addEventListener('keydown', e => {
+  if ($('#script-editor-overlay').classList.contains('open') && e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); seApply(); }
+});
+function createNewScript() {
+  if (!ed.scripts) loadProjectAssets();
+  const name = (prompt('Script name', 'MyScript') || '').trim().replace(/\.cs$/, '');
+  if (!name) return null;
+  if (ed.scripts[name]) { toast('A script with that name already exists'); return null; }
+  ed.scripts[name] = { params: {}, source: NEW_SCRIPT_TEMPLATE };
+  persistScripts(); renderProjectWindow();
+  return name;
+}
+function loadScenesMap() {
+  try { return JSON.parse(store.getItem(pk('scenes'))) || {}; } catch (e) { return {}; }
+}
+function saveScenesMap(map) { store.setItem(pk('scenes'), JSON.stringify(map)); }
 function renderProjectWindow() {
   const b = $('#bottom-body');
   if (b.dataset.tab === 'console') return;
   const scenes = loadScenesMap();
+  const scriptRows = Object.keys(ed.scripts || {}).map((n) =>
+    `<div class="asset row" data-script="${escAttr(n)}"><span class="ico">📜</span>${escAttr(n)}.cs<span class="pw-hint">click to edit</span><button class="pw-x" data-del-script="${escAttr(n)}" title="Delete script">✕</button></div>`).join('')
+    || '<div class="pw-empty">No scripts — Assets ▸ Create ▸ Script</div>';
   const assets = [
-    ['Player.cs', '📜'], ['Spin.cs', '📜'], ['Bob.cs', '📜'],
     ['Ground.mat', '🎨'], ['Player.mat', '🎨'], ['Sprites', '🖼️'],
   ];
   const sceneRows = Object.keys(scenes).map((n) =>
-    `<div class="asset" data-scene="${escAttr(n)}"><span class="ico">🗂️</span>${escAttr(n)}<span class="pw-hint">click to open</span><button class="pw-x" data-del-scene="${escAttr(n)}" title="Delete scene">✕</button></div>`).join('')
+    `<div class="asset row" data-scene="${escAttr(n)}"><span class="ico">🗂️</span>${escAttr(n)}<span class="pw-hint">click to open</span><button class="pw-x" data-del-scene="${escAttr(n)}" title="Delete scene">✕</button></div>`).join('')
     || '<div class="pw-empty">No saved scenes — File ▸ Save Scene As…</div>';
   const prefabRows = Object.keys(ed.prefabs).map((n) =>
-    `<div class="asset" data-prefab="${escAttr(n)}"><span class="ico">📦</span>${escAttr(n)}<span class="pw-hint">click to instantiate</span><button class="pw-x pw-ren" data-ren-prefab="${escAttr(n)}" title="Rename prefab">✎</button><button class="pw-x" data-del-prefab="${escAttr(n)}" title="Delete prefab">✕</button></div>`).join('')
+    `<div class="asset row" data-prefab="${escAttr(n)}"><span class="ico">📦</span>${escAttr(n)}<span class="pw-hint">click to instantiate</span><button class="pw-x pw-ren" data-ren-prefab="${escAttr(n)}" title="Rename prefab">✎</button><button class="pw-x" data-del-prefab="${escAttr(n)}" title="Delete prefab">✕</button></div>`).join('')
     || '<div class="pw-empty">No prefabs — Assets ▸ Create ▸ Prefab From Selection</div>';
   b.innerHTML = `<div class="assets">
     <div class="pw-section">Scenes</div>${sceneRows}
+    <div class="pw-section">Scripts</div>${scriptRows}
     <div class="pw-section">Prefabs</div>${prefabRows}
     <div class="pw-section">Assets</div>${assets.map(([n, i]) => `<div class="asset"><span class="ico">${i}</span>${n}</div>`).join('')}
   </div>`;
   b.querySelectorAll('.asset').forEach((a) => a.onclick = () => {
     if (a.dataset.scene) { openSavedScene(a.dataset.scene); return; }
     if (a.dataset.prefab) { instantiatePrefab(a.dataset.prefab); return; }
+    if (a.dataset.script) { openScriptEditor(a.dataset.script); return; }
     status(`Asset selected: ${a.textContent.trim()}`);
+  });
+  b.querySelectorAll('[data-del-script]').forEach(btn => btn.onclick = e => {
+    e.stopPropagation();
+    const n = btn.dataset.delScript;
+    if (!confirm(`Delete script "${n}.cs"? Objects using it will lose the component.`)) return;
+    delete ed.scripts[n]; persistScripts();
+    ed.objects.forEach(o => { if (o.userData.components.script === n) o.userData.components.script = null; });
+    renderProjectWindow(); renderInspector(); log('warn', `Deleted script ${n}.cs`);
   });
   // project management: delete scenes, delete + rename prefabs
   b.querySelectorAll('[data-del-scene]').forEach(btn => btn.onclick = e => {
@@ -1967,7 +2412,7 @@ function renderProjectWindow() {
     const n = btn.dataset.delScene;
     if (!confirm(`Delete scene "${n}"? This cannot be undone.`)) return;
     const map = loadScenesMap(); delete map[n];
-    store.setItem('unitycraft-scenes', JSON.stringify(map));
+    saveScenesMap(map);
     if (ed.sceneName === n) { ed.sceneName = 'UntitledScene'; $('#hier-tab').textContent = 'Hierarchy — ' + ed.sceneName; }
     renderProjectWindow(); log('warn', `Deleted scene ${n}`);
   });
@@ -1976,7 +2421,7 @@ function renderProjectWindow() {
     const n = btn.dataset.delPrefab;
     if (!confirm(`Delete prefab "${n}"? This cannot be undone.`)) return;
     delete ed.prefabs[n];
-    store.setItem('unitycraft-prefabs', JSON.stringify(ed.prefabs));
+    store.setItem(pk('prefabs'), JSON.stringify(ed.prefabs));
     renderProjectWindow(); log('warn', `Deleted prefab ${n}`);
   });
   b.querySelectorAll('[data-ren-prefab]').forEach(btn => btn.onclick = e => {
@@ -1985,7 +2430,7 @@ function renderProjectWindow() {
     const nn = (prompt('Rename prefab', n) || '').trim();
     if (!nn || nn === n || ed.prefabs[nn]) return;
     ed.prefabs[nn] = ed.prefabs[n]; delete ed.prefabs[n];
-    store.setItem('unitycraft-prefabs', JSON.stringify(ed.prefabs));
+    store.setItem(pk('prefabs'), JSON.stringify(ed.prefabs));
     renderProjectWindow(); log('sys', `Renamed prefab ${n} → ${nn}`);
   });
 }
@@ -2171,13 +2616,52 @@ function loadSceneFromSpec(spec) {
   let maxId = 0; ed.objects.forEach(o => { maxId = Math.max(maxId, o.userData.id); });
   ed.idSeq = Math.max(ed.idSeq, maxId + 1);
   ed.selected = null; tcontrols.detach();
+  invalidateParenting();
   renderHierarchy(); renderInspector();
+}
+
+/* ---- parenting: children follow their parent ----
+   Nesting is logical (objects stay scene-root children of Three.js, so
+   world positions survive reparenting). Each frame, when a parent's world
+   transform changed (gizmo, Inspector, script, physics), the same delta
+   matrix is applied to every descendant. _lw caches are wiped after
+   programmatic restores (undo, play-exit, scene load) so deltas never
+   double-apply. */
+function invalidateParenting() { ed.objects.forEach(o => { o.userData._lw = null; }); }
+function propagateFrom(o) {
+  const kids = ed.objects.filter(x => x.userData.parentId === o.userData.id);
+  if (!kids.length) { o.userData._lw = null; return; }
+  const nw = new THREE.Matrix4().compose(o.position, o.quaternion, o.scale);
+  const lw = o.userData._lw;
+  if (lw && !nw.equals(lw)) {
+    const delta = nw.clone().multiply(lw.clone().invert());
+    for (const c of kids) {
+      const cw = new THREE.Matrix4().compose(c.position, c.quaternion, c.scale);
+      cw.premultiply(delta);
+      cw.decompose(c.position, c.quaternion, c.scale);
+    }
+  }
+  o.userData._lw = nw;
+  for (const c of kids) propagateFrom(c);
+}
+function syncParenting() {
+  for (const o of ed.objects) if (o.userData.parentId == null) propagateFrom(o);
 }
 
 function handleAction(d) {
   if (d.act === 'create') { pushHistory(); const o = makeObject(d.type, { atPivot: true }); select(o); log('sys', `Created ${o.userData.name}`); }
   if (d.act === 'create-empty') { pushHistory(); const o = makeObject('empty'); select(o); log('sys', `Created ${o.userData.name} (empty)`); }
-  if (d.act === 'create-empty-parent') { pushHistory(); const o = makeObject('empty', { name: 'GameObject' }); if (ed.selected) o.position.copy(ed.selected.position); select(o); log('sys', 'Created empty parent GameObject'); }
+  if (d.act === 'create-empty-parent') {
+    pushHistory();
+    const o = makeObject('empty', { name: 'GameObject' });
+    const sel = ed.selected;
+    if (sel) {
+      o.position.copy(sel.position);
+      sel.userData.parentId = o.userData.id; // actually parent the selection, like Unity's Create Empty Parent
+      log('sys', `Created empty parent — ${sel.userData.name} is now a child of ${o.userData.name}`);
+    } else log('sys', 'Created empty GameObject');
+    select(o);
+  }
   if (d.act === 'move-to-view' && ed.selected) { ed.selected.position.copy(orbit.target); renderInspector(); log('sys', `Moved ${ed.selected.userData.name} to view`); }
   if (d.act === 'align-with-view' && ed.selected) { ed.selected.rotation.copy(sceneCamera.rotation); renderInspector(); log('sys', `Aligned ${ed.selected.userData.name} with view`); }
   if (d.act === 'copy' && ed.selected) { ed.clipboard = serializeObject(ed.selected); status(`Copied ${ed.selected.userData.name}`); }
@@ -2212,6 +2696,8 @@ function handleAction(d) {
       toast(`${COMP_LABEL[d.comp] || d.comp} is already on ${ed.selected.userData.name}`);
     }
   }
+  if (d.act === 'win-scripts') openScriptEditor(ed.selected && ed.selected.userData.components.script);
+  if (d.act === 'create-script') { const n = createNewScript(); if (n) openScriptEditor(n); }
   if (d.act === 'scene-settings') openSceneSettings();
   if (d.act === 'play') togglePlay();
   if (d.act === 'pause') togglePause();
@@ -2220,9 +2706,11 @@ function handleAction(d) {
   if (d.act === 'redo') redo();
   if (d.act === 'new-scene') { newScene(); }
   if (d.act === 'save-scene') {
-    store.setItem('unitycraft-scene', serializeScene());
+    saveQuickScene();
     const scenes = loadScenesMap();
-    if (scenes[ed.sceneName] !== undefined) { scenes[ed.sceneName] = serializeScene(); store.setItem('unitycraft-scenes', JSON.stringify(scenes)); }
+    if (scenes[ed.sceneName] !== undefined) { scenes[ed.sceneName] = serializeScene(); saveScenesMap(scenes); }
+    touchProject();
+    captureScenePreview();
     renderProjectWindow();
     log('sys', `${ed.sceneName} saved`);
     toast('Scene saved');
@@ -2233,8 +2721,10 @@ function handleAction(d) {
     ed.sceneName = name;
     const scenes = loadScenesMap();
     scenes[name] = serializeScene();
-    store.setItem('unitycraft-scenes', JSON.stringify(scenes));
-    store.setItem('unitycraft-scene', serializeScene()); // keep the quick-save key in sync
+    saveScenesMap(scenes);
+    saveQuickScene(); // keep the quick-save key in sync
+    touchProject();
+    captureScenePreview();
     $('#hier-tab').textContent = 'Hierarchy — ' + name;
     renderProjectWindow();
     log('sys', `${name} saved`);
@@ -2245,18 +2735,20 @@ function handleAction(d) {
     const name = (prompt('Prefab name', ed.selected.userData.name) || '').trim();
     if (!name) return;
     ed.prefabs[name] = serializeObject(ed.selected);
-    store.setItem('unitycraft-prefabs', JSON.stringify(ed.prefabs));
+    store.setItem(pk('prefabs'), JSON.stringify(ed.prefabs));
     renderProjectWindow();
     log('sys', `Prefab created: ${name}`);
   }
   if (d.act === 'win-stats') { $('#stats-panel').classList.toggle('on'); }
   if (d.act === 'open-scene') {
-    const data = store.getItem('unitycraft-scene');
-    if (!data) { log('warn', 'No saved scene found'); toast('No saved scene'); return; }
-    loadSceneFromSpec(JSON.parse(data));
+    const raw = store.getItem(pk('scene'));
+    if (!raw) { log('warn', 'No saved scene found'); toast('No saved scene'); return; }
+    const wrap = JSON.parse(raw);
+    loadSceneFromSpec(wrap.spec !== undefined ? wrap.spec : wrap);
+    if (wrap.name) { ed.sceneName = wrap.name; $('#hier-tab').textContent = 'Hierarchy — ' + ed.sceneName; }
     log('sys', `${ed.sceneName} loaded from save`);
   }
-  if (d.act === 'back-hub') { $('#editor').style.display = 'none'; $('#hub').classList.remove('hidden'); renderHub(); }
+  if (d.act === 'back-hub') { captureScenePreview(); $('#editor').style.display = 'none'; $('#hub').classList.remove('hidden'); renderHub(); }
   if (d.act === 'prefs') { toast('Preferences are not implemented in UnityCraft'); return; }
   if (d.act === 'about') toast('UnityCraft — a browser reconstruction. Not affiliated with Unity Technologies.');
 }
@@ -2286,19 +2778,39 @@ function deleteSelected() {
 function duplicateSelected() {
   const o = ed.selected; if (!o) return;
   pushHistory(); // snapshot before mutation
+  // duplicate the whole subtree: the object plus every descendant
+  const kids = collectSubtree(o);
   const spec = serializeObject(o);
-  const c = makeObject(o.userData.type, { name: o.userData.name + ' (copy)' });
+  const c = makeObject(o.userData.type, { name: o.userData.name });
   restoreObject(c, spec);
+  c.userData.name = o.userData.name + ' (copy)'; // after restore (it resets the name from spec)
   c.userData.id = ed.idSeq++; // fresh identity; duplicate keeps the same parent
   c.position.x += 1.5;
+  const map = new Map([[o.userData.id, c]]);
+  for (const k of kids) {
+    const kc = makeObject(k.userData.type, { name: k.userData.name });
+    restoreObject(kc, serializeObject(k));
+    kc.userData.id = ed.idSeq++;
+    kc.userData.parentId = map.get(k.userData.parentId).userData.id; // re-hang under the copy
+    kc.position.x += 1.5;
+    map.set(k.userData.id, kc);
+  }
+  invalidateParenting();
   select(c);
-  log('sys', `Duplicated ${o.userData.name} (components copied)`);
+  log('sys', `Duplicated ${o.userData.name}${kids.length ? ' + ' + kids.length + ' child object' + (kids.length > 1 ? 's' : '') : ''} (components copied)`);
+}
+function collectSubtree(root) {
+  const out = [];
+  const walk = (id) => { for (const o of ed.objects) if (o.userData.parentId === id) { out.push(o); walk(o.userData.id); } };
+  walk(root.userData.id);
+  return out;
 }
 function togglePlay() {
   if (!ed.playing) {
     ed.playSnapshot = ed.objects.map(o => ({ o, spec: serializeObject(o) })); // full state, incl. object set
     ed.playing = true; ed.paused = false;
     ed.playClock = 0; ed.physAcc = 0; ed.scriptPhysWarn = false;
+    resetScriptRuntime();
     initPhysics();
     $('#editor').classList.add('playing');
     document.querySelector('[data-act="play"]').classList.add('active');
@@ -2318,6 +2830,7 @@ function togglePlay() {
       log('sys', 'PlayerController active — WASD to move, Space to jump (Game view)');
   } else {
     ed.playing = false; ed.paused = false;
+    if (scriptWorker) { scriptWorker.terminate(); scriptWorker = null; workerBusy = false; clearTimeout(scriptWatchdog); }
     $('#editor').classList.remove('playing');
     document.querySelector('[data-act="play"]').classList.remove('active');
     document.querySelector('[data-act="pause"]').classList.remove('active');
@@ -2338,6 +2851,7 @@ function togglePlay() {
     renderHierarchy();
     renderInspector();
     log('sys', 'Exited Play Mode (scene state restored)');
+    invalidateParenting();
   }
 }
 function togglePause() {
@@ -2367,6 +2881,7 @@ function snapshotScene() {
 }
 function applySnapshot(snap) {
   const keep = new Set(snap.map(x => x.ref));
+  invalidateParenting();
   ed.objects.forEach(o => { if (!keep.has(o)) disposeObject(o); });
   ed.objects = snap.map(x => {
     if (!x.ref.parent) { scene.add(x.ref); }
@@ -2398,7 +2913,7 @@ function bindKeys() {
     }
     if (k === 'delete') deleteSelected();
     if (e.ctrlKey && k === 'd') { e.preventDefault(); duplicateSelected(); }
-    if (e.ctrlKey && k === 's') { e.preventDefault(); handleAction({ act: 'save-scene' }); }
+    if (e.ctrlKey && k === 's') { e.preventDefault(); if (!$('#script-editor-overlay').classList.contains('open')) handleAction({ act: 'save-scene' }); }
     if (e.ctrlKey && k === 'n' && e.shiftKey) { e.preventDefault(); handleAction({ act: 'create-empty' }); return; }
     if (e.ctrlKey && k === 'g' && e.shiftKey) { e.preventDefault(); handleAction({ act: 'create-empty-parent' }); return; }
     if (e.ctrlKey && k === 'c') { if (ed.selected) { e.preventDefault(); handleAction({ act: 'copy' }); } }
@@ -2737,18 +3252,20 @@ function stepAnimators() {
 
 function advancePlay(dt) {
   ed.playClock += dt;
-  // scripts: physics owns the transform of active (non-kinematic) rigidbodies
-  ed.objects.forEach(o => {
+  // scripts: physics owns the transform of active (non-kinematic) rigidbodies.
+  // User scripts run in a terminable worker on plain state snapshots (stepScripts);
+  // the skip warning fires there when a dynamic body carries a script.
+  let warned = false;
+  for (const o of ed.objects) {
     const sc = o.userData.components.script;
-    if (!sc) return;
+    if (!sc) continue;
     const rb = o.userData.components.rigidbody;
-    if (rb && !rb.isKinematic) {
+    if (rb && !rb.isKinematic && !warned) {
+      warned = true;
       if (!ed.scriptPhysWarn) { ed.scriptPhysWarn = true; log('warn', 'Scripts are skipped on dynamic Rigidbodies — physics owns their transform (like Unity warnings about animating physics objects)'); }
-      return;
     }
-    if (sc === 'SpinScript') o.rotation.y += THREE.MathUtils.degToRad(o.userData.scriptParams.speed) * dt;
-    if (sc === 'BobScript') o.position.y += Math.sin(ed.playClock / 0.3) * o.userData.scriptParams.amp * dt * 2;
-  });
+  }
+  stepScripts(dt);
   stepPhysics(dt);
   stepAnimators();
   stepPlayerControllers(dt);
@@ -2856,6 +3373,8 @@ function loop(now) {
     stepParticles(dt);
   }
   ed.shaderMats.forEach(m => { if (m.uniforms && m.uniforms.uTime) m.uniforms.uTime.value = ed.simTime; });
+  // parenting: children follow parent transforms (gizmo, inspector, script, physics)
+  if (ed.objects.some(o => o.userData.parentId != null)) syncParenting();
   // play mode: fixed-timestep simulation (accumulator, capped to avoid spiral of death)
   if (ed.playing && !ed.paused) {
     ed.physAcc = Math.min(ed.physAcc + dt, PHYS.fixedDt * PHYS.maxSteps);
@@ -2914,7 +3433,11 @@ window.unitycraft = { // debug/test handle
   ed, scene, makeObject, tcontrols, applySnap, select,
   addComponent, setShader, applySceneSettings, serializeScene, loadSceneFromSpec,
   SHADERS: Object.keys(SHADERS), AUDIO_CLIPS: Object.keys(AUDIO_CLIPS), PHYS,
+  openScriptEditor, createNewScript, loadProjectAssets, persistScripts, captureScenePreview,
+  openEditor, store, syncParenting, invalidateParenting, collectSubtree, duplicateSelected,
+  __workerInfo: () => ({ exists: !!scriptWorker, dead: workerDead, busy: workerBusy, errors: [...scriptErrors] }),
 };
+seedProjectPreviews();
 renderHub();
 setTimeout(() => $('#loading').classList.add('is-dismissed'), 1400);
 </script>

@@ -136,7 +136,7 @@ try {
     document.querySelector('[data-act="create-prefab"]').click();
   });
   check("unitycraft: prefab created + persisted",
-    !!(await page.evaluate(() => window.unitycraft.ed.prefabs.PlayerPrefab && localStorage.getItem("unitycraft-prefabs"))));
+    !!(await page.evaluate(() => window.unitycraft.ed.prefabs.PlayerPrefab && localStorage.getItem(`unitycraft-proj:${window.unitycraft.ed.projectId}:prefabs`))));
   await page.evaluate(() => { document.querySelector('.ptab[data-bottomtab="project"]').click(); });
   await page.waitForTimeout(200);
   const nBefore = await page.evaluate(() => window.unitycraft.ed.objects.length);
@@ -148,7 +148,7 @@ try {
   const nSaved = await page.evaluate(() => window.unitycraft.ed.objects.length);
   await page.evaluate(() => { document.querySelector('[data-act="save-scene-as"]').click(); });
   check("unitycraft: save scene as persists",
-    !!(await page.evaluate(() => JSON.parse(localStorage.getItem("unitycraft-scenes")).QAScene)));
+    !!(await page.evaluate(() => JSON.parse(localStorage.getItem(`unitycraft-proj:${window.unitycraft.ed.projectId}:scenes`)).QAScene)));
   await page.evaluate(() => { document.querySelector('[data-act="new-scene"]').click(); });
   await page.waitForTimeout(200);
   const nNew = await page.evaluate(() => window.unitycraft.ed.objects.length);
@@ -361,8 +361,336 @@ try {
   });
   check("unitycraft: scene settings (fog + gravity) apply and serialize",
     settingsOk.fog && settingsOk.g === -5 && settingsOk.sky === "dusk", JSON.stringify(settingsOk));
+
+  // Projects are real and isolated: A's scene must not leak into B
+  {
+    await page.evaluate(() => { window.unitycraft.makeObject("cube", { name: "IsolationCube" }); });
+    await page.click('.ed-menu[data-menu="file"] > button');
+    await page.click('.ed-menu[data-menu="file"] [data-act="save-scene"]');
+    await page.click('.ed-menu[data-menu="file"] > button');
+    await page.click('.ed-menu[data-menu="file"] [data-act="back-hub"]');
+    await page.waitForTimeout(600);
+    const bCard = await page.$('#recent-grid .project-card');
+    if (bCard) { await bCard.click(); await page.waitForTimeout(900); }
+    const bState = await page.evaluate(() => ({
+      id: window.unitycraft.ed.projectId,
+      hasLeak: window.unitycraft.ed.objects.some(o => o.userData.name === "IsolationCube"),
+      scripts: Object.keys(window.unitycraft.ed.scripts || {}).length,
+    }));
+    check("unitycraft: projects are isolated (B opens fresh, no A leak)",
+      bState.id !== "p-rollaball" && !bState.hasLeak && bState.scripts >= 3, JSON.stringify(bState));
+    await page.click('.ed-menu[data-menu="file"] > button');
+    await page.click('.ed-menu[data-menu="file"] [data-act="back-hub"]');
+    await page.waitForTimeout(600);
+    await page.click('#project-grid .project-card .thumb');
+    await page.waitForTimeout(900);
+    const aState = await page.evaluate(() => ({
+      id: window.unitycraft.ed.projectId,
+      kept: window.unitycraft.ed.objects.some(o => o.userData.name === "IsolationCube"),
+    }));
+    check("unitycraft: project A keeps its saved scene after B was opened",
+      aState.id === "p-rollaball" && aState.kept, JSON.stringify(aState));
+  }
+
+  // Script system: user script runs on Play via the worker; Stop restores
+  {
+    const added = await page.evaluate(() => {
+      const uc = window.unitycraft;
+      uc.ed.scripts["QASpin"] = { params: { rate: 3 }, source: "obj.rotation.y += obj.params.rate * dt;" };
+      uc.persistScripts();
+      const c = uc.makeObject("cube", { name: "QAScripted" });
+      return uc.addComponent(c, "QASpin");
+    });
+    await page.click('[data-act="play"]');
+    await page.waitForTimeout(1500);
+    const rot = await page.evaluate(() => {
+      const o = window.unitycraft.ed.objects.find(x => x.userData.name === "QAScripted");
+      return o ? o.rotation.y : null;
+    });
+    await page.click('[data-act="play"]'); // stop
+    await page.waitForTimeout(400);
+    const restored = await page.evaluate(() => {
+      const o = window.unitycraft.ed.objects.find(x => x.userData.name === "QAScripted");
+      return o ? o.rotation.y : null;
+    });
+    const winfo = await page.evaluate(() => window.unitycraft.__workerInfo());
+    check("unitycraft: user script runs in worker on Play (rotation advances)",
+      added && rot !== null && rot > 0.4 && Number.isFinite(rot) && winfo.exists !== undefined,
+      "rot=" + rot + " worker=" + JSON.stringify(winfo));
+    check("unitycraft: scripted rotation restored on Stop", restored === 0, "restored=" + restored);
+  }
+
+  // Parenting: children follow parent transforms; subtree duplicate keeps children
+  {
+    const p3 = await page.evaluate(() => {
+      const uc = window.unitycraft;
+      const parent = uc.makeObject("cube", { name: "QAParent" });
+      parent.position.set(0, 1, 0);
+      const child = uc.makeObject("sphere", { name: "QAChild" });
+      child.position.set(2, 1, 0);
+      child.userData.parentId = parent.userData.id;
+      uc.invalidateParenting();
+      uc.syncParenting();
+      parent.position.x += 3;
+      uc.syncParenting();
+      const follows = Math.abs(child.position.x - 5) < 1e-6;
+      uc.select(parent);
+      uc.duplicateSelected();
+      const dupParent = uc.ed.objects.find(o => o.userData.name === "QAParent (copy)");
+      const dupChild = uc.ed.objects.find(o => o.userData.name === "QAChild" && dupParent && o.userData.parentId === dupParent.userData.id);
+      return { follows, childX: child.position.x, parent: !!dupParent, child: !!dupChild };
+    });
+    check("unitycraft: children follow parent transform", p3.follows, "child.x=" + p3.childX);
+    check("unitycraft: duplicate copies the whole subtree", p3.parent && p3.child, JSON.stringify(p3));
+  }
+
+  // Hub preview: saving captures a real render used as the project card thumbnail
+  {
+    const pv = await page.evaluate(() => ({
+      captured: window.unitycraft.captureScenePreview(),
+      stored: (localStorage.getItem("unitycraft-proj:p-rollaball:preview") || "").startsWith("data:image/jpeg"),
+    }));
+    await page.click('.ed-menu[data-menu="file"] > button');
+    await page.click('.ed-menu[data-menu="file"] [data-act="back-hub"]');
+    await page.waitForTimeout(600);
+    const cardImg = await page.evaluate(() => {
+      const el = document.querySelector('#project-grid .project-card .thumb');
+      return el ? el.style.backgroundImage.includes("data:image") : false;
+    });
+    check("unitycraft: hub card shows rendered scene preview",
+      pv.captured && pv.stored && cardImg, JSON.stringify({ captured: pv.captured, stored: pv.stored, cardImg }));
+    await page.click('#project-grid .project-card .thumb');
+    await page.waitForTimeout(900);
+  }
+
+  // Script editor: seeded scripts listed, Apply persists, syntax errors reported
+  {
+    await page.click('.ed-menu[data-menu="window"] > button');
+    await page.click('.ed-menu[data-menu="window"] [data-act="win-scripts"]');
+    await page.waitForTimeout(300);
+    const seOpen = await page.evaluate(() => document.getElementById("script-editor-overlay").classList.contains("open"));
+    const listed = await page.evaluate(() => [...document.querySelectorAll("#se-list .se-item")].map(e => e.textContent.trim()));
+    await page.evaluate(() => {
+      const t = document.getElementById("se-code");
+      t.value = "obj.position.y = 1 + Math.sin(t) * 0.5;";
+      t.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await page.click("#se-apply");
+    await page.waitForTimeout(200);
+    const persisted = await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem("unitycraft-proj:p-rollaball:scripts"));
+      return !!(s.SpinScript && s.SpinScript.source.includes("Math.sin"));
+    });
+    await page.evaluate(() => {
+      const t = document.getElementById("se-code");
+      t.value = "obj.position.y += ;";
+      t.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await page.click("#se-apply");
+    await page.waitForTimeout(200);
+    const errShown = await page.evaluate(() => document.getElementById("se-note").textContent.startsWith("Syntax error"));
+    const stillOpen = await page.evaluate(() => document.getElementById("script-editor-overlay").classList.contains("open"));
+    await page.click("#se-close");
+    check("unitycraft: script editor lists seeded scripts and persists edits",
+      seOpen && listed.length >= 3 && persisted, JSON.stringify({ seOpen, listed }));
+    check("unitycraft: syntax errors reported without breaking the editor",
+      errShown && stillOpen, JSON.stringify({ errShown, stillOpen }));
+  }
+
   await zeroErrors("unitycraft");
 } catch (e) { check("unitycraft: suite ran", false, String(e).slice(0, 160)); }
+
+/* UnityCraft first-visit hub (clean storage), legacy-key migration, UI reparent + undo */
+try {
+  // Clean storage: the hub must show real rendered previews on first visit
+  // (projects that were never opened get their default template rendered at boot)
+  const freshCtx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  const fp = await freshCtx.newPage();
+  await fp.bringToFront();
+  const freshErrors = [];
+  fp.on("pageerror", (e) => freshErrors.push("pageerror: " + e.message.slice(0, 180)));
+  await fp.goto(BASE + "/unitycraft/", { waitUntil: "domcontentloaded", timeout: 45000 });
+  await fp.waitForTimeout(2600); // boot seeds previews, splash dismisses
+  const fresh = await fp.evaluate(() => {
+    const cards = [...document.querySelectorAll("#project-grid .project-card .thumb, #recent-grid .project-card .thumb")];
+    return {
+      cards: cards.length,
+      withRender: cards.filter(c => (c.style.backgroundImage || "").includes("data:image/jpeg")).length,
+      stored: (localStorage.getItem("unitycraft-proj:p-rollaball:preview") || "").startsWith("data:image/jpeg"),
+    };
+  });
+  check("unitycraft: first visit hub shows rendered previews",
+    fresh.cards >= 3 && fresh.withRender >= 3 && fresh.stored,
+    JSON.stringify({ ...fresh, errors: freshErrors.length }));
+  await freshCtx.close();
+
+  // Authentic legacy upgrade: pre-project saves exist BEFORE the new app's
+  // first boot (init script), with real content — a scene containing a cube and
+  // a prefab. Migration must land them in the first project and remove old keys.
+  const upCtx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  await upCtx.addInitScript(() => {
+    if (localStorage.getItem("unitycraft-projects")) return; // only before first boot
+    const cube = { name: "LegacyCube", type: "cube", id: 1, parent: null, p: [0, 1, 0], r: [0, 0, 0], s: [1, 1, 1], comps: {}, params: {} };
+    const settings = { sky: "solid", skyColor: "#262626", fog: false, fogColor: "#3a4a58", fogDensity: 0.02, ambient: 0.55, gravity: -9.81 };
+    localStorage.setItem("unitycraft-scenes", JSON.stringify({ LegacyScene: { name: "LegacyScene", spec: { v: 2, settings, objects: [{ ...cube }] } } }));
+    localStorage.setItem("unitycraft-scene", JSON.stringify({ name: "QuickLegacy", spec: { v: 2, settings, objects: [{ ...cube, id: 2 }] } }));
+    localStorage.setItem("unitycraft-prefabs", JSON.stringify({ LegacyPrefab: { ...cube, id: 3, name: "LegacyPrefab" } }));
+  });
+  const up = await upCtx.newPage();
+  await up.bringToFront();
+  await up.goto(BASE + "/unitycraft/", { waitUntil: "domcontentloaded", timeout: 45000 });
+  await up.waitForTimeout(2800); // migration runs at boot
+  const mig = await up.evaluate(() => {
+    const r = {
+      scenes: !!JSON.parse(localStorage.getItem("unitycraft-proj:p-rollaball:scenes") || "null").LegacyScene,
+      prefabs: !!JSON.parse(localStorage.getItem("unitycraft-proj:p-rollaball:prefabs") || "null").LegacyPrefab,
+      quick: JSON.parse(localStorage.getItem("unitycraft-proj:p-rollaball:scene") || "null").name === "QuickLegacy",
+      legacyRemoved: !localStorage.getItem("unitycraft-scenes") && !localStorage.getItem("unitycraft-prefabs") && !localStorage.getItem("unitycraft-scene"),
+    };
+    return r;
+  });
+  check("unitycraft: legacy saves migrate into the first project",
+    mig.scenes && mig.prefabs && mig.quick && mig.legacyRemoved, JSON.stringify(mig));
+  // Migrated data is accessible: opening the project loads the migrated scene,
+  // and the migrated prefab instantiates from the Project window
+  await up.click("#project-grid .project-card .thumb");
+  await up.waitForTimeout(1800);
+  const loaded = await up.evaluate(() =>
+    [...document.querySelectorAll("#hierarchy .hitem")].some(r => r.textContent.includes("LegacyCube")));
+  const inst = await up.evaluate(() => {
+    const row = [...document.querySelectorAll(".asset.row")].find(r => r.textContent.includes("LegacyPrefab"));
+    if (!row) return { found: false };
+    row.click();
+    return { found: true, count: window.unitycraft.ed.objects.filter(o => o.userData.name === "LegacyPrefab").length };
+  });
+  check("unitycraft: migrated scene loads and migrated prefab instantiates",
+    loaded && inst.found && inst.count >= 1, JSON.stringify({ loaded, inst }));
+  // Later edits are never re-overwritten by migration
+  await up.evaluate(() => {
+    localStorage.setItem("unitycraft-proj:p-rollaball:scene", JSON.stringify({ name: "AfterMigration", spec: { v: 2, settings: {}, objects: [] } }));
+  });
+  await up.reload({ waitUntil: "domcontentloaded" });
+  await up.waitForTimeout(2200);
+  const mig2 = await up.evaluate(() => JSON.parse(localStorage.getItem("unitycraft-proj:p-rollaball:scene")).name);
+  // Stale legacy keys reappearing next to newer project data must be discarded
+  await up.evaluate(() => {
+    const cube = { name: "StaleCube", type: "cube", id: 1, parent: null, p: [0, 1, 0], r: [0, 0, 0], s: [1, 1, 1], comps: {}, params: {} };
+    localStorage.setItem("unitycraft-scenes", JSON.stringify({ StaleScene: { name: "StaleScene", spec: { v: 2, settings: {}, objects: [cube] } } }));
+    localStorage.setItem("unitycraft-scene", JSON.stringify({ name: "StaleQuick", spec: { v: 2, settings: {}, objects: [] } }));
+  });
+  await up.reload({ waitUntil: "domcontentloaded" });
+  await up.waitForTimeout(2400);
+  const kept = await up.evaluate(() => {
+    const r = {
+      scene: JSON.parse(localStorage.getItem("unitycraft-proj:p-rollaball:scene")).name,
+      scenesHasStale: !!JSON.parse(localStorage.getItem("unitycraft-proj:p-rollaball:scenes")).StaleScene,
+      scenesHasLegacy: !!JSON.parse(localStorage.getItem("unitycraft-proj:p-rollaball:scenes")).LegacyScene,
+      legacyRemoved: !localStorage.getItem("unitycraft-scenes") && !localStorage.getItem("unitycraft-scene"),
+    };
+    return r;
+  });
+  check("unitycraft: migration does not overwrite later edits", mig2 === "AfterMigration", "scene=" + mig2);
+  check("unitycraft: stale legacy keys never clobber newer project data",
+    kept.scene === "AfterMigration" && !kept.scenesHasStale && kept.scenesHasLegacy && kept.legacyRemoved,
+    JSON.stringify(kept));
+  await upCtx.close();
+
+  // Hub seed depicts the project's actual saved scene: a project with a
+  // distinctive saved scene (red sky, big cube) and no preview gets a seed that
+  // differs from the SAME project's template seed captured before the save
+  const pvCtx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  const pv = await pvCtx.newPage();
+  await pv.bringToFront();
+  await pv.goto(BASE + "/unitycraft/", { waitUntil: "domcontentloaded", timeout: 45000 });
+  await pv.waitForTimeout(2600);
+  const baseline = await pv.evaluate(() => localStorage.getItem("unitycraft-proj:p-rollaball:preview") || ""); // template seed
+  await pv.click("#project-grid .project-card .thumb");
+  await pv.waitForTimeout(1800);
+  await pv.evaluate(() => {
+    const uc = window.unitycraft;
+    uc.applySceneSettings({ sky: "solid", skyColor: "#ff2020", fog: false, fogColor: "#3a4a58", fogDensity: 0.02, ambient: 0.55, gravity: -9.81 });
+    const big = uc.makeObject("cube", { name: "BigRed" });
+    big.scale.set(3, 3, 3); big.position.set(0, 1.5, 0);
+    localStorage.setItem(`unitycraft-proj:${uc.ed.projectId}:scene`, JSON.stringify({ name: "RedScene", spec: JSON.parse(uc.serializeScene()) }));
+    localStorage.removeItem(`unitycraft-proj:${uc.ed.projectId}:preview`);
+  });
+  await pv.reload({ waitUntil: "domcontentloaded" });
+  await pv.waitForTimeout(2800); // boot re-seeds from the SAVED scene
+  const seedCheck = await pv.evaluate(() => ({
+    seeded: localStorage.getItem("unitycraft-proj:p-rollaball:preview") || "",
+  }));
+  check("unitycraft: hub seed renders the project's saved scene (not a generic placeholder)",
+    baseline.startsWith("data:image/jpeg") && seedCheck.seeded.startsWith("data:image/jpeg") &&
+    seedCheck.seeded !== baseline,
+    "same-project seed differs from its template baseline (seeded=" + seedCheck.seeded.length + " bytes, baseline=" + baseline.length + " bytes)");
+
+  // Seeding accepts both recognized saved-scene shapes: legacy v1 arrays and
+  // valid empty v2 scenes — each must render its saved content, not the template
+  const fmt = await pv.evaluate(() => {
+    // distinctive v1 array scene: sphere instead of cube, no settings
+    const sph = { name: "V1Sphere", type: "sphere", id: 1, parent: null, p: [0, 0.5, 0], r: [0, 0, 0], s: [1, 1, 1], comps: {}, params: {} };
+    localStorage.setItem("unitycraft-proj:p-rollaball:scene", JSON.stringify({ name: "V1Scene", spec: [sph] }));
+    localStorage.removeItem("unitycraft-proj:p-rollaball:preview");
+    return true;
+  });
+  await pv.reload({ waitUntil: "domcontentloaded" });
+  await pv.waitForTimeout(2800);
+  const v1seed = await pv.evaluate(() => localStorage.getItem("unitycraft-proj:p-rollaball:preview") || "");
+  await pv.evaluate(() => {
+    // empty v2 scene with a distinctive sky
+    localStorage.setItem("unitycraft-proj:p-rollaball:scene", JSON.stringify({ name: "EmptyScene", spec: { v: 2, settings: { sky: "solid", skyColor: "#2020ff", fog: false, fogColor: "#3a4a58", fogDensity: 0.02, ambient: 0.55, gravity: -9.81 }, objects: [] } }));
+    localStorage.removeItem("unitycraft-proj:p-rollaball:preview");
+  });
+  await pv.reload({ waitUntil: "domcontentloaded" });
+  await pv.waitForTimeout(2800);
+  const emptySeed = await pv.evaluate(() => localStorage.getItem("unitycraft-proj:p-rollaball:preview") || "");
+  check("unitycraft: hub seed uses legacy v1 array saves",
+    fmt && v1seed.startsWith("data:image/jpeg") && v1seed !== baseline, "v1 render differs from template");
+  check("unitycraft: hub seed uses valid empty v2 scene saves",
+    emptySeed.startsWith("data:image/jpeg") && emptySeed !== baseline && emptySeed !== v1seed,
+    "empty-scene render differs from template and v1");
+  await pvCtx.close();
+
+  // UI drag-to-reparent with a real DataTransfer + Undo restores the old parent
+  const rpCtx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
+  const rp = await rpCtx.newPage();
+  await rp.bringToFront();
+  const rpErrors = [];
+  rp.on("pageerror", (e) => rpErrors.push("pageerror: " + e.message.slice(0, 180)));
+  await rp.goto(BASE + "/unitycraft/", { waitUntil: "domcontentloaded", timeout: 45000 });
+  await rp.waitForTimeout(2400);
+  await rp.click("#project-grid .project-card .thumb");
+  await rp.waitForTimeout(1600);
+  await rp.click('.ed-menu[data-menu="gameobject"] > button');
+  await rp.click('.ed-menu[data-menu="gameobject"] [data-act="create"][data-type="cube"]');
+  await rp.waitForTimeout(500);
+  const reparent = await rp.evaluate(() => {
+    const rows = [...document.querySelectorAll("#hierarchy .hitem")];
+    const cube = rows.find(r => r.textContent.includes("Cube"));
+    const player = rows.find(r => r.textContent.includes("Player"));
+    if (!cube || !player) return { ok: false, why: "rows" };
+    const dt = new DataTransfer();
+    cube.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer: dt }));
+    player.dispatchEvent(new DragEvent("dragover", { bubbles: true, cancelable: true, dataTransfer: dt }));
+    player.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: dt }));
+    const uc = window.unitycraft;
+    const c = uc.ed.objects.find(o => o.userData.name === "Cube");
+    const p = uc.ed.objects.find(o => o.userData.name === "Player");
+    return { ok: c.userData.parentId === p.userData.id, parentId: c.userData.parentId };
+  });
+  await rp.click('.ed-menu[data-menu="edit"] > button');
+  await rp.click('.ed-menu[data-menu="edit"] [data-act="undo"]');
+  await rp.waitForTimeout(400);
+  const undone = await rp.evaluate(() => {
+    const c = window.unitycraft.ed.objects.find(o => o.userData.name === "Cube");
+    return c ? c.userData.parentId : "gone"; // undo of reparent keeps the Cube, clears parentId
+  });
+  check("unitycraft: drag-to-reparent via hierarchy UI (real DataTransfer)",
+    reparent.ok && rpErrors.length === 0, JSON.stringify({ ...reparent, errors: rpErrors }));
+  check("unitycraft: undo restores the pre-reparent state",
+    undone === null, "parentId=" + JSON.stringify(undone));
+  await rpCtx.close();
+} catch (e) { check("unitycraft: first-visit/migration/reparent suite ran", false, String(e).slice(0, 160)); }
 
 /* UnityCraft in a localStorage-blocked context (sandboxed-preview fallback) */
 try {
