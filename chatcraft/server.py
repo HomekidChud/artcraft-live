@@ -140,10 +140,10 @@ RUN_BLOCK_RE = re.compile(r"```run[ \t]*\n(.*?)```", re.S | re.I)
 # placeholder left where a run block was, before file blocks are extracted
 CMD_MARK_RE = re.compile(r"\x00CMD(\d+)\x00")
 # narrowly-anchored fake shell prompts (never a mid-command "$"): a lone
-# "$/# prompt at line start, or the user@host ... $ form
+# "$" prompt at line start, or the user@host ... $ form. "#" is deliberately
+# NOT treated as a root prompt - that would rewrite shell comments.
 PROMPT_NOISE_RE = re.compile(
     r"^\$[ \t]+"
-    r"|^#[ \t]+"
     r"|^[\w.@-]+@[^\n$]*\$[ \t]+")
 
 
@@ -453,27 +453,94 @@ def file_record(path: Path):
             "modified": time.strftime("%H:%M", time.localtime(st.st_mtime))}
 
 
+def parse_blocks(text):
+    """Sequentially split a model reply into text / file / run blocks.
+
+    A real line scanner (not overlapping regexes): every line belongs to at
+    most one block, so a malformed merged fence (file content directly
+    followed by a ```run opener sharing the file's closing fence) cannot
+    swallow a later file. Handles the two spellings small local models use:
+    ```lang filename.ext\n... and ```lang\nfilename.ext\n...
+    """
+    lines = text.split("\n")
+    blocks = []
+    cur = []
+
+    def flush():
+        if cur:
+            blocks.append(("text", "\n".join(cur)))
+            del cur[:]
+
+    i, n = 0, len(lines)
+    while i < n:
+        ln = lines[i]
+        run_open = re.match(r"^```run[ \t]*$", ln, re.I)
+        file_open = re.match(
+            r"^```([\w+#-]*)[ \t]*:?[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*$", ln)
+        bare_open = re.match(r"^```([\w+#-]*)[ \t]*$", ln)
+        fname_next = i + 1 < n and re.match(
+            r"^[\w./-]+\.[\w+#-]+$", lines[i + 1].strip())
+        if run_open:
+            flush()
+            j = i + 1
+            cmd = []
+            while j < n and not lines[j].strip().startswith("```"):
+                cmd.append(lines[j])
+                j += 1
+            blocks.append(("run", "\n".join(cmd).strip()))
+            i = j + 1
+            continue
+        if file_open:
+            flush()
+            lang, name = file_open.group(1) or "", file_open.group(2)
+            j = i + 1
+            content = []
+            while j < n and not lines[j].strip().startswith("```"):
+                content.append(lines[j])
+                j += 1
+            blocks.append(("file", lang, name, "\n".join(content)))
+            # merged fence: the closing line is itself a ```run opener -
+            # close the file but reprocess that line as a run block
+            i = j if (j < n and re.match(r"^```run", lines[j], re.I)) else j + 1
+            continue
+        if bare_open and fname_next:
+            flush()
+            lang = bare_open.group(1) or ""
+            name = lines[i + 1].strip()
+            j = i + 2
+            content = []
+            while j < n and not lines[j].strip().startswith("```"):
+                content.append(lines[j])
+                j += 1
+            blocks.append(("file", lang, name, "\n".join(content)))
+            i = j if (j < n and re.match(r"^```run", lines[j], re.I)) else j + 1
+            continue
+        cur.append(ln)
+        i += 1
+    flush()
+    return blocks
+
+
 def extract_files(text):
-    files = []
-
-    def repl(m):
-        g = m.groups()
-        lang = name = content = None
-        for i in (0, 3, 6, 9):  # four alternative spellings, groups of 3
-            if g[i] is not None:
-                lang, name, content = g[i], g[i + 1], g[i + 2]
-                break
-        files.append({"name": Path(name).name, "lang": lang or "text",
-                      "content": content.rstrip("\n")})
-        return f"wrote file: {Path(name).name}"
-
-    return FILE_BLOCK_RE.sub(repl, text), files
+    """Compatibility wrapper over parse_blocks: (cleaned text, files)."""
+    parts, files = [], []
+    for b in parse_blocks(text):
+        if b[0] == "text":
+            parts.append(b[1])
+        elif b[0] == "file":
+            files.append({"name": Path(b[2]).name, "lang": b[1] or "text",
+                          "content": b[3].rstrip("\n")})
+            parts.append("wrote file: " + Path(b[2]).name)
+        else:
+            parts.append("```run\n" + b[1] + "\n```")
+    return "\n".join(parts), files
 
 
 def normalize_cmd(cmd):
-    """Strip narrowly-anchored fake shell prompts (\"$ ls\",
-    \"user@host:~$ ls\") that small local models prepend. Only forms anchored
-    at the line start are touched, so ordinary commands (echo $HOME,\n    echo '$ x') are never rewritten."""
+    """Strip narrowly-anchored fake shell prompts ("$ ls",
+    "user@host:~$ ls") that small local models prepend. Only forms anchored
+    at the line start are touched, so ordinary commands (echo $HOME,
+    echo '$ x', # comments) are never rewritten."""
     cmd = cmd.strip()
     first, sep, rest = cmd.partition("\n")
     if PROMPT_NOISE_RE.match(first):
@@ -484,12 +551,8 @@ def normalize_cmd(cmd):
 
 
 def extract_runs(text):
-    runs = []
-    for m in RUN_BLOCK_RE.finditer(text):
-        cmd = normalize_cmd(m.group(1))
-        if cmd:
-            runs.append(cmd)
-    return runs
+    return [normalize_cmd(b[1]) for b in parse_blocks(text)
+            if b[0] == "run" and normalize_cmd(b[1])]
 
 
 def run_command(cmd):
@@ -750,24 +813,16 @@ class Handler(BaseHTTPRequestHandler):
                 full_text = "".join(chunks)
 
                 # 5. extract files + commands, then show the cleaned reply.
-                # Run blocks are marked BEFORE file extraction so a model that
-                # merges fences ("...```" + "run" on one line) can't let the
-                # file regex swallow the run block. The final `clean` event
-                # replaces the marks with an honest ran/not-run/skipped marker
-                # AFTER the commands actually execute.
-                runs = [normalize_cmd(m.group(1)) for m in RUN_BLOCK_RE.finditer(full_text)]
-                runs = [r for r in runs if r]
-                _cmd_marks = {}
-
-                def _mark(m):
-                    i = len(_cmd_marks)
-                    # store the NORMALIZED command so the ran/not-run lookup
-                    # below uses the same string the executor used
-                    _cmd_marks[i] = normalize_cmd(m.group(1))
-                    return "\x00CMD%d\x00" % i
-
-                marked = RUN_BLOCK_RE.sub(_mark, full_text)
-                cleaned, files = extract_files(marked)
+                # parse_blocks scans line-by-line so malformed merged fences
+                # can't swallow a later block; each block gets its OWN
+                # execution record (index -> exit code), so duplicate command
+                # strings can never borrow a sibling's result. The final
+                # `clean` event reports ran/failed/not-run honestly AFTER
+                # execution.
+                blocks = parse_blocks(full_text)
+                run_idx = [i for i, b in enumerate(blocks) if b[0] == "run"
+                           and normalize_cmd(b[1])]
+                cleaned, files = extract_files(full_text)
                 saved = []
                 if files:
                     for f in files:
@@ -778,13 +833,21 @@ class Handler(BaseHTTPRequestHandler):
                         saved.append({"name": safe.name, "lang": f.get("lang") or "text",
                                       "size": safe.stat().st_size})
                         yield step(sid, f"Wrote {f['name']}", "done")
-                    yield ev("files", {"files": saved,
-                               "cleaned_text": CMD_MARK_RE.sub("(running command…)", cleaned)})
+                    pre = []
+                    for b in blocks:
+                        if b[0] == "text":
+                            pre.append(b[1])
+                        elif b[0] == "file":
+                            pre.append("wrote file: " + Path(b[2]).name)
+                        elif normalize_cmd(b[1]):
+                            pre.append("(running command…)")
+                    yield ev("files", {"files": saved, "cleaned_text": "\n".join(pre)})
 
                 # 6. run commands the reply contains (max 5 per turn)
-                results = {}  # cmd -> returncode, only for commands actually run
-                for i, cmd in enumerate(runs[:5]):
-                    sid = f"cmd-{i + 1}"
+                rc_by_block = {}  # block index -> exit code, only blocks run
+                for n_run, bi in enumerate(run_idx[:5]):
+                    cmd = normalize_cmd(blocks[bi][1])
+                    sid = f"cmd-{n_run + 1}"
                     if not ALLOW_CMDS:
                         yield step(sid, "Commands disabled", "skip",
                                    "set CHATCRAFT_ALLOW_CMDS=1 to enable")
@@ -797,18 +860,26 @@ class Handler(BaseHTTPRequestHandler):
                              else f"Failed: {cmd[:60]} (exit {rc})")
                     yield step(sid, label, state, first)
                     yield ev("command", {"command": cmd, "returncode": rc, "output": out[:2000]})
-                    results[cmd] = rc
-                if runs:
-                    def _after(m):
-                        i = int(m.group(1))
-                        c = _cmd_marks.get(i, "")
-                        if c in results:
-                            return (f"ran: {c[:60]}" if results[c] == 0
-                                    else f"failed (exit {results[c]}): {c[:60]}")
-                        return ("skipped: commands disabled" if not ALLOW_CMDS
-                                else f"not run (over the 5-command limit): {c[:60]}")
-                    cleaned = CMD_MARK_RE.sub(_after, cleaned)
-                    yield ev("clean", {"text": cleaned})
+                    rc_by_block[bi] = rc
+                if run_idx:
+                    parts = []
+                    for i, b in enumerate(blocks):
+                        if b[0] == "text":
+                            parts.append(b[1])
+                        elif b[0] == "file":
+                            parts.append("wrote file: " + Path(b[2]).name)
+                        else:
+                            c = normalize_cmd(b[1])
+                            if not c:
+                                continue
+                            if i in rc_by_block:
+                                rc = rc_by_block[i]
+                                parts.append(f"ran: {c[:60]}" if rc == 0
+                                             else f"failed (exit {rc}): {c[:60]}")
+                            else:
+                                parts.append("skipped: commands disabled" if not ALLOW_CMDS
+                                             else f"not run (over the 5-command limit): {c[:60]}")
+                    yield ev("clean", {"text": "\n".join(parts)})
 
                 custom = bool(model.get("custom"))
                 local = bool(model.get("local"))
