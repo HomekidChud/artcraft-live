@@ -6,3 +6,7 @@ assistant/training/.worker.lock
 assistant/training/*.log
 server/data/
 shots/
+
+# ChatCraft runtime state (generated files + custom-model keys)
+chatcraft/files/
+chatcraft/data/

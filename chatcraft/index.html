@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Otto: AI workspace</title>
+<title>ChatCraft: AI workspace</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%232ed8a2' d='M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,7 +33,7 @@
     --code-text: #e8e5e0;
   }
   body:has(#t-dark:checked) {
-    /* Ember dark: charcoal canvas with a warm amber glow, like Otto's slides builder */
+    /* Ember dark: charcoal canvas with a warm amber glow, like ChatCraft's slides builder */
     --bg: #1a1817;
     --bg-side: #171512;
     --surface: #252220;
@@ -55,7 +55,7 @@
     --code-text: #d8d4ce;
   }
 
-  /* Otto signature theme: painted wallpaper + floating dark cards + mint accent */
+  /* ChatCraft signature theme: painted wallpaper + floating dark cards + mint accent */
   body:has(#t-otto:checked) {
     --bg: rgba(16, 20, 24, 0.6);
     --bg-side: rgba(17, 21, 26, 0.82);
@@ -284,6 +284,7 @@
     background: var(--surface); border: 1px solid var(--border);
     border-radius: 14px; box-shadow: var(--shadow-lg);
     padding: 6px; min-width: 250px;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
   }
   .model-menu .option {
     display: flex; gap: 10px; align-items: flex-start; width: 100%;
@@ -294,6 +295,8 @@
   .model-menu .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; flex: none; }
   .opt-name { font-weight: 500; font-size: 0.9rem; }
   .opt-desc { font-size: 0.78rem; color: var(--muted); }
+  .model-menu .option.unconfigured .opt-name { color: var(--faint); }
+  .model-menu .option.unconfigured .dot { background: var(--faint); }
 
   .chat-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; min-height: 46vh; gap: 10px; padding: 24px; }
   .chat-empty h3 { margin: 0; font-size: 1.05rem; }
@@ -782,7 +785,7 @@
   }
   .check-row input:checked ~ .cb { background: var(--accent); border-color: var(--accent); color: #fff; }
 
-  /* ============ HOME (Otto style) ============ */
+  /* ============ HOME (ChatCraft style) ============ */
   .view-home { flex-direction: column; }
   .home-scroll { flex: 1; overflow-y: auto; min-height: 0; }
   .home-inner { max-width: 860px; margin: 0 auto; padding: 26px 24px 48px; }
@@ -1125,7 +1128,19 @@
   .sandbox-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 
   /* ---------- harness steps + files ---------- */
-  .steps-bar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .steps-bar { display: flex; flex-wrap: wrap; gap: 6px; row-gap: 4px; margin-bottom: 10px; }
+  .step-detail {
+    flex-basis: 100%; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.72rem;
+    color: var(--faint); margin: 4px 0 6px; line-height: 1.4;
+  }
+  .cmd-out {
+    margin: 4px 0 8px; padding: 10px 12px; border-radius: 10px;
+    background: var(--code-bg); color: var(--code-text);
+    font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 0.78rem;
+    white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow-y: auto;
+  }
+  .cmd-out .cmd-line { color: var(--accent); font-weight: 600; }
   .step {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 0.72rem; font-weight: 600; letter-spacing: 0.01em;
@@ -1257,7 +1272,7 @@
   .cm-row .del { all: unset; cursor: pointer; color: var(--faint); font-size: 0.85rem; padding: 0 4px; }
   .cm-row .del:hover { color: #e0567a; }
 
-  /* legibility over the photographic wallpaper (Otto theme) */
+  /* legibility over the photographic wallpaper (ChatCraft theme) */
   body:has(#t-otto:checked) .space-note,
   body:has(#t-otto:checked) .home-hero .home-sub,
   body:has(#t-otto:checked) .home-date,
@@ -1374,7 +1389,7 @@
 
   /* ============ TOAST ============ */
   .toast {
-    position: fixed; left: 50%; bottom: 28px;
+    position: fixed; left: 50%; bottom: 96px;
     transform: translate(-50%, 16px); z-index: 90;
     background: var(--surface); color: var(--text);
     border: 1px solid var(--border); border-radius: 12px;
@@ -1489,7 +1504,7 @@
         <span class="brand-mark" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z"/></svg>
         </span>
-        Otto
+        ChatCraft
       </div>
       <label class="icon-btn side-close" for="nav-toggle" aria-label="Close menu" title="Close menu">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -1555,7 +1570,7 @@
         <h3 class="side-label">Projects</h3>
         <label class="proj-item" for="p-1">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
-          Otto UI kit
+          ChatCraft UI kit
         </label>
         <label class="proj-item" for="p-2">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
@@ -1647,7 +1662,7 @@
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 019 9c0 1.6-.9 2.6-2.4 2.6h-2.2a2 2 0 00-1.5 3.3c.4.5.5 1 .2 1.6-.3.5-1 .9-1.9.9a9 9 0 01-9-9 9 9 0 018-8.4z"/><circle cx="8.5" cy="10.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="10.5" r="1" fill="currentColor" stroke="none"/></svg>
         </summary>
         <div class="model-menu theme-menu">
-          <label class="option" for="t-otto"><span class="dot" style="background:#2ed8a2"></span><span><span class="opt-name">Otto</span><br><span class="opt-desc">Wallpaper, dark cards, mint accent</span></span></label>
+          <label class="option" for="t-otto"><span class="dot" style="background:#2ed8a2"></span><span><span class="opt-name">ChatCraft</span><br><span class="opt-desc">Wallpaper, dark cards, mint accent</span></span></label>
           <label class="option" for="t-light"><span class="dot" style="background:#e8c46a"></span><span><span class="opt-name">Light</span><br><span class="opt-desc">Warm paper, terracotta accent</span></span></label>
           <label class="option" for="t-dark"><span class="dot" style="background:#d9992e"></span><span><span class="opt-name">Ember</span><br><span class="opt-desc">Charcoal canvas, warm amber glow</span></span></label>
         </div>
@@ -1784,7 +1799,7 @@
         <div class="composer-wrap">
           <div class="composer-inner">
             <div class="composer">
-              <textarea rows="1" placeholder="Message Otto…" aria-label="Message Otto"></textarea>
+              <textarea rows="1" placeholder="Message ChatCraft…" aria-label="Message ChatCraft"></textarea>
               <div class="composer-bar">
                 <details class="model comp-model" id="comp-model-picker">
                   <summary>
@@ -1805,7 +1820,7 @@
                 </button>
               </div>
             </div>
-            <div class="composer-foot">Otto can make mistakes: check important info. Chat runs on your selected model with the advisor pass.</div>
+            <div class="composer-foot">ChatCraft can make mistakes: check important info. Chat runs on your selected model with the advisor pass.</div>
           </div>
         </div>
 
@@ -2063,10 +2078,10 @@
             <div class="set-row">
               <span class="sr-info">
                 <span class="sr-title">Theme</span>
-                <span class="sr-desc">Otto wallpaper, light paper, or ember dark</span>
+                <span class="sr-desc">ChatCraft wallpaper, light paper, or ember dark</span>
               </span>
               <span class="sr-control segment theme-seg">
-                <label for="t-otto">Otto</label>
+                <label for="t-otto">ChatCraft</label>
                 <label for="t-light">Light</label>
                 <label for="t-dark">Ember</label>
               </span>
@@ -2098,7 +2113,7 @@
 
             <div class="h-field" style="margin-top:12px;">
               <label for="hs-system">System prompt</label>
-              <textarea id="hs-system" rows="3" placeholder="Empty = Otto's default personality"></textarea>
+              <textarea id="hs-system" rows="3" placeholder="Empty = ChatCraft's default personality"></textarea>
             </div>
 
             <div class="h-switch" style="margin-top:12px;">
@@ -2129,11 +2144,11 @@
 
           <div class="set-section">
             <h3>Agents & usage</h3>
-            <div class="set-sub">Controls how Otto runs multiple agents in parallel.</div>
+            <div class="set-sub">Controls how ChatCraft runs multiple agents in parallel.</div>
             <div class="set-row">
               <span class="sr-info">
                 <span class="sr-title">Multi-agent mode</span>
-                <span class="sr-desc">How eagerly Otto spins up extra agents</span>
+                <span class="sr-desc">How eagerly ChatCraft spins up extra agents</span>
               </span>
               <span class="sr-control segment agentmode-seg">
                 <input type="radio" name="agentmode" id="am-off"><label for="am-off">Off</label>
@@ -2207,7 +2222,7 @@
               <span class="brand-mark" aria-hidden="true">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z"/></svg>
               </span>
-              Otto
+              ChatCraft
             </div>
             <h2>Welcome back</h2>
             <p class="auth-sub">Sign in to sync your chats, projects, and agents.</p>
@@ -2235,7 +2250,7 @@
             <div class="auth-note">Sign-in isn't wired up yet. The workspace works without an account.</div>
             <label class="auth-back" for="v-chat-1">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
-              Back to Otto
+              Back to ChatCraft
             </label>
           </div>
         </div>
@@ -2249,7 +2264,7 @@
               <span class="brand-mark" aria-hidden="true">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z"/></svg>
               </span>
-              Otto
+              ChatCraft
             </div>
             <h2>Create your account</h2>
             <p class="auth-sub">Free plan: 100 messages a week, 3 agents per run.</p>
@@ -2275,7 +2290,7 @@
             <div class="auth-note">Sign-in isn't wired up yet. The workspace works without an account.</div>
             <label class="auth-back" for="v-chat-1">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
-              Back to Otto
+              Back to ChatCraft
             </label>
           </div>
         </div>
@@ -2321,6 +2336,7 @@
       </div>
       <div class="fv-actions">
         <button class="fv-btn" id="fv-copy" type="button">Copy</button>
+        <button class="fv-btn" id="fv-dl" type="button">Download</button>
         <button class="fv-btn danger" id="fv-del" type="button">Delete</button>
         <button class="fv-btn" id="fv-close" type="button">Close</button>
       </div>
@@ -2329,7 +2345,7 @@
   </div>
 </div>
 
-<script>window.__API_BASE__ = "__PORT_8000__";</script>
+<script>window.__API_BASE__ = "";</script>
 <script>
 (function () {
   "use strict";
@@ -2382,12 +2398,10 @@
   })();
 
   /* ---------- API base (real chat) ---------- */
+  // Empty = same origin (python server.py serves both the UI and the API).
+  // Opened straight from disk? Fall back to the default local backend.
   var rawApiBase = window.__API_BASE__ || "";
-  var unresolvedApi = rawApiBase.indexOf("__PORT_") === 0;
-  var localHostnames = { "localhost": 1, "127.0.0.1": 1, "[::1]": 1 };
-  var API = unresolvedApi
-    ? (localHostnames[location.hostname] ? "http://localhost:8000" : null)
-    : rawApiBase;
+  var API = rawApiBase || (location.protocol === "file:" ? "http://localhost:8000" : "");
 
   var chatState = {
     model: "claude_sonnet_5_5",
@@ -2427,7 +2441,7 @@
     m.className = "msg msg-ai new-msg";
     m.innerHTML =
       '<span class="who" aria-hidden="true">' + whoSvg + '</span>' +
-      '<div class="ai-col"><div class="typing"><span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>Otto is thinking…</div></div>';
+      '<div class="ai-col"><div class="typing"><span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>ChatCraft is thinking…</div></div>';
     return m;
   }
   function buildAiMsg(text) {
@@ -2467,6 +2481,18 @@
     pill.className = "step " + (data.state || "run");
     pill.innerHTML = (data.state === "done" ? STEP_ICONS.done : STEP_ICONS.run) + "<span></span>";
     pill.querySelector("span").textContent = data.label || data.id;
+    // optional mono detail line (e.g. command output, file listing)
+    if (data.detail != null && data.detail !== "") {
+      var det = bar.querySelector('.step-detail[data-step="' + data.id + '"]');
+      if (!det) {
+        det = document.createElement("div");
+        det.className = "step-detail";
+        det.setAttribute("data-step", data.id);
+        bar.appendChild(det);
+      }
+      det.textContent = data.detail;
+      det.title = data.detail;
+    }
   }
   function buildAdvisorChip(note) {
     var d = document.createElement("div");
@@ -2520,7 +2546,7 @@
     return card;
   }
   function openFileViewer(name) {
-    if (!API) { toast("Backend offline"); return; }
+    if (API === null) { toast("Backend offline"); return; }
     fetch(API + "/api/files/" + encodeURIComponent(name), { credentials: "same-origin" })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
@@ -2536,7 +2562,7 @@
   }
   function closeFileViewer() { $("#file-viewer").hidden = true; }
   function loadFiles() {
-    if (!API) return;
+    if (API === null) return;
     fetch(API + "/api/files", { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (d) { renderFiles(d.files || []); })
@@ -2568,7 +2594,7 @@
       del.textContent = "\u2715";
       del.addEventListener("click", function (e) {
         e.stopPropagation();
-        if (!API) return;
+        if (API === null) return;
         fetch(API + "/api/files/" + encodeURIComponent(f.name), {
           method: "DELETE", credentials: "same-origin"
         }).then(function () {
@@ -2596,9 +2622,23 @@
       toast("Copy not available here");
     }
   });
+  $("#fv-dl").addEventListener("click", function () {
+    var name = $("#fv-name").textContent, body = $("#fv-body").textContent;
+    if (!name || !body) { toast("Nothing to download"); return; }
+    try {
+      var blob = new Blob([body], { type: "text/plain" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    } catch (e) { toast("Download not available here"); }
+  });
   $("#fv-del").addEventListener("click", function () {
     var name = $("#fv-name").textContent;
-    if (!API || !name) return;
+    if (API === null || !name) return;
     fetch(API + "/api/files/" + encodeURIComponent(name), {
       method: "DELETE", credentials: "same-origin"
     }).then(function () {
@@ -2616,6 +2656,10 @@
     var advCost = data.advisor_cost_usd || 0;
     var total = data.total_cost_usd != null ? data.total_cost_usd : mainCost + advCost;
     function fmt(c) { return c < 0.0001 ? c.toFixed(6) : c.toFixed(4); }
+    if (data.local) {
+      d.textContent = model + " · local model · $0.00 (runs on your machine)";
+      return d;
+    }
     if (!known) {
       d.textContent = model + " · custom endpoint · main cost unavailable (no public pricing)" +
         (advCost ? " · advisor ~$" + fmt(advCost) : "");
@@ -2639,7 +2683,7 @@
       var txt = m.querySelector(".bubble") || m.querySelector(".txt");
       if (!txt) return;
       var t = txt.textContent.trim();
-      if (!t || t.indexOf("Otto is thinking") === 0) return;
+      if (!t || t.indexOf("ChatCraft is thinking") === 0) return;
       out.push({ role: isUser ? "user" : "assistant", content: t });
     });
     return out;
@@ -2656,7 +2700,7 @@
     scrollThread();
     var shell = null, txtEl = null;
 
-    if (!API) {
+    if (API === null) {
       typing.replaceWith(buildAiMsg(
         "The chat backend isn't reachable, so no model can answer right now. " +
         "Check the connection and try again."
@@ -2726,6 +2770,24 @@
               }
               txtEl.appendChild(document.createTextNode(data.delta));
               scrollThread();
+            } else if (ev === "command" && data.command) {
+              if (!shell) {
+                shell = buildAiShell();
+                txtEl = shell.querySelector(".txt");
+                typing.replaceWith(shell);
+              }
+              var colC = shell.querySelector(".ai-col");
+              if (colC) {
+                var block = document.createElement("div");
+                block.className = "cmd-out";
+                var line = document.createElement("div");
+                line.className = "cmd-line";
+                line.textContent = "$ " + data.command;
+                block.appendChild(line);
+                block.appendChild(document.createTextNode(data.output || ""));
+                colC.appendChild(block);
+                scrollThread();
+              }
             } else if (ev === "files" && data.files) {
               // swap the raw code blocks for clean file cards
               if (txtEl && txtEl.parentNode && typeof data.cleaned_text === "string") {
@@ -2822,6 +2884,13 @@
   function shortName(label) {
     return label.replace("Claude ", "").replace("GPT-", "").replace("Gemini ", "").replace("Grok ", "");
   }
+  // honest availability note per model: local / custom / needs key
+  function modelStatus(m) {
+    if (m.local) return "local · free";
+    if (m.custom) return "custom endpoint";
+    if (m.configured === false) return m.status || "needs API key";
+    return "$" + m.in + "/M in · $" + m.out + "/M out";
+  }
   function fillModelMenu(menuEl, isSelect, platformOnly) {
     if (!menuEl) return;
     var models = platformOnly ? MODELS.filter(function (m) { return !m.custom; }) : MODELS;
@@ -2830,7 +2899,8 @@
       models.forEach(function (m) {
         var o = document.createElement("option");
         o.value = m.id;
-        o.textContent = m.label + " · " + m.provider + (m.tier === "cheapest" || m.tier === "fast" ? " (cheap)" : "");
+        o.textContent = m.label + " · " + m.provider +
+          (m.configured === false && !m.local ? " (" + (m.status || "needs API key") + ")" : "");
         menuEl.appendChild(o);
       });
       return;
@@ -2848,19 +2918,18 @@
       groups[p].forEach(function (m) {
         var btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "option";
+        btn.className = "option" + (m.configured === false && !m.local ? " unconfigured" : "");
         btn.setAttribute("data-id", m.id);
         var dot = document.createElement("span");
         dot.className = "dot";
-        dot.style.background = m.custom ? "#b08bd6" : "var(--accent)";
+        dot.style.background = m.custom ? "#b08bd6" : (m.local ? "#6fae7f" : "var(--accent)");
         var mid = document.createElement("span");
         var name = document.createElement("span");
         name.className = "opt-name";
         name.textContent = m.label;
         var price = document.createElement("span");
         price.className = "m-price";
-        price.textContent = " · " + (m.in ? "$" + m.in + "/M in · $" + m.out + "/M out" : "custom endpoint") +
-          " · " + m.tier;
+        price.textContent = " · " + modelStatus(m) + " · " + (m.tier || "custom");
         mid.appendChild(name);
         mid.appendChild(price);
         var check = document.createElement("span");
@@ -2885,6 +2954,10 @@
       m = MODELS.find(function (x) { return x.id === "claude_sonnet_5_5"; });
       if (!m) return;
       id = m.id;
+    }
+    if (m.configured === false && !m.local) {
+      toast(m.label + " is selected but " + (m.status || "needs an API key") +
+        " — replies will fail until it's set");
     }
     chatState.model = id;
     var short = shortName(m.label);
@@ -2924,7 +2997,7 @@
   }
 
   function loadModels() {
-    if (!API) return;
+    if (API === null) return;
     fetch(API + "/api/models", { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (d) {
@@ -2958,7 +3031,7 @@
 
   /* ---------- custom models (plugin) ---------- */
   function loadCustomList() {
-    if (!API) return;
+    if (API === null) return;
     fetch(API + "/api/custom-models", { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (d) { renderCustomList(d.models || []); })
@@ -2984,7 +3057,7 @@
       del.title = "Remove";
       del.textContent = "\u2715";
       del.addEventListener("click", function () {
-        if (!API) return;
+        if (API === null) return;
         fetch(API + "/api/custom-models/" + encodeURIComponent(m.id), {
           method: "DELETE", credentials: "same-origin"
         }).then(function (r) {
@@ -3001,7 +3074,7 @@
   }
   var cmAdd = $("#cm-add");
   if (cmAdd) cmAdd.addEventListener("click", function () {
-    if (!API) { toast("Backend offline"); return; }
+    if (API === null) { toast("Backend offline"); return; }
     var payload = {
       id: ($("#cm-label").value || $("#cm-name").value || "custom").trim().toLowerCase().replace(/\s+/g, "-"),
       label: $("#cm-label").value.trim() || $("#cm-name").value.trim(),
@@ -3028,12 +3101,6 @@
         ["#cm-label", "#cm-base", "#cm-name", "#cm-key"].forEach(function (s) { $(s).value = ""; });
         toast("Added " + payload.label + " to the model menus");
         loadModels();
-  loadFiles();
-  $$('input[name="view"]').forEach(function (r) {
-    r.addEventListener("change", function () {
-      if (r.id === "v-docs") loadFiles();
-    });
-  });
       })
       .catch(function () { toast("Couldn't add the model"); });
   });
