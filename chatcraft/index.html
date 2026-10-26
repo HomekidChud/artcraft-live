@@ -2124,7 +2124,7 @@
             <div class="usage-row" id="usage-row">
               <span>Messages this session: <b id="us-msgs">0</b></span>
               <span>Completed-turn cost estimates (failed turns and unpriced custom calls excluded): <b id="us-cost">$0.0000</b></span>
-              <span>Default advisor: <b>Claude Haiku 4.5</b> (about $0.001 per review)</span>
+              <span>Default advisor: <b>Claude Haiku 5.5</b> (about $0.001 per review)</span>
             </div>
           </div>
 
@@ -2406,7 +2406,7 @@
   var chatState = {
     model: "claude_sonnet_5_5",
     advisorEnabled: true,
-    advisorModel: "claude_haiku_4_5",
+    advisorModel: "claude_haiku_5_5",
     temperature: 0.7,
     maxTokens: 1024,
     system: ""
@@ -2657,7 +2657,13 @@
     var total = data.total_cost_usd != null ? data.total_cost_usd : mainCost + advCost;
     function fmt(c) { return c < 0.0001 ? c.toFixed(6) : c.toFixed(4); }
     if (data.local) {
-      d.textContent = model + " · local model · $0.00 (runs on your machine)";
+      d.textContent = model + " · local model · $0.00 (runs on your machine)" +
+        (data.reported_model ? " · served as " + data.reported_model : "");
+      return d;
+    }
+    if (data.reported_model && data.reported_model !== model) {
+      d.textContent = model + " · provider reported serving: " + data.reported_model +
+        (known ? " · ~$" + fmt(total) : "");
       return d;
     }
     if (!known) {
@@ -2788,6 +2794,10 @@
                 colC.appendChild(block);
                 scrollThread();
               }
+            } else if (ev === "clean" && typeof data.text === "string") {
+              // final honest text after commands ran (ran / not run / skipped markers)
+              if (txtEl) txtEl.textContent = data.text;
+              scrollThread();
             } else if (ev === "files" && data.files) {
               // swap the raw code blocks for clean file cards
               if (txtEl && txtEl.parentNode && typeof data.cleaned_text === "string") {

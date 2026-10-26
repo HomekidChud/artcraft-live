@@ -7,12 +7,15 @@ manager and viewer. Single-file frontend, zero-dependency Python backend.
 
 ## What's live
 
-- Chat with 9 catalog models (Claude, GPT, Gemini, Grok families), local
+- Chat with catalog models (Claude, GPT, Gemini, Grok families), local
   Ollama models (auto-detected when Ollama is running), and custom
-  OpenAI/Anthropic-compatible endpoints added from Settings.
+  OpenAI/Anthropic-compatible endpoints added from Settings. Catalog model
+  IDs and prices are best-effort estimates — check them against your
+  provider's docs and edit the `CATALOG` list in `server.py` if needed.
 - Honest model status: every model in the menu shows whether it is actually
   usable — "needs ANTHROPIC_API_KEY", "local · free", or live pricing.
-  Nothing pretends to be a model it isn't.
+  Nothing pretends to be a model it isn't, and the cost line shows the
+  provider-reported model name when it differs from the one requested.
 - Advisor: a fast, cheap reviewer model that briefs every turn before the
   main model answers. Always on, server-side, with its own usage/cost line.
   If the advisor model is unavailable the UI says so and the turn continues.
@@ -41,7 +44,8 @@ manager and viewer. Single-file frontend, zero-dependency Python backend.
 python server.py        # http://localhost:8000 — UI and API, no installs
 ```
 
-Open http://localhost:8000. That's it — no pip, no build step.
+Open http://localhost:8000. That's it — no pip, no build step. The server
+listens on 127.0.0.1 only; set `CHATCRAFT_HOST` to change that.
 
 ### Using local models (Ollama)
 
@@ -78,12 +82,18 @@ model menu.
 
 ## Security notes
 
-- The server executes ```run commands from model replies inside the
-  `files/` workspace, with a 20s timeout. This is the point of a harness,
-  but it is your machine: set `CHATCRAFT_ALLOW_CMDS=0` to disable, or
-  `CHATCRAFT_CMD_TIMEOUT` to change the limit.
+- The server binds to `127.0.0.1` by default (set `CHATCRAFT_HOST=0.0.0.0`
+  only if you understand the API is unauthenticated). Keep it loopback.
+- The server executes ```run commands from model replies with `cwd=files/`,
+  a 20s timeout and output caps — but that is a working directory, NOT a
+  sandbox: a shell command can read anything your user can. This is the
+  point of a harness, but it is your machine and there is no auth on the
+  API, so do not expose it to a network. Set `CHATCRAFT_ALLOW_CMDS=0` to
+  disable command execution entirely, or `CHATCRAFT_CMD_TIMEOUT` to
+  change the limit.
 - Custom-model keys are stored in `data/custom_models.json` (gitignored).
-- Files are sandboxed to `files/` — path traversal is stripped server-side.
+- File list/read/delete endpoints are restricted to `files/` — path
+  traversal is stripped server-side. Command execution is not restricted.
 
 ## Honest status
 

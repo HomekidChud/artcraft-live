@@ -38,6 +38,7 @@ DATA_DIR.mkdir(exist_ok=True)
 CUSTOM_FILE = DATA_DIR / "custom_models.json"
 
 PORT = int(os.environ.get("PORT", "8000"))
+HOST = os.environ.get("CHATCRAFT_HOST", "127.0.0.1")  # loopback by default
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 # Command execution is the point of a harness, but it is YOUR machine:
 # set CHATCRAFT_ALLOW_CMDS=0 to disable ```run blocks entirely.
@@ -56,9 +57,9 @@ CATALOG = [
     {"id": "claude_opus_5_5", "label": "Claude Opus 5.5", "provider": "Anthropic",
      "tier": "quality", "in": 5.0, "out": 25.0,
      "api": {"kind": "anthropic", "model": "claude-opus-5-5", "env": "ANTHROPIC_API_KEY"}},
-    {"id": "claude_haiku_4_5", "label": "Claude Haiku 4.5", "provider": "Anthropic",
+    {"id": "claude_haiku_5_5", "label": "Claude Haiku 5.5", "provider": "Anthropic",
      "tier": "fast", "in": 1.0, "out": 5.0,
-     "api": {"kind": "anthropic", "model": "claude-haiku-4-5", "env": "ANTHROPIC_API_KEY"}},
+     "api": {"kind": "anthropic", "model": "claude-haiku-5-5", "env": "ANTHROPIC_API_KEY"}},
     {"id": "gpt_5_1", "label": "GPT-5.1", "provider": "OpenAI",
      "tier": "balanced", "in": 1.25, "out": 10.0,
      "api": {"kind": "openai", "model": "gpt-5.1", "env": "OPENAI_API_KEY"}},
@@ -85,7 +86,7 @@ CATALOG = [
 ]
 
 DEFAULT_MODEL = "claude_sonnet_5_5"
-DEFAULT_ADVISOR = "claude_haiku_4_5"
+DEFAULT_ADVISOR = "claude_haiku_5_5"
 
 DEFAULT_SYSTEM = (
     "You are ChatCraft, a warm, concise personal-workspace assistant. "
@@ -244,7 +245,8 @@ def http_sse(url, payload, headers=None, timeout=180):
 
 def stream_openai_compat(api, messages, system, max_tokens, temperature, api_key=""):
     """OpenAI-compatible chat completions (OpenAI, Gemini-compat, xAI, Ollama,
-    LM Studio, vLLM...). Yields ('text', delta) and ('usage', {...})."""
+    LM Studio, vLLM...). Yields ('text', delta), ('usage', {...}) and
+    ('model', provider-reported model name)."""
     base = api.get("base_url") or "https://api.openai.com/v1"
     body = {
         "model": api["model"], "messages": messages, "stream": True,
@@ -259,8 +261,11 @@ def stream_openai_compat(api, messages, system, max_tokens, temperature, api_key
         headers["Authorization"] = "Bearer " + api_key
     usage = {"in": 0, "out": 0}
     got_text = False
+    reported = None
     try:
         for ev in http_sse(base.rstrip("/") + "/chat/completions", body, headers):
+            if ev.get("model"):
+                reported = ev["model"]
             choices = ev.get("choices") or []
             if choices:
                 delta = (choices[0].get("delta") or {}).get("content")
@@ -277,28 +282,35 @@ def stream_openai_compat(api, messages, system, max_tokens, temperature, api_key
     if not got_text:
         raise RuntimeError("provider streamed no text (check the model name)")
     yield ("usage", usage)
+    if reported:
+        yield ("model", reported)
 
 
 def stream_anthropic(api, messages, system, max_tokens, temperature, api_key=""):
-    """Anthropic Messages API. Yields ('text', delta) and ('usage', {...})."""
-    key = api_key or os.environ.get(api["env"], "")
+    """Anthropic Messages API (honours a custom base_url). Yields
+    ('text', delta), ('usage', {...}) and ('model', reported name)."""
+    base = (api.get("base_url") or "https://api.anthropic.com").rstrip("/")
     body = {"model": api["model"], "messages": messages,
             "max_tokens": max_tokens, "stream": True}
     if system:
         body["system"] = system
     if temperature is not None:
         body["temperature"] = temperature
-    headers = {"x-api-key": key, "anthropic-version": "2023-06-01"}
+    headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01"}
     usage = {"in": 0, "out": 0}
     got_text = False
+    reported = None
     try:
-        for ev in http_sse("https://api.anthropic.com/v1/messages", body, headers):
+        for ev in http_sse(base + "/v1/messages", body, headers):
             etype = ev.get("type", "")
             if etype == "content_block_delta" and ev.get("delta", {}).get("type") == "text_delta":
                 got_text = True
                 yield ("text", ev["delta"]["text"])
             elif etype == "message_start":
-                usage["in"] = ev.get("message", {}).get("usage", {}).get("input_tokens", 0)
+                msg = ev.get("message", {})
+                usage["in"] = msg.get("usage", {}).get("input_tokens", 0)
+                if msg.get("model"):
+                    reported = msg["model"]
             elif etype == "message_delta":
                 usage["out"] = ev.get("usage", {}).get("output_tokens", 0)
     except urllib.error.HTTPError as e:
@@ -308,12 +320,19 @@ def stream_anthropic(api, messages, system, max_tokens, temperature, api_key="")
     if not got_text:
         raise RuntimeError("Anthropic streamed no text (check the model name)")
     yield ("usage", usage)
+    if reported:
+        yield ("model", reported)
+
+
+def resolve_credentials(m):
+    """Custom records carry api_key; catalog models read their env var."""
+    return m.get("api_key", "") or os.environ.get((m.get("api") or {}).get("env") or "", "")
 
 
 def model_stream(m, messages, system, max_tokens, temperature):
-    """Route a model record to the right protocol. Yields ('text'|'usage', payload)."""
+    """Route a model record to the right protocol. Yields ('text'|'usage'|'model', payload)."""
     api = dict(m.get("api") or {})
-    api_key = m.get("api_key", "")
+    api_key = resolve_credentials(m)
     if m.get("custom"):
         api = {"kind": "anthropic" if m.get("provider") == "anthropic-compat" else "openai",
                "model": m.get("model_name", ""), "base_url": m.get("base_url")}
@@ -323,21 +342,26 @@ def model_stream(m, messages, system, max_tokens, temperature):
     else:
         gen = stream_openai_compat(api, messages, system, max_tokens, temperature, api_key)
     usage = {"in": 0, "out": 0}
+    reported = None
     for kind_, payload in gen:
         if kind_ == "text":
             yield ("text", payload)
         elif kind_ == "usage":
             usage = payload
+        elif kind_ == "model":
+            reported = payload
     if usage["in"] == 0 and usage["out"] == 0:
         # no usage reported: honest rough estimate so the cost line still shows
         usage = {"in": 0, "out": 0, "estimated": True}
     yield ("usage", usage)
+    if reported:
+        yield ("model", reported)
 
 
 def advisor_pass(m, messages):
     """One-shot (non-streaming) advisor call. Returns (note, error, usage)."""
     api = dict(m.get("api") or {})
-    api_key = m.get("api_key", "")
+    api_key = resolve_credentials(m)
     if m.get("custom"):
         api = {"kind": "anthropic" if m.get("provider") == "anthropic-compat" else "openai",
                "model": m.get("model_name", ""), "base_url": m.get("base_url")}
@@ -345,11 +369,12 @@ def advisor_pass(m, messages):
     usage = {"in": 0, "out": 0}
     try:
         if api.get("kind") == "anthropic":
+            base = (api.get("base_url") or "https://api.anthropic.com").rstrip("/")
             status, body = http_json(
-                "https://api.anthropic.com/v1/messages",
+                base + "/v1/messages",
                 {"model": api["model"], "system": ADVISOR_SYSTEM, "messages": trimmed,
                  "max_tokens": 200},
-                headers={"x-api-key": api_key or os.environ.get(api.get("env", ""), ""),
+                headers={"x-api-key": api_key,
                          "anthropic-version": "2023-06-01"}, timeout=60)
             note = ""
             if status == 200 and body.get("content"):
@@ -573,11 +598,11 @@ class Handler(BaseHTTPRequestHandler):
                 # 1. read the conversation
                 yield step("read", f"Read conversation ({len(messages)} messages)", "done")
 
-                # 2. read the workspace files (real read: names + sizes into context)
+                # 2. list the workspace files (names + sizes into context)
                 files_now = [p for p in FILES_DIR.iterdir() if p.is_file()]
                 if files_now:
                     listing = ", ".join(f"{p.name} ({p.stat().st_size}B)" for p in files_now[:30])
-                    yield step("workspace", "Reading workspace files", "done", listing)
+                    yield step("workspace", "Listing workspace files", "done", listing)
                 else:
                     yield step("workspace", "Workspace empty", "done")
 
@@ -611,7 +636,7 @@ class Handler(BaseHTTPRequestHandler):
                     system += (f"\n\nYour advisor reviewed this conversation and suggests: "
                                f"\"{advisor_note}\" Follow the advisor's guidance where it helps.")
                 yield step("write", f"Writing reply ({model['label']})", "run")
-                chunks, usage = [], {"in": 0, "out": 0}
+                chunks, usage, reported_model = [], {"in": 0, "out": 0}, None
                 for kind, payload in model_stream(
                         model, messages, system,
                         int(req.get("max_tokens") or 1024),
@@ -621,55 +646,76 @@ class Handler(BaseHTTPRequestHandler):
                         yield ev("text", {"delta": payload})
                     elif kind == "usage":
                         usage = payload
+                    elif kind == "model":
+                        reported_model = payload
                 yield step("write", "Writing reply", "done")
 
                 full_text = "".join(chunks)
 
                 # 5. extract files + commands, then show the cleaned reply
+                # (run blocks stay raw in the files event; the final `clean`
+                # event replaces them with an honest ran/not-run/skipped marker
+                # AFTER the commands actually execute)
                 cleaned, files = extract_files(full_text)
                 runs = extract_runs(full_text)
-                if runs:
-                    def _mark(m):
-                        return f"ran: {m.group(1).strip()[:60]}"
-                    cleaned = RUN_BLOCK_RE.sub(_mark, cleaned)
                 saved = []
                 if files:
                     for f in files:
-                        yield step("files", f"Writing {f['name']}", "run")
+                        sid = "file-" + Path(f["name"]).name
+                        yield step(sid, f"Writing {f['name']}", "run")
                         safe = FILES_DIR / Path(f["name"]).name
                         safe.write_text(f["content"], encoding="utf-8")
                         saved.append({"name": safe.name, "lang": f.get("lang") or "text",
                                       "size": safe.stat().st_size})
-                        yield step("files", f"Wrote {f['name']}", "done")
+                        yield step(sid, f"Wrote {f['name']}", "done")
                     yield ev("files", {"files": saved, "cleaned_text": cleaned})
 
                 # 6. run commands the reply contains
+                ran_any = False
                 for i, cmd in enumerate(runs[:5]):
+                    sid = f"cmd-{i + 1}"
                     if not ALLOW_CMDS:
-                        yield step("cmd", "Commands disabled", "done",
+                        yield step(sid, "Commands disabled", "done",
                                    "set CHATCRAFT_ALLOW_CMDS=1 to enable")
                         break
-                    yield step("cmd", f"Running: {cmd[:60]}", "run")
+                    yield step(sid, f"Running: {cmd[:60]}", "run")
                     rc, out = run_command(cmd)
                     first = (out.strip().splitlines() or [""])[0][:120]
-                    yield step("cmd", f"Ran: {cmd[:60]} (exit {rc})", "done", first)
+                    label = f"Ran: {cmd[:60]} (exit {rc})" if rc == 0 else f"Failed: {cmd[:60]} (exit {rc})"
+                    yield step(sid, label, "done", first)
                     yield ev("command", {"command": cmd, "returncode": rc, "output": out[:2000]})
+                    ran_any = True
+                if runs and not ALLOW_CMDS:
+                    # mark skipped commands honestly in the final text
+                    cleaned = RUN_BLOCK_RE.sub(lambda m: "skipped: commands disabled", cleaned)
+                elif runs and ALLOW_CMDS:
+                    def _after(m):
+                        cmd_txt = m.group(1).strip()[:60]
+                        return f"ran: {cmd_txt}" if ran_any else f"not run: {cmd_txt}"
+                    cleaned = RUN_BLOCK_RE.sub(_after, cleaned)
+                if runs:
+                    yield ev("clean", {"text": cleaned})
 
                 custom = bool(model.get("custom"))
                 local = bool(model.get("local"))
                 cost = 0.0 if (custom or local) else estimate_cost(
                     model, usage.get("in", 0), usage.get("out", 0))
+                total = None if custom else round(cost + advisor_cost, 6)
                 done = {
                     "usage": usage, "cost_usd": round(cost, 6),
                     "advisor_usage": advisor_usage,
                     "advisor_cost_usd": round(advisor_cost, 6),
-                    "total_cost_usd": None if custom else round(cost + advisor_cost, 6),
+                    "total_cost_usd": total,
                     "model": model["id"], "cost_known": not custom,
                     "files": [f["name"] for f in saved],
                 }
                 if local:
-                    done.update({"cost_usd": 0.0, "total_cost_usd": 0.0,
+                    # local model: main cost is $0, but a paid advisor still counts
+                    done.update({"cost_usd": 0.0,
+                                 "total_cost_usd": round(advisor_cost, 6),
                                  "cost_known": True, "local": True})
+                if reported_model and reported_model != model["id"]:
+                    done["reported_model"] = reported_model
                 yield ev("done", done)
             except Exception as e:
                 yield ev("error", {"error": str(e)[:300]})
@@ -682,8 +728,8 @@ def estimate_cost(model, in_tokens, out_tokens):
 
 
 if __name__ == "__main__":
-    print(f"ChatCraft backend on http://localhost:{PORT}")
+    print(f"ChatCraft backend on http://{HOST}:{PORT}")
     print(f"  workspace: {FILES_DIR}")
     print(f"  commands:  {'enabled' if ALLOW_CMDS else 'DISABLED (CHATCRAFT_ALLOW_CMDS=0)'}")
     print(f"  ollama:    {OLLAMA_URL} (auto-detected if running)")
-    ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
+    ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
