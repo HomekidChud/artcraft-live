@@ -80,6 +80,17 @@ Settings → Custom models: add any OpenAI-compatible or Anthropic-compatible
 endpoint (base URL + model name + optional key). It then appears in every
 model menu.
 
+## Configuration (env vars)
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CHATCRAFT_HOST` / `CHATCRAFT_PORT` | `127.0.0.1` / `8000` | Bind address (loopback by default) |
+| `CHATCRAFT_ALLOWED_ORIGINS` | _(empty)_ | Extra origins allowed to POST/DELETE, for deployments behind a reverse proxy that rewrites the Host header. Comma-separated, e.g. `https://sites.example.com` |
+| `CHATCRAFT_ALLOW_NULL_ORIGIN` | `0` | Accept `Origin: null` (file:// pages, sandboxed preview iframes). Enable only when the server is reachable solely through an authenticated proxy |
+| `CHATCRAFT_ALLOW_CMDS` | `1` | Set `0` to disable ```run command blocks entirely |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` / `XAI_API_KEY` | — | Provider keys; models without their key show as unavailable |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama instance for local open-source models |
+
 ## Security notes
 
 - The server binds to `127.0.0.1` by default (set `CHATCRAFT_HOST=0.0.0.0`

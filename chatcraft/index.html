@@ -2415,11 +2415,14 @@
   })();
 
   /* ---------- API base (real chat) ---------- */
-  // Priority: saved Backend URL (Settings) > inline __API_BASE__ > file:// fallback.
+  // Priority: ?backend= URL parameter (bookmarked) > inline __API_BASE__ > file:// fallback.
   // Empty = same origin (python server.py serves both the UI and the API).
-  var savedApiBase = "";
-  try { savedApiBase = localStorage.getItem("cc_api_base") || ""; } catch (e) {}
-  var rawApiBase = savedApiBase || window.__API_BASE__ || "";
+  var qsApiBase = "";
+  try {
+    var qm = location.search.match(/[?&]backend=([^&]+)/);
+    if (qm) qsApiBase = decodeURIComponent(qm[1]).replace(/\/+$/, "");
+  } catch (e) {}
+  var rawApiBase = qsApiBase || window.__API_BASE__ || "";
   var API = rawApiBase || (location.protocol === "file:" ? "http://localhost:8000" : "");
 
   var chatState = {
@@ -3145,12 +3148,14 @@
   /* ---------- settings: backend URL (for hosted copies of this page) ---------- */
   var apiBaseInput = $("#api-base-input"), apiBaseSave = $("#api-base-save");
   if (apiBaseInput && apiBaseSave) {
-    try { apiBaseInput.value = localStorage.getItem("cc_api_base") || ""; } catch (e) {}
     apiBaseSave.addEventListener("click", function () {
       var v = (apiBaseInput.value || "").trim().replace(/\/+$/, "");
-      try { localStorage.setItem("cc_api_base", v); } catch (e) {}
       toast(v ? "Backend URL saved — reloading" : "Backend URL cleared — reloading");
-      setTimeout(function () { location.reload(); }, 600);
+      setTimeout(function () {
+        // persisted as a ?backend= parameter: survives reloads, bookmarkable,
+        // and needs no browser storage (blocked in sandboxed previews)
+        location.href = location.pathname + (v ? "?backend=" + encodeURIComponent(v) : "");
+      }, 600);
     });
   }
 

@@ -43,6 +43,20 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 # Command execution is the point of a harness, but it is YOUR machine:
 # set CHATCRAFT_ALLOW_CMDS=0 to disable ```run blocks entirely.
 ALLOW_CMDS = os.environ.get("CHATCRAFT_ALLOW_CMDS", "1") not in ("0", "false", "no")
+# Extra origins allowed to POST/DELETE, for deployments behind a reverse proxy
+# that rewrites the Host header (comma-separated, e.g.
+# CHATCRAFT_ALLOWED_ORIGINS=https://sites.example.com).
+ALLOWED_ORIGINS = {
+    o.strip().rstrip("/")
+    for o in os.environ.get("CHATCRAFT_ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+}
+# Accept `Origin: null` (opaque-origin pages: file:// or sandboxed preview
+# iframes) for mutations. Off by default; enable only when the server is
+# reachable solely through an authenticated proxy (e.g. a hosted preview),
+# since a null origin cannot be verified.
+ALLOW_NULL_ORIGIN = os.environ.get("CHATCRAFT_ALLOW_NULL_ORIGIN", "0") in (
+    "1", "true", "yes")
 CMD_TIMEOUT = int(os.environ.get("CHATCRAFT_CMD_TIMEOUT", "20"))
 
 # ----------------------------------------------------------------- catalog ---
@@ -473,9 +487,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def _origin_ok(self):
         """Reject cross-origin mutations: browsers always send Origin on
-        cross-site requests; same-origin/curl/tools send none or a matching one."""
+        cross-site requests; same-origin/curl/tools send none or a matching one.
+        Origins listed in CHATCRAFT_ALLOWED_ORIGINS are also accepted (reverse
+        proxies that rewrite Host make the default Host check unusable)."""
         origin = self.headers.get("Origin")
         if not origin:
+            return True
+        if origin == "null":
+            return ALLOW_NULL_ORIGIN
+        if origin.rstrip("/") in ALLOWED_ORIGINS:
             return True
         host = self.headers.get("Host", "")
         try:
