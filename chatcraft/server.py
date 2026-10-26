@@ -125,9 +125,15 @@ ADVISOR_SYSTEM = (
 )
 
 # ```lang filename.ext ... ```   (also accepts ```lang:filename.ext)
-FILE_BLOCK_RE = re.compile(r"```([\w+#-]*)[ \t]*:?[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*\n(.*?)```", re.S)
+# and the variant small local models often emit: ```lang\nfilename.ext\n...```
+FILE_BLOCK_RE = re.compile(
+    r"```([\w+#-]*)[ \t]*:?[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*\n(.*?)```"
+    r"|```([\w+#-]*)[ \t]*\n[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*\n(.*?)```",
+    re.S)
 # ```run\n command \n```
 RUN_BLOCK_RE = re.compile(r"```run[ \t]*\n(.*?)```", re.S | re.I)
+# placeholder left where a run block was, before file blocks are extracted
+CMD_MARK_RE = re.compile(r"\x00CMD(\d+)\x00")
 
 
 # ------------------------------------------------------------ model records ---
@@ -161,7 +167,13 @@ def ollama_models():
                 "local": True,
                 "api": {"kind": "openai", "model": m["name"],
                         "base_url": OLLAMA_URL + "/v1", "env": None},
+                "_size": m.get("size", 0),
             })
+        # largest first: when no hosted model is configured, the frontend
+        # auto-picks the first usable model — prefer the most capable local one
+        out.sort(key=lambda m: m["_size"], reverse=True)
+        for m in out:
+            del m["_size"]
         return out
     except Exception:
         return []
@@ -434,7 +446,10 @@ def extract_files(text):
     files = []
 
     def repl(m):
-        lang, name, content = m.group(1), m.group(2), m.group(3)
+        if m.group(1) is not None:  # ```lang filename.ext\n...
+            lang, name, content = m.group(1), m.group(2), m.group(3)
+        else:  # ```lang\nfilename.ext\n... (common from small local models)
+            lang, name, content = m.group(4), m.group(5), m.group(6)
         files.append({"name": Path(name).name, "lang": lang or "text",
                       "content": content.rstrip("\n")})
         return f"wrote file: {Path(name).name}"
@@ -442,10 +457,21 @@ def extract_files(text):
     return FILE_BLOCK_RE.sub(repl, text), files
 
 
+PROMPT_NOISE_RE = re.compile(r"^[^\n\r]*?[$#][ \t]+(?=[A-Za-z_.\\/])")
+
+
 def extract_runs(text):
     runs = []
     for m in RUN_BLOCK_RE.finditer(text):
         cmd = m.group(1).strip()
+        # small local models often prefix commands with a fake shell prompt
+        # ("$ ls", "user@host:~$ ls"); strip that noise before executing
+        first, sep, rest = cmd.partition("\n")
+        if "$" in first or first.rstrip().endswith("#"):
+            stripped = PROMPT_NOISE_RE.sub("", first, count=1).lstrip()
+            if stripped:
+                cmd = stripped + (sep + rest if sep else "")
+        cmd = cmd.strip()
         if cmd:
             runs.append(cmd)
     return runs
@@ -708,12 +734,22 @@ class Handler(BaseHTTPRequestHandler):
 
                 full_text = "".join(chunks)
 
-                # 5. extract files + commands, then show the cleaned reply
-                # (run blocks stay raw in the files event; the final `clean`
-                # event replaces them with an honest ran/not-run/skipped marker
-                # AFTER the commands actually execute)
-                cleaned, files = extract_files(full_text)
+                # 5. extract files + commands, then show the cleaned reply.
+                # Run blocks are marked BEFORE file extraction so a model that
+                # merges fences ("...```" + "run" on one line) can't let the
+                # file regex swallow the run block. The final `clean` event
+                # replaces the marks with an honest ran/not-run/skipped marker
+                # AFTER the commands actually execute.
                 runs = extract_runs(full_text)
+                _cmd_marks = {}
+
+                def _mark(m):
+                    i = len(_cmd_marks)
+                    _cmd_marks[i] = m.group(1).strip()
+                    return "\x00CMD%d\x00" % i
+
+                marked = RUN_BLOCK_RE.sub(_mark, full_text)
+                cleaned, files = extract_files(marked)
                 saved = []
                 if files:
                     for f in files:
@@ -724,7 +760,8 @@ class Handler(BaseHTTPRequestHandler):
                         saved.append({"name": safe.name, "lang": f.get("lang") or "text",
                                       "size": safe.stat().st_size})
                         yield step(sid, f"Wrote {f['name']}", "done")
-                    yield ev("files", {"files": saved, "cleaned_text": cleaned})
+                    yield ev("files", {"files": saved,
+                               "cleaned_text": CMD_MARK_RE.sub("(running command…)", cleaned)})
 
                 # 6. run commands the reply contains (max 5 per turn)
                 results = {}  # cmd -> returncode, only for commands actually run
@@ -745,13 +782,14 @@ class Handler(BaseHTTPRequestHandler):
                     results[cmd] = rc
                 if runs:
                     def _after(m):
-                        c = m.group(1).strip()
+                        i = int(m.group(1))
+                        c = _cmd_marks.get(i, "")
                         if c in results:
                             return (f"ran: {c[:60]}" if results[c] == 0
                                     else f"failed (exit {results[c]}): {c[:60]}")
                         return ("skipped: commands disabled" if not ALLOW_CMDS
                                 else f"not run (over the 5-command limit): {c[:60]}")
-                    cleaned = RUN_BLOCK_RE.sub(_after, cleaned)
+                    cleaned = CMD_MARK_RE.sub(_after, cleaned)
                     yield ev("clean", {"text": cleaned})
 
                 custom = bool(model.get("custom"))
