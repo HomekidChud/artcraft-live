@@ -2165,6 +2165,8 @@
               <div class="h-field"><label for="api-base-input">Backend URL</label><input type="text" id="api-base-input" placeholder="http://localhost:8000"></div>
             </div>
             <button class="btn" id="api-base-save" style="margin-top:10px;">Save backend URL</button>
+            <div class="h-field" style="margin-top:16px;"><label for="access-code-input">Access code</label><input type="password" id="access-code-input" placeholder="from the site owner" autocomplete="off"></div>
+            <button class="btn" id="access-code-save" style="margin-top:10px;">Save access code</button>
           </div>
 
           <div class="set-section">
@@ -2441,6 +2443,21 @@
     maxTokens: 1024,
     system: ""
   };
+
+  /* ---------- authenticated API fetch ---------- */
+  var toast = toast || function () {};
+  function apiFetch(url, opts) {
+    opts = opts || {};
+    opts.credentials = opts.credentials || "same-origin";
+    if (chatState.accessCode) {
+      opts.headers = Object.assign({}, opts.headers, { "X-Access-Code": chatState.accessCode });
+    }
+    return fetch(url, opts).then(function (r) {
+      if (r.status === 401) toast("Access code required — set it in Settings");
+      return r;
+    });
+  }
+
   var usage = { msgs: 0, cost: 0 };
   var MODELS = [];
 
@@ -2623,7 +2640,7 @@
   }
   function openFileViewer(name) {
     if (API === null) { toast("Backend offline"); return; }
-    fetch(API + "/api/files/" + encodeURIComponent(name), { credentials: "same-origin" })
+    apiFetch(API + "/api/files/" + encodeURIComponent(name), { credentials: "same-origin" })
       .then(function (r) {
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
@@ -2639,7 +2656,7 @@
   function closeFileViewer() { $("#file-viewer").hidden = true; }
   function loadFiles() {
     if (API === null) return;
-    fetch(API + "/api/files", { credentials: "same-origin" })
+    apiFetch(API + "/api/files", { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (d) { renderFiles(d.files || []); })
       .catch(function () {});
@@ -2671,7 +2688,7 @@
       del.addEventListener("click", function (e) {
         e.stopPropagation();
         if (API === null) return;
-        fetch(API + "/api/files/" + encodeURIComponent(f.name), {
+        apiFetch(API + "/api/files/" + encodeURIComponent(f.name), {
           method: "DELETE", credentials: "same-origin"
         }).then(function () {
           toast("Deleted " + f.name);
@@ -2715,7 +2732,7 @@
   $("#fv-del").addEventListener("click", function () {
     var name = $("#fv-name").textContent;
     if (API === null || !name) return;
-    fetch(API + "/api/files/" + encodeURIComponent(name), {
+    apiFetch(API + "/api/files/" + encodeURIComponent(name), {
       method: "DELETE", credentials: "same-origin"
     }).then(function () {
       closeFileViewer();
@@ -2805,7 +2822,7 @@
       system_prompt: chatState.system
     });
 
-    fetch(API + "/api/chat", {
+    apiFetch(API + "/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: body,
@@ -3111,7 +3128,7 @@
 
   function loadModels() {
     if (API === null) return;
-    fetch(API + "/api/models", { credentials: "same-origin" })
+    apiFetch(API + "/api/models", { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (d) {
         MODELS = d.models || [];
@@ -3145,7 +3162,7 @@
   /* ---------- custom models (plugin) ---------- */
   function loadCustomList() {
     if (API === null) return;
-    fetch(API + "/api/custom-models", { credentials: "same-origin" })
+    apiFetch(API + "/api/custom-models", { credentials: "same-origin" })
       .then(function (r) { return r.json(); })
       .then(function (d) { renderCustomList(d.models || []); })
       .catch(function () {});
@@ -3171,7 +3188,7 @@
       del.textContent = "\u2715";
       del.addEventListener("click", function () {
         if (API === null) return;
-        fetch(API + "/api/custom-models/" + encodeURIComponent(m.id), {
+        apiFetch(API + "/api/custom-models/" + encodeURIComponent(m.id), {
           method: "DELETE", credentials: "same-origin"
         }).then(function (r) {
           if (!r.ok) throw new Error("HTTP " + r.status);
@@ -3200,7 +3217,7 @@
       toast("Base URL and model name are required");
       return;
     }
-    fetch(API + "/api/custom-models", {
+    apiFetch(API + "/api/custom-models", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -3217,6 +3234,19 @@
       })
       .catch(function () { toast("Couldn't add the model"); });
   });
+
+  /* ---------- settings: access code ---------- */
+  var accessInput = $("#access-code-input"), accessSave = $("#access-code-save");
+  if (accessInput && accessSave) {
+    accessInput.value = chatState.accessCode || "";
+    accessSave.addEventListener("click", function () {
+      chatState.accessCode = (accessInput.value || "").trim();
+      toast(chatState.accessCode ? "Access code saved" : "Access code cleared");
+      loadModels();
+      loadFiles();
+      loadCustomList();
+    });
+  }
 
   /* ---------- settings: backend URL (for hosted copies of this page) ---------- */
   var apiBaseInput = $("#api-base-input"), apiBaseSave = $("#api-base-save");

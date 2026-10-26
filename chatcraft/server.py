@@ -58,6 +58,9 @@ ALLOWED_ORIGINS = {
 ALLOW_NULL_ORIGIN = os.environ.get("CHATCRAFT_ALLOW_NULL_ORIGIN", "0") in (
     "1", "true", "yes")
 CMD_TIMEOUT = int(os.environ.get("CHATCRAFT_CMD_TIMEOUT", "20"))
+# When set, every /api/* request must carry this code in the X-Access-Code
+# header. Empty (default) = no auth, e.g. a private loopback dev server.
+ACCESS_CODE = os.environ.get("CHATCRAFT_ACCESS_CODE", "")
 
 # ----------------------------------------------------------------- catalog ---
 # Prices are rough public list prices, USD per million tokens (estimates).
@@ -604,6 +607,28 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     # -- helpers
+    def _authorized(self):
+        """True when the request carries the access code (if one is set)."""
+        if not ACCESS_CODE:
+            return True
+        return (self.headers.get("X-Access-Code") or "") == ACCESS_CODE
+
+    def do_OPTIONS(self):
+        """CORS preflight for the GitHub Pages frontend (and any allowed origin)."""
+        origin = (self.headers.get("Origin") or "").rstrip("/")
+        if origin and origin in ALLOWED_ORIGINS:
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Access-Control-Allow-Methods",
+                             "GET, POST, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers",
+                             "Content-Type, X-Access-Code")
+            self.send_header("Access-Control-Max-Age", "86400")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        else:
+            self._send(403, {"error": "cross-origin request rejected"})
+
     def _send(self, code, body, ctype="application/json", extra=None):
         data = body if isinstance(body, bytes) else json.dumps(body).encode("utf-8")
         self.send_response(code)
@@ -659,6 +684,9 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- static
     def do_GET(self):
+        if self.path.startswith("/api/") and not self._authorized():
+            return self._send(401, {"error": "access code required"})
+
         path = urllib.parse.urlparse(self.path).path
         if path in ("/", "/index.html"):
             return self._send(200, (BASE_DIR / "index.html").read_bytes(),
@@ -691,6 +719,9 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, {"error": "not found"})
 
     def do_DELETE(self):
+        if self.path.startswith("/api/") and not self._authorized():
+            return self._send(401, {"error": "access code required"})
+
         if not self._origin_ok():
             return self._send(403, {"error": "cross-origin request rejected"})
         path = urllib.parse.urlparse(self.path).path
@@ -707,6 +738,9 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, {"error": "not found"})
 
     def do_POST(self):
+        if self.path.startswith("/api/") and not self._authorized():
+            return self._send(401, {"error": "access code required"})
+
         if not self._origin_ok():
             return self._send(403, {"error": "cross-origin request rejected"})
         path = urllib.parse.urlparse(self.path).path
