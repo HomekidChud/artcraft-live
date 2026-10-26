@@ -305,6 +305,59 @@
   }
   .kv input[type=color] { height: 22px; padding: 1px 2px; }
   .kv input[type=checkbox] { accent-color: #7aad4a; }
+  .kv input[type=range] { flex: 1; accent-color: #7aad4a; min-width: 0; }
+  .comp-header .cicon { font-size: 12px; color: #9c9c9c; }
+  .comp-header .cx {
+    margin-left: auto; color: #8f8f8f; font-size: 13px; padding: 0 4px; border-radius: 3px;
+    visibility: hidden; flex-shrink: 0;
+  }
+  .comp-header:hover .cx { visibility: visible; }
+  .comp-header .cx:hover { color: #ff6b6b; background: #2a2a2a; }
+  /* Add Component flow (Unity-style) */
+  #addcomp-wrap { padding: 8px 10px 12px; }
+  #addcomp-btn {
+    width: 100%; padding: 6px; background: #2b2b2b; border: 1px solid #3f3f3f; border-radius: 4px;
+    color: #c8c8c8; font-size: 12px; font-weight: 600;
+  }
+  #addcomp-btn:hover { background: #333; color: #fff; }
+  #addcomp-menu {
+    position: absolute; left: 10px; right: 10px; bottom: 44px; z-index: 40;
+    background: #1f1f1f; border: 1px solid #111; border-radius: 5px;
+    box-shadow: 0 8px 22px rgba(0,0,0,.55); max-height: 340px; overflow-y: auto; padding: 4px 0;
+  }
+  #addcomp-menu .ac-cat { padding: 4px 12px 2px; font-size: 10.5px; color: #8f8f8f; text-transform: uppercase; letter-spacing: .06em; }
+  #addcomp-menu button { display: flex; width: 100%; text-align: left; padding: 5px 12px; font-size: 12px; color: #c8c8c8; }
+  #addcomp-menu button:hover { background: var(--ed-blue); color: #fff; }
+  #addcomp-menu .ac-hint { margin-left: auto; color: #777; font-size: 10.5px; }
+  .kbdrow { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .kbdrow .t { width: 92px; color: var(--ed-muted); font-size: 11.5px; flex-shrink: 0; }
+  .kf-list { margin: 4px 0 6px; border: 1px solid #2a2a2a; border-radius: 4px; max-height: 120px; overflow-y: auto; }
+  .kf-row { display: flex; align-items: center; gap: 6px; padding: 2px 8px; font-size: 11px; color: #b4b4b4; }
+  .kf-row:hover { background: #2a2a2a; }
+  .kf-row .kf-x { margin-left: auto; color: #8f8f8f; cursor: pointer; }
+  .kf-row .kf-x:hover { color: #ff6b6b; }
+  .btn-sm {
+    padding: 3px 10px; border-radius: 4px; background: #2b2b2b; border: 1px solid #3f3f3f;
+    color: #c8c8c8; font-size: 11px; font-weight: 600;
+  }
+  .btn-sm:hover { background: #333; color: #fff; }
+  /* Scene settings modal */
+  #settings-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 70;
+    display: none; align-items: center; justify-content: center;
+  }
+  #settings-overlay.open { display: flex; }
+  #settings-modal {
+    width: min(560px, 92vw); max-height: 86dvh; overflow-y: auto;
+    background: #1b1b1b; border: 1px solid #2b2b2b; border-radius: 10px; padding: 20px 22px;
+  }
+  #settings-modal h2 { color: #fff; font-size: 16px; margin-bottom: 14px; font-weight: 600; }
+  #settings-modal .set-section { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: #8f8f8f; margin: 14px 0 8px; font-weight: 600; }
+  #settings-modal .kv .k { width: 130px; }
+  #settings-modal .kv input[type=text], #settings-modal .kv input[type=color], #settings-modal .kv input[type=number], #settings-modal .kv select {
+    flex: 1; background: #191919; border: 1px solid #2f2f2f; border-radius: 3px; color: #c8c8c8;
+    padding: 4px 6px; font-size: 12px; outline: none; min-width: 0;
+  }
 
   /* Project window */
   .assets { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px; }
@@ -421,6 +474,33 @@
   </div>
 </div>
 
+<!-- ===== Scene Settings modal (Lighting & Physics) ===== -->
+<div id="settings-overlay">
+  <div id="settings-modal" role="dialog" aria-label="Scene Settings">
+    <h2>Scene Settings</h2>
+    <div class="set-section">Environment & Lighting</div>
+    <div class="kv"><span class="k">Skybox</span>
+      <select id="set-sky">
+        <option value="solid">Solid Color</option>
+        <option value="gradient">Gradient (Procedural)</option>
+        <option value="dusk">Dusk Gradient</option>
+      </select>
+    </div>
+    <div class="kv"><span class="k">Sky Color</span><input type="color" id="set-skycolor" value="#262626" /></div>
+    <div class="kv"><span class="k">Fog</span><input type="checkbox" id="set-fog" /></div>
+    <div class="kv"><span class="k">Fog Color</span><input type="color" id="set-fogcolor" value="#3a4a58" /></div>
+    <div class="kv"><span class="k">Fog Density</span><input type="number" id="set-fogdensity" step="0.005" min="0" max="0.2" value="0.02" /></div>
+    <div class="kv"><span class="k">Ambient Light</span><input type="range" id="set-ambient" min="0" max="1.5" step="0.05" value="0.55" /></div>
+    <div class="set-section">Physics</div>
+    <div class="kv"><span class="k">Gravity (m/s²)</span><input type="number" id="set-gravity" step="0.5" min="-50" max="0" value="-9.81" /></div>
+    <div class="kv" style="color:#8f8f8f;font-size:11px;margin-top:2px">Fixed timestep 1/60 s · restitution averaged · friction applied on contact</div>
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
+      <button class="btn-sm" id="set-cancel">Cancel</button>
+      <button class="btn-sm" id="set-apply" style="background:#3d5a2a;border-color:#4f7a35">Apply</button>
+    </div>
+  </div>
+</div>
+
 <!-- ===== Unity Editor workspace ===== -->
 <div id="editor">
   <div class="ed-menubar" id="menubar">
@@ -489,6 +569,12 @@
     </div>
     <div class="ed-menu" data-menu="component"><button>Component</button>
       <div class="ed-dropdown">
+        <button data-act="addcomp" data-comp="rigidbody">Physics ▸ Rigidbody</button>
+        <button data-act="addcomp" data-comp="collider">Physics ▸ Collider</button>
+        <button data-act="addcomp" data-comp="particles">Effects ▸ Particle System</button>
+        <button data-act="addcomp" data-comp="audio">Audio ▸ Audio Source</button>
+        <button data-act="addcomp" data-comp="animator">Animation ▸ Animator</button>
+        <div class="sep"></div>
         <button data-act="addcomp" data-comp="SpinScript">Scripts ▸ Spin.cs</button>
         <button data-act="addcomp" data-comp="BobScript">Scripts ▸ Bob (float).cs</button>
         <button data-act="addcomp" data-comp="PlayerController">Scripts ▸ PlayerController (WASD).cs</button>
@@ -500,6 +586,7 @@
         <button data-act="win-console">General ▸ Console <span>Ctrl+Shift+C</span></button>
         <button data-act="win-services">General ▸ Services</button>
         <button data-act="win-stats">General ▸ Statistics</button>
+        <button data-act="scene-settings">General ▸ Scene Settings (Lighting & Physics)</button>
         <div class="sep"></div>
         <button data-act="save-layout">Layouts ▸ Save Layout…</button>
       </div>
@@ -814,7 +901,348 @@ const ed = {
   objects: [], selected: null, idSeq: 1, tool: 'move', playing: false, paused: false,
   viewTab: 'scene', playSnapshot: null, history: [], redoStack: [], sceneName: 'SampleScene',
   clipboard: null, prefabs: {}, keys: {},
+  simTime: 0, playClock: 0, physAcc: 0,
+  sceneSettings: { sky: 'solid', skyColor: '#262626', fog: false, fogColor: '#3a4a58', fogDensity: 0.02, ambient: 0.55, gravity: -9.81 },
+  shaderMats: new Set(), audioNodes: new Set(), contactPairs: new Set(),
 };
+
+/* ================================================================
+   MATERIAL & SHADER SYSTEM
+   A serializable material configuration (userData.mat) drives the
+   THREE material. One code path builds the material, one reads it
+   back — the Inspector, serialization, prefabs and duplication all
+   use the same config, so nothing can drift out of sync.
+   ================================================================ */
+const SHADERS = {
+  standard: {
+    label: 'Standard (Lit PBR)', icon: '🌐',
+    desc: 'Metallic workflow PBR — matches the Unity Standard shader',
+    params: [
+      { key: 'color', label: 'Albedo', type: 'color', def: '#cfcfcf' },
+      { key: 'roughness', label: 'Smoothness', type: 'range', min: 0, max: 1, step: 0.05, def: 0.65 },
+      { key: 'metalness', label: 'Metallic', type: 'range', min: 0, max: 1, step: 0.05, def: 0.05 },
+      { key: 'emissive', label: 'Emission', type: 'color', def: '#000000' },
+    ],
+    build(cfg) {
+      return new THREE.MeshStandardMaterial({
+        color: new THREE.Color(cfg.color), roughness: cfg.roughness, metalness: cfg.metalness,
+        emissive: new THREE.Color(cfg.emissive),
+      });
+    },
+  },
+  unlit: {
+    label: 'Unlit', icon: '⬜', desc: 'Flat color, ignores lighting',
+    params: [{ key: 'color', label: 'Color', type: 'color', def: '#cfcfcf' }],
+    build(cfg) { return new THREE.MeshBasicMaterial({ color: new THREE.Color(cfg.color) }); },
+  },
+  toon: {
+    label: 'Toon (Ramp)', icon: '🎨', desc: 'Cel-shaded with a 3-step ramp',
+    params: [
+      { key: 'color', label: 'Color', type: 'color', def: '#e8b04b' },
+      { key: 'steps', label: 'Ramp Steps', type: 'range', min: 2, max: 5, step: 1, def: 3 },
+    ],
+    build(cfg) {
+      const mat = new THREE.MeshToonMaterial({ color: new THREE.Color(cfg.color) });
+      mat.gradientMap = makeToonRamp(Math.round(cfg.steps));
+      return mat;
+    },
+  },
+  hologram: {
+    label: 'Hologram (Fresnel)', icon: '📡', desc: 'Fresnel glow + animated scanlines (custom GLSL)',
+    params: [
+      { key: 'color', label: 'Color', type: 'color', def: '#35d0ff' },
+      { key: 'fresnel', label: 'Fresnel Power', type: 'range', min: 0.5, max: 6, step: 0.25, def: 2.5 },
+      { key: 'scanSpeed', label: 'Scan Speed', type: 'range', min: 0, max: 4, step: 0.25, def: 1.5 },
+    ],
+    build(cfg) {
+      const uniforms = {
+        uTime: { value: 0 },
+        uColor: { value: new THREE.Color(cfg.color) },
+        uFresnel: { value: cfg.fresnel },
+        uScan: { value: cfg.scanSpeed },
+      };
+      const mat = new THREE.ShaderMaterial({
+        uniforms, transparent: true,
+        vertexShader: `
+          varying vec3 vN; varying vec3 vW;
+          void main() {
+            vN = normalize(mat3(modelMatrix) * normal);
+            vec4 wp = modelMatrix * vec4(position, 1.0); vW = wp.xyz;
+            gl_Position = projectionMatrix * viewMatrix * wp;
+          }`,
+        fragmentShader: `
+          uniform float uTime, uFresnel, uScan; uniform vec3 uColor;
+          varying vec3 vN; varying vec3 vW;
+          void main() {
+            vec3 V = normalize(cameraPosition - vW);
+            float f = pow(1.0 - abs(dot(normalize(vN), V)), uFresnel);
+            float scan = 0.5 + 0.5 * sin(vW.y * 40.0 - uTime * uScan * 6.2831);
+            vec3 col = uColor * (0.25 + 0.75 * f) + uColor * scan * 0.35;
+            gl_FragColor = vec4(col, 0.30 + 0.70 * f);
+          }`,
+      });
+      mat.userData.shaderKey = 'hologram';
+      ed.shaderMats.add(mat);
+      return mat;
+    },
+  },
+  water: {
+    label: 'Water (Animated)', icon: '🌊', desc: 'Vertex waves + depth mix (custom GLSL)',
+    params: [
+      { key: 'color', label: 'Deep Color', type: 'color', def: '#1a6f9e' },
+      { key: 'waveHeight', label: 'Wave Height', type: 'range', min: 0, max: 0.5, step: 0.02, def: 0.12 },
+      { key: 'waveSpeed', label: 'Wave Speed', type: 'range', min: 0, max: 3, step: 0.1, def: 1.0 },
+    ],
+    build(cfg) {
+      const uniforms = {
+        uTime: { value: 0 },
+        uDeep: { value: new THREE.Color(cfg.color) },
+        uShallow: { value: new THREE.Color(cfg.color).lerp(new THREE.Color('#9fd8ff'), 0.55) },
+        uAmp: { value: cfg.waveHeight },
+        uSpeed: { value: cfg.waveSpeed },
+      };
+      const mat = new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader: `
+          uniform float uTime, uAmp, uSpeed;
+          varying vec3 vW; varying float vWave;
+          void main() {
+            vec3 p = position;
+            float w = sin(p.x * 3.0 + uTime * uSpeed * 6.2831) * 0.6
+                    + sin(p.z * 4.3 + uTime * uSpeed * 4.4) * 0.4;
+            p.y += w * uAmp;
+            vWave = w;
+            vec4 wp = modelMatrix * vec4(p, 1.0); vW = wp.xyz;
+            gl_Position = projectionMatrix * viewMatrix * wp;
+          }`,
+        fragmentShader: `
+          uniform vec3 uDeep, uShallow;
+          varying vec3 vW; varying float vWave;
+          void main() {
+            vec3 V = normalize(cameraPosition - vW);
+            float f = pow(1.0 - abs(dot(vec3(0.0, 1.0, 0.0), V)), 2.0);
+            vec3 col = mix(uShallow, uDeep, clamp(vWave * 0.5 + 0.5, 0.0, 1.0));
+            col = mix(col, vec3(1.0), f * 0.55);
+            gl_FragColor = vec4(col, 0.92);
+          }`,
+      });
+      mat.userData.shaderKey = 'water';
+      ed.shaderMats.add(mat);
+      return mat;
+    },
+  },
+  dissolve: {
+    label: 'Dissolve (Noise)', icon: '✨', desc: 'Animated noise burn-away (custom GLSL)',
+    params: [
+      { key: 'color', label: 'Color', type: 'color', def: '#cfcfcf' },
+      { key: 'progress', label: 'Dissolve', type: 'range', min: 0, max: 1, step: 0.01, def: 0.35 },
+      { key: 'edge', label: 'Edge Glow', type: 'color', def: '#ff7a1a' },
+    ],
+    build(cfg) {
+      const uniforms = {
+        uTime: { value: 0 },
+        uColor: { value: new THREE.Color(cfg.color) },
+        uProgress: { value: cfg.progress },
+        uEdge: { value: new THREE.Color(cfg.edge) },
+      };
+      const mat = new THREE.ShaderMaterial({
+        uniforms,
+        vertexShader: `
+          varying vec3 vL;
+          void main() {
+            vL = position;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }`,
+        fragmentShader: `
+          uniform float uTime, uProgress; uniform vec3 uColor, uEdge;
+          varying vec3 vL;
+          float hash(vec3 p) {
+            p = fract(p * vec3(443.897, 441.423, 437.195));
+            p += dot(p, p.yzx + 19.19);
+            return fract((p.x + p.y) * p.z);
+          }
+          float noise(vec3 p) {
+            vec3 i = floor(p), f = fract(p);
+            f = f * f * (3.0 - 2.0 * f);
+            return mix(
+              mix(mix(hash(i), hash(i + vec3(1,0,0)), f.x), mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+              mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x), mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y),
+              f.z);
+          }
+          void main() {
+            float n = noise(vL * 6.0 + floor(uTime * 8.0) * 0.13);
+            if (n < uProgress) discard;
+            float edge = smoothstep(uProgress, uProgress + 0.08, n);
+            vec3 col = mix(uEdge * 1.6, uColor, edge);
+            gl_FragColor = vec4(col, 1.0);
+          }`,
+      });
+      mat.userData.shaderKey = 'dissolve';
+      ed.shaderMats.add(mat);
+      return mat;
+    },
+  },
+  wireframe: {
+    label: 'Wireframe', icon: '🕸️', desc: 'Wireframe lines over a dark fill',
+    params: [{ key: 'color', label: 'Wire Color', type: 'color', def: '#35d07f' }],
+    build(cfg) {
+      return new THREE.MeshBasicMaterial({ color: new THREE.Color(cfg.color), wireframe: true });
+    },
+  },
+};
+/* toon ramp texture: N discrete steps, shared per step count */
+const toonRamps = {};
+function makeToonRamp(steps) {
+  steps = Math.max(2, Math.min(5, Math.round(steps)));
+  if (toonRamps[steps]) return toonRamps[steps];
+  const c = document.createElement('canvas'); c.width = steps; c.height = 1;
+  const ctx = c.getContext('2d');
+  for (let i = 0; i < steps; i++) {
+    const v = Math.round(40 + (215 * i) / (steps - 1));
+    ctx.fillStyle = `rgb(${v},${v},${v})`; ctx.fillRect(i, 0, 1, 1);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.minFilter = THREE.NearestFilter; tex.magFilter = THREE.NearestFilter;
+  toonRamps[steps] = tex;
+  return tex;
+}
+function defaultMatCfg() {
+  const cfg = { shader: 'standard' };
+  for (const p of SHADERS.standard.params) cfg[p.key] = p.def;
+  return cfg;
+}
+/* build (or rebuild) the THREE material for an object from its config */
+function applyMaterial(o) {
+  const u = o.userData;
+  if (!u.mat) u.mat = defaultMatCfg();
+  const def = SHADERS[u.mat.shader] || SHADERS.standard;
+  if (o.material && o.material !== null && o.isMesh) {
+    if (o.material.userData && o.material.userData.shaderKey) ed.shaderMats.delete(o.material);
+    if (o.material.dispose) o.material.dispose();
+  }
+  const old = o.material;
+  const m = def.build(u.mat);
+  m.name = def.label;
+  // preserve lighting-related flags the user set in the Inspector
+  if (old && old.wireframe !== undefined && u.mat.shader !== 'wireframe') m.wireframe = old.wireframe && false;
+  o.material = m;
+  return m;
+}
+/* read the live material back into the config (used when the Inspector
+   mutates the THREE material directly, and by QA) */
+function syncMatFromLive(o) {
+  const u = o.userData;
+  if (!u.mat || !o.material) return;
+  if (u.mat.shader === 'standard' && o.material.isMeshStandardMaterial) {
+    u.mat.color = '#' + o.material.color.getHexString();
+    u.mat.roughness = o.material.roughness;
+    u.mat.metalness = o.material.metalness;
+    u.mat.emissive = '#' + o.material.emissive.getHexString();
+  }
+}
+function setShader(o, key) {
+  const u = o.userData;
+  const prev = u.mat ? { ...u.mat } : defaultMatCfg();
+  const cfg = { shader: key };
+  for (const p of (SHADERS[key] || SHADERS.standard).params) cfg[p.key] = prev[p.key] !== undefined ? prev[p.key] : p.def;
+  u.mat = cfg;
+  applyMaterial(o);
+  renderInspector();
+}
+
+/* ================================================================
+   COMPONENT DEFAULTS — Unity-style component configurations
+   ================================================================ */
+const COMPONENT_DEFS = {
+  rigidbody: () => ({ mass: 1, drag: 0.05, useGravity: true, isKinematic: false, freeze: { x: false, y: false, z: false } }),
+  collider: () => ({ shape: 'box', isTrigger: false, bounciness: 0, friction: 0.6 }),
+  audio: () => ({ clip: 'tone', volume: 0.6, pitch: 1, loop: false, playOnAwake: true }),
+  particles: () => ({ rate: 24, lifetime: 1.6, speed: 2.2, size: 0.14, color: '#ffd27a', gravity: -0.4, cone: 30 }),
+  animator: () => ({ duration: 2, loop: true, speed: 1, keys: { pos: [], rot: [], scl: [] } }),
+};
+function addComponent(o, key) {
+  const c = o.userData.components;
+  if (!c) return false;
+  if (key === 'collider' && c.collider) return false;
+  if (key === 'rigidbody' && c.rigidbody) return false;
+  if (key === 'audio' && c.audio) return false;
+  if (key === 'particles' && c.particles) return false;
+  if (key === 'animator' && c.animator) return false;
+  if (key === 'collider') c.collider = COMPONENT_DEFS.collider();
+  else if (key === 'rigidbody') c.rigidbody = COMPONENT_DEFS.rigidbody();
+  else if (key === 'audio') c.audio = COMPONENT_DEFS.audio();
+  else if (key === 'particles') { c.particles = COMPONENT_DEFS.particles(); createParticleSystem(o); }
+  else if (key === 'animator') c.animator = COMPONENT_DEFS.animator();
+  else if (key.endsWith('Script') || key === 'PlayerController') c.script = key;
+  else return false;
+  return true;
+}
+
+/* ================================================================
+   SCENE SETTINGS (Lighting & Physics) — apply + persist
+   ================================================================ */
+const skyTextures = {};
+function gradientSkyTexture(stops) {
+  const c = document.createElement('canvas'); c.width = 2; c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 128);
+  stops.forEach(([p, col]) => g.addColorStop(p, col));
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 2, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+function applySceneSettings(s) {
+  ed.sceneSettings = { ...s };
+  if (s.sky === 'solid') {
+    scene.background = new THREE.Color(s.skyColor);
+  } else {
+    const key = s.sky;
+    if (!skyTextures[key]) {
+      skyTextures[key] = gradientSkyTexture(
+        key === 'dusk' ? [[0, '#2b1f3a'], [0.55, '#5a3a55'], [0.8, '#c96f4a'], [1, '#3a2b33']] :
+        [[0, '#3f5468'], [0.5, '#2b3440'], [1, '#1c2027']]);
+    }
+    scene.background = skyTextures[key];
+  }
+  scene.fog = s.fog ? new THREE.FogExp2(new THREE.Color(s.fogColor).getHex(), s.fogDensity) : null;
+  hemi.intensity = s.ambient;
+  // ShaderMaterials do not sample scene.fog automatically; set the flag on built-ins
+  ed.objects.forEach(o => { if (o.material && o.material.fog !== undefined) o.material.fog = !!s.fog; });
+}
+function openSceneSettings() {
+  const s = ed.sceneSettings;
+  $('#set-sky').value = s.sky;
+  $('#set-skycolor').value = s.skyColor;
+  $('#set-fog').checked = s.fog;
+  $('#set-fogcolor').value = s.fogColor;
+  $('#set-fogdensity').value = s.fogDensity;
+  $('#set-ambient').value = s.ambient;
+  $('#set-gravity').value = s.gravity;
+  $('#settings-overlay').classList.add('open');
+}
+function bindSceneSettings() {
+  $('#set-cancel').onclick = () => $('#settings-overlay').classList.remove('open');
+  $('#settings-overlay').addEventListener('pointerdown', e => { if (e.target === $('#settings-overlay')) $('#settings-overlay').classList.remove('open'); });
+  $('#set-apply').onclick = () => {
+    applySceneSettings({
+      sky: $('#set-sky').value,
+      skyColor: $('#set-skycolor').value,
+      fog: $('#set-fog').checked,
+      fogColor: $('#set-fogcolor').value,
+      fogDensity: Math.max(0, parseFloat($('#set-fogdensity').value) || 0.02),
+      ambient: parseFloat($('#set-ambient').value) || 0.55,
+      gravity: parseFloat($('#set-gravity').value) || -9.81,
+    });
+    $('#settings-overlay').classList.remove('open');
+    log('sys', 'Scene settings applied (lighting + physics)');
+    status('Scene settings applied');
+  };
+  $('#set-sky').onchange = () => { // live sky preview
+    const s = { ...ed.sceneSettings, sky: $('#set-sky').value };
+    applySceneSettings(s);
+  };
+}
 
 /* ---- three.js setup ---- */
 const container = $('#scene-container');
@@ -931,8 +1359,9 @@ function makeObject(type, opts = {}) {
     const geo = GEOM[type]();
     if (type === 'plane') { geo.rotateX(-Math.PI / 2); }
     geo.computeBoundingBox();
-    const mat = new THREE.MeshStandardMaterial({ color: 0xcfcfcf, roughness: 0.65, metalness: 0.05 });
-    obj = new THREE.Mesh(geo, mat);
+    obj = new THREE.Mesh(geo, new THREE.MeshStandardMaterial());
+    obj.userData.mat = defaultMatCfg();
+    applyMaterial(obj);
     obj.castShadow = true; obj.receiveShadow = true;
     const spawn = opts.atPivot ? scenePivotSpawn() : null;
     if (type === 'plane') { obj.position.y = 0; if (spawn) obj.position.set(spawn.x, 0, spawn.z); }
@@ -944,7 +1373,14 @@ function makeObject(type, opts = {}) {
   obj.userData.id = ed.idSeq++;
   obj.userData.type = type;
   obj.userData.name = opts.name || defaultName(type);
-  obj.userData.components = { meshRenderer: type !== 'empty', collider: type !== 'plane' && type !== 'empty' && type !== 'spawn', script: null, ...opts.components };
+  const withComponents = type !== 'empty' && type !== 'spawn';
+  obj.userData.components = {
+    meshRenderer: withComponents,
+    rigidbody: null,
+    collider: withComponents ? { ...COMPONENT_DEFS.collider(), shape: type === 'sphere' ? 'sphere' : 'box' } : null,
+    audio: null, particles: null, animator: null,
+    script: null, ...opts.components,
+  };
   obj.userData.scriptParams = { speed: 90, amp: 0.5, playerSpeed: 6 };
   scene.add(obj);
   ed.objects.push(obj);
@@ -957,9 +1393,30 @@ function defaultName(type) {
   return n ? `${base} (${n + 1})` : base;
 }
 function removeHelper(o) { if (o.userData.helper) scene.remove(o.userData.helper); }
+/* full teardown: helpers, particle systems, shader registrations */
+function disposeObject(o) {
+  if (o.userData.ps) {
+    scene.remove(o.userData.ps.pts);
+    o.userData.ps.geo.dispose(); o.userData.ps.mat.dispose();
+    o.userData.ps = null;
+  }
+  if (o.userData.components && o.userData.components.particles) o.userData.components.particles = null;
+  if (o.userData.audioTimer) { clearInterval(o.userData.audioTimer); o.userData.audioTimer = null; }
+  if (o.material && o.material.userData && o.material.userData.shaderKey) ed.shaderMats.delete(o.material);
+  // deleting a collider can leave sleepers floating — wake everything
+  ed.objects.forEach(x => { if (x !== o && x.userData.rb) { x.userData.rb.sleeping = false; x.userData.rb.still = 0; } });
+  removeHelper(o);
+  scene.remove(o);
+}
+
+/* does this object act as a solid physics collider? */
+function solidCollider(c) {
+  const col = c.userData.components && c.userData.components.collider;
+  return !!(col && !col.isTrigger);
+}
 
 function resetSceneFor(project) {
-  ed.objects.slice().forEach(o => { removeHelper(o); scene.remove(o); });
+  ed.objects.slice().forEach(disposeObject);
   ed.objects = []; ed.selected = null; ed.playing = false; ed.paused = false;
   tcontrols.detach(); ed.history = []; ed.redoStack = [];
   makeObject('camera', { name: 'Main Camera' });
@@ -970,15 +1427,16 @@ function resetSceneFor(project) {
   if (project.target === 'plane') cube.position.set(0, 0.01, 0);
   const ground = makeObject('plane', { name: 'Ground' });
   ground.scale.set(3, 1, 3);
-  ground.material.color.set(0x8a8f7a);
-  ground.userData.components.collider = false;
+  ground.userData.mat.color = '#8a8f7a';
+  applyMaterial(ground); // static collider — falling bodies land on it
   ed.selected = null;
   renderHierarchy(); renderInspector(); renderProjectWindow();
   log('sys', 'SampleScene loaded (2 objects + Ground)');
 }
 
 function initEditor() {
-  bindToolbar(); bindMenus(); bindKeys(); bindPanels();
+  bindToolbar(); bindMenus(); bindKeys(); bindPanels(); bindSceneSettings();
+  applySceneSettings(ed.sceneSettings);
   try { ed.prefabs = JSON.parse(store.getItem('unitycraft-prefabs')) || {}; } catch (e) { ed.prefabs = {}; }
   renderProjectWindow();
   const ro = new ResizeObserver(resize);
@@ -1153,6 +1611,7 @@ function renderHierarchy() {
 }
 
 /* ---- inspector ---- */
+const COMP_LABEL = { rigidbody: 'Rigidbody', collider: 'Collider', audio: 'Audio Source', particles: 'Particle System', animator: 'Animator', script: 'Script' };
 function renderInspector() {
   const el = $('#inspector');
   const o = ed.selected;
@@ -1166,7 +1625,26 @@ function renderInspector() {
   const isMesh = (u.type in GEOM) && u.type !== 'empty';
   const isLight = u.type === 'light' || u.type === 'pointlight';
   const isCamera = u.type === 'camera';
-  const col = isLight ? '#' + o.color.getHexString() : (isCamera || !o.material) ? '#cfcfcf' : '#' + o.material.color.getHexString();
+  const col = isLight ? '#' + o.color.getHexString() : (isCamera || !o.material) ? '#cfcfcf'
+    : o.material.color ? '#' + o.material.color.getHexString() : (u.mat && u.mat.color) || '#cfcfcf';
+  const comps = u.components;
+  const mat = u.mat || (u.mat = defaultMatCfg());
+  const shaderDef = SHADERS[mat.shader] || SHADERS.standard;
+
+  const matParamRows = shaderDef.params.map(pd => {
+    if (pd.type === 'color') return `<div class="kv"><span class="k">${pd.label}</span><input type="color" data-matkey="${pd.key}" value="${mat[pd.key]}" /></div>`;
+    return `<div class="kv"><span class="k">${pd.label}</span><input type="range" data-matkey="${pd.key}" min="${pd.min}" max="${pd.max}" step="${pd.step}" value="${mat[pd.key]}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${mat[pd.key]}</span></div>`;
+  }).join('');
+
+  const rb = comps.rigidbody;
+  const col_ = comps.collider;
+  const au = comps.audio;
+  const ps = comps.particles;
+  const an = comps.animator;
+
+  const kfList = (track, label) => `
+    <div class="kbdrow"><span class="t">${label}</span><span style="flex:1"></span><input type="number" class="kf-t" data-track="${track}" step="0.1" min="0" value="0.5" style="width:44px;background:#191919;border:1px solid #2f2f2f;border-radius:3px;color:#c8c8c8;padding:2px 4px;font-size:11px" /><button class="btn-sm" data-addkey="${track}">+ Key @ t</button></div>
+    <div class="kf-list">${(an.keys[track] || []).map((k, i) => `<div class="kf-row"><span>t=${k.t.toFixed(2)}</span><span style="color:#8f8f8f">[${k.v.map(v => Math.round(v * 100) / 100).join(', ')}]</span><span class="kf-x" data-delkey="${track}" data-i="${i}">✕</span></div>`).join('') || '<div class="kf-row" style="color:#666">no keyframes</div>'}</div>`;
 
   el.innerHTML = `
     <div class="insp-header">
@@ -1182,20 +1660,69 @@ function renderInspector() {
     </div>
     ${isMesh ? `
     <div class="comp">
-      <div class="comp-header"><span class="fold">▼</span> Mesh Renderer</div>
+      <div class="comp-header"><span class="fold">▼</span> <span class="cicon">🌐</span> Mesh Renderer</div>
       <div class="comp-body">
         <div class="kv"><span class="k">Cast Shadows</span><input type="checkbox" id="insp-shadow" ${o.castShadow !== false ? 'checked' : ''} /></div>
-        <div class="kv"><span class="k">Material</span><input type="color" id="insp-color" value="${col}" /></div>
-        <div class="kv"><span class="k">Smoothness</span><input type="number" id="insp-smooth" step="0.05" min="0" max="1" value="${o.material.roughness !== undefined ? (1 - o.material.roughness).toFixed(2) : 0.35}" /></div>
-        <div class="kv"><span class="k">Metallic</span><input type="number" id="insp-metal" step="0.05" min="0" max="1" value="${(o.material.metalness ?? 0.05).toFixed(2)}" /></div>
-        <div class="kv"><span class="k">Emission</span><input type="color" id="insp-emissive" value="#${o.material.emissive.getHexString()}" /></div>
-        <div class="kv"><span class="k">Preset</span><select id="insp-preset" style="background:#191919;border:1px solid #2f2f2f;color:#dcdcdc;border-radius:3px;padding:2px 4px;font-size:11px"><option value="">—</option><option value="standard">Standard</option><option value="plastic">Plastic</option><option value="metal">Metal</option><option value="chrome">Chrome</option><option value="neon">Neon</option></select></div>
+        <div class="kv"><span class="k">Shader</span><select id="insp-shader" style="background:#191919;border:1px solid #2f2f2f;color:#dcdcdc;border-radius:3px;padding:2px 4px;font-size:11px">${Object.entries(SHADERS).map(([k, d]) => `<option value="${k}" ${mat.shader === k ? 'selected' : ''}>${d.label}</option>`).join('')}</select></div>
+        ${matParamRows}
+        ${mat.shader === 'standard' ? `<div class="kv"><span class="k">Preset</span><select id="insp-preset" style="background:#191919;border:1px solid #2f2f2f;color:#dcdcdc;border-radius:3px;padding:2px 4px;font-size:11px"><option value="">—</option><option value="standard">Standard</option><option value="plastic">Plastic</option><option value="metal">Metal</option><option value="chrome">Chrome</option><option value="neon">Neon</option></select></div>` : `<div style="color:#777;font-size:10.5px;margin:2px 0 4px">${shaderDef.desc}</div>`}
       </div>
-    </div>
+    </div>` : ''}
+    ${rb ? `
     <div class="comp">
-      <div class="comp-header"><span class="fold">▼</span> Box Collider</div>
+      <div class="comp-header"><span class="fold">▼</span> <span class="cicon">⚙️</span> Rigidbody <button class="cx" data-rm="rigidbody" title="Remove component">✕</button></div>
       <div class="comp-body">
-        <div class="kv"><span class="k">Enabled</span><input type="checkbox" id="insp-coll" ${u.components.collider ? 'checked' : ''} /></div>
+        <div class="kv"><span class="k">Mass</span><input type="number" id="insp-mass" step="0.5" min="0.01" value="${rb.mass}" /></div>
+        <div class="kv"><span class="k">Linear Damping</span><input type="number" id="insp-drag" step="0.01" min="0" value="${rb.drag}" /></div>
+        <div class="kv"><span class="k">Use Gravity</span><input type="checkbox" id="insp-gravity" ${rb.useGravity ? 'checked' : ''} /></div>
+        <div class="kv"><span class="k">Is Kinematic</span><input type="checkbox" id="insp-kinematic" ${rb.isKinematic ? 'checked' : ''} /></div>
+        <div class="kv"><span class="k">Freeze Pos X/Y/Z</span><span style="display:flex;gap:10px"><label style="display:flex;gap:3px;align-items:center">X<input type="checkbox" id="insp-fx" ${rb.freeze.x ? 'checked' : ''}/></label><label style="display:flex;gap:3px;align-items:center">Y<input type="checkbox" id="insp-fy" ${rb.freeze.y ? 'checked' : ''}/></label><label style="display:flex;gap:3px;align-items:center">Z<input type="checkbox" id="insp-fz" ${rb.freeze.z ? 'checked' : ''}/></label></span></div>
+      </div>
+    </div>` : ''}
+    ${col_ && isMesh ? `
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> <span class="cicon">📦</span> Collider <button class="cx" data-rm="collider" title="Remove component">✕</button></div>
+      <div class="comp-body">
+        <div class="kv"><span class="k">Shape</span><select id="insp-colshape" style="background:#191919;border:1px solid #2f2f2f;color:#dcdcdc;border-radius:3px;padding:2px 4px;font-size:11px"><option value="box" ${col_.shape === 'box' ? 'selected' : ''}>Box</option><option value="sphere" ${col_.shape === 'sphere' ? 'selected' : ''}>Sphere</option></select></div>
+        <div class="kv"><span class="k">Is Trigger</span><input type="checkbox" id="insp-trigger" ${col_.isTrigger ? 'checked' : ''} /></div>
+        <div class="kv"><span class="k">Bounciness</span><input type="range" id="insp-bounce" min="0" max="1" step="0.05" value="${col_.bounciness}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${col_.bounciness}</span></div>
+        <div class="kv"><span class="k">Friction</span><input type="range" id="insp-friction" min="0" max="1" step="0.05" value="${col_.friction}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${col_.friction}</span></div>
+      </div>
+    </div>` : ''}
+    ${au ? `
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> <span class="cicon">🔊</span> Audio Source <button class="cx" data-rm="audio" title="Remove component">✕</button></div>
+      <div class="comp-body">
+        <div class="kv"><span class="k">Clip</span><select id="insp-clip" style="background:#191919;border:1px solid #2f2f2f;color:#dcdcdc;border-radius:3px;padding:2px 4px;font-size:11px">${Object.entries(AUDIO_CLIPS).map(([k, c]) => `<option value="${k}" ${au.clip === k ? 'selected' : ''}>${c.label}</option>`).join('')}</select></div>
+        <div class="kv"><span class="k">Volume</span><input type="range" id="insp-vol" min="0" max="1" step="0.05" value="${au.volume}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${au.volume}</span></div>
+        <div class="kv"><span class="k">Pitch</span><input type="number" id="insp-pitch" step="0.1" min="0.25" max="4" value="${au.pitch}" /></div>
+        <div class="kv"><span class="k">Loop</span><input type="checkbox" id="insp-loop" ${au.loop ? 'checked' : ''} /></div>
+        <div class="kv"><span class="k">Play On Awake</span><input type="checkbox" id="insp-awake" ${au.playOnAwake ? 'checked' : ''} /></div>
+        <div class="kv"><span class="k"></span><button class="btn-sm" id="insp-audiotest">▶ Preview</button></div>
+      </div>
+    </div>` : ''}
+    ${ps && isMesh ? `
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> <span class="cicon">✨</span> Particle System <button class="cx" data-rm="particles" title="Remove component">✕</button></div>
+      <div class="comp-body">
+        <div class="kv"><span class="k">Rate (per s)</span><input type="range" id="insp-rate" min="2" max="200" step="2" value="${ps.rate}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${ps.rate}</span></div>
+        <div class="kv"><span class="k">Lifetime (s)</span><input type="range" id="insp-life" min="0.2" max="5" step="0.1" value="${ps.lifetime}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${ps.lifetime}</span></div>
+        <div class="kv"><span class="k">Speed</span><input type="range" id="insp-speed" min="0.2" max="8" step="0.1" value="${ps.speed}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${ps.speed}</span></div>
+        <div class="kv"><span class="k">Size</span><input type="range" id="insp-psize" min="0.02" max="0.6" step="0.02" value="${ps.size}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${ps.size}</span></div>
+        <div class="kv"><span class="k">Color</span><input type="color" id="insp-pcolor" value="${ps.color}" /></div>
+        <div class="kv"><span class="k">Gravity</span><input type="range" id="insp-pgrav" min="-9.8" max="0" step="0.2" value="${ps.gravity}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${ps.gravity}</span></div>
+        <div class="kv"><span class="k">Cone (deg)</span><input type="range" id="insp-cone" min="0" max="85" step="5" value="${ps.cone}" /><span style="width:26px;text-align:right;color:#8f8f8f;font-size:10.5px">${ps.cone}</span></div>
+      </div>
+    </div>` : ''}
+    ${an ? `
+    <div class="comp">
+      <div class="comp-header"><span class="fold">▼</span> <span class="cicon">🎬</span> Animator <button class="cx" data-rm="animator" title="Remove component">✕</button></div>
+      <div class="comp-body">
+        <div class="kv"><span class="k">Duration (s)</span><input type="number" id="insp-andur" step="0.5" min="0.1" value="${an.duration}" /></div>
+        <div class="kv"><span class="k">Loop</span><input type="checkbox" id="insp-anloop" ${an.loop ? 'checked' : ''} /></div>
+        <div class="kv"><span class="k">Speed</span><input type="number" id="insp-anspeed" step="0.1" min="0.1" value="${an.speed}" /></div>
+        ${kfList('pos', 'Position')}${kfList('rot', 'Rotation (°)')}${kfList('scl', 'Scale')}
+        <div style="color:#777;font-size:10.5px">Keyframes capture the current transform. Played on the play clock in Play mode.</div>
       </div>
     </div>` : ''}
     ${isLight ? `
@@ -1215,14 +1742,32 @@ function renderInspector() {
       </div>
     </div>` : ''}
     <div class="comp">
-      <div class="comp-header"><span class="fold">▼</span> ${u.components.script ? 'Script — ' + u.components.script : 'Add Component'}</div>
+      <div class="comp-header"><span class="fold">▼</span> ${comps.script ? 'Script — ' + comps.script : 'Add Component'} ${comps.script ? '<button class="cx" data-rm="script" title="Remove component">✕</button>' : ''}</div>
       <div class="comp-body">
-        ${u.components.script ? `
-        <div class="kv"><span class="k">Script</span><input type="text" value="${u.components.script}.cs" disabled /></div>
-        ${u.components.script === 'SpinScript' ? `<div class="kv"><span class="k">Speed (deg/s)</span><input type="number" id="insp-speed" step="10" value="${u.scriptParams.speed}" /></div>` : ''}
-        ${u.components.script === 'BobScript' ? `<div class="kv"><span class="k">Amplitude</span><input type="number" id="insp-amp" step="0.1" value="${u.scriptParams.amp}" /></div>` : ''}
-        ${u.components.script === 'PlayerController' ? `<div class="kv"><span class="k">Move Speed</span><input type="number" id="insp-pspeed" step="0.5" value="${u.scriptParams.playerSpeed ?? 6}" /></div>` : ''}` : `
-        <div style="color:#777;font-size:11.5px">Use Component ▸ Scripts to attach a behaviour.</div>`}
+        ${comps.script ? `
+        <div class="kv"><span class="k">Script</span><input type="text" value="${comps.script}.cs" disabled /></div>
+        ${comps.script === 'SpinScript' ? `<div class="kv"><span class="k">Speed (deg/s)</span><input type="number" id="insp-speed" step="10" value="${u.scriptParams.speed}" /></div>` : ''}
+        ${comps.script === 'BobScript' ? `<div class="kv"><span class="k">Amplitude</span><input type="number" id="insp-amp" step="0.1" value="${u.scriptParams.amp}" /></div>` : ''}
+        ${comps.script === 'PlayerController' ? `<div class="kv"><span class="k">Move Speed</span><input type="number" id="insp-pspeed" step="0.5" value="${u.scriptParams.playerSpeed ?? 6}" /></div>` : ''}` : `
+        <div style="color:#777;font-size:11.5px">Use the Add Component button below, or Component ▸ in the menu bar.</div>`}
+      </div>
+    </div>
+    <div id="addcomp-wrap">
+      <button id="addcomp-btn">Add Component</button>
+      <div id="addcomp-menu" class="hidden">
+        <div class="ac-cat">Physics</div>
+        <button data-acomp="rigidbody">Rigidbody <span class="ac-hint">mass · gravity · damping</span></button>
+        <button data-acomp="collider">Collider <span class="ac-hint">box / sphere + trigger</span></button>
+        <div class="ac-cat">Effects</div>
+        <button data-acomp="particles">Particle System <span class="ac-hint">emitter</span></button>
+        <div class="ac-cat">Audio</div>
+        <button data-acomp="audio">Audio Source <span class="ac-hint">generated tones</span></button>
+        <div class="ac-cat">Animation</div>
+        <button data-acomp="animator">Animator <span class="ac-hint">keyframe tracks</span></button>
+        <div class="ac-cat">Scripts</div>
+        <button data-acomp="SpinScript">Spin.cs</button>
+        <button data-acomp="BobScript">Bob (float).cs</button>
+        <button data-acomp="PlayerController">PlayerController (WASD).cs</button>
       </div>
     </div>`;
 
@@ -1232,23 +1777,130 @@ function renderInspector() {
   if (colorInp) colorInp.oninput = e => { isLight ? o.color.set(e.target.value) : o.material.color.set(e.target.value); };
   const shadow = $('#insp-shadow');
   if (shadow) shadow.onchange = e => { o.castShadow = e.target.checked; };
-  const smooth = $('#insp-smooth');
-  if (smooth) smooth.onchange = e => { o.material.roughness = 1 - parseFloat(e.target.value || 0.35); };
-  const metal = $('#insp-metal');
-  if (metal) metal.onchange = e => { o.material.metalness = Math.min(1, Math.max(0, parseFloat(e.target.value || 0))); };
-  const emis = $('#insp-emissive');
-  if (emis) emis.oninput = e => { o.material.emissive.set(e.target.value); };
+  /* material params (shader-driven) */
+  const shaderSel = $('#insp-shader');
+  if (shaderSel) shaderSel.onchange = e => setShader(o, e.target.value);
+  el.querySelectorAll('[data-matkey]').forEach(inp => {
+    const key = inp.dataset.matkey;
+    const pd = shaderDef.params.find(p => p.key === key);
+    inp.oninput = () => {
+      u.mat[key] = inp.type === 'color' ? inp.value : parseFloat(inp.value);
+      const span = inp.parentElement.querySelector('span:last-child');
+      if (span && inp.type !== 'color') span.textContent = u.mat[key];
+      // live-update where cheap: standard colors + shader uniforms
+      if (inp.type === 'color') {
+        if (o.material.isMeshStandardMaterial && key === 'color') o.material.color.set(inp.value);
+        if (o.material.uniforms && o.material.uniforms.uColor) o.material.uniforms.uColor.value.set(inp.value);
+        if (o.material.uniforms && o.material.uniforms.uDeep && key === 'color') { o.material.uniforms.uDeep.value.set(inp.value); o.material.uniforms.uShallow.value.set(inp.value).lerp(new THREE.Color('#9fd8ff'), 0.55); }
+      }
+    };
+    inp.onchange = () => { u.mat[key] = inp.type === 'color' ? inp.value : parseFloat(inp.value); applyMaterial(o); };
+  });
   const preset = $('#insp-preset');
   if (preset) preset.onchange = e => {
-    const m = o.material; if (!m) return;
-    const p = e.target.value;
-    if (p === 'standard') { m.roughness = 0.65; m.metalness = 0.05; m.emissive.set(0x000000); }
-    if (p === 'plastic') { m.roughness = 0.35; m.metalness = 0; m.emissive.set(0x000000); }
-    if (p === 'metal') { m.roughness = 0.3; m.metalness = 0.9; m.emissive.set(0x000000); }
-    if (p === 'chrome') { m.roughness = 0.1; m.metalness = 1; m.emissive.set(0x000000); }
-    if (p === 'neon') { m.roughness = 0.5; m.metalness = 0; m.emissive.copy(m.color).multiplyScalar(0.55); }
+    const m = u.mat; if (!m) return;
+    const pv = e.target.value;
+    if (pv === 'standard') { m.roughness = 0.65; m.metalness = 0.05; m.emissive = '#000000'; }
+    if (pv === 'plastic') { m.roughness = 0.35; m.metalness = 0; m.emissive = '#000000'; }
+    if (pv === 'metal') { m.roughness = 0.3; m.metalness = 0.9; m.emissive = '#000000'; }
+    if (pv === 'chrome') { m.roughness = 0.1; m.metalness = 1; m.emissive = '#000000'; }
+    if (pv === 'neon') { m.roughness = 0.5; m.metalness = 0; m.emissive = m.color; }
+    applyMaterial(o);
     renderInspector();
   };
+  /* rigidbody */
+  const mass = $('#insp-mass');
+  if (mass) mass.onchange = e => { rb.mass = Math.max(0.01, parseFloat(e.target.value) || 1); };
+  const dragIn = $('#insp-drag');
+  if (dragIn) dragIn.onchange = e => { rb.drag = Math.max(0, parseFloat(e.target.value) || 0); };
+  const grav = $('#insp-gravity');
+  if (grav) grav.onchange = e => { rb.useGravity = e.target.checked; };
+  const kin = $('#insp-kinematic');
+  if (kin) kin.onchange = e => { rb.isKinematic = e.target.checked; };
+  ['x', 'y', 'z'].forEach(ax => {
+    const f = $('#insp-f' + ax);
+    if (f) f.onchange = e => { rb.freeze[ax] = e.target.checked; };
+  });
+  /* collider */
+  const colshape = $('#insp-colshape');
+  if (colshape) colshape.onchange = e => { col_.shape = e.target.value; };
+  const trig = $('#insp-trigger');
+  if (trig) trig.onchange = e => { col_.isTrigger = e.target.checked; };
+  const bounce = $('#insp-bounce');
+  if (bounce) bounce.oninput = e => { col_.bounciness = parseFloat(e.target.value); const sp = e.target.parentElement.querySelector('span:last-child'); if (sp) sp.textContent = col_.bounciness; };
+  const fric = $('#insp-friction');
+  if (fric) fric.oninput = e => { col_.friction = parseFloat(e.target.value); const sp = e.target.parentElement.querySelector('span:last-child'); if (sp) sp.textContent = col_.friction; };
+  /* audio */
+  const clip = $('#insp-clip');
+  if (clip) clip.onchange = e => { au.clip = e.target.value; };
+  const vol = $('#insp-vol');
+  if (vol) vol.oninput = e => { au.volume = parseFloat(e.target.value); const sp = e.target.parentElement.querySelector('span:last-child'); if (sp) sp.textContent = au.volume; };
+  const pitch = $('#insp-pitch');
+  if (pitch) pitch.onchange = e => { au.pitch = Math.max(0.25, parseFloat(e.target.value) || 1); };
+  const loop = $('#insp-loop');
+  if (loop) loop.onchange = e => { au.loop = e.target.checked; };
+  const awake = $('#insp-awake');
+  if (awake) awake.onchange = e => { au.playOnAwake = e.target.checked; };
+  const atest = $('#insp-audiotest');
+  if (atest) atest.onclick = () => playAudioFor(o, { once: true });
+  /* particles */
+  const pbind = (id, key, isNum) => { const e_ = $(id); if (e_) e_.oninput = ev => { ps[key] = isNum ? parseFloat(ev.target.value) : ev.target.value; const sp = ev.target.parentElement.querySelector('span:last-child'); if (sp && isNum) sp.textContent = ps[key]; } };
+  pbind('#insp-rate', 'rate', true); pbind('#insp-life', 'lifetime', true); pbind('#insp-speed', 'speed', true);
+  pbind('#insp-psize', 'size', true); pbind('#insp-pcolor', 'color', false); pbind('#insp-pgrav', 'gravity', true); pbind('#insp-cone', 'cone', true);
+  /* animator */
+  const andur = $('#insp-andur');
+  if (andur) andur.onchange = e => { an.duration = Math.max(0.1, parseFloat(e.target.value) || 2); };
+  const anloop = $('#insp-anloop');
+  if (anloop) anloop.onchange = e => { an.loop = e.target.checked; };
+  const anspeed = $('#insp-anspeed');
+  if (anspeed) anspeed.onchange = e => { an.speed = Math.max(0.1, parseFloat(e.target.value) || 1); };
+  el.querySelectorAll('[data-addkey]').forEach(btn => btn.onclick = () => {
+    const track = btn.dataset.addkey;
+    const tIn = el.querySelector(`.kf-t[data-track="${track}"]`);
+    const t = Math.max(0, parseFloat(tIn.value) || 0);
+    const v = track === 'pos' ? o.position.toArray() : track === 'rot' ? [r.x, r.y, r.z] : o.scale.toArray();
+    an.keys[track] = an.keys[track] || [];
+    an.keys[track].push({ t, v: v.map(x => Math.round(x * 1000) / 1000) });
+    an.keys[track].sort((a, b) => a.t - b.t);
+    renderInspector();
+    log('sys', `Keyframe added on ${u.name} ${track} @ t=${t.toFixed(2)}`);
+  });
+  el.querySelectorAll('[data-delkey]').forEach(btn => btn.onclick = () => {
+    const track = btn.dataset.delkey;
+    an.keys[track].splice(parseInt(btn.dataset.i), 1);
+    renderInspector();
+  });
+  /* component removal */
+  el.querySelectorAll('[data-rm]').forEach(btn => btn.onclick = () => {
+    const key = btn.dataset.rm;
+    pushHistory();
+    if (key === 'script') u.components.script = null;
+    else if (key === 'rigidbody') u.components.rigidbody = null;
+    else if (key === 'collider') u.components.collider = null;
+    else if (key === 'audio') { if (u.audioTimer) { clearInterval(u.audioTimer); u.audioTimer = null; } u.components.audio = null; }
+    else if (key === 'particles') {
+      if (u.ps) { scene.remove(u.ps.pts); u.ps.geo.dispose(); u.ps.mat.dispose(); u.ps = null; }
+      u.components.particles = null;
+    }
+    else if (key === 'animator') u.components.animator = null;
+    renderInspector();
+    log('sys', `Removed ${COMP_LABEL[key] || key} from ${u.name}`);
+  });
+  /* Add Component menu */
+  const addBtn = $('#addcomp-btn');
+  const addMenu = $('#addcomp-menu');
+  addBtn.onclick = e => { e.stopPropagation(); addMenu.classList.toggle('hidden'); };
+  addMenu.querySelectorAll('[data-acomp]').forEach(b => b.onclick = () => {
+    addMenu.classList.add('hidden');
+    const key = b.dataset.acomp;
+    if (addComponent(o, key)) {
+      renderInspector();
+      log('sys', `Added ${key.endsWith('Script') || key === 'PlayerController' ? key + '.cs' : COMP_LABEL[key]} to ${u.name}`);
+    } else {
+      toast(`${COMP_LABEL[key] || key} is already on ${u.name}`);
+    }
+  });
+  document.addEventListener('click', ev => { if (!addMenu.contains(ev.target) && ev.target !== addBtn) addMenu.classList.add('hidden'); }, { once: true });
   const fov = $('#insp-fov');
   if (fov) fov.onchange = e => { o.fov = parseFloat(e.target.value || 60); o.updateProjectionMatrix(); };
   const near = $('#insp-near');
@@ -1261,8 +1913,6 @@ function renderInspector() {
   if (amp) amp.onchange = e => { u.scriptParams.amp = parseFloat(e.target.value || 0.5); };
   const pspeed = $('#insp-pspeed');
   if (pspeed) pspeed.onchange = e => { u.scriptParams.playerSpeed = parseFloat(e.target.value || 6); };
-  const coll = $('#insp-coll');
-  if (coll) coll.onchange = e => { u.components.collider = e.target.checked; };
 }
 function vec3(label, kind, v) {
   return `<div class="vec3"><span class="lbl">${label}</span>${['x', 'y', 'z'].map(ax =>
@@ -1467,13 +2117,15 @@ function bindMenus() {
   });
   document.addEventListener('click', () => document.querySelectorAll('.ed-menu').forEach(x => x.classList.remove('open')));
 }
-/* full-state serialization shared by save/load and play-mode snapshots */
+/* full-state serialization shared by save/load and play-mode snapshots.
+   Components and material configs are deep-copied so nested component
+   state (collider shape, rigidbody flags, keyframes…) survives round-trips. */
 function serializeObject(o) {
   const u = o.userData;
-  const d = { name: u.name, type: u.type, id: u.id, parent: u.parentId ?? null, p: o.position.toArray(), r: [o.rotation.x, o.rotation.y, o.rotation.z], s: o.scale.toArray(), comps: { ...u.components }, params: { ...u.scriptParams } };
+  const d = { name: u.name, type: u.type, id: u.id, parent: u.parentId ?? null, p: o.position.toArray(), r: [o.rotation.x, o.rotation.y, o.rotation.z], s: o.scale.toArray(), comps: JSON.parse(JSON.stringify(u.components)), params: { ...u.scriptParams } };
+  if (u.mat) d.mat = JSON.parse(JSON.stringify(u.mat));
   if (u.type === 'light' || u.type === 'pointlight') { d.color = '#' + o.color.getHexString(); d.intensity = o.intensity; }
   if (u.type === 'camera') { d.fov = o.fov; d.near = o.near; }
-  if (o.material) d.mat = { color: '#' + o.material.color.getHexString(), roughness: o.material.roughness, metalness: o.material.metalness, emissive: '#' + o.material.emissive.getHexString() };
   if (o.isMesh || o.isObject3D) { d.castShadow = o.castShadow === true; d.receiveShadow = o.receiveShadow === true; }
   return d;
 }
@@ -1483,19 +2135,41 @@ function restoreObject(o, d) {
   o.userData.name = d.name;
   if (d.id !== undefined) o.userData.id = d.id;
   o.userData.parentId = d.parent ?? null; // nesting survives save/load
-  if (d.comps) Object.assign(o.userData.components, d.comps);
+  if (d.comps) {
+    const comps = JSON.parse(JSON.stringify(d.comps));
+    // legacy migration: pre-engine saves stored `collider: true/false`
+    if (typeof comps.collider === 'boolean') comps.collider = comps.collider ? COMPONENT_DEFS.collider() : null;
+    if (comps.collider && !comps.collider.shape) comps.collider = { ...COMPONENT_DEFS.collider(), ...comps.collider };
+    o.userData.components = { rigidbody: null, collider: null, audio: null, particles: null, animator: null, script: null, meshRenderer: o.userData.components.meshRenderer, ...comps };
+  }
   if (d.params) Object.assign(o.userData.scriptParams, d.params);
-  if (d.mat && o.material) { o.material.color.set(d.mat.color); o.material.roughness = d.mat.roughness; o.material.metalness = d.mat.metalness ?? 0.05; o.material.emissive.set(d.mat.emissive || '#000000'); }
+  if (d.mat) {
+    const mat = JSON.parse(JSON.stringify(d.mat));
+    if (!mat.shader) { // legacy MeshStandardMaterial state
+      const cfg = defaultMatCfg();
+      cfg.color = mat.color || cfg.color;
+      cfg.roughness = mat.roughness ?? cfg.roughness;
+      cfg.metalness = mat.metalness ?? cfg.metalness;
+      cfg.emissive = mat.emissive || cfg.emissive;
+      o.userData.mat = cfg;
+    } else o.userData.mat = mat;
+    if (o.isMesh) applyMaterial(o);
+  }
+  if (o.userData.components.particles && o.isMesh) createParticleSystem(o);
   if (d.color) o.color.set(d.color);
   if (d.intensity !== undefined) o.intensity = d.intensity;
   if (d.fov !== undefined) { o.fov = d.fov; o.near = d.near; o.updateProjectionMatrix(); }
   if (d.castShadow !== undefined) { o.castShadow = d.castShadow; o.receiveShadow = d.receiveShadow; }
 }
-function serializeScene() { return JSON.stringify(ed.objects.map(serializeObject)); }
+function serializeScene() { return JSON.stringify({ v: 2, settings: { ...ed.sceneSettings }, objects: ed.objects.map(serializeObject) }); }
 function loadSceneFromSpec(spec) {
-  ed.objects.slice().forEach(o => { removeHelper(o); scene.remove(o); });
+  const list = Array.isArray(spec) ? spec : (spec.objects || []);
+  ed.objects.slice().forEach(disposeObject);
   ed.objects = [];
-  spec.forEach(d0 => { const o = makeObject(d0.type, { name: d0.name }); restoreObject(o, d0); });
+  if (!Array.isArray(spec) && spec.settings) applySceneSettings(spec.settings);
+  list.forEach(d0 => { const o = makeObject(d0.type, { name: d0.name }); restoreObject(o, d0); });
+  let maxId = 0; ed.objects.forEach(o => { maxId = Math.max(maxId, o.userData.id); });
+  ed.idSeq = Math.max(ed.idSeq, maxId + 1);
   ed.selected = null; tcontrols.detach();
   renderHierarchy(); renderInspector();
 }
@@ -1531,10 +2205,14 @@ function handleAction(d) {
   if (d.act === 'delete' && ed.selected) { deleteSelected(); }
   if (d.act === 'duplicate' && ed.selected) { duplicateSelected(); }
   if (d.act === 'addcomp' && ed.selected) {
-    ed.selected.userData.components.script = d.comp;
-    renderInspector();
-    log('sys', `Attached ${d.comp}.cs to ${ed.selected.userData.name}`);
+    if (addComponent(ed.selected, d.comp)) {
+      renderInspector();
+      log('sys', `Added ${d.comp.endsWith('Script') || d.comp === 'PlayerController' ? d.comp + '.cs' : COMP_LABEL[d.comp] || d.comp} to ${ed.selected.userData.name}`);
+    } else {
+      toast(`${COMP_LABEL[d.comp] || d.comp} is already on ${ed.selected.userData.name}`);
+    }
   }
+  if (d.act === 'scene-settings') openSceneSettings();
   if (d.act === 'play') togglePlay();
   if (d.act === 'pause') togglePause();
   if (d.act === 'step') stepPlay();
@@ -1608,21 +2286,26 @@ function deleteSelected() {
 function duplicateSelected() {
   const o = ed.selected; if (!o) return;
   pushHistory(); // snapshot before mutation
+  const spec = serializeObject(o);
   const c = makeObject(o.userData.type, { name: o.userData.name + ' (copy)' });
-  c.position.copy(o.position).x += 1.5;
-  c.scale.copy(o.scale); c.rotation.copy(o.rotation);
-  if (c.material && o.material) c.material.color.copy(o.material.color);
+  restoreObject(c, spec);
+  c.userData.id = ed.idSeq++; // fresh identity; duplicate keeps the same parent
+  c.position.x += 1.5;
   select(c);
-  log('sys', `Duplicated ${o.userData.name}`);
+  log('sys', `Duplicated ${o.userData.name} (components copied)`);
 }
 function togglePlay() {
   if (!ed.playing) {
     ed.playSnapshot = ed.objects.map(o => ({ o, spec: serializeObject(o) })); // full state, incl. object set
     ed.playing = true; ed.paused = false;
+    ed.playClock = 0; ed.physAcc = 0; ed.scriptPhysWarn = false;
+    initPhysics();
     $('#editor').classList.add('playing');
     document.querySelector('[data-act="play"]').classList.add('active');
     status('Play mode — press Stop to return to editing');
     log('sys', 'Entered Play Mode');
+    // AudioSources with Play On Awake fire on Play (WebAudio needs the click gesture)
+    ed.objects.forEach(o => { if (o.userData.components.audio && o.userData.components.audio.playOnAwake) playAudioFor(o); });
     // Spawn Point: the player starts at the marker if the scene has one
     const spawn = ed.objects.find(o => o.userData.type === 'spawn');
     const pc = ed.objects.find(o => o.userData.components.script === 'PlayerController');
@@ -1638,10 +2321,11 @@ function togglePlay() {
     $('#editor').classList.remove('playing');
     document.querySelector('[data-act="play"]').classList.remove('active');
     document.querySelector('[data-act="pause"]').classList.remove('active');
+    stopAllAudio();
     if (ed.playSnapshot) {
       // Unity: changes made in Play mode are reset on exit — restore the full pre-play state
       const snapSet = new Set(ed.playSnapshot.map(x => x.o));
-      ed.objects.filter(o => !snapSet.has(o)).forEach(o => { removeHelper(o); scene.remove(o); }); // remove objects created during play
+      ed.objects.filter(o => !snapSet.has(o)).forEach(disposeObject); // remove objects created during play
       ed.playSnapshot.forEach(({ o, spec }) => {
         if (!o.parent) { scene.add(o); if (o.userData.helper && !o.userData.helper.parent) scene.add(o.userData.helper); }
         restoreObject(o, spec);
@@ -1677,15 +2361,16 @@ function redo() {
   log('sys', 'Redo');
 }
 function snapshotScene() {
-  return ed.objects.map(o => ({ ref: o, name: o.userData.name, type: o.userData.type, p: o.position.clone(), r: o.rotation.clone(), s: o.scale.clone() }));
+  // full object specs (components + material config), not just transforms —
+  // so undo/redo also reverts component and shader changes
+  return ed.objects.map(o => ({ ref: o, spec: serializeObject(o) }));
 }
 function applySnapshot(snap) {
-  const keep = ed.objects.slice();
-  keep.forEach(o => { if (!snap.find(x => x.ref === o)) { removeHelper(o); scene.remove(o); } });
+  const keep = new Set(snap.map(x => x.ref));
+  ed.objects.forEach(o => { if (!keep.has(o)) disposeObject(o); });
   ed.objects = snap.map(x => {
     if (!x.ref.parent) { scene.add(x.ref); }
-    x.ref.userData.name = x.name;
-    x.ref.position.copy(x.p); x.ref.rotation.copy(x.r); x.ref.scale.copy(x.s);
+    restoreObject(x.ref, x.spec);
     return x.ref;
   });
   ed.selected = null; tcontrols.detach();
@@ -1736,12 +2421,336 @@ function activeCamera() {
 
 /* ---- render loop ---- */
 let lastT = performance.now(); let frames = 0; let fpsT = 0;
+
+/* ================================================================
+   PHYSICS ENGINE — Unity-style rigidbody simulation.
+   Fixed 1/60 s timestep (accumulator), semi-implicit Euler,
+   box + sphere colliders with per-object physics materials
+   (bounciness / friction, averaged on contact — Unity's default
+   combine mode), triggers, collision events, sleeping.
+   Modeled on the Unity Rigidbody / PhysicsMaterial references.
+   ================================================================ */
+const PHYS = { fixedDt: 1 / 60, maxSteps: 5, sleepSpeed: 0.06, sleepFrames: 40 };
+const _pv = new THREE.Vector3();
+const _pa = new THREE.Box3(); const _pb = new THREE.Box3();
+function worldAABB(o, out) {
+  const bb = o.geometry.boundingBox;
+  out.makeEmpty();
+  for (let i = 0; i < 8; i++) {
+    _pv.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z);
+    _pv.multiply(o.scale).applyQuaternion(o.quaternion).add(o.position);
+    out.expandByPoint(_pv);
+  }
+  // flat planes (Ground) have a degenerate zero-height AABB — give them a thin
+  // collider slab so box colliders can actually land on them
+  if (out.max.y - out.min.y < 1e-4) out.min.y -= 0.15;
+  return out;
+}
+function sphereOf(o) {
+  const s = o.geometry.boundingSphere || (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere);
+  return { c: o.position.clone().add(s.center.clone().multiply(o.scale)), r: s.radius * Math.max(o.scale.x, o.scale.y, o.scale.z) };
+}
+function isDynamic(o) {
+  const c = o.userData.components;
+  return !!(o.isMesh && c.rigidbody && !c.rigidbody.isKinematic && c.collider && c.script !== 'PlayerController');
+}
+function initPhysics() {
+  ed.contactPairs.clear();
+  ed.objects.forEach(o => {
+    const c = o.userData.components;
+    if (c.rigidbody) o.userData.rb = { v: new THREE.Vector3(), sleeping: false, still: 0 };
+  });
+}
+function pairKey(a, b) { return a.userData.id < b.userData.id ? a.userData.id + '|' + b.userData.id : b.userData.id + '|' + a.userData.id; }
+/* resolve a dynamic body against one other collider; returns true if they touched */
+function resolvePair(d, c, dt) {
+  const dc = d.userData.components.collider, cc = c.userData.components.collider;
+  const dcSph = dc.shape === 'sphere', ccSph = cc.shape === 'sphere';
+  let nx = 0, ny = 0, nz = 0, pen = 0, hit = false;
+  const sphereVsBox = (s, b) => { // normal points from box toward sphere (pushes the sphere out)
+    worldAABB(b, _pb);
+    _pv.set(
+      Math.max(_pb.min.x, Math.min(s.c.x, _pb.max.x)),
+      Math.max(_pb.min.y, Math.min(s.c.y, _pb.max.y)),
+      Math.max(_pb.min.z, Math.min(s.c.z, _pb.max.z)));
+    const dx = s.c.x - _pv.x, dy = s.c.y - _pv.y, dz = s.c.z - _pv.z;
+    const dist = Math.hypot(dx, dy, dz);
+    if (dist >= s.r) return null;
+    const l = dist || 1e-6;
+    return { nx: dx / l, ny: dy / l, nz: dz / l, pen: s.r - dist };
+  };
+  const res = !dcSph && !ccSph ? (() => { // box vs box (AABB approximation)
+    worldAABB(d, _pa); worldAABB(c, _pb);
+    const ox = Math.min(_pa.max.x, _pb.max.x) - Math.max(_pa.min.x, _pb.min.x);
+    const oy = Math.min(_pa.max.y, _pb.max.y) - Math.max(_pa.min.y, _pb.min.y);
+    const oz = Math.min(_pa.max.z, _pb.max.z) - Math.max(_pa.min.z, _pb.min.z);
+    if (ox <= 0 || oy <= 0 || oz <= 0) return null;
+    if (ox <= oy && ox <= oz) return { nx: d.position.x < c.position.x ? -1 : 1, ny: 0, nz: 0, pen: ox };
+    if (oy <= oz) return { nx: 0, ny: d.position.y < c.position.y ? -1 : 1, nz: 0, pen: oy };
+    return { nx: 0, ny: 0, nz: d.position.z < c.position.z ? -1 : 1, pen: oz };
+  })() : dcSph && ccSph ? (() => { // sphere vs sphere
+    const a = sphereOf(d), b = sphereOf(c);
+    const dx = b.c.x - a.c.x, dy = b.c.y - a.c.y, dz = b.c.z - a.c.z;
+    const dist = Math.hypot(dx, dy, dz), rsum = a.r + b.r;
+    if (dist >= rsum) return null;
+    const l = dist || 1e-6;
+    return { nx: -dx / l, ny: -dy / l, nz: -dz / l, pen: rsum - dist };
+  })() : dcSph ? sphereVsBox(sphereOf(d), c) // dynamic sphere vs static box
+    : (() => { // dynamic box vs static sphere: normal from sphere center to closest point on box
+      const s = sphereOf(c);
+      worldAABB(d, _pa);
+      _pv.set(
+        Math.max(_pa.min.x, Math.min(s.c.x, _pa.max.x)),
+        Math.max(_pa.min.y, Math.min(s.c.y, _pa.max.y)),
+        Math.max(_pa.min.z, Math.min(s.c.z, _pa.max.z)));
+      const cdx = _pv.x - s.c.x, cdy = _pv.y - s.c.y, cdz = _pv.z - s.c.z;
+      const l = Math.hypot(cdx, cdy, cdz) || 1e-6;
+      if (l >= s.r) return null;
+      return { nx: cdx / l, ny: cdy / l, nz: cdz / l, pen: s.r - l };
+    })();
+  if (res) { hit = true; nx = res.nx; ny = res.ny; nz = res.nz; pen = res.pen; }
+  if (!hit) return false;
+  const key = pairKey(d, c);
+  const trigger = dc.isTrigger || cc.isTrigger;
+  if (!ed.contactPairs.has(key)) {
+    ed.contactPairs.add(key);
+    log('sys', trigger ? `OnTriggerEnter: ${d.userData.name} ↔ ${c.userData.name}` : `OnCollisionEnter: ${d.userData.name} ↔ ${c.userData.name}`);
+  }
+  if (trigger) return true; // triggers never push back
+  // separate: full push against statics/kinematics, mass-split between two dynamics
+  const bothDyn = isDynamic(c);
+  const mD = d.userData.components.rigidbody.mass || 1;
+  const mC = bothDyn ? (c.userData.components.rigidbody.mass || 1) : Infinity;
+  const share = bothDyn ? mC / (mD + mC) : 1;
+  d.position.x += nx * pen * share; d.position.y += ny * pen * share; d.position.z += nz * pen * share;
+  if (bothDyn) { c.position.x -= nx * pen * (1 - share); c.position.y -= ny * pen * (1 - share); c.position.z -= nz * pen * (1 - share); }
+  // restitution (averaged — Unity's default combine) + friction on contact
+  const rb = d.userData.rb;
+  const e = (dc.bounciness + cc.bounciness) / 2;
+  const fr = (dc.friction + cc.friction) / 2;
+  const vn = rb.v.x * nx + rb.v.y * ny + rb.v.z * nz; // velocity along contact normal
+  if (vn < 0) {
+    // slow approach → inelastic (resting); fast → bounce with restitution
+    const j = Math.abs(vn) < 0.4 ? -vn : -(1 + e) * vn;
+    rb.v.x += nx * j; rb.v.y += ny * j; rb.v.z += nz * j;
+  }
+  // tangential friction: damp the velocity components not along the normal
+  const vnn = rb.v.x * nx + rb.v.y * ny + rb.v.z * nz;
+  const damp = Math.max(0, 1 - fr * 12 * dt);
+  rb.v.x -= (rb.v.x - nx * vnn) * (1 - damp);
+  rb.v.y -= (rb.v.y - ny * vnn) * (1 - damp);
+  rb.v.z -= (rb.v.z - nz * vnn) * (1 - damp);
+  if (bothDyn && c.userData.rb && c.userData.rb.sleeping) { c.userData.rb.sleeping = false; c.userData.rb.still = 0; }
+  rb.sleeping = false; // touching something wakes a sleeping body
+  return true;
+}
+function stepPhysics(dt) {
+  const g = ed.sceneSettings.gravity;
+  for (const o of ed.objects) {
+    if (!isDynamic(o)) continue;
+    const rb = o.userData.rb; const cfg = o.userData.components.rigidbody;
+    if (rb.sleeping) continue;
+    if (cfg.useGravity && !cfg.freeze.y) rb.v.y += g * dt;
+    const dragK = 1 / (1 + cfg.drag * dt);
+    rb.v.multiplyScalar(dragK);
+    if (cfg.freeze.x) rb.v.x = 0;
+    if (cfg.freeze.z) rb.v.z = 0;
+    o.position.x += rb.v.x * dt;
+    o.position.y += rb.v.y * dt;
+    o.position.z += rb.v.z * dt;
+  }
+  // collisions: dynamic bodies vs every collider (statics, kinematics, other dynamics)
+  for (const d of ed.objects) {
+    if (!isDynamic(d) || d.userData.rb.sleeping) continue;
+    let grounded = false;
+    for (const c of ed.objects) {
+      if (c === d || !c.isMesh) continue;
+      const cc = c.userData.components.collider;
+      if (!cc || c.userData.type === 'spawn') continue;
+      const touched = resolvePair(d, c, dt);
+      if (touched && !cc.isTrigger && d.userData.rb.v.y >= -0.01) {
+        // resting on something below → grounded (for sleep)
+        const dy = d.position.y - c.position.y;
+        if (dy > 0) grounded = true;
+      }
+    }
+    // fall-off-world safety
+    if (d.position.y < -60) { d.position.set(0, 8, 0); d.userData.rb.v.set(0, 0, 0); }
+    // sleep bookkeeping
+    const rb = d.userData.rb;
+    if (grounded && rb.v.length() < PHYS.sleepSpeed) { rb.still++; if (rb.still > PHYS.sleepFrames) { rb.sleeping = true; rb.v.set(0, 0, 0); } }
+    else rb.still = 0;
+  }
+}
+
+/* ================================================================
+   PARTICLE SYSTEM — THREE.Points emitter with Unity-style main
+   module parameters (rate, lifetime, speed, size, color, gravity,
+   cone). Simulated against the simulation clock so Pause freezes
+   emission. Runs in edit mode too (Unity previews particles).
+   ================================================================ */
+const particleTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 30);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.5, 'rgba(255,255,255,.55)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(32, 32, 30, 0, Math.PI * 2); ctx.fill();
+  return new THREE.CanvasTexture(c);
+})();
+function createParticleSystem(o) {
+  const MAXP = 500;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAXP * 3), 3));
+  geo.setDrawRange(0, 0);
+  const mat = new THREE.PointsMaterial({
+    map: particleTex, transparent: true, opacity: 0.85, depthWrite: false,
+    blending: THREE.AdditiveBlending, color: 0xffd27a, size: 0.14,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.frustumCulled = false;
+  scene.add(pts);
+  o.userData.ps = { pts, geo, mat, pool: [], acc: 0, MAXP };
+  return o.userData.ps;
+}
+function stepParticles(dt) {
+  for (const o of ed.objects) {
+    const ps = o.userData.ps, cfg = o.userData.components && o.userData.components.particles;
+    if (!ps || !cfg) continue;
+    // emit
+    ps.acc += cfg.rate * dt;
+    while (ps.acc >= 1 && ps.pool.length < ps.MAXP) {
+      ps.acc -= 1;
+      const a = (Math.random() - 0.5) * 2 * (cfg.cone * Math.PI / 180);
+      const spd = cfg.speed * (0.75 + Math.random() * 0.5);
+      ps.pool.push({
+        x: o.position.x, y: o.position.y, z: o.position.z,
+        vx: Math.sin(a) * spd, vy: Math.cos(Math.abs(a)) * spd, vz: (Math.random() - 0.5) * spd * 0.4,
+        life: cfg.lifetime * (0.8 + Math.random() * 0.4),
+      });
+    }
+    if (ps.acc > ps.MAXP) ps.acc = ps.MAXP;
+    // simulate + write buffer
+    const pos = ps.geo.attributes.position.array;
+    let n = 0;
+    for (let i = ps.pool.length - 1; i >= 0; i--) {
+      const p = ps.pool[i];
+      p.life -= dt;
+      if (p.life <= 0) { ps.pool.splice(i, 1); continue; }
+      p.vy += (cfg.gravity || 0) * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      pos[n * 3] = p.x; pos[n * 3 + 1] = p.y; pos[n * 3 + 2] = p.z;
+      n++;
+    }
+    ps.geo.setDrawRange(0, n);
+    ps.geo.attributes.position.needsUpdate = true;
+    ps.mat.size = cfg.size;
+    ps.mat.color.set(cfg.color);
+  }
+}
+
+/* ================================================================
+   AUDIO — generated tones via WebAudio (no imported clips).
+   The context is created on the first user gesture (Play click);
+   AudioSource.playOnAwake fires on Play, everything stops on Stop.
+   ================================================================ */
+let audioCtx = null;
+const AUDIO_CLIPS = {
+  tone: { label: 'Tone (A4 sine)', type: 'sine', freq: 440, dur: 0.6 },
+  chime: { label: 'Chime (two-note)', type: 'sine', freq: 523.25, freq2: 659.25, dur: 0.9 },
+  pulse: { label: 'Pulse (square)', type: 'square', freq: 220, dur: 0.35 },
+};
+function ensureAudioCtx() {
+  try {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+  } catch (e) { audioCtx = null; }
+  return audioCtx;
+}
+function playAudioFor(o, opts = {}) {
+  const cfg = o.userData.components.audio;
+  if (!cfg) return;
+  const ctx = ensureAudioCtx();
+  if (!ctx) { log('warn', 'Audio unavailable in this browser'); return; }
+  const clip = AUDIO_CLIPS[cfg.clip] || AUDIO_CLIPS.tone;
+  const t0 = ctx.currentTime + 0.01;
+  const vol = Math.max(0.0001, cfg.volume);
+  const mk = (freq, when, dur) => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = clip.type;
+    osc.frequency.value = freq * (cfg.pitch || 1);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(vol, when + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.0001, when + dur);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(when); osc.stop(when + dur + 0.05);
+    ed.audioNodes.add(osc);
+    osc.onended = () => ed.audioNodes.delete(osc);
+  };
+  mk(clip.freq, t0, clip.dur);
+  if (clip.freq2) mk(clip.freq2, t0 + 0.18, clip.dur * 0.8);
+  if (cfg.loop && !opts.once) {
+    o.userData.audioTimer = setInterval(() => playAudioFor(o, { once: true }), (clip.dur + 0.25) * 1000);
+  }
+}
+function stopAllAudio() {
+  ed.audioNodes.forEach(osc => { try { osc.stop(); } catch (e) {} });
+  ed.audioNodes.clear();
+  ed.objects.forEach(o => { if (o.userData.audioTimer) { clearInterval(o.userData.audioTimer); o.userData.audioTimer = null; } });
+}
+
+/* ================================================================
+   ANIMATOR — keyframe tracks (position / rotation / scale) with
+   linear interpolation, sampled against the play clock. Keyframes
+   are captured from the object's current transform in the Inspector.
+   ================================================================ */
+function sampleTrack(keys, t) {
+  if (!keys || !keys.length) return null;
+  const last = keys[keys.length - 1];
+  if (t <= keys[0].t) return keys[0].v.slice();
+  if (t >= last.t) return last.v.slice();
+  for (let i = 0; i < keys.length - 1; i++) {
+    const a = keys[i], b = keys[i + 1];
+    if (t >= a.t && t <= b.t) {
+      const f = (t - a.t) / Math.max(1e-6, b.t - a.t);
+      return a.v.map((v, k) => v + (b.v[k] - v) * f);
+    }
+  }
+  return last.v.slice();
+}
+function stepAnimators() {
+  for (const o of ed.objects) {
+    const an = o.userData.components.animator;
+    if (!an || !an.duration) continue;
+    let t = ed.playClock * (an.speed || 1);
+    if (an.loop) t = t % an.duration; else t = Math.min(t, an.duration);
+    const p = sampleTrack(an.keys.pos, t);
+    if (p) o.position.set(p[0], p[1], p[2]);
+    const r = sampleTrack(an.keys.rot, t);
+    if (r) o.rotation.set(THREE.MathUtils.degToRad(r[0]), THREE.MathUtils.degToRad(r[1]), THREE.MathUtils.degToRad(r[2]));
+    const s = sampleTrack(an.keys.scl, t);
+    if (s) o.scale.set(s[0] || 0.01, s[1] || 0.01, s[2] || 0.01);
+  }
+}
+
 function advancePlay(dt) {
+  ed.playClock += dt;
+  // scripts: physics owns the transform of active (non-kinematic) rigidbodies
   ed.objects.forEach(o => {
     const sc = o.userData.components.script;
+    if (!sc) return;
+    const rb = o.userData.components.rigidbody;
+    if (rb && !rb.isKinematic) {
+      if (!ed.scriptPhysWarn) { ed.scriptPhysWarn = true; log('warn', 'Scripts are skipped on dynamic Rigidbodies — physics owns their transform (like Unity warnings about animating physics objects)'); }
+      return;
+    }
     if (sc === 'SpinScript') o.rotation.y += THREE.MathUtils.degToRad(o.userData.scriptParams.speed) * dt;
-    if (sc === 'BobScript') o.position.y += Math.sin(performance.now() / 300) * o.userData.scriptParams.amp * dt * 2;
+    if (sc === 'BobScript') o.position.y += Math.sin(ed.playClock / 0.3) * o.userData.scriptParams.amp * dt * 2;
   });
+  stepPhysics(dt);
+  stepAnimators();
   stepPlayerControllers(dt);
 }
 /* PlayerController: WASD movement + gravity/jump in Play mode (Game view gets a
@@ -1757,7 +2766,7 @@ function blockedAt(o, px, pz) {
   const r = 0.5; // player half-extent
   for (const c of ed.objects) {
     if (c === o || !c.isMesh) continue;
-    if (c.userData.components.collider === false) continue;
+    if (!solidCollider(c)) continue;
     if (c.userData.type === 'spawn') continue;
     const cbb = c.geometry.boundingBox;
     const hx = ((cbb.max.x - cbb.min.x) / 2) * c.scale.x, hz = ((cbb.max.z - cbb.min.z) / 2) * c.scale.z;
@@ -1774,7 +2783,7 @@ function groundTopFor(o) {
   for (const c of ed.objects) {
     if (c === o || !c.isMesh) continue;
     const isPlane = c.userData.type === 'plane';
-    if (!isPlane && c.userData.components.collider === false) continue;
+    if (!isPlane && !solidCollider(c)) continue;
     const cbb = c.geometry.boundingBox;
     const hx = ((cbb.max.x - cbb.min.x) / 2) * c.scale.x, hz = ((cbb.max.z - cbb.min.z) / 2) * c.scale.z;
     const top = c.position.y + cbb.max.y * c.scale.y;
@@ -1840,8 +2849,23 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min((now - lastT) / 1000, 0.1);
   lastT = now;
-  if (ed.playing && !ed.paused) advancePlay(dt);
+  // simulation clock: advances in edit mode and play, frozen by Pause.
+  // Drives shader uTime uniforms and particle simulation.
+  if (!(ed.playing && ed.paused)) {
+    ed.simTime += dt;
+    stepParticles(dt);
+  }
+  ed.shaderMats.forEach(m => { if (m.uniforms && m.uniforms.uTime) m.uniforms.uTime.value = ed.simTime; });
+  // play mode: fixed-timestep simulation (accumulator, capped to avoid spiral of death)
+  if (ed.playing && !ed.paused) {
+    ed.physAcc = Math.min(ed.physAcc + dt, PHYS.fixedDt * PHYS.maxSteps);
+    while (ed.physAcc >= PHYS.fixedDt) { advancePlay(PHYS.fixedDt); ed.physAcc -= PHYS.fixedDt; }
+  }
   if (ed.viewTab === 'scene') orbit.update();
+  // editor-only overlays (axis gizmo, scene toolbar, transform gizmo) hide in Game view
+  axCanvas.style.display = ed.viewTab === 'scene' ? '' : 'none';
+  $('#scene-toolbar').style.display = ed.viewTab === 'scene' ? '' : 'none';
+  tcontrols.visible = ed.viewTab === 'scene';
   const helpersVisible = $('#chk-gizmos').checked;
   grid.visible = ed.viewTab === 'scene' && $('#chk-grid').checked;
   ed.objects.forEach(o => { if (o.userData.helper) o.userData.helper.visible = helpersVisible && ed.viewTab === 'scene'; });
@@ -1886,7 +2910,11 @@ function drawAxisGizmo() {
 }
 
 /* ---- boot: show Hub after loading screen (mirrors Hub splash) ---- */
-window.unitycraft = { ed, scene, makeObject, tcontrols, applySnap }; // debug/test handle
+window.unitycraft = { // debug/test handle
+  ed, scene, makeObject, tcontrols, applySnap, select,
+  addComponent, setShader, applySceneSettings, serializeScene, loadSceneFromSpec,
+  SHADERS: Object.keys(SHADERS), AUDIO_CLIPS: Object.keys(AUDIO_CLIPS), PHYS,
+};
 renderHub();
 setTimeout(() => $('#loading').classList.add('is-dismissed'), 1400);
 </script>

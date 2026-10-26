@@ -92,12 +92,15 @@ try {
   const hRows = await page.locator("#hierarchy .hitem").count();
   check("unitycraft: hierarchy search filters", hRows === 2, "rows: " + hRows);
   await page.locator("#hier-search").fill("");
-  // Save + reload round-trip incl. metalness/emissive
+  // Save + reload round-trip incl. metalness/emissive (via the serializable material config
+  // — the same path the Inspector writes through)
   await page.evaluate(() => {
     const uc = window.unitycraft;
     const o = uc.ed.objects.find((x) => x.userData.type === "cube");
-    o.material.metalness = 0.9;
-    o.material.emissive.set("#aa2200");
+    o.userData.mat.metalness = 0.9;
+    o.userData.mat.emissive = "#aa2200";
+    o.userData.mat.color = "#3366cc";
+    window.unitycraft.setShader(o, "standard");
     document.querySelector('[data-act="save-scene"]').click();
   });
   await page.reload({ waitUntil: "load", timeout: 45000 });
@@ -109,7 +112,7 @@ try {
   const matAfter = await page.evaluate(() => {
     const uc = window.unitycraft;
     const o = uc.ed.objects.find((x) => x.userData.type === "cube");
-    return o ? { m: o.material.metalness, e: "#" + o.material.emissive.getHexString() } : null;
+    return o ? { m: o.material.metalness, e: "#" + o.material.emissive.getHexString(), c: "#" + o.material.color.getHexString() } : null;
   });
   check("unitycraft: save/reload keeps material state",
     matAfter && matAfter.m === 0.9 && matAfter.e === "#aa2200", JSON.stringify(matAfter));
@@ -225,6 +228,139 @@ try {
     document.querySelector('.ptab[data-viewtab="scene"]').click();
   });
   await page.waitForTimeout(300);
+  /* ---------- Engine upgrade: physics, shaders, particles, animator, components ---------- */
+  // Rigidbody: a dynamic cube falls and rests on the ground plane
+  const physRes = await page.evaluate(async () => {
+    const uc = window.unitycraft;
+    const c = uc.makeObject("cube", { name: "PhysCube" });
+    c.position.set(2, 6, -2);
+    uc.addComponent(c, "rigidbody");
+    const trig = uc.makeObject("cube", { name: "TrigZone" });
+    trig.position.set(4, 2, -2); trig.scale.set(1.6, 2.5, 1.6);
+    trig.userData.components.collider.isTrigger = true;
+    const faller = uc.makeObject("cube", { name: "Faller" });
+    faller.position.set(4, 6, -2);
+    uc.addComponent(faller, "rigidbody");
+    document.querySelector('[data-act="play"]').click();
+    await new Promise((r) => setTimeout(r, 2200));
+    const y = +c.position.y.toFixed(2);
+    const fy = +faller.position.y.toFixed(2);
+    const contacts = [...uc.ed.contactPairs];
+    document.querySelector('[data-act="play"]').click();
+    await new Promise((r) => setTimeout(r, 300));
+    return { y, fy, contacts: contacts.length, restored: +c.position.y.toFixed(2) };
+  });
+  check("unitycraft: rigidbody falls and rests on ground (y=0.5)", physRes.y === 0.5, JSON.stringify(physRes));
+  check("unitycraft: trigger collider passes through (lands at ground, not on zone)", physRes.fy === 0.5, JSON.stringify(physRes));
+  check("unitycraft: collision/trigger events logged (contact pairs)", physRes.contacts >= 2, "pairs: " + physRes.contacts);
+  check("unitycraft: play-mode physics state restored on stop", physRes.restored === 6, "y restored: " + physRes.restored);
+  // Shaders: switch to hologram, verify material + animated uTime; pause freezes it
+  const shaderRes = await page.evaluate(async () => {
+    const uc = window.unitycraft;
+    const o = uc.ed.objects.find((x) => x.userData.name === "PhysCube");
+    uc.setShader(o, "hologram");
+    const t0 = o.material.uniforms.uTime.value;
+    await new Promise((r) => setTimeout(r, 400));
+    const t1 = o.material.uniforms.uTime.value;
+    return { type: o.material.type, t0, t1, animated: t1 > t0 };
+  });
+  check("unitycraft: hologram shader is a ShaderMaterial with animated uTime",
+    shaderRes.type === "ShaderMaterial" && shaderRes.animated, JSON.stringify(shaderRes));
+  // Pause freezes the simulation clock (shader time stops)
+  await page.evaluate(() => { document.querySelector('[data-act="play"]').click(); });
+  await page.evaluate(() => { document.querySelector('[data-act="pause"]').click(); });
+  const pauseFrozen = await page.evaluate(async () => {
+    const o = window.unitycraft.ed.objects.find((x) => x.userData.name === "PhysCube");
+    const a = o.material.uniforms.uTime.value;
+    await new Promise((r) => setTimeout(r, 500));
+    const b = o.material.uniforms.uTime.value;
+    document.querySelector('[data-act="pause"]').click();
+    document.querySelector('[data-act="play"]').click(); // exit play
+    return a === b;
+  });
+  check("unitycraft: pause freezes shader simulation clock", pauseFrozen, String(pauseFrozen));
+  // Particles: emitter runs in edit mode (Unity previews particles)
+  const partRes = await page.evaluate(async () => {
+    const uc = window.unitycraft;
+    const o = uc.ed.objects.find((x) => x.userData.name === "PhysCube");
+    uc.addComponent(o, "particles");
+    await new Promise((r) => setTimeout(r, 600));
+    return { drawn: o.userData.ps.geo.drawRange.count, cfg: o.userData.components.particles.rate };
+  });
+  check("unitycraft: particle system emits in edit mode", partRes.drawn > 0, JSON.stringify(partRes));
+  // Animator: keyframe track moves the object in play mode, restored on stop
+  const animRes = await page.evaluate(async () => {
+    const uc = window.unitycraft;
+    const o = uc.ed.objects.find((x) => x.userData.name === "PhysCube");
+    const an = o.userData.components.animator;
+    uc.addComponent(o, "animator");
+    o.userData.components.animator.keys.pos = [
+      { t: 0, v: [0, 0.5, 0] },
+      { t: 1, v: [3, 0.5, 0] },
+    ];
+    o.userData.components.animator.duration = 1;
+    o.userData.components.animator.loop = false; // clamp at the last keyframe
+    document.querySelector('[data-act="play"]').click();
+    await new Promise((r) => setTimeout(r, 1600));
+    const x = +o.position.x.toFixed(2);
+    document.querySelector('[data-act="play"]').click();
+    await new Promise((r) => setTimeout(r, 300));
+    const restored = +o.position.x.toFixed(2);
+    return { x, restored };
+  });
+  check("unitycraft: animator keyframes move object in play mode", animRes.x > 2.5, JSON.stringify(animRes));
+  check("unitycraft: animator state restored on stop", animRes.restored === 2, "x restored: " + animRes.restored);
+  // Inspector UI: Add Component flow adds a Rigidbody via the popup menu
+  const addComp = await page.evaluate(() => {
+    const uc = window.unitycraft;
+    const target = uc.ed.objects.find((x) => x.userData.name === "PhysCube");
+    uc.select(target); // renders the Inspector for the selection
+    document.getElementById("addcomp-btn").click();
+    const btn = document.querySelector('#addcomp-menu [data-acomp="rigidbody"]');
+    if (!btn) return { ok: false, why: "menu item missing" };
+    btn.click();
+    const o = uc.ed.objects.find((x) => x.userData.name === "PhysCube");
+    return { ok: !!o.userData.components.rigidbody };
+  });
+  check("unitycraft: Add Component menu adds Rigidbody via Inspector", addComp.ok, JSON.stringify(addComp));
+  // Save/reload round-trip keeps engine components (shader + particles + rigidbody)
+  await page.evaluate(() => { document.querySelector('[data-act="save-scene"]').click(); });
+  const roundTrip = await page.evaluate(async () => {
+    const uc = window.unitycraft;
+    const spec = JSON.parse(uc.serializeScene());
+    uc.loadSceneFromSpec(spec);
+    const o = uc.ed.objects.find((x) => x.userData.name === "PhysCube");
+    return {
+      v: spec.v,
+      hasSettings: !!spec.settings,
+      shader: o.userData.mat.shader,
+      particles: !!o.userData.components.particles,
+      psRebuilt: !!o.userData.ps,
+      rigidbody: !!o.userData.components.rigidbody,
+      colliderShape: o.userData.components.collider.shape,
+    };
+  });
+  check("unitycraft: scene v2 format keeps shader + particles + rigidbody",
+    roundTrip.v === 2 && roundTrip.hasSettings && roundTrip.shader === "hologram" &&
+    roundTrip.particles && roundTrip.psRebuilt && roundTrip.rigidbody, JSON.stringify(roundTrip));
+  // Legacy v1 scene format (plain array) still loads
+  const legacyOk = await page.evaluate(() => {
+    const uc = window.unitycraft;
+    const n = uc.ed.objects.length;
+    const arr = JSON.parse(uc.serializeScene()).objects.map((o) => ({ ...o }));
+    uc.loadSceneFromSpec(arr);
+    return uc.ed.objects.length === n;
+  });
+  check("unitycraft: legacy v1 scene format (array) loads", legacyOk, String(legacyOk));
+  // Scene settings: fog + gravity apply and persist in the v2 format
+  const settingsOk = await page.evaluate(() => {
+    const uc = window.unitycraft;
+    uc.applySceneSettings({ sky: "dusk", fog: true, fogColor: "#3a4a58", fogDensity: 0.05, ambient: 0.9, gravity: -5, skyColor: "#262626" });
+    const spec = JSON.parse(uc.serializeScene());
+    return { fog: !!window.unitycraft.scene.fog, g: spec.settings.gravity, sky: spec.settings.sky };
+  });
+  check("unitycraft: scene settings (fog + gravity) apply and serialize",
+    settingsOk.fog && settingsOk.g === -5 && settingsOk.sky === "dusk", JSON.stringify(settingsOk));
   await zeroErrors("unitycraft");
 } catch (e) { check("unitycraft: suite ran", false, String(e).slice(0, 160)); }
 
