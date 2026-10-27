@@ -1,8 +1,81 @@
 # ChatCraft improvements — all changes, this build
 
-Everything below is implemented, tested (90/90 harness tests), and live.
-The "not built yet" cards that remain (Canvas, Video, Dashboards, Agents &
-automations) are listed at the bottom with what it would take to build them.
+Everything below is implemented, tested (110/110 harness tests), and live.
+
+## This build: every "not built yet" view, implemented
+
+The previous build shipped a Browser agent view that was dead on arrival
+(and the README still listed it as planned). This build fixes that and
+implements every remaining planned view that can be built honestly.
+
+### 0. Two shipped-breaking bugs fixed (the app was dead JS)
+- **The whole app's JavaScript was a syntax error**: the Browser-view CSS
+  had been pasted INSIDE the `<script>` block (dead code that kills the
+  entire script parse — no chat, no menus, nothing worked). Moved into the
+  stylesheet; the script now parses (verified with `new Function()`).
+- **The Browser view referenced `API_BASE`, a variable that never existed**
+  (the real variable is `API`): every browser-agent call threw
+  `ReferenceError` the moment the view opened, which is why it looked
+  "not built". All 6 call sites fixed and verified end-to-end with a real
+  Chromium drive (goto example.com, title + history captured).
+
+### 1. Browser agent — actually live now
+- Full live view: URL bar, screenshot, page text, numbered clickable
+  elements, back/scroll, History and Bookmarks sidebars persisted as JSON.
+- Chat drives the same session via ```browser blocks; the view refreshes
+  live as the model clicks through pages.
+
+### 2. Canvas — live
+- Split editor + live sandboxed-iframe preview (debounced), "Save to
+  Documents" writes into the workspace via a new `POST /api/files/<name>`
+  endpoint (path-traversal-stripped, same rules as chat-written files).
+
+### 3. Agents — live
+- Hire a bot: name, description, model, persona (system prompt). Stored
+  server-side (`data/agents.json`). "Chat" applies the bot's model +
+  persona to the next conversation. Fired bots are deletable.
+
+### 4. Skills — live
+- A skill is a reusable system prompt. Install / remove / apply to chat
+  from the Skills view (`data/skills.json`).
+
+### 5. Automations — live
+- A saved prompt on a timer: interval, model, enable/pause, "Run now".
+  A scheduler thread inside `server.py` checks every 20s; each run calls
+  the model and saves a markdown result to Documents. Honest cost guard:
+  created paused, 200-run lifetime cap, interval floored at 1 minute.
+
+### 6. Projects — live
+- Group workspace files into named projects (`data/projects.json`);
+  only files that actually exist are listed (ghosts dropped). The
+  sidebar's Projects section now renders REAL projects instead of the
+  old hardcoded demo names (which also removes the last fake content).
+
+### 7. Dashboards — live
+- The server records every chat turn (model, tokens, cost) into
+  `data/usage-log.json` (bounded at 500 entries) and the Dashboards view
+  charts it: messages-per-day bars, per-model breakdown, running total.
+  No history yet? It says so instead of faking charts.
+
+### 8. Plugins — honest
+- The Plugins view now lists the custom model endpoints that are actually
+  connected, and says plainly that a marketplace isn't built — endpoints
+  are the whole plugin surface today.
+
+### 9. Backend hardening & tests
+- New stores follow the existing stdlib-only JSON pattern; every new
+  endpoint is covered by 20 new harness tests (stores, scheduler run with
+  a stubbed model, live loopback HTTP smoke test, traversal check).
+  Harness: 110/110 green; the usage log is isolated from test runs so the
+  harness can't pollute real runtime state.
+
+### 10. Video studio — still honestly planned
+- Video generation needs an external video-gen API (Sora-style); none is
+  available on the platform proxy. The view says so rather than faking it.
+
+## Previous build's log (unchanged)
+
+Everything below is implemented, tested, and live.
 
 ## What ChatCraft does now
 
@@ -102,18 +175,17 @@ Measured (real runs, estimates from configured rates):
 | Advisor review | visible per message (0 when skipped) |
 
 ### 10. Testing
-- 90 mocked tests (`test_harness.py`) drive the full chat loop with
-  stubs: budget rounds, truncation, tool delivery, advisor packing,
-  continuation, browser blocks, state API, bookmarks/history persistence.
-- All 90 pass; harness must stay green after every `server.py` change.
+- The harness grew with the app: 110 mocked tests (`test_harness.py`)
+  drive the full chat loop with stubs: budget rounds, truncation, tool
+  delivery, advisor packing, continuation, browser blocks, state API,
+  bookmarks/history persistence, plus the new feature stores and endpoints.
+- All pass; harness must stay green after every `server.py` change.
 
 ## Still "not built yet" (honest list)
 
 | View | Status | What it would take |
 |---|---|---|
-| Canvas | not built | A collaborative document editor — needs a doc store + sync protocol (the workspace already persists files, so the backend half exists) |
 | Video | not built | Video generation needs an external generation API (OpenAI Sora-style) — no video-gen model is available on the current proxy |
-| Dashboards | not built | Saved queries + charts; data layer would come from the workspace files the agent already writes |
-| Agents & automations | not built | Cron-style scheduled runs of a saved prompt; needs a scheduler process next to the server |
+| Plugin marketplace | not built | A curated directory + install protocol; custom model endpoints are the live integration today |
 
-The Browser agent card was on this list and is now LIVE (improvement #7).
+Everything else that was on this list is now live (see the top of this file).

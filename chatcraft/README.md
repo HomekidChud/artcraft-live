@@ -108,9 +108,14 @@ model menu.
 
 ## Honest status
 
-Not built yet: agents, automations, browser agent, canvas, video studio,
-dashboards, projects, skills/plugins marketplace, sign-in. The UI marks these
-as "Planned" rather than faking them. No demo or sample content anywhere.
+Live: chat, advisor pass, model harness (files/commands/browsing/browser),
+the Browser agent live view, Canvas, Agents, Skills, Automations, Projects,
+Dashboards, Documents viewer, custom model endpoints (the plugin surface).
+
+Not built yet: video studio (needs a video generation API — none available
+on the platform proxy) and a plugin marketplace (custom endpoints are the
+live integration today). Those views say so rather than faking it. No demo
+or sample content anywhere.
 
 ## Deploying
 

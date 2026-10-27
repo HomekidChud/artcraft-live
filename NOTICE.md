@@ -136,10 +136,36 @@ The harness is tuned for minimal tokens per COMPLETED task:
 
 - `chatcraft/index.html` — the whole frontend (single file, no build step)
 - `chatcraft/server.py` — the backend (stdlib-only Python, serves UI + API on :8000)
-- `chatcraft/test_harness.py` — 30 offline tests; run `python3 test_harness.py` after any change
+- `chatcraft/test_harness.py` — 110 offline tests; run `python3 test_harness.py` after any change
 - `chatcraft/files/`, `chatcraft/data/` — runtime state (gitignored)
 
-## Recent changes in this repo (2026-10-27)
+## Recent changes in this repo (2026-10-27, build 2)
+
+1. **Two shipped-breaking bugs fixed**: the Browser-view CSS was pasted
+   INSIDE the `<script>` block (killed the whole app's JS parse), and the
+   browser view called an `API_BASE` variable that never existed (the real
+   one is `API`) — every browser-agent call threw ReferenceError on open.
+   Both fixed; the script is verified to parse and the browser view was
+   driven end-to-end with real Chromium.
+2. **Every remaining "not built yet" view implemented** (except video,
+   which needs a video-gen API): Canvas (editor + live iframe preview +
+   save-to-Documents via new `POST /api/files/<name>`), Agents (hire a
+   bot: model + persona, `data/agents.json`), Skills (reusable system
+   prompts, `data/skills.json`), Automations (timer + scheduler thread,
+   `data/automations.json`, created paused, 200-run cap, results saved to
+   Documents), Projects (`data/projects.json`, sidebar now lists real
+   projects), Dashboards (per-turn usage recorded to `data/usage-log.json`,
+   bounded 500, charted client-side), Plugins (honest list of connected
+   custom endpoints).
+3. **Sidebar demo content removed**: the hardcoded fake projects
+   ("ChatCraft UI kit", "Sourdough log") are gone — the Projects nav now
+   renders real projects from the API.
+4. Harness grew 90 → 110 tests: new feature stores, scheduler run with a
+   stubbed model, live loopback HTTP smoke test of every new endpoint,
+   path-traversal check on the file-write endpoint. The harness now also
+   isolates the usage log so test runs can't pollute runtime state.
+
+## Recent changes in this repo (2026-10-27, build 1)
 
 1. **Minimal steps UI** — the per-reply step timeline is now one compact
    collapsed line ("Working · …" while streaming, "N steps completed" /

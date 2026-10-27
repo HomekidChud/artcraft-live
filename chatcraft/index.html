@@ -713,6 +713,9 @@
   .field { margin: 14px 0; }
   .field label { display: block; font-size: 0.82rem; font-weight: 500; margin-bottom: 6px; }
   .field input { width: 100%; }
+  .field textarea { width: 100%; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px;
+    font-size: 0.84rem; font-family: inherit; resize: vertical; }
   .segment {
     display: inline-flex; background: var(--surface-2);
     border: 1px solid var(--border); border-radius: 10px; padding: 3px;
@@ -1500,6 +1503,78 @@
     .harness-grid { grid-template-columns: 1fr; }
   }
 
+  /* ---------- browser agent view (was dead code inside <script> — moved) ---------- */
+  /* -------------------------------------------------- browser agent --- */
+  .page-browser { max-width: 1080px; }
+  .browser-wrap { display: grid; grid-template-columns: 220px 1fr; gap: 14px; }
+  .browser-side { display: flex; flex-direction: column; gap: 14px; }
+  .bs-group { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px; padding: 12px; }
+  .bs-group h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; opacity: .6; margin: 0 0 8px; }
+  .bs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .bs-list li { display: flex; align-items: center; gap: 6px; }
+  .bs-list .bk-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0;
+    color: inherit; font-size: 13px; padding: 4px 6px; border-radius: 8px; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bs-list .bk-open:hover { background: rgba(255,255,255,.07); }
+  .bs-list .bk-del { background: none; border: 0; color: #c77; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 6px; }
+  .bs-list .bk-del:hover { background: rgba(200,80,80,.2); }
+  .browser-main { min-width: 0; }
+  .browser-bar { display: flex; gap: 8px; margin-bottom: 10px; }
+  .br-btn { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); color: inherit;
+    border-radius: 10px; padding: 0 12px; cursor: pointer; font-size: 14px; }
+  .br-btn:hover { background: rgba(255,255,255,.13); }
+  .br-btn.br-go { font-weight: 600; }
+  .br-input { flex: 1; min-width: 0; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px; padding: 8px 12px; color: inherit; font-size: 14px; }
+  .br-input:focus { outline: 1px solid #8b6bd6; }
+  .br-notice { font-size: 13px; padding: 8px 10px; border-radius: 10px; margin-bottom: 10px;
+    background: rgba(200,80,80,.15); border: 1px solid rgba(200,80,80,.35); }
+  .br-notice.ok { background: rgba(80,200,120,.12); border-color: rgba(80,200,120,.35); }
+  .browser-preview { padding: 12px; }
+  .br-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+  .br-title { font-weight: 600; }
+  .br-cur { font-size: 12px; opacity: .6; word-break: break-all; }
+  .br-shot { width: 100%; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); margin-bottom: 10px; }
+  .br-text { font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    max-height: 260px; overflow: auto; margin: 0 0 10px; opacity: .85; }
+  .br-els { display: flex; flex-wrap: wrap; gap: 6px; }
+  .br-el { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 8px;
+    font-size: 12px; padding: 4px 9px; cursor: pointer; color: inherit; max-width: 240px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .br-el:hover { background: rgba(139,107,214,.25); border-color: rgba(139,107,214,.5); }
+  .br-el .n { color: #8b6bd6; font-weight: 700; margin-right: 4px; }
+  .br-notice.hidden, .br-shot.hidden, .br-text.hidden { display: none; }
+  @media (max-width: 760px) { .browser-wrap { grid-template-columns: 1fr; } }
+
+  /* ---------- canvas ---------- */
+  .canvas-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  #cv-code { min-height: 420px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 14px; padding: 14px; color: inherit; font-family: ui-monospace, monospace;
+    font-size: 13px; line-height: 1.5; resize: vertical; }
+  #cv-code:focus { outline: 1px solid #8b6bd6; }
+  .canvas-preview { padding: 0; overflow: hidden; min-height: 420px; }
+  #cv-frame { width: 100%; height: 100%; min-height: 420px; border: 0; background: #fff; }
+  @media (max-width: 760px) { .canvas-wrap { grid-template-columns: 1fr; } }
+
+  /* ---------- feature views (agents/projects/skills/automations/plugins) ---------- */
+  .field-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .field-row .field { flex: 1; min-width: 160px; }
+  .feat-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 14px; margin-bottom: 8px; }
+  .feat-mid { flex: 1; min-width: 0; }
+  .feat-name { font-weight: 600; font-size: 0.92rem; }
+  .feat-meta { font-size: 0.78rem; color: var(--faint); word-break: break-word; }
+  .feat-act { display: flex; gap: 6px; flex: none; }
+
+  /* ---------- dashboards ---------- */
+  .db-bars { display: flex; align-items: flex-end; gap: 8px; height: 140px; padding: 8px 4px 0; }
+  .db-bar { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .db-bar .bar { background: linear-gradient(180deg, #8b6bd6, #6a4fc0); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .db-bar .lbl { text-align: center; font-size: 0.66rem; color: var(--faint); margin-top: 4px; }
+  .db-empty { padding: 30px 10px; text-align: center; color: var(--faint); font-size: 0.85rem; }
+
 </style>
 </head>
 <body>
@@ -1798,8 +1873,9 @@
                 <div class="sys-row"><span class="sdot"></span><span class="sr-label">Advisor pass</span><span class="sr-time">always on</span></div>
                 <div class="sys-row"><span class="sdot"></span><span class="sr-label">Files written by chat</span><span class="sr-time">live</span></div>
                 <div class="sys-row"><span class="sdot"></span><span class="sr-label">Browser agent: chat drives a real browser</span><span class="sr-time">live</span></div>
-                <div class="sys-row"><span class="sdot idle"></span><span class="sr-label">Agents & automations</span><span class="sr-time">not built yet</span></div>
-                <div class="sys-row"><span class="sdot idle"></span><span class="sr-label">Canvas, video & dashboards</span><span class="sr-time">not built yet</span></div>
+                <div class="sys-row"><span class="sdot"></span><span class="sr-label">Agents, skills & automations</span><span class="sr-time">live</span></div>
+                <div class="sys-row"><span class="sdot"></span><span class="sr-label">Canvas, projects & dashboards</span><span class="sr-time">live</span></div>
+                <div class="sys-row"><span class="sdot idle"></span><span class="sr-label">Video studio</span><span class="sr-time">needs a video API</span></div>
               </div>
             </div>
 
@@ -1870,13 +1946,20 @@
 
       <!-- ============ VIEW: CANVAS ============ -->
       <section class="view view-canvas" aria-label="Canvas">
-        <div class="page">
-          <div class="page-head"><h2>Canvas</h2></div>
-          <div class="card">
-            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
-            <p class="sandbox-sub">A live code canvas with preview is planned. For now, ask chat to write files and open them in the Documents viewer.</p>
+        <div class="page page-canvas">
+          <div class="page-head"><h2>Canvas</h2>
+            <div>
+              <input type="text" id="cv-name" placeholder="snippet.html" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:6px 10px;color:inherit;font-size:13px;width:150px;">
+              <button class="btn" id="cv-save">Save to Documents</button>
+              <button class="btn btn-ghost" id="cv-clear">New</button>
+            </div>
           </div>
-
+          <p class="page-sub">Write HTML/CSS/JS on the left, see it live on the right. Saves land in Documents.</p>
+          <div class="canvas-wrap">
+            <textarea id="cv-code" spellcheck="false" aria-label="Code editor"><h1>Hello canvas</h1>
+<p>Edit me on the left.</p></textarea>
+            <div class="canvas-preview card"><iframe id="cv-frame" sandbox="allow-scripts" title="Live preview"></iframe></div>
+          </div>
         </div>
       </section>
 
@@ -1939,30 +2022,19 @@
         <div class="page">
           <div class="page-head">
             <h2>Agents</h2>
-            <button class="btn">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              Hire a bot
-            </button>
           </div>
-          <p class="page-sub">Give it a name, a description, and a model. That's the whole hiring process.</p>
+          <p class="page-sub">Give it a name, a description, a model and a persona. That's the whole hiring process.</p>
           <div class="card">
-            <div class="run-top">
-              <h3>Agents aren't live yet</h3>
-              <span class="status-badge st-queue">Planned</span>
+            <div class="run-top" style="margin-bottom:10px;"><h3 style="font-size:0.95rem;">Hire a bot</h3></div>
+            <div class="field-row">
+              <div class="field"><label for="ag-name">Name</label><input type="text" id="ag-name" placeholder="Research buddy"></div>
+              <div class="field"><label for="ag-model">Model</label><select id="ag-model"></select></div>
             </div>
-            <p class="sandbox-sub">Chat, the advisor pass, file writing and the model harness are live. Hiring bots that run on schedules or work together is the next milestone — this view will hold them.</p>
+            <div class="field"><label for="ag-desc">Description</label><input type="text" id="ag-desc" placeholder="What is it for?"></div>
+            <div class="field"><label for="ag-system">Persona (system prompt)</label><textarea id="ag-system" rows="3" placeholder="You are a meticulous researcher. Cite sources."></textarea></div>
+            <button class="btn" id="ag-add">Hire</button>
           </div>
-
-          <div class="card">
-            <div class="run-top" style="margin-bottom: 10px;">
-              <h3 style="font-size: 0.95rem;">What you can do now</h3>
-            </div>
-            <div class="feed-row"><span class="favatar">1</span><span>Chat with any of the 9 built-in models or your own endpoints</span></div>
-            <div class="feed-row"><span class="favatar">2</span><span>Watch every turn's steps: read, advisor, reply, files</span></div>
-            <div class="feed-row"><span class="favatar">3</span><span>Ask chat to write files and manage them in Documents</span></div>
-            <div class="feed-row"><span class="favatar">4</span><span>Tune cost and quality in Settings</span></div>
-          </div>
-
+          <div id="ag-list" style="margin-top:12px;"></div>
         </div>
       </section>
 
@@ -1971,15 +2043,16 @@
         <div class="page">
           <div class="page-head">
             <h2>Projects</h2>
-            <button class="btn">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-              New project
-            </button>
           </div>
+          <p class="page-sub">Group the files your chats write into projects. Files stay in Documents; projects just organise them.</p>
           <div class="card">
-            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
-            <p class="sandbox-sub">Projects that group files and chats are planned. Your files live in Documents for now.</p>
+            <div class="field-row">
+              <div class="field"><label for="pj-name">New project name</label><input type="text" id="pj-name" placeholder="Sourdough log"></div>
+              <div class="field"><label for="pj-desc">Description</label><input type="text" id="pj-desc" placeholder="What's it for?"></div>
+            </div>
+            <button class="btn" id="pj-add">Create project</button>
           </div>
+          <div id="pj-list" style="margin-top:12px;"></div>
         </div>
       </section>
 
@@ -1988,12 +2061,14 @@
         <div class="page">
           <div class="page-head">
             <h2>Skills</h2>
-            <button class="btn btn-ghost">Manage</button>
           </div>
+          <p class="page-sub">A skill is a reusable system prompt. Install one, then apply it to any chat.</p>
           <div class="card">
-            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
-            <p class="sandbox-sub">Custom skills are not installable yet. The model harness and settings are live.</p>
+            <div class="field"><label for="sk-name">Skill name</label><input type="text" id="sk-name" placeholder="Terse mode"></div>
+            <div class="field"><label for="sk-prompt">Prompt</label><textarea id="sk-prompt" rows="3" placeholder="Answer in bullet points only. Max 5 bullets."></textarea></div>
+            <button class="btn" id="sk-add">Install skill</button>
           </div>
+          <div id="sk-list" style="margin-top:12px;"></div>
         </div>
       </section>
 
@@ -2002,11 +2077,12 @@
         <div class="page">
           <div class="page-head">
             <h2>Plugins</h2>
-            <button class="btn btn-ghost">Browse directory</button>
           </div>
+          <p class="page-sub">Custom model endpoints are the live integration: add any OpenAI- or Anthropic-compatible endpoint and it appears in every model menu.</p>
           <div class="card">
-            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
-            <p class="sandbox-sub">No plugins are connected yet. Custom model endpoints are the live integration today.</p>
+            <div class="run-top"><h3>Connected endpoints</h3><span class="status-badge st-ok" id="pl-count">—</span></div>
+            <div id="pl-list"></div>
+            <p class="sandbox-sub" style="margin-top:10px;">Manage them in Settings → Custom models. A plugin marketplace isn't built — endpoints are the whole plugin surface today.</p>
           </div>
         </div>
       </section>
@@ -2015,10 +2091,17 @@
       <section class="view view-automations" aria-label="Automations">
         <div class="page">
           <div class="page-head"><h2>Automations</h2></div>
+          <p class="page-sub">A saved prompt on a timer. Each run calls the model and saves the result to Documents. Costs real tokens per run — keep intervals long.</p>
           <div class="card">
-            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
-            <p class="sandbox-sub">Scheduled and trigger-based runs are the next milestone. Chat is live today; automations that fire on a timer or an event will live here.</p>
+            <div class="field-row">
+              <div class="field"><label for="au-name">Name</label><input type="text" id="au-name" placeholder="Morning digest"></div>
+              <div class="field"><label for="au-interval">Every (minutes)</label><input type="number" id="au-interval" min="1" value="60"></div>
+              <div class="field"><label for="au-model">Model</label><select id="au-model"></select></div>
+            </div>
+            <div class="field"><label for="au-prompt">Prompt</label><textarea id="au-prompt" rows="2" placeholder="Summarise today's workspace files in 5 bullets."></textarea></div>
+            <button class="btn" id="au-add">Create automation</button>
           </div>
+          <div id="au-list" style="margin-top:12px;"></div>
         </div>
       </section>
 
@@ -2026,9 +2109,12 @@
       <section class="view view-dashboards" aria-label="Dashboards">
         <div class="page">
           <div class="page-head"><h2>Dashboards</h2></div>
+          <p class="page-sub">Real usage from your own chats: messages per day, tokens, and estimated cost.</p>
           <div class="card">
-            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
-            <p class="sandbox-sub">No data pipelines are connected yet. Dashboards will chart your real usage once there is history to chart.</p>
+            <div class="run-top"><h3>Messages per day</h3><span class="status-badge st-ok" id="db-total">—</span></div>
+            <div id="db-chart"></div>
+            <div id="db-models" style="margin-top:12px;"></div>
+            <p class="sandbox-sub" style="margin-top:10px;">Charts your own chat history once there is history to chart. Cost figures are estimates from the configured per-model rates.</p>
           </div>
         </div>
       </section>
@@ -2561,7 +2647,7 @@
   }
 
   function brRefresh() {
-    apiFetch(API_BASE + "/api/browser/state").then(function (r) { return r.json(); })
+    apiFetch(API + "/api/browser/state").then(function (r) { return r.json(); })
       .then(function (d) {
         if (d.err) brNotice(d.err);
         else brRender(d.state);
@@ -2570,10 +2656,10 @@
   }
 
   function brSidebars() {
-    apiFetch(API_BASE + "/api/browser/bookmarks").then(function (r) { return r.json(); })
+    apiFetch(API + "/api/browser/bookmarks").then(function (r) { return r.json(); })
       .then(function (d) { brRenderList("bm-list", d.bookmarks, true); })
       .catch(function () {});
-    apiFetch(API_BASE + "/api/browser/history").then(function (r) { return r.json(); })
+    apiFetch(API + "/api/browser/history").then(function (r) { return r.json(); })
       .then(function (d) { brRenderList("bh-list", d.history, false); })
       .catch(function () {});
   }
@@ -2594,7 +2680,7 @@
         var del = document.createElement("button");
         del.className = "bk-del"; del.textContent = "\u00d7"; del.title = "Remove bookmark";
         del.onclick = function () {
-          apiFetch(API_BASE + "/api/browser/bookmarks?url=" + encodeURIComponent(it.url),
+          apiFetch(API + "/api/browser/bookmarks?url=" + encodeURIComponent(it.url),
                    { method: "DELETE" }).then(function () { brSidebars(); });
         };
         li.appendChild(del);
@@ -2613,7 +2699,7 @@
     var body = { action: action };
     if (kw) Object.assign(body, kw);
     brNotice("Working…", true);
-    apiFetch(API_BASE + "/api/browser/action", {
+    apiFetch(API + "/api/browser/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
@@ -2646,7 +2732,7 @@
       var url = cur ? cur.textContent.trim() : "";
       if (!url) { brNotice("Open a page first"); return; }
       var title = (document.getElementById("br-title").textContent || "") || url;
-      apiFetch(API_BASE + "/api/browser/bookmarks", {
+      apiFetch(API + "/api/browser/bookmarks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url, title: title })
@@ -2849,48 +2935,6 @@
     scrollThread();
   }
 
-  /* -------------------------------------------------- browser agent --- */
-  .page-browser { max-width: 1080px; }
-  .browser-wrap { display: grid; grid-template-columns: 220px 1fr; gap: 14px; }
-  .browser-side { display: flex; flex-direction: column; gap: 14px; }
-  .bs-group { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
-    border-radius: 14px; padding: 12px; }
-  .bs-group h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; opacity: .6; margin: 0 0 8px; }
-  .bs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-  .bs-list li { display: flex; align-items: center; gap: 6px; }
-  .bs-list .bk-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0;
-    color: inherit; font-size: 13px; padding: 4px 6px; border-radius: 8px; cursor: pointer;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .bs-list .bk-open:hover { background: rgba(255,255,255,.07); }
-  .bs-list .bk-del { background: none; border: 0; color: #c77; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 6px; }
-  .bs-list .bk-del:hover { background: rgba(200,80,80,.2); }
-  .browser-main { min-width: 0; }
-  .browser-bar { display: flex; gap: 8px; margin-bottom: 10px; }
-  .br-btn { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); color: inherit;
-    border-radius: 10px; padding: 0 12px; cursor: pointer; font-size: 14px; }
-  .br-btn:hover { background: rgba(255,255,255,.13); }
-  .br-btn.br-go { font-weight: 600; }
-  .br-input { flex: 1; min-width: 0; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
-    border-radius: 10px; padding: 8px 12px; color: inherit; font-size: 14px; }
-  .br-input:focus { outline: 1px solid #8b6bd6; }
-  .br-notice { font-size: 13px; padding: 8px 10px; border-radius: 10px; margin-bottom: 10px;
-    background: rgba(200,80,80,.15); border: 1px solid rgba(200,80,80,.35); }
-  .br-notice.ok { background: rgba(80,200,120,.12); border-color: rgba(80,200,120,.35); }
-  .browser-preview { padding: 12px; }
-  .br-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
-  .br-title { font-weight: 600; }
-  .br-cur { font-size: 12px; opacity: .6; word-break: break-all; }
-  .br-shot { width: 100%; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); margin-bottom: 10px; }
-  .br-text { font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
-    max-height: 260px; overflow: auto; margin: 0 0 10px; opacity: .85; }
-  .br-els { display: flex; flex-wrap: wrap; gap: 6px; }
-  .br-el { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 8px;
-    font-size: 12px; padding: 4px 9px; cursor: pointer; color: inherit; max-width: 240px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .br-el:hover { background: rgba(139,107,214,.25); border-color: rgba(139,107,214,.5); }
-  .br-el .n { color: #8b6bd6; font-weight: 700; margin-right: 4px; }
-  .br-notice.hidden, .br-shot.hidden, .br-text.hidden { display: none; }
-  @media (max-width: 760px) { .browser-wrap { grid-template-columns: 1fr; } }
 
   /* ---------- files: cards, viewer, browser ---------- */
   function fmtSize(n) {
@@ -3415,6 +3459,8 @@
     fillModelMenu($("#comp-model-menu"), false);
     fillModelMenu(hsModel, true);
     fillModelMenu(hsAdvisorModel, true, true); // advisor: platform models only
+    fillModelSelect(document.getElementById("ag-model"), false);
+    fillModelSelect(document.getElementById("au-model"), true);
     // first load only: if the defaults aren't usable (no API key), switch to
     // the first model that actually works so a fresh visitor isn't stuck
     if (!refreshModelUI.picked) {
@@ -3631,6 +3677,444 @@
       toast("Pairing isn't wired up yet");
     });
   });
+
+  /* ---------- canvas: live editor + preview + save ---------- */
+  (function cvInit() {
+    var code = document.getElementById("cv-code");
+    var frame = document.getElementById("cv-frame");
+    var save = document.getElementById("cv-save");
+    var clear = document.getElementById("cv-clear");
+    var name = document.getElementById("cv-name");
+    if (!code || !frame) return;
+    var t = null;
+    function render() {
+      frame.srcdoc = code.value;
+    }
+    code.addEventListener("input", function () {
+      clearTimeout(t);
+      t = setTimeout(render, 400);
+    });
+    render();
+    if (clear) clear.addEventListener("click", function () {
+      code.value = "<h1>Hello canvas</h1>\n<p>Edit me on the left.</p>";
+      if (name) name.value = "";
+      render();
+    });
+    if (save) save.addEventListener("click", function () {
+      var fname = (name && name.value.trim()) || "canvas.html";
+      if (!fname.includes(".")) fname += ".html";
+      apiFetch(API + "/api/files/" + encodeURIComponent(fname), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: code.value })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (d.error) { toast(d.error); return; }
+        toast("Saved " + fname + " to Documents");
+        loadFiles();
+      }).catch(function () { toast("Backend unreachable"); });
+    });
+  })();
+
+  /* ---------- feature views: agents / skills / automations / projects / plugins ---------- */
+  function featRow(mid, actions) {
+    var row = document.createElement("div");
+    row.className = "feat-row";
+    row.appendChild(mid);
+    var act = document.createElement("div");
+    act.className = "feat-act";
+    actions.forEach(function (a) { act.appendChild(a); });
+    row.appendChild(act);
+    return row;
+  }
+  function featMid(name, meta) {
+    var mid = document.createElement("div");
+    mid.className = "feat-mid";
+    var n = document.createElement("div");
+    n.className = "feat-name";
+    n.textContent = name;
+    var m = document.createElement("div");
+    m.className = "feat-meta";
+    m.textContent = meta;
+    mid.appendChild(n);
+    mid.appendChild(m);
+    return mid;
+  }
+  function smallBtn(label, title, fn) {
+    var b = document.createElement("button");
+    b.className = "btn btn-ghost";
+    b.textContent = label;
+    if (title) b.title = title;
+    b.addEventListener("click", fn);
+    return b;
+  }
+  function fillModelSelect(sel, withEmpty) {
+    if (!sel) return;
+    sel.innerHTML = "";
+    if (withEmpty) {
+      var o = document.createElement("option");
+      o.value = "";
+      o.textContent = "Default model";
+      sel.appendChild(o);
+    }
+    MODELS.forEach(function (m) {
+      var o = document.createElement("option");
+      o.value = m.id;
+      o.textContent = m.label;
+      sel.appendChild(o);
+    });
+  }
+
+  // ---- agents ----
+  function loadAgents() {
+    var list = document.getElementById("ag-list");
+    if (!list) return;
+    apiFetch(API + "/api/agents").then(function (r) { return r.json(); })
+      .then(function (d) { renderAgents(d.agents || []); })
+      .catch(function () {});
+  }
+  function renderAgents(agents) {
+    var list = document.getElementById("ag-list");
+    list.innerHTML = "";
+    if (!agents.length) {
+      var e = document.createElement("div");
+      e.className = "db-empty";
+      e.textContent = "No bots hired yet.";
+      list.appendChild(e);
+      return;
+    }
+    agents.forEach(function (a) {
+      var m = MODELS.find(function (x) { return x.id === a.model; });
+      var meta = (a.description || "") + " · " + (m ? m.label : (a.model || "default model"));
+      var mid = featMid(a.name, meta);
+      var chat = smallBtn("Chat", "Open chat with this bot", function () {
+        if (a.model) setModel(a.model);
+        chatState.system = a.system || "";
+        var hsSystem = document.getElementById("hs-system");
+        if (hsSystem) hsSystem.value = chatState.system;
+        document.getElementById("v-chat-1").checked = true;
+        toast("Chatting as " + a.name + (a.model ? " · " + a.model : ""));
+      });
+      var del = smallBtn("\u2715", "Fire this bot", function () {
+        apiFetch(API + "/api/agents/" + encodeURIComponent(a.id), { method: "DELETE" })
+          .then(function () { loadAgents(); });
+      });
+      list.appendChild(featRow(mid, [chat, del]));
+    });
+  }
+  var agAdd = document.getElementById("ag-add");
+  if (agAdd) agAdd.addEventListener("click", function () {
+    var payload = {
+      name: document.getElementById("ag-name").value.trim(),
+      description: document.getElementById("ag-desc").value.trim(),
+      model: document.getElementById("ag-model").value,
+      system: document.getElementById("ag-system").value.trim()
+    };
+    if (!payload.name) { toast("Give the bot a name"); return; }
+    apiFetch(API + "/api/agents", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.error) { toast(d.error); return; }
+      ["ag-name", "ag-desc", "ag-system"].forEach(function (id) { document.getElementById(id).value = ""; });
+      toast("Hired " + payload.name);
+      loadAgents();
+    }).catch(function () { toast("Backend unreachable"); });
+  });
+
+  // ---- skills ----
+  function loadSkills() {
+    var list = document.getElementById("sk-list");
+    if (!list) return;
+    apiFetch(API + "/api/skills").then(function (r) { return r.json(); })
+      .then(function (d) { renderSkills(d.skills || []); })
+      .catch(function () {});
+  }
+  function renderSkills(skills) {
+    var list = document.getElementById("sk-list");
+    list.innerHTML = "";
+    if (!skills.length) {
+      var e = document.createElement("div");
+      e.className = "db-empty";
+      e.textContent = "No skills installed yet.";
+      list.appendChild(e);
+      return;
+    }
+    skills.forEach(function (s) {
+      var mid = featMid(s.name, (s.prompt || "").slice(0, 120));
+      var use = smallBtn("Apply", "Use this skill in chat", function () {
+        chatState.system = s.prompt;
+        var hsSystem = document.getElementById("hs-system");
+        if (hsSystem) hsSystem.value = s.prompt;
+        document.getElementById("v-chat-1").checked = true;
+        toast("Skill applied: " + s.name);
+      });
+      var del = smallBtn("\u2715", "Remove skill", function () {
+        apiFetch(API + "/api/skills/" + encodeURIComponent(s.id), { method: "DELETE" })
+          .then(function () { loadSkills(); });
+      });
+      list.appendChild(featRow(mid, [use, del]));
+    });
+  }
+  var skAdd = document.getElementById("sk-add");
+  if (skAdd) skAdd.addEventListener("click", function () {
+    var payload = {
+      name: document.getElementById("sk-name").value.trim(),
+      prompt: document.getElementById("sk-prompt").value.trim()
+    };
+    if (!payload.name || !payload.prompt) { toast("Name and prompt are required"); return; }
+    apiFetch(API + "/api/skills", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.error) { toast(d.error); return; }
+      document.getElementById("sk-name").value = "";
+      document.getElementById("sk-prompt").value = "";
+      toast("Installed skill: " + payload.name);
+      loadSkills();
+    }).catch(function () { toast("Backend unreachable"); });
+  });
+
+  // ---- automations ----
+  function loadAutomations() {
+    var list = document.getElementById("au-list");
+    if (!list) return;
+    apiFetch(API + "/api/automations").then(function (r) { return r.json(); })
+      .then(function (d) { renderAutomations(d.automations || []); })
+      .catch(function () {});
+  }
+  function renderAutomations(autos) {
+    var list = document.getElementById("au-list");
+    list.innerHTML = "";
+    if (!autos.length) {
+      var e = document.createElement("div");
+      e.className = "db-empty";
+      e.textContent = "No automations yet.";
+      list.appendChild(e);
+      return;
+    }
+    autos.forEach(function (a) {
+      var state = a.enabled ? "enabled" : "paused";
+      var last = a.last_run ? new Date(a.last_run * 1000).toLocaleString() : "never";
+      var mid = featMid(a.name, "every " + a.interval_min + " min · " + state +
+        " · runs: " + a.runs + " · last: " + last +
+        (a.last_result ? " · " + a.last_result : ""));
+      var toggle = smallBtn(a.enabled ? "Pause" : "Enable", "", function () {
+        a.enabled = !a.enabled;
+        apiFetch(API + "/api/automations", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(a)
+        }).then(function () { loadAutomations(); });
+      });
+      var run = smallBtn("Run now", "Run once immediately", function () {
+        run.textContent = "Running…";
+        apiFetch(API + "/api/automations/" + encodeURIComponent(a.id) + "/run", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: "{}"
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          toast(d.ok ? "Ran — result saved to Documents" : ("Failed: " + d.result));
+          loadAutomations();
+          loadFiles();
+        }).catch(function () { toast("Backend unreachable"); });
+      });
+      var del = smallBtn("\u2715", "Delete automation", function () {
+        apiFetch(API + "/api/automations/" + encodeURIComponent(a.id), { method: "DELETE" })
+          .then(function () { loadAutomations(); });
+      });
+      list.appendChild(featRow(mid, [toggle, run, del]));
+    });
+  }
+  var auAdd = document.getElementById("au-add");
+  if (auAdd) auAdd.addEventListener("click", function () {
+    var payload = {
+      name: document.getElementById("au-name").value.trim(),
+      prompt: document.getElementById("au-prompt").value.trim(),
+      interval_min: parseInt(document.getElementById("au-interval").value, 10) || 60,
+      model: document.getElementById("au-model").value,
+      enabled: false
+    };
+    if (!payload.name || !payload.prompt) { toast("Name and prompt are required"); return; }
+    apiFetch(API + "/api/automations", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.error) { toast(d.error); return; }
+      document.getElementById("au-name").value = "";
+      document.getElementById("au-prompt").value = "";
+      toast("Created " + payload.name + " (paused — enable it to start)");
+      loadAutomations();
+    }).catch(function () { toast("Backend unreachable"); });
+  });
+
+  // ---- projects ----
+  function loadProjects() {
+    var list = document.getElementById("pj-list");
+    if (!list) return;
+    apiFetch(API + "/api/projects").then(function (r) { return r.json(); })
+      .then(function (d) { renderProjects(d.projects || []); renderSideProjects(d.projects || []); })
+      .catch(function () {});
+  }
+  function renderProjects(projects) {
+    var list = document.getElementById("pj-list");
+    list.innerHTML = "";
+    if (!projects.length) {
+      var e = document.createElement("div");
+      e.className = "db-empty";
+      e.textContent = "No projects yet.";
+      list.appendChild(e);
+      return;
+    }
+    projects.forEach(function (p) {
+      var mid = featMid(p.name, (p.description || "") +
+        (p.files.length ? " · " + p.files.length + " file(s): " + p.files.join(", ") : " · no files"));
+      var addF = smallBtn("+ file", "Add a workspace file to this project", function () {
+        apiFetch(API + "/api/files").then(function (r) { return r.json(); }).then(function (d) {
+          var names = (d.files || []).map(function (f) { return f.name; });
+          if (!names.length) { toast("No workspace files to add yet"); return; }
+          var pick = prompt("Add which file?\n" + names.join("\n"), "");
+          if (!pick || names.indexOf(pick) === -1) return;
+          p.files.push(pick);
+          apiFetch(API + "/api/projects", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(p)
+          }).then(function () { loadProjects(); });
+        });
+      });
+      var del = smallBtn("\u2715", "Delete project", function () {
+        apiFetch(API + "/api/projects/" + encodeURIComponent(p.id), { method: "DELETE" })
+          .then(function () { loadProjects(); });
+      });
+      list.appendChild(featRow(mid, [addF, del]));
+    });
+  }
+  function renderSideProjects(projects) {
+    var nav = document.querySelector('.side-scroll nav[aria-label="Projects"]');
+    if (!nav) return;
+    nav.innerHTML = '<h3 class="side-label">Projects</h3>';
+    projects.forEach(function (p) {
+      var l = document.createElement("div");
+      l.className = "proj-item";
+      l.style.cursor = "pointer";
+      l.textContent = p.name;
+      l.title = p.description || "";
+      l.addEventListener("click", function () {
+        document.getElementById("v-projects").checked = true;
+      });
+      nav.appendChild(l);
+    });
+  }
+  var pjAdd = document.getElementById("pj-add");
+  if (pjAdd) pjAdd.addEventListener("click", function () {
+    var payload = {
+      name: document.getElementById("pj-name").value.trim(),
+      description: document.getElementById("pj-desc").value.trim()
+    };
+    if (!payload.name) { toast("Give the project a name"); return; }
+    apiFetch(API + "/api/projects", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      if (d.error) { toast(d.error); return; }
+      document.getElementById("pj-name").value = "";
+      document.getElementById("pj-desc").value = "";
+      toast("Created project " + payload.name);
+      loadProjects();
+    }).catch(function () { toast("Backend unreachable"); });
+  });
+
+  // ---- plugins: custom endpoints list ----
+  function renderPlugins() {
+    var list = document.getElementById("pl-list");
+    if (!list) return;
+    var customs = MODELS.filter(function (m) { return m.custom; });
+    var count = document.getElementById("pl-count");
+    if (count) count.textContent = customs.length + " connected";
+    list.innerHTML = "";
+    if (!customs.length) {
+      var e = document.createElement("div");
+      e.className = "db-empty";
+      e.textContent = "No custom endpoints yet — add one in Settings → Custom models.";
+      list.appendChild(e);
+      return;
+    }
+    customs.forEach(function (m) {
+      var mid = featMid(m.label, (m.provider || "") + " · " + (m.model_name || ""));
+      list.appendChild(featRow(mid, []));
+    });
+  }
+
+  // ---- dashboards ----
+  function loadUsage() {
+    var chart = document.getElementById("db-chart");
+    if (!chart) return;
+    apiFetch(API + "/api/usage").then(function (r) { return r.json(); })
+      .then(function (d) { renderUsage(d.log || []); })
+      .catch(function () {});
+  }
+  function renderUsage(log) {
+    var chart = document.getElementById("db-chart");
+    var modelsEl = document.getElementById("db-models");
+    var totalEl = document.getElementById("db-total");
+    chart.innerHTML = "";
+    if (!log.length) {
+      var e = document.createElement("div");
+      e.className = "db-empty";
+      e.textContent = "No chats yet — usage appears here after your first message.";
+      chart.appendChild(e);
+      if (totalEl) totalEl.textContent = "0 messages";
+      return;
+    }
+    // group by day
+    var days = {};
+    log.forEach(function (entry) {
+      var d = new Date(entry.ts * 1000);
+      var key = d.toISOString().slice(0, 10);
+      days[key] = days[key] || { n: 0, cost: 0 };
+      days[key].n += 1;
+      days[key].cost += entry.cost_usd || 0;
+    });
+    var keys = Object.keys(days).sort().slice(-14);
+    var max = Math.max.apply(null, keys.map(function (k) { return days[k].n; }));
+    var bars = document.createElement("div");
+    bars.className = "db-bars";
+    keys.forEach(function (k) {
+      var bar = document.createElement("div");
+      bar.className = "db-bar";
+      var fill = document.createElement("div");
+      fill.className = "bar";
+      fill.style.height = Math.round(days[k].n / max * 100) + "%";
+      fill.title = days[k].n + " messages · ~$" + days[k].cost.toFixed(4);
+      var lbl = document.createElement("div");
+      lbl.className = "lbl";
+      lbl.textContent = k.slice(5);
+      bar.appendChild(fill);
+      bar.appendChild(lbl);
+      bars.appendChild(bar);
+    });
+    chart.appendChild(bars);
+    if (totalEl) totalEl.textContent = log.length + " messages";
+    if (modelsEl) {
+      modelsEl.innerHTML = "";
+      var byModel = {};
+      log.forEach(function (entry) { byModel[entry.model] = (byModel[entry.model] || 0) + 1; });
+      Object.keys(byModel).forEach(function (m) {
+        modelsEl.appendChild(featMid(m, byModel[m] + " message(s)"));
+      });
+    }
+  }
+
+  // wire view activation
+  $$('input[name="view"]').forEach(function (r) {
+    r.addEventListener("change", function () {
+      if (r.id === "v-agents") loadAgents();
+      if (r.id === "v-skills") loadSkills();
+      if (r.id === "v-automations") loadAutomations();
+      if (r.id === "v-projects") loadProjects();
+      if (r.id === "v-plugins") renderPlugins();
+      if (r.id === "v-dashboards") loadUsage();
+    });
+  });
+  fillModelSelect(document.getElementById("ag-model"), false);
+  fillModelSelect(document.getElementById("au-model"), true);
+  loadAgents(); loadSkills(); loadAutomations(); loadProjects(); loadUsage();
 
   /* ---------- animate meters when the agents view opens ---------- */
   document.addEventListener("change", function (e) {

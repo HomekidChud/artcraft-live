@@ -39,6 +39,11 @@ DATA_DIR = BASE_DIR / "data"           # custom-model records (gitignored)
 FILES_DIR.mkdir(exist_ok=True)
 DATA_DIR.mkdir(exist_ok=True)
 CUSTOM_FILE = DATA_DIR / "custom_models.json"
+PROJECTS_FILE = DATA_DIR / "projects.json"
+AGENTS_FILE = DATA_DIR / "agents.json"
+SKILLS_FILE = DATA_DIR / "skills.json"
+AUTOMATIONS_FILE = DATA_DIR / "automations.json"
+USAGE_LOG_FILE = DATA_DIR / "usage-log.json"
 
 PORT = int(os.environ.get("PORT", "8000"))
 HOST = os.environ.get("CHATCRAFT_HOST", "127.0.0.1")  # loopback by default
@@ -972,8 +977,9 @@ BROWSER_DATA = {"history": DATA_DIR / "browser-history.json",
 
 
 def _load_json(path, default):
+    """Read JSON, falling back to the default when missing/corrupt."""
     try:
-        return json.loads(path.read_text())
+        return json.loads(Path(path).read_text())
     except Exception:
         return default
 
@@ -1091,6 +1097,14 @@ def browser_action(action, **kw):
     return (val, "") if tag == "ok" else (None, str(val)[:150])
 
 
+def _save_json(path, data):
+    """Write JSON, best-effort (state files must never crash the server)."""
+    try:
+        Path(path).write_text(json.dumps(data, indent=2))
+    except Exception:
+        pass
+
+
 def browser_state():
     """Current snapshot, or (None, reason) when the session never started."""
     if not BROWSER_ENABLED:
@@ -1140,6 +1154,142 @@ def run_command(cmd):
         return -1, f"timed out after {CMD_TIMEOUT}s"
     except Exception as e:
         return -1, str(e)[:300]
+
+
+# ------------------------------------------------------------ feature stores ---
+# Projects / agents / skills / automations / usage: small JSON stores in
+# data/ (gitignored runtime state), same pattern as custom models.
+
+import uuid as _uuid
+
+
+def _new_id():
+    return _uuid.uuid4().hex[:10]
+
+
+# ------- projects: group existing workspace files -------
+
+def load_projects():
+    return _load_json(PROJECTS_FILE, [])
+
+
+def save_projects(p):
+    _save_json(PROJECTS_FILE, p)
+
+
+def project_record(p):
+    files = [f for f in p.get("files", []) if (FILES_DIR / f).is_file()]
+    return {"id": p["id"], "name": p["name"], "description": p.get("description", ""),
+            "files": files, "created": p.get("created", 0)}
+
+
+# ------- agents: named personas (model + system prompt) -------
+
+def load_agents():
+    return _load_json(AGENTS_FILE, [])
+
+
+def save_agents(a):
+    _save_json(AGENTS_FILE, a)
+
+
+# ------- skills: reusable system-prompt presets -------
+
+def load_skills():
+    return _load_json(SKILLS_FILE, [])
+
+
+def save_skills(s):
+    _save_json(SKILLS_FILE, s)
+
+
+# ------- automations: scheduled prompt runs -------
+
+def load_automations():
+    return _load_json(AUTOMATIONS_FILE, [])
+
+
+def save_automations(a):
+    _save_json(AUTOMATIONS_FILE, a)
+
+
+# ------- usage log (dashboards) -------
+
+def record_usage(entry):
+    """Append one chat turn's usage. Bounded: keep the last 500 entries."""
+    log = _load_json(USAGE_LOG_FILE, [])
+    log.append(entry)
+    _save_json(USAGE_LOG_FILE, log[-500:])
+
+
+# ------------------------------------------------------------ scheduler ---
+
+def run_automation_once(a):
+    """Run one automation: model call on its prompt, reply saved to a
+    workspace file. Returns (ok, filename_or_error)."""
+    model = find_model(a.get("model") or DEFAULT_MODEL)
+    model, err = model_status(model)
+    if err:
+        return False, err
+    system = ("You are a scheduled automation run. Produce a short, useful "
+              "result for the prompt below. Write markdown.")
+    chunks = []
+    try:
+        for kind, payload in model_stream(model, [{"role": "user",
+                                                 "content": a["prompt"]}],
+                                         system, 768, None):
+            if kind == "text" and payload:
+                chunks.append(payload)
+    except Exception as e:
+        return False, str(e)[:150]
+    text = "".join(chunks).strip()
+    if not text:
+        return False, "model returned no text"
+    ts = time.strftime("%Y%m%d-%H%M%S")
+    safe = re.sub(r"[^\w.-]+", "-", a.get("name", "run"))[:30] or "run"
+    fname = f"automation-{safe}-{ts}.md"
+    (FILES_DIR / fname).write_text(
+        f"# {a.get('name', 'run')} — {time.strftime('%Y-%m-%d %H:%M')}\n\n"
+        f"prompt: {a['prompt']}\n\n---\n\n{text}", encoding="utf-8")
+    return True, fname
+
+
+def _automation_loop():
+    """Scheduler thread: every 20s, run any automation whose interval has
+    elapsed. Bounded: an automation stops after 200 runs (cost guard)."""
+    while True:
+        time.sleep(20)
+        try:
+            autos = load_automations()
+            changed = False
+            for a in autos:
+                if not a.get("enabled"):
+                    continue
+                if a.get("runs", 0) >= 200:
+                    continue
+                interval = max(60, int(a.get("interval_min") or 60))
+                if time.time() - a.get("last_run", 0) < interval * 60:
+                    continue
+                ok, detail = run_automation_once(a)
+                a["last_run"] = time.time()
+                a["runs"] = a.get("runs", 0) + 1
+                a["last_result"] = ("ok: " if ok else "failed: ") + str(detail)[:120]
+                changed = True
+            if changed:
+                save_automations(autos)
+        except Exception:
+            pass
+
+
+_scheduler_started = False
+
+
+def start_scheduler():
+    global _scheduler_started
+    if _scheduler_started:
+        return
+    _scheduler_started = True
+    threading.Thread(target=_automation_loop, daemon=True).start()
 
 
 # ------------------------------------------------------------------- server ---
@@ -1269,6 +1419,19 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"models": [
                 {k: v for k, v in m.items() if k != "api_key"} | {"custom": True}
                 for m in load_custom_models()]})
+        # ---- feature stores ----
+        if path == "/api/projects":
+            return self._send(200, {"projects": [project_record(p)
+                                                 for p in load_projects()]})
+        if path == "/api/agents":
+            return self._send(200, {"agents": load_agents()})
+        if path == "/api/skills":
+            return self._send(200, {"skills": load_skills()})
+        if path == "/api/automations":
+            return self._send(200, {"automations": load_automations()})
+        if path == "/api/usage":
+            log = _load_json(USAGE_LOG_FILE, [])
+            return self._send(200, {"log": log})
         return self._send(404, {"error": "not found"})
 
     def do_DELETE(self):
@@ -1300,6 +1463,23 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/custom-models/"):
             mid = urllib.parse.unquote(path.split("/api/custom-models/")[1])
             save_custom_models([m for m in load_custom_models() if m["id"] != mid])
+            return self._send(200, {"ok": True})
+        # ---- feature stores ----
+        if path.startswith("/api/projects/"):
+            pid = urllib.parse.unquote(path.split("/api/projects/")[1])
+            save_projects([p for p in load_projects() if p["id"] != pid])
+            return self._send(200, {"ok": True})
+        if path.startswith("/api/agents/"):
+            aid = urllib.parse.unquote(path.split("/api/agents/")[1])
+            save_agents([a for a in load_agents() if a["id"] != aid])
+            return self._send(200, {"ok": True})
+        if path.startswith("/api/skills/"):
+            sid = urllib.parse.unquote(path.split("/api/skills/")[1])
+            save_skills([s for s in load_skills() if s["id"] != sid])
+            return self._send(200, {"ok": True})
+        if path.startswith("/api/automations/"):
+            aid = urllib.parse.unquote(path.split("/api/automations/")[1])
+            save_automations([a for a in load_automations() if a["id"] != aid])
             return self._send(200, {"ok": True})
         return self._send(404, {"error": "not found"})
 
@@ -1354,6 +1534,82 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"returncode": rc, "output": out})
         if path == "/api/chat":
             return self._api_chat(self._body())
+        # ---- feature stores ----
+        if path == "/api/projects":
+            b = self._body()
+            if not b.get("name"):
+                return self._send(400, {"error": "name required"})
+            projects = [p for p in load_projects() if p["id"] != b.get("id")]
+            p = {"id": b.get("id") or _new_id(), "name": str(b["name"])[:80],
+                 "description": str(b.get("description") or "")[:300],
+                 "files": [str(f) for f in b.get("files", [])
+                           if (FILES_DIR / str(f)).is_file()],
+                 "created": b.get("created") or time.time()}
+            projects.append(p)
+            save_projects(projects)
+            return self._send(200, {"ok": True, "project": project_record(p)})
+        if path == "/api/agents":
+            b = self._body()
+            if not b.get("name"):
+                return self._send(400, {"error": "name required"})
+            agents = [a for a in load_agents() if a["id"] != b.get("id")]
+            a = {"id": b.get("id") or _new_id(), "name": str(b["name"])[:60],
+                 "description": str(b.get("description") or "")[:300],
+                 "model": b.get("model") or "", "system": str(b.get("system") or "")[:2000],
+                 "created": b.get("created") or time.time()}
+            agents.append(a)
+            save_agents(agents)
+            return self._send(200, {"ok": True, "agent": a})
+        if path == "/api/skills":
+            b = self._body()
+            if not b.get("name") or not b.get("prompt"):
+                return self._send(400, {"error": "name and prompt required"})
+            skills = [s for s in load_skills() if s["id"] != b.get("id")]
+            s = {"id": b.get("id") or _new_id(), "name": str(b["name"])[:60],
+                 "prompt": str(b["prompt"])[:2000],
+                 "created": b.get("created") or time.time()}
+            skills.append(s)
+            save_skills(skills)
+            return self._send(200, {"ok": True, "skill": s})
+        if path == "/api/automations":
+            b = self._body()
+            if not b.get("name") or not b.get("prompt"):
+                return self._send(400, {"error": "name and prompt required"})
+            autos = [a for a in load_automations() if a["id"] != b.get("id")]
+            iv = b.get("interval_min")
+            a = {"id": b.get("id") or _new_id(), "name": str(b["name"])[:60],
+                 "prompt": str(b["prompt"])[:500],
+                 "interval_min": max(1, int(iv)) if iv is not None else 60,
+                 "model": b.get("model") or "",
+                 "enabled": bool(b.get("enabled")),
+                 "runs": 0, "last_run": 0, "last_result": "",
+                 "created": b.get("created") or time.time()}
+            autos.append(a)
+            save_automations(autos)
+            return self._send(200, {"ok": True, "automation": a})
+        if path.startswith("/api/automations/") and path.endswith("/run"):
+            aid = urllib.parse.unquote(path.split("/api/automations/")[1][:-4])
+            a = next((x for x in load_automations() if x["id"] == aid), None)
+            if a is None:
+                return self._send(404, {"error": "no such automation"})
+            ok, detail = run_automation_once(a)
+            autos = load_automations()
+            for x in autos:
+                if x["id"] == aid:
+                    x["last_run"] = time.time()
+                    x["runs"] = x.get("runs", 0) + 1
+                    x["last_result"] = ("ok: " if ok else "failed: ") + str(detail)[:120]
+            save_automations(autos)
+            return self._send(200, {"ok": ok, "result": str(detail)[:300]})
+        if path.startswith("/api/files/"):
+            # write a file into the workspace (canvas saves; same rules as chat)
+            name = Path(urllib.parse.unquote(path.split("/api/files/")[1])).name
+            b = self._body()
+            if not name or "content" not in b:
+                return self._send(400, {"error": "content required"})
+            (FILES_DIR / name).write_text(str(b["content"]), encoding="utf-8")
+            return self._send(200, {"ok": True, "name": name,
+                                    "size": (FILES_DIR / name).stat().st_size})
         return self._send(404, {"error": "not found"})
 
     # -- the harness
@@ -1756,6 +2012,10 @@ class Handler(BaseHTTPRequestHandler):
                                  "cost_known": True, "local": True})
                 if reported_model and reported_model != model["id"]:
                     done["reported_model"] = reported_model
+                record_usage({"ts": time.time(), "model": model["id"],
+                              "in": usage.get("in", 0), "out": usage.get("out", 0),
+                              "cost_usd": (None if custom else round(cost, 6)),
+                              "local": local})
                 yield ev("done", done)
             except Exception as e:
                 yield ev("error", {"error": str(e)[:300]})
@@ -1772,4 +2032,5 @@ if __name__ == "__main__":
     print(f"  workspace: {FILES_DIR}")
     print(f"  commands:  {'enabled' if ALLOW_CMDS else 'DISABLED (CHATCRAFT_ALLOW_CMDS=0)'}")
     print(f"  ollama:    {OLLAMA_URL} (auto-detected if running)")
+    start_scheduler()
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

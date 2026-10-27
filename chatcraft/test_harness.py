@@ -190,6 +190,11 @@ def drive_chat(scripted_replies, req):
     """Run Handler._api_chat with every model/tool call mocked. Each entry
     of scripted_replies is (text, finish_reason) for the Nth model call."""
     import server as srv
+    # _api_chat records usage into the server's real data dir; isolate it
+    if not hasattr(srv, "_usage_isolated"):
+        srv._usage_isolated = True
+        import tempfile as _tf
+        srv.USAGE_LOG_FILE = Path(_tf.mkdtemp()) / "usage-log.json"
     calls = []
 
     def fake_model_stream(m, messages, system, max_tokens, temperature):
@@ -542,6 +547,135 @@ test_tool_loop_truncation()
 test_browser_block_executes()
 test_browser_budget_and_failure()
 test_browser_parse_action()
+
+
+# --- new feature stores: projects / agents / skills / automations / usage ---
+import json as _json
+import tempfile as _tempfile
+
+
+def test_feature_stores():
+    """The new JSON stores round-trip and the endpoint layer is honest."""
+    import server as srv
+    with _tempfile.TemporaryDirectory() as td:
+        srv.PROJECTS_FILE = Path(td) / "projects.json"
+        srv.AGENTS_FILE = Path(td) / "agents.json"
+        srv.SKILLS_FILE = Path(td) / "skills.json"
+        srv.AUTOMATIONS_FILE = Path(td) / "automations.json"
+        srv.USAGE_LOG_FILE = Path(td) / "usage-log.json"
+        srv.FILES_DIR = Path(td) / "files"
+        srv.FILES_DIR.mkdir()
+
+        # projects: only real workspace files are kept in the record
+        (srv.FILES_DIR / "notes.md").write_text("hi")
+        save_p = srv.save_projects
+        srv.save_projects([{"id": "p1", "name": "Sourdough log",
+                            "description": "d",
+                            "files": ["notes.md", "ghost.md"],
+                            "created": 1}])
+        rec = srv.load_projects()[0]
+        check("projects: ghost file dropped", srv.project_record(rec)["files"],
+              ["notes.md"])
+
+        # agents / skills round-trip
+        srv.save_agents([{"id": "a1", "name": "Buddy", "description": "x",
+                          "model": "m", "system": "be terse"}])
+        check("agents: round-trip", srv.load_agents()[0]["name"], "Buddy")
+        srv.save_skills([{"id": "s1", "name": "Terse", "prompt": "bullets only"}])
+        check("skills: round-trip", srv.load_skills()[0]["prompt"], "bullets only")
+
+        # usage log: bounded at 500
+        for i in range(505):
+            srv.record_usage({"ts": i, "model": "m", "in": 1, "out": 1,
+                              "cost_usd": 0.001, "local": False})
+        log = srv._load_json(srv.USAGE_LOG_FILE, [])
+        check("usage: capped at 500", len(log), 500)
+        check("usage: newest kept", log[-1]["ts"], 504)
+
+        # automation run with a stubbed model: text saved to a workspace file
+        ran = []
+
+        def fake_stream(m, msgs, sys_, mt, temp):
+            ran.append(msgs[0]["content"])
+            yield ("text", "Automation result body")
+            yield ("usage", {"in": 1, "out": 2})
+
+        orig_stream, orig_find = srv.model_stream, srv.find_model
+        srv.model_stream = fake_stream
+        srv.find_model = lambda mid: {"id": "m", "label": "M", "api": {}, "in": 1, "out": 1}
+        try:
+            ok, detail = srv.run_automation_once(
+                {"name": "digest", "prompt": "summarise", "model": "m"})
+            check("automation: ran ok", ok, True)
+            check("automation: prompt reached the model", ran, ["summarise"])
+            saved = list(srv.FILES_DIR.glob("automation-digest-*.md"))
+            check("automation: result file saved", len(saved), 1)
+            check("automation: file has result body",
+                  "Automation result body" in saved[0].read_text(), True)
+        finally:
+            srv.model_stream, srv.find_model = orig_stream, orig_find
+
+
+def test_feature_endpoints():
+    """Smoke the new HTTP endpoints against a live loopback server."""
+    import threading
+    import urllib.request as _rq
+    import server as srv
+    with _tempfile.TemporaryDirectory() as td:
+        srv.DATA_DIR = Path(td)
+        srv.PROJECTS_FILE = Path(td) / "projects.json"
+        srv.AGENTS_FILE = Path(td) / "agents.json"
+        srv.SKILLS_FILE = Path(td) / "skills.json"
+        srv.AUTOMATIONS_FILE = Path(td) / "automations.json"
+        srv.USAGE_LOG_FILE = Path(td) / "usage-log.json"
+        srv.FILES_DIR = Path(td) / "files"
+        srv.FILES_DIR.mkdir()
+        srv.ALLOW_CMDS = False
+        httpd = srv.ThreadingHTTPServer(("127.0.0.1", 0), srv.Handler)
+        port = httpd.server_address[1]
+        th = threading.Thread(target=httpd.serve_forever, daemon=True)
+        th.start()
+        try:
+            def call(method, path, body=None):
+                req = _rq.Request(f"http://127.0.0.1:{port}{path}", method=method,
+                                  data=_json.dumps(body).encode() if body is not None else None,
+                                  headers={"Content-Type": "application/json"})
+                with _rq.urlopen(req, timeout=5) as r:
+                    return _json.loads(r.read().decode())
+
+            d = call("POST", "/api/projects", {"name": "P1", "description": "d"})
+            check("api projects: create", d["ok"], True)
+            d = call("GET", "/api/projects")
+            check("api projects: list", d["projects"][0]["name"], "P1")
+            pid = d["projects"][0]["id"]
+            check("api projects: delete", call("DELETE", f"/api/projects/{pid}")["ok"], True)
+
+            d = call("POST", "/api/agents", {"name": "B", "model": "m", "system": "s"})
+            check("api agents: create", d["agent"]["name"], "B")
+            check("api agents: list", call("GET", "/api/agents")["agents"][0]["id"],
+                  d["agent"]["id"])
+
+            d = call("POST", "/api/skills", {"name": "S", "prompt": "p"})
+            check("api skills: create", d["skill"]["prompt"], "p")
+            d = call("POST", "/api/automations", {"name": "A", "prompt": "run", "interval_min": 0})
+            check("api automations: interval floored at 1", d["automation"]["interval_min"], 1)
+
+            d = call("POST", "/api/files/canvas.html", {"content": "<b>x</b>"})
+            check("api files: write", d["ok"], True)
+            d = call("GET", "/api/files/canvas.html")
+            check("api files: read back", d["content"], "<b>x</b>")
+            # path traversal is stripped
+            d = call("POST", "/api/files/..%2F..%2Fetc-passwd", {"content": "x"})
+            check("api files: traversal stripped", d.get("name", "").startswith(".."), False)
+
+            d = call("GET", "/api/usage")
+            check("api usage: empty log", d["log"], [])
+        finally:
+            httpd.shutdown()
+
+
+test_feature_stores()
+test_feature_endpoints()
 
 if FAILURES:
     print(f"\n{len(FAILURES)} FAILURES")
