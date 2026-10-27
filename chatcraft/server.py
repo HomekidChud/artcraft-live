@@ -886,14 +886,38 @@ class Handler(BaseHTTPRequestHandler):
                 cleaned, files = extract_files(full_text)
                 saved = []
                 if files:
+                    import difflib
                     for f in files:
                         sid = "file-" + Path(f["name"]).name
-                        yield step(sid, f"Writing {f['name']}", "run")
                         safe = FILES_DIR / Path(f["name"]).name
+                        existed = safe.exists()
+                        old_lines = (safe.read_text(encoding="utf-8",
+                                                    errors="replace").splitlines()
+                                     if existed else [])
+                        yield step(sid, f"Writing {f['name']}", "run")
                         safe.write_text(f["content"], encoding="utf-8")
-                        saved.append({"name": safe.name, "lang": f.get("lang") or "text",
-                                      "size": safe.stat().st_size})
-                        yield step(sid, f"Wrote {f['name']}", "done")
+                        new_lines = f["content"].splitlines()
+                        adds = dels = 0
+                        if existed:
+                            for op, i1, i2, j1, j2 in difflib.SequenceMatcher(
+                                    None, old_lines, new_lines,
+                                    autojunk=False).get_opcodes():
+                                if op == "insert":
+                                    adds += j2 - j1
+                                elif op == "delete":
+                                    dels += i2 - i1
+                                elif op == "replace":
+                                    adds += j2 - j1
+                                    dels += i2 - i1
+                        rec = {"name": safe.name, "lang": f.get("lang") or "text",
+                               "size": safe.stat().st_size}
+                        if existed:
+                            rec["adds"], rec["dels"] = adds, dels
+                            label = f"Edited {safe.name} +{adds} -{dels}"
+                        else:
+                            label = f"Created {safe.name}"
+                        saved.append(rec)
+                        yield step(sid, label, "done")
                     pre = []
                     for b in blocks:
                         if b[0] == "text":
