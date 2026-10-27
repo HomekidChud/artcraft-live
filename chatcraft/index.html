@@ -191,6 +191,7 @@
   #v-canvas:checked ~ .app label.nav-item[for="v-canvas"],
   #v-video:checked ~ .app label.nav-item[for="v-video"],
   #v-browser:checked ~ .app label.nav-item[for="v-browser"],
+  #v-phone:checked ~ .app label.nav-item[for="v-phone"],
   #v-agents:checked ~ .app label.nav-item[for="v-agents"],
   #v-automations:checked ~ .app label.nav-item[for="v-automations"],
   #v-dashboards:checked ~ .app label.nav-item[for="v-dashboards"],
@@ -210,6 +211,7 @@
   #v-canvas:checked ~ .app label.nav-item[for="v-canvas"] svg,
   #v-video:checked ~ .app label.nav-item[for="v-video"] svg,
   #v-browser:checked ~ .app label.nav-item[for="v-browser"] svg,
+  #v-phone:checked ~ .app label.nav-item[for="v-phone"] svg,
   #v-agents:checked ~ .app label.nav-item[for="v-agents"] svg,
   #v-automations:checked ~ .app label.nav-item[for="v-automations"] svg,
   #v-dashboards:checked ~ .app label.nav-item[for="v-dashboards"] svg,
@@ -318,6 +320,7 @@
   #v-canvas:checked ~ .app .view-canvas,
   #v-video:checked ~ .app .view-video,
   #v-browser:checked ~ .app .view-browser,
+  #v-phone:checked ~ .app .view-phone,
   #v-agents:checked ~ .app .view-agents,
   #v-automations:checked ~ .app .view-automations,
   #v-dashboards:checked ~ .app .view-dashboards,
@@ -1586,6 +1589,7 @@
 <input type="radio" name="view" id="v-canvas" class="state">
 <input type="radio" name="view" id="v-video" class="state">
 <input type="radio" name="view" id="v-browser" class="state">
+<input type="radio" name="view" id="v-phone" class="state">
 <input type="radio" name="view" id="v-agents" class="state">
 <input type="radio" name="view" id="v-automations" class="state">
 <input type="radio" name="view" id="v-dashboards" class="state">
@@ -1659,6 +1663,10 @@
         <label class="nav-item" for="v-browser">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg>
           Browser
+        </label>
+        <label class="nav-item" for="v-phone">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 19h2"/></svg>
+          Phone
         </label>
         <label class="nav-item" for="v-agents">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M8 7.5l6 9M16 7.5l-6 9"/></svg>
@@ -2013,6 +2021,43 @@
                 <div id="br-els" class="br-els"></div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: PHONE ============ -->
+      <section class="view view-phone" aria-label="Phone bridge">
+        <div class="page">
+          <div class="page-head"><h2>Phone</h2></div>
+          <p class="page-sub">Pair your Android phone with the ChatCraft APK, then drive it from chat with <code>```phone</code> blocks — tap, type, swipe, read the screen.</p>
+          <div class="card">
+            <div class="run-top" style="margin-bottom:10px;"><h3 style="font-size:0.95rem;">Paired devices</h3></div>
+            <div id="ph-list"></div>
+            <p class="page-sub" style="margin-top:10px;">To pair: install the ChatCraft APK, open it, and point it at <code id="ph-base"></code>. The app posts to <code>POST /api/phone/pair</code> and starts polling — it appears here within a minute of being opened.</p>
+            <p class="page-sub">On the phone, enable the ChatCraft accessibility service (the APK links you to the right settings screen) so the agent can see the screen and tap for you. No root needed; iOS does not allow this.</p>
+          </div>
+          <div class="card" style="margin-top:12px;">
+            <div class="run-top" style="margin-bottom:10px;"><h3 style="font-size:0.95rem;">Manual command</h3></div>
+            <div class="field-row">
+              <div class="field" style="flex:1"><label for="ph-action">Action</label>
+                <select id="ph-action">
+                  <option value="state">state</option>
+                  <option value="tap">tap</option>
+                  <option value="text">text</option>
+                  <option value="swipe">swipe</option>
+                  <option value="enter">enter</option>
+                  <option value="back">back</option>
+                  <option value="home">home</option>
+                  <option value="open">open</option>
+                </select></div>
+              <div class="field" style="flex:2"><label for="ph-params">Params (x, y / text / direction)</label><input type="text" id="ph-params" placeholder="540 1200"></div>
+            </div>
+            <button class="btn" id="ph-send">Send</button>
+            <pre id="ph-out" class="br-text hidden" style="margin-top:10px;"></pre>
+          </div>
+          <div class="card" style="margin-top:12px;">
+            <div class="run-top" style="margin-bottom:10px;"><h3 style="font-size:0.95rem;">Latest screen state</h3></div>
+            <pre id="ph-state" class="br-text">No phone connected yet.</pre>
           </div>
         </div>
       </section>
@@ -2743,7 +2788,65 @@
     document.querySelectorAll("input[name='view']").forEach(function (r) {
       r.addEventListener("change", function () {
         if (r.id === "v-browser") brRefresh();
+        if (r.id === "v-phone") phRefresh();
       });
+    });
+  })();
+
+  // ---------- phone bridge ----------
+  (function () {
+    function phEl(id) { return document.getElementById(id); }
+    function esc(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+    window.phRefresh = function () {
+      var base = phEl("ph-base");
+      if (base && !base.textContent) base.textContent = API;
+      apiFetch(API + "/api/phone/devices", { method: "GET" })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          var list = phEl("ph-list");
+          if (!list) return;
+          var ds = j.devices || [];
+          if (!ds.length) {
+            list.innerHTML = '<p class="page-sub">No phone paired yet.</p>';
+            return;
+          }
+          list.innerHTML = ds.map(function (d) {
+            return '<div class="feat-row" style="margin-bottom:6px;">' +
+              '<span>' + esc(d.name) + '</span>' +
+              '<span class="page-sub">' + (d.online ? "online" : "offline") +
+              " — " + esc(d.device_id) + "</span></div>";
+          }).join("");
+          var st = phEl("ph-state");
+          if (st && j.latest_state) st.textContent = j.latest_state;
+        }).catch(function () {});
+    };
+    var sendBtn = phEl("ph-send");
+    if (sendBtn) sendBtn.addEventListener("click", function () {
+      var action = phEl("ph-action").value;
+      var raw = (phEl("ph-params").value || "").trim();
+      var params = {};
+      if (action === "tap") {
+        var xy = raw.split(/[\s,]+/);
+        params = { x: parseInt(xy[0] || "0", 10), y: parseInt(xy[1] || "0", 10) };
+      } else if (action === "text" || action === "open") {
+        params = (action === "text") ? { text: raw } : { target: raw };
+      } else if (action === "swipe") {
+        params = { dir: raw || "up" };
+      }
+      var out = phEl("ph-out");
+      out.classList.remove("hidden");
+      out.textContent = "Sending…";
+      apiFetch(API + "/api/phone/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: action, params: params })
+      }).then(function (r) { return r.json(); })
+        .then(function (j) { out.textContent = JSON.stringify(j, null, 2); })
+        .catch(function (e) { out.textContent = "Failed: " + e; });
     });
   })();
 

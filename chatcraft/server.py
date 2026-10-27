@@ -125,9 +125,17 @@ DEFAULT_SYSTEM = (
     "it and saves the readable text as browse-<site>.md.\n"
     "BROWSER: to drive a real browser (click links, fill forms), emit a "
     "```browser block with ONE ACTION PER LINE: goto <url>, click <n>, "
-    "type <n>: <text>, scroll up|down, back. Each action returns the page "
-    "state with numbered elements (numbered from 1) — chain actions across "
-    "lines using those numbers.\n"
+    "type <n>: <text>, scroll up|down, back, click_xy <x> <y> (viewport "
+    "pixel coordinates), press <key> (Enter, Tab, Escape...), wait <ms>. "
+    "Each action returns the page state with numbered elements (numbered "
+    "from 1) and the viewport size — chain actions across lines using "
+    "those numbers or coordinates.\n"
+    "PHONE: if the user has paired an Android phone (the ChatCraft APK), "
+    "you can drive it: emit a ```phone block with ONE ACTION PER LINE: "
+    "state (read the screen: numbered elements with coordinates), "
+    "tap <x> <y>, text <msg>, swipe up|down|left|right, enter, back, home, "
+    "open <package-or-url>. Each action returns the new screen state. "
+    "If no phone is paired, say so — never fake phone actions.\n"
     "When tool results come back, use them to finish the answer. Ordinary code "
     "snippets stay in plain fences with no filename or marker."
 )
@@ -625,6 +633,10 @@ def cleaned_text(blocks, rc_by_block, browse_by_block=None, cmds_pending=False):
             blines = b[1].splitlines() or [""]
             parts.append("browser: " + blines[0][:60]
                          + ("…" if len(blines) > 1 else ""))
+        elif b[0] == "phone":
+            plines = b[1].splitlines() or [""]
+            parts.append("phone: " + plines[0][:60]
+                         + ("…" if len(plines) > 1 else ""))
         elif b[0] == "browse":
             u = (b[1].splitlines() or [""])[0][:80]
             if browse_by_block is None:
@@ -651,7 +663,7 @@ def cleaned_text(blocks, rc_by_block, browse_by_block=None, cmds_pending=False):
     return "\n".join(parts)
 
 
-def build_obs(cmd_log, browse_log, browser_log=None, cap=9000):
+def build_obs(cmd_log, browse_log, browser_log=None, phone_log=None, cap=9000):
     """Bounded packing of tool results for the continuation: every
     operation's identity and outcome ALWAYS ships (compact status lines);
     output excerpts fill the remaining budget; anything left out is
@@ -667,6 +679,9 @@ def build_obs(cmd_log, browse_log, browser_log=None, cap=9000):
                       else f"[{u} — {str(body)[:100]}]")
     for line, ok, detail in (browser_log or []):
         status.append(f"browser {str(line).strip()[:80]} — "
+                      + ("ok" if ok else f"FAILED: {str(detail)[:60]}"))
+    for line, ok, detail in (phone_log or []):
+        status.append(f"phone {str(line).strip()[:80]} — "
                       + ("ok" if ok else f"FAILED: {str(detail)[:60]}"))
     status_text = "\n".join(status)
     if len(status_text) > cap - 800:
@@ -685,6 +700,9 @@ def build_obs(cmd_log, browse_log, browser_log=None, cap=9000):
     for line, ok, detail in (browser_log or []):
         if ok:
             details.append(f"[browser {str(line).strip()[:60]} →\n{detail}]")
+    for line, ok, detail in (phone_log or []):
+        if ok:
+            details.append(f"[phone {str(line).strip()[:60]} →\n{detail}]")
     packed, used = [], 0
     for d in details:
         if used + len(d) <= budget:
@@ -750,6 +768,7 @@ def parse_blocks(text):
         run_open = re.match(r"^```run[ \t]*$", ln, re.I)
         browse_open = re.match(r"^```browse[ \t]*$", ln, re.I)
         browser_open = re.match(r"^```browser[ \t]*$", ln, re.I)
+        phone_open = re.match(r"^```phone[ \t]*$", ln, re.I)
         file_open = re.match(
             r"^```([\w+#-]*)[ \t]*:?[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*$", ln)
         bare_open = re.match(r"^```([\w+#-]*)[ \t]*$", ln)
@@ -786,7 +805,7 @@ def parse_blocks(text):
             blocks.append(("browse", "\n".join(url).strip()))
             i = j + 1
             continue
-        if browser_open:
+        if browser_open or phone_open:
             j = i + 1
             acts = []
             while j < n and not lines[j].strip().startswith("```"):
@@ -798,7 +817,8 @@ def parse_blocks(text):
                 i += 1
                 continue
             flush()
-            blocks.append(("browser", "\n".join(acts).strip()))
+            blocks.append(("phone" if phone_open else "browser",
+                           "\n".join(acts).strip()))
             i = j + 1
             continue
         if file_open:
@@ -1043,7 +1063,12 @@ def _page_snapshot(page):
         content, title, url = page.content()[:500_000], (page.title() or ""), page.url
     except Exception:
         content, title, url = "", "", ""
+    try:
+        vp = page.viewport_size or {"width": 1280, "height": 720}
+    except Exception:
+        vp = {"width": 1280, "height": 720}
     return {"url": url, "title": title[:120],
+            "viewport": {"w": vp.get("width", 1280), "h": vp.get("height", 720)},
             "text": _page_text(content)[:3000], "elements": els, "shot": shot}
 
 
@@ -1086,6 +1111,16 @@ def browser_action(action, **kw):
             els[kw["n"] - 1].fill(kw.get("text", ""))
         elif action == "scroll":
             page.mouse.wheel(0, kw.get("dy", 600))
+        elif action == "click_xy":
+            page.mouse.click(int(kw.get("x", 0)), int(kw.get("y", 0)))
+            try:
+                page.wait_for_load_state("networkidle", timeout=3000)
+            except Exception:
+                pass
+        elif action == "press":
+            page.keyboard.press(str(kw.get("key", "Enter")))
+        elif action == "wait":
+            page.wait_for_timeout(int(kw.get("ms", 500)))
         elif action == "back":
             page.go_back()
         try:
@@ -1115,7 +1150,8 @@ def browser_state():
 
 def parse_browser_action(line):
     """One action line from a ```browser block:
-    goto <url> | click <n> | type <n>: <text> | scroll up|down | back"""
+    goto <url> | click <n> | type <n>: <text> | scroll up|down | back
+    | click_xy <x> <y> | press <key> | wait <ms>"""
     line = line.strip()
     m = re.match(r"^goto\s+(\S+)$", line, re.I)
     if m:
@@ -1131,6 +1167,43 @@ def parse_browser_action(line):
     m = re.match(r"^scroll\s+(up|down)$", line, re.I)
     if m:
         return ("scroll", {"dy": -600 if m.group(1).lower() == "up" else 600})
+    m = re.match(r"^click_xy\s+(\d+)\s+(\d+)$", line, re.I)
+    if m:
+        return ("click_xy", {"x": int(m.group(1)), "y": int(m.group(2))})
+    m = re.match(r"^press\s+([\w+]+)$", line, re.I)
+    if m:
+        return ("press", {"key": m.group(1)})
+    m = re.match(r"^wait\s+(\d+)$", line, re.I)
+    if m:
+        return ("wait", {"ms": min(5000, int(m.group(1)))})
+    return None
+
+
+def parse_phone_action(line):
+    """One action line from a ```phone block:
+    state | tap <x> <y> | text <msg> | swipe up|down|left|right
+    | enter | back | home | open <package-or-url>"""
+    line = line.strip()
+    if re.match(r"^state$", line, re.I):
+        return ("state", {})
+    m = re.match(r"^tap\s+(\d+)\s+(\d+)$", line, re.I)
+    if m:
+        return ("tap", {"x": int(m.group(1)), "y": int(m.group(2))})
+    m = re.match(r"^text\s+(.*)$", line, re.I)
+    if m:
+        return ("text", {"text": m.group(1)})
+    m = re.match(r"^swipe\s+(up|down|left|right)$", line, re.I)
+    if m:
+        return ("swipe", {"dir": m.group(1).lower()})
+    if re.match(r"^enter$", line, re.I):
+        return ("enter", {})
+    if re.match(r"^back$", line, re.I):
+        return ("back", {})
+    if re.match(r"^home$", line, re.I):
+        return ("home", {})
+    m = re.match(r"^open\s+(\S+)$", line, re.I)
+    if m:
+        return ("open", {"target": m.group(1)})
     return None
 
 
@@ -1139,7 +1212,9 @@ def _compact_browser_state(state):
     els = "; ".join(f"[{e['n']}] {e['tag']} '{e['text'][:40]}'"
                     + (f" -> {e['href'][:60]}" if e["href"] else "")
                     for e in state["elements"][:25])
-    return (f"url={state['url']} title={state['title']!r}\n"
+    vp = state.get("viewport") or {}
+    return (f"url={state['url']} title={state['title']!r} "
+            f"viewport={vp.get('w')}x{vp.get('h')}\n"
             f"text: {state['text'][:1200]}\nelements: {els or 'none'}")
 
 
@@ -1154,6 +1229,86 @@ def run_command(cmd):
         return -1, f"timed out after {CMD_TIMEOUT}s"
     except Exception as e:
         return -1, str(e)[:300]
+
+
+# ------------------------------------------------------------ phone bridge ---
+# Remote phone control (Android APK pairs with this backend). The phone
+# cannot accept inbound connections (mobile NAT), so the bridge is
+# OUTBOUND-ONLY: the app long-polls /api/phone/poll for commands and posts
+# results to /api/phone/result. The chat harness enqueues actions from
+# ```phone blocks and waits for the device to report the new screen state.
+
+import secrets as _secrets
+
+PHONES = {}  # device_id -> {secret, name, last_seen, last_state, queue, waiters}
+_PHONE_LOCK = threading.Lock()
+
+
+def phone_pair(name):
+    did = _secrets.token_hex(6)
+    secret = _secrets.token_hex(16)
+    with _PHONE_LOCK:
+        PHONES[did] = {"secret": secret, "name": str(name or "phone")[:40],
+                       "last_seen": time.time(), "last_state": None,
+                       "queue": [], "waiters": {}}
+    return {"device_id": did, "secret": secret}
+
+
+def phone_auth(did, secret):
+    with _PHONE_LOCK:
+        d = PHONES.get(did)
+    if not d or d["secret"] != str(secret or ""):
+        return None
+    return d
+
+
+def phone_default_device():
+    """The most recently seen phone (within 15 minutes), or None."""
+    with _PHONE_LOCK:
+        candidates = [(d["last_seen"], did) for did, d in PHONES.items()
+                      if time.time() - d["last_seen"] < 900]
+    if not candidates:
+        return None
+    return max(candidates)[1]
+
+
+def phone_enqueue(did, action, params):
+    cmd = {"id": _secrets.token_hex(6), "action": action, "params": params}
+    with _PHONE_LOCK:
+        d = PHONES.get(did)
+        if d is None:
+            return None, "no such device"
+        d["queue"].append(cmd)
+    return cmd, ""
+
+
+def phone_wait_result(did, cmd_id, timeout=30):
+    """Block until the device reports this command's result."""
+    done = threading.Event()
+    with _PHONE_LOCK:
+        d = PHONES.get(did)
+        if d is None:
+            return {"ok": False, "detail": "device disappeared"}
+        d["waiters"][cmd_id] = {"event": done, "result": None}
+    done.wait(timeout)
+    with _PHONE_LOCK:
+        d = PHONES.get(did) or {}
+        w = d.get("waiters", {}).pop(cmd_id, None)
+    if w is None or w["result"] is None:
+        return {"ok": False, "detail": "device did not respond in time"}
+    return w["result"]
+
+
+def phone_devices():
+    with _PHONE_LOCK:
+        out = [{"device_id": did, "name": d["name"],
+                "last_seen": d["last_seen"],
+                "online": time.time() - d["last_seen"] < 90,
+                "has_state": bool(d["last_state"]),
+                "state": d["last_state"]}
+               for did, d in PHONES.items()]
+        latest = max(out, key=lambda r: r["last_seen"], default=None)
+        return out, (latest or {}).get("state") or ""
 
 
 # ------------------------------------------------------------ feature stores ---
@@ -1432,6 +1587,28 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/usage":
             log = _load_json(USAGE_LOG_FILE, [])
             return self._send(200, {"log": log})
+        # ---- phone bridge ----
+        if path == "/api/phone/devices":
+            devs, latest = phone_devices()
+            return self._send(200, {"devices": devs, "latest_state": latest})
+        q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+        if path == "/api/phone/poll":
+            did = (q.get("device_id") or [""])[0]
+            d = phone_auth(did, (q.get("secret") or [""])[0])
+            if d is None:
+                return self._send(403, {"error": "bad device credentials"})
+            # long-poll: hand over queued commands, up to 25s
+            deadline = time.time() + 25
+            while time.time() < deadline:
+                with _PHONE_LOCK:
+                    cmds = d["queue"][:]
+                    d["queue"] = d["queue"][len(cmds):]
+                    if cmds:
+                        d["last_seen"] = time.time()
+                if cmds:
+                    return self._send(200, {"commands": cmds})
+                time.sleep(1)
+            return self._send(200, {"commands": []})
         return self._send(404, {"error": "not found"})
 
     def do_DELETE(self):
@@ -1492,12 +1669,14 @@ class Handler(BaseHTTPRequestHandler):
         path = urllib.parse.urlparse(self.path).path
         if path == "/api/browser/action":
             b = self._body()
-            if b.get("action") not in ("goto", "click", "type",
-                                       "scroll", "back"):
+            if b.get("action") not in ("goto", "click", "type", "scroll", "back",
+                                       "click_xy", "press", "wait"):
                 return self._send(400, {"error": "unknown browser action"})
             state, err = browser_action(
                 b["action"], url=b.get("url", ""), n=int(b.get("n", 0)),
-                text=b.get("text", ""), dy=int(b.get("dy", 600)))
+                text=b.get("text", ""), dy=int(b.get("dy", 600)),
+                x=int(b.get("x", 0)), y=int(b.get("y", 0)),
+                key=b.get("key", ""), ms=int(b.get("ms", 500)))
             return self._send(200, {"state": state, "err": err})
         if path == "/api/browser/bookmarks":
             b = self._body()
@@ -1601,6 +1780,37 @@ class Handler(BaseHTTPRequestHandler):
                     x["last_result"] = ("ok: " if ok else "failed: ") + str(detail)[:120]
             save_automations(autos)
             return self._send(200, {"ok": ok, "result": str(detail)[:300]})
+        if path == "/api/phone/pair":
+            b = self._body()
+            return self._send(200, phone_pair(b.get("name")))
+        if path == "/api/phone/result":
+            b = self._body()
+            d = phone_auth(b.get("device_id", ""), b.get("secret", ""))
+            if d is None:
+                return self._send(403, {"error": "bad device credentials"})
+            with _PHONE_LOCK:
+                d["last_seen"] = time.time()
+                if b.get("state"):
+                    d["last_state"] = b["state"]
+                w = d["waiters"].get(b.get("cmd_id"))
+                if w is not None:
+                    w["result"] = {"ok": bool(b.get("ok")),
+                                    "detail": str(b.get("detail") or "")[:300],
+                                    "state": b.get("state")}
+                    w["event"].set()
+            return self._send(200, {"ok": True})
+        if path == "/api/phone/command":
+            b = self._body()
+            did = b.get("device_id") or phone_default_device()
+            if not did:
+                return self._send(404, {"error": "no phone paired — install the "
+                                                 "ChatCraft APK and pair it first"})
+            cmd, err = phone_enqueue(did, b.get("action", ""),
+                                     b.get("params") or {})
+            if err:
+                return self._send(404, {"error": err})
+            return self._send(200, {"ok": True, "command": cmd,
+                                    "device": did})
         if path.startswith("/api/files/"):
             # write a file into the workspace (canvas saves; same rules as chat)
             name = Path(urllib.parse.unquote(path.split("/api/files/")[1])).name
@@ -1901,12 +2111,67 @@ class Handler(BaseHTTPRequestHandler):
                             skip_seq[0] += 1
                             yield step(f"br-skip-{skip_seq[0]}",
                                       f"Skipped: {line.strip()[:45]} (limit)", "skip")
+                    # phone: drive the paired Android phone (the ChatCraft
+                    # APK). One action per line, budgeted like the browser.
+                    phone_log = []
+                    phone_blocks = [(i, b) for i, b in enumerate(blocks)
+                                    if b[0] == "phone"]
+                    did = phone_default_device()
+                    for bi, b in phone_blocks:
+                        act_lines = [l for l in b[1].splitlines() if l.strip()]
+                        block_budget = browse_budget
+                        for line in act_lines[:max(0, browse_budget)]:
+                            browse_budget -= 1
+                            act = parse_phone_action(line)
+                            if act is None:
+                                phone_log.append((line, None, "unknown action"))
+                                continue
+                            skip_seq[0] += 1
+                            sid = f"ph-{skip_seq[0]}"
+                            yield step(sid, f"Phone: {line.strip()[:60]}", "run")
+                            if not did:
+                                yield step(sid, "No phone paired", "fail",
+                                           "install the ChatCraft APK and pair it")
+                                phone_log.append((line, None, "no phone paired"))
+                                continue
+                            cmd, err = phone_enqueue(did, act[0], act[1])
+                            if err:
+                                yield step(sid, f"Phone failed: {line.strip()[:45]}",
+                                          "fail", err)
+                                phone_log.append((line, None, err))
+                                continue
+                            res = phone_wait_result(did, cmd["id"], 30)
+                            if not res.get("ok") and \
+                                    "did not respond" in str(res.get("detail", "")):
+                                yield step(sid, "Phone timeout", "fail",
+                                           f"{cmd['action']} timed out after 30s")
+                                phone_log.append((line, None,
+                                                  "timeout waiting for the phone "
+                                                  "(is the app in the background?)"))
+                                continue
+                            ok, detail, pstate = (res["ok"], res["detail"],
+                                                  res.get("state") or "")
+                            status = "ok" if ok else f"FAILED: {detail[:60]}"
+                            yield step(sid, f"Phone: {line.strip()[:60]}",
+                                       "done" if ok else "fail", detail[:60])
+                            summary = (f"{status}\n{str(pstate)[:1500]}"
+                                       if pstate else status)
+                            phone_log.append((line, ok, summary))
+                            yield ev("phone", {"action": line.strip()[:80],
+                                              "ok": ok, "detail": detail[:200]})
+                        for line in act_lines[max(0, block_budget):]:
+                            phone_log.append((line, None,
+                                              "skipped: per-turn phone budget"))
+                            skip_seq[0] += 1
+                            yield step(f"ph-skip-{skip_seq[0]}",
+                                      f"Skipped: {line.strip()[:45]} (limit)", "skip")
                     return (rc_by_block, browse_by_block, cmd_log, browse_log,
-                            browser_log, saved, len(run_slice), len(browse_slice))
+                            browser_log, phone_log, saved, len(run_slice),
+                            len(browse_slice))
 
                 # 5-7. execute the reply's tool blocks (budgets shared per turn)
                 (rc_by_block, browse_by_block, cmd_log, browse_log,
-                 browser_log, saved, uc, ub) = \
+                 browser_log, phone_log, saved, uc, ub) = \
                     yield from execute_reply_tools(full_text)
                 cmd_left, browse_left, id_base = 10 - uc, 5 - ub, uc + ub
 
@@ -1930,8 +2195,10 @@ class Handler(BaseHTTPRequestHandler):
                 cont_msgs = messages + [
                     {"role": "assistant", "content": echo_text(full_text)}]
                 rounds = 0
-                while (cmd_log or browse_log or browser_log) and rounds < CONT_MAX:
-                    obs_text = build_obs(cmd_log, browse_log, browser_log)
+                while (cmd_log or browse_log or browser_log or phone_log) \
+                        and rounds < CONT_MAX:
+                    obs_text = build_obs(cmd_log, browse_log, browser_log,
+                                         phone_log)
                     obs_text = ("TOOL RESULTS from the run/browse blocks in your "
                                 "reply — the platform ran them for you (skips and "
                                 "failures included). Use these results NOW to "
@@ -1961,12 +2228,12 @@ class Handler(BaseHTTPRequestHandler):
                     if not cont_text.strip():
                         yield step("cont", "Used tool results", "fail",
                                    "continuation returned no text")
-                        cmd_log, browse_log, browser_log = [], [], []
+                        cmd_log, browse_log, browser_log, phone_log = [], [], [], []
                         break
                     yield step("cont", "Used tool results", "done")
                     cont_msgs.append({"role": "assistant", "content": cont_text[:6000]})
                     # only NEW tool results feed the next round
-                    (crc, cbb, ccl, cbl, cbrl, saved2,
+                    (crc, cbb, ccl, cbl, cbrl, cphl, saved2,
                      uc2, ub2) = yield from execute_reply_tools(
                         cont_text, cmd_budget=cmd_left,
                         browse_budget=browse_left, id_base=id_base)
@@ -1980,9 +2247,9 @@ class Handler(BaseHTTPRequestHandler):
                             "[continuation hit the token limit — "
                             "possibly truncated]")
                     yield ev("clean", {"text": last_clean})
-                    cmd_log, browse_log, browser_log = ccl, cbl, cbrl
+                    cmd_log, browse_log, browser_log, phone_log = ccl, cbl, cbrl, cphl
                 pending_notes = list(truncation_notes)
-                if cmd_log or browse_log:
+                if cmd_log or browse_log or browser_log or phone_log:
                     pending_notes.append(
                         "[continuation budget reached — the latest tool "
                         "results above were not summarized]")

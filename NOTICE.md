@@ -139,6 +139,40 @@ The harness is tuned for minimal tokens per COMPLETED task:
 - `chatcraft/test_harness.py` — 110 offline tests; run `python3 test_harness.py` after any change
 - `chatcraft/files/`, `chatcraft/data/` — runtime state (gitignored)
 
+## Recent changes in this repo (2026-10-27, build 3)
+
+1. **Computer use**: the browser agent gained `click_xy <x> <y>`,
+   `press <key>` and `wait <ms>` actions, and every page state fed back to
+   the model now carries the viewport size (so raw-coordinate clicking is
+   usable). The manual Browser view and chat ```browser blocks share them.
+2. **Phone control (Android)**: chat can now drive a paired phone via
+   ```phone blocks (`state`, `tap`, `text`, `swipe`, `enter`, `back`,
+   `home`, `open`). New backend bridge in `server.py`
+   (`/api/phone/pair|poll|result|command|devices` — 25s long-poll), a new
+   **Phone** sidebar view (devices, pairing instructions, manual command
+   box, latest screen state), and the same budget/honest-failure rules as
+   the browser agent. Deep research confirmed an AccessibilityService is
+   the only no-root way on Android; iOS is impossible for third-party
+   apps — the UI says so instead of faking it.
+3. **Android APK (`chatcraft-android/`)**: a 2-file no-dependency app.
+   MainActivity pairs with a ChatCraft server (POST /api/phone/pair) and
+   loads it in a WebView; PhoneBridgeService is the AccessibilityService
+   that polls for commands, dispatches real gestures, types via
+   ACTION_SET_TEXT, does global back/home, launches apps/URLs, and answers
+   every command with a numbered screen dump. Output:
+   `chatcraft-android/ChatCraft-phone-bridge.apk` (minSdk 26, signed).
+   Build from source with the SDK tools:
+   `aapt2 compile --dir res -o build/res.zip && aapt2 link -o
+   build/app-unsigned.apk -I <android.jar> --manifest
+   AndroidManifest.xml --java build/gen --auto-add-overlay build/res.zip
+   && javac -encoding UTF-8 -source 8 -target 8 -bootclasspath <android.jar>
+   -d build/classes build/gen/.../R.java src/.../*.java && d8 --lib
+   <android.jar> --release --output build <classes> && zipalign + apksigner`.
+   Verified statically (badging, manifest, signature); no emulator run in
+   this sandbox (no KVM), so on-device behavior is untested here.
+4. Tests: 131/131 harness (21 new phone-bridge/computer-use checks),
+   13/13 + 11/11 Playwright e2e.
+
 ## Recent changes in this repo (2026-10-27, build 2)
 
 1. **Two shipped-breaking bugs fixed**: the Browser-view CSS was pasted

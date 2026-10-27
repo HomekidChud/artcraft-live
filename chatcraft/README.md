@@ -108,9 +108,14 @@ model menu.
 
 ## Honest status
 
-Live: chat, advisor pass, model harness (files/commands/browsing/browser),
-the Browser agent live view, Canvas, Agents, Skills, Automations, Projects,
-Dashboards, Documents viewer, custom model endpoints (the plugin surface).
+Live: chat, advisor pass, model harness (files/commands/browsing/browser,
+computer-use pointer/keyboard actions), the Browser agent live view, the
+Phone view + Android phone bridge (```phone blocks; see
+`chatcraft-android/ChatCraft-phone-bridge.apk` — pair the app, enable its
+accessibility service, and the agent can tap, type and read the phone's
+screen; Android only, iOS forbids third-party apps from doing this),
+Canvas, Agents, Skills, Automations, Projects, Dashboards, Documents
+viewer, custom model endpoints (the plugin surface).
 
 Not built yet: video studio (needs a video generation API — none available
 on the platform proxy) and a plugin marketplace (custom endpoints are the

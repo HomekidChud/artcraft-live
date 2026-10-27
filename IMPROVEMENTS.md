@@ -1,6 +1,52 @@
 # ChatCraft improvements — all changes, this build
 
-Everything below is implemented, tested (110/110 harness tests), and live.
+Everything below is implemented, tested (131/131 harness tests, 13/13 + 11/11
+e2e checks), and live.
+
+## Build 3: computer use + phone control (the Android APK)
+
+The agent can now use a computer (browser-level pointer/keyboard control)
+and drive a real Android phone. Deep research first: on Android the only
+no-root way to read the screen and inject taps is an AccessibilityService
+(the approach used by every phone-control agent product); on iOS this is
+impossible for third-party apps — so the phone bridge is Android-only and
+says so honestly.
+
+### 9. Computer use in the browser agent
+- New browser actions: `click_xy <x> <y>` (raw viewport-coordinate click),
+  `press <key>` (Enter, Tab, Escape…), `wait <ms>`. The page state fed back
+  to the model now includes the viewport size, so coordinates are usable.
+- All documented in the model's system prompt; the manual Browser view and
+  chat ```browser blocks share them.
+
+### 10. Phone control — a ```phone block + Phone view
+- Chat can drive a paired Android phone: ```phone blocks with one action
+  per line: `state` (numbered screen dump with tap coordinates),
+  `tap <x> <y>`, `text <msg>`, `swipe up|down|left|right`, `enter`, `back`,
+  `home`, `open <package-or-url>`. Every action's result includes the fresh
+  screen state, so the model can chain actions. Budgeted like the browser
+  (shares the 5-actions-per-turn budget), honest failure steps when no
+  phone is paired or it times out.
+- New backend bridge in `server.py`: `POST /api/phone/pair`,
+  `GET /api/phone/poll` (25s long-poll), `POST /api/phone/result`,
+  `POST /api/phone/command`, `GET /api/phone/devices`.
+- New **Phone** view in the sidebar: paired devices with online status,
+  pairing instructions, a manual command box, and the latest screen state.
+
+### 11. The Android APK (chatcraft-android/)
+- A tiny no-dependency Android app (2 Java files, ~600 lines) that pairs
+  with any ChatCraft server and lets the agent drive the phone:
+  - **MainActivity**: pairing screen (server URL + device name →
+    POST /api/phone/pair), then loads ChatCraft itself in a WebView.
+  - **PhoneBridgeService**: an AccessibilityService that long-polls for
+    commands, executes them with real gestures (`dispatchGesture`),
+    `ACTION_SET_TEXT` typing, global back/home, app/URL launching, and
+    answers each with a numbered screen dump (elements + coordinates).
+- Built with the Android SDK build tools (aapt2/javac/d8/zipalign/apksigner),
+  minSdk 26 (Android 8+), signed, verified. Sideload-ready
+  `ChatCraft-phone-bridge.apk`. Note honestly: it was built and verified
+  statically (manifest, signing, dex) — no emulator run happened in this
+  sandbox (no KVM), so on-device behavior is expected but untested here.
 
 ## This build: every "not built yet" view, implemented
 

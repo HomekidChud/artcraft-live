@@ -553,6 +553,7 @@ test_browser_parse_action()
 # --- new feature stores: projects / agents / skills / automations / usage ---
 import json as _json
 import tempfile as _tempfile
+import time
 
 
 def test_feature_stores():
@@ -675,6 +676,121 @@ def test_feature_endpoints():
             httpd.shutdown()
 
 
+def test_phone_bridge():
+    """Phone bridge: pair, auth, enqueue, result round-trip, and block parsing."""
+    import threading
+    import urllib.request as _rq
+    import server as srv
+    with _tempfile.TemporaryDirectory() as td:
+        srv.DATA_DIR = Path(td)
+        srv.FILES_DIR = Path(td) / "files"
+        srv.FILES_DIR.mkdir()
+        srv.ALLOW_CMDS = False
+        srv.PHONES.clear()
+        with srv._PHONE_LOCK:
+            srv.PHONES.clear()
+
+        # pair a device
+        d = srv.phone_pair("Pixel 8")
+        check("phone: pair returns id+secret",
+              bool(d["device_id"]) and bool(d["secret"]), True)
+        did, secret = d["device_id"], d["secret"]
+
+        # auth rejects bad credentials
+        check("phone: bad secret rejected", srv.phone_auth(did, "wrong"), None)
+
+        # devices listing marks it offline until seen recently
+        devs, latest = srv.phone_devices()
+        check("phone: listed in devices",
+              any(x["device_id"] == did for x in devs), True)
+
+        # enqueue a command and wait for a result via the endpoint
+        cmd, err = srv.phone_enqueue(did, "tap", {"x": 100, "y": 200})
+        check("phone: enqueue ok", (cmd["action"], err), ("tap", ""))
+
+        httpd = srv.ThreadingHTTPServer(("127.0.0.1", 0), srv.Handler)
+        port = httpd.server_address[1]
+        th = threading.Thread(target=httpd.serve_forever, daemon=True)
+        th.start()
+        try:
+            def call(method, path, body=None):
+                req = _rq.Request(f"http://127.0.0.1:{port}{path}", method=method,
+                                  data=_json.dumps(body).encode() if body is not None else None,
+                                  headers={"Content-Type": "application/json"})
+                try:
+                    with _rq.urlopen(req, timeout=10) as r:
+                        return _json.loads(r.read().decode())
+                except _rq.HTTPError as e:
+                    return _json.loads(e.read().decode())
+
+            # simulate the phone posting the result in a background thread
+            def phone_replies():
+                time.sleep(0.3)
+                call("POST", "/api/phone/result", {
+                    "device_id": did, "secret": secret,
+                    "cmd_id": cmd["id"], "ok": True,
+                    "detail": "tapped", "state": "[1] Button (540,1200)"})
+            reply_th = threading.Thread(target=phone_replies)
+            reply_th.start()
+            res = srv.phone_wait_result(did, cmd["id"], 5)
+            reply_th.join()
+            check("phone: wait got result",
+                  (res["ok"], res["detail"], res["state"]),
+                  (True, "tapped", "[1] Button (540,1200)"))
+
+            # devices endpoint shows the latest state
+            devs = call("GET", "/api/phone/devices")["devices"]
+            row = [x for x in devs if x["device_id"] == did][0]
+            check("phone: online + state surfaced",
+                  (row["online"], row["state"]), (True, "[1] Button (540,1200)"))
+
+            # command without a device is an honest error
+            srv.PHONES.clear()
+            d2 = call("POST", "/api/phone/command", {"action": "state"})
+            check("phone: command with no device errors", "error" in d2, True)
+
+            # pair endpoint round-trip
+            d3 = call("POST", "/api/phone/pair", {"name": "S24"})
+            check("phone: pair endpoint", "secret" in d3, True)
+        finally:
+            httpd.shutdown()
+
+        # parse_phone_action coverage
+        check("phone: parse state", srv.parse_phone_action("state"), ("state", {}))
+        check("phone: parse tap", srv.parse_phone_action("tap 10 20"),
+              ("tap", {"x": 10, "y": 20}))
+        check("phone: parse text", srv.parse_phone_action("text hello world"),
+              ("text", {"text": "hello world"}))
+        check("phone: parse swipe", srv.parse_phone_action("swipe up"),
+              ("swipe", {"dir": "up"}))
+        check("phone: parse back/home/open",
+              (srv.parse_phone_action("back"), srv.parse_phone_action("home"),
+               srv.parse_phone_action("open https://example.com")),
+              (("back", {}), ("home", {}),
+               ("open", {"target": "https://example.com"})))
+        check("phone: bad action rejected", srv.parse_phone_action("dance"), None)
+
+        # ```phone block parsing
+        blocks = srv.parse_blocks("before\n```phone\nstate\ntap 10 20\n```\nafter")
+        check("phone: block parsed",
+              [b[0] for b in blocks if b[0] == "phone"], ["phone"])
+        ph = [b for b in blocks if b[0] == "phone"][0][1]
+        check("phone: block actions kept", ph, "state\ntap 10 20")
+        # unterminated block is kept as text, never executed
+        blocks = srv.parse_blocks("```phone\nstate")
+        check("phone: unterminated stays text",
+              any(b[0] == "phone" for b in blocks), False)
+
+        # browser computer-use actions parse
+        check("browser: click_xy", srv.parse_browser_action("click_xy 30 40"),
+              ("click_xy", {"x": 30, "y": 40}))
+        check("browser: press", srv.parse_browser_action("press Enter"),
+              ("press", {"key": "Enter"}))
+        check("browser: wait", srv.parse_browser_action("wait 300"),
+              ("wait", {"ms": 300}))
+
+
+test_phone_bridge()
 test_feature_stores()
 test_feature_endpoints()
 
