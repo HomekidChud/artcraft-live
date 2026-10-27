@@ -3166,6 +3166,7 @@
       o.querySelector(".m-check").hidden = o.getAttribute("data-id") !== id;
     });
     if (hsModel) hsModel.value = id;
+    if (!chatState.advisorModel) setAdvisorModel(""); // refresh "same as your model"
   }
   function setAdvisorModel(id) {
     chatState.advisorModel = id;

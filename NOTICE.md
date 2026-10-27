@@ -42,17 +42,27 @@ ChatCraft is now a full agent in its cloud workspace:
 ## Advisor follows your model (privacy default)
 
 The advisor is a separate always-on reviewer that runs BEFORE the main
-model — by default it is now the model YOU picked (empty advisor_model
-from the UI), so no model the user didn't choose reads the conversation.
-A different advisor can still be picked in Settings. The cheap locator
-scanner follows the same family as the advisor (claude → haiku,
-gpt → nano, gemini → flash, grok → grok) for the same reason.
+model and writes a brief the main model then follows — the chosen main
+model still writes every answer. By default the advisor IS the model you
+picked (empty advisor_model from the UI), so no unchosen model reads the
+conversation. A different advisor stays pickable in Settings.
 
-## Browsing: headless Chromium
+Two precise details:
+- the cheap locator scanner is the advisor's cheaper SAME-FAMILY SIBLING
+  (claude→haiku_4_5, gpt→gpt5_nano, gemini→gemini_3_flash, grok→grok_4_3);
+  unknown/local/custom models scan THEMSELVES (never a silently
+  configured default like Claude)
+- so the honest claim is: only your chosen model and (for the cheap scan)
+  its same-family sibling ever read the conversation
 
-`fetch_page` now renders pages in headless Chromium (Playwright,
-installed system-wide: `pip install playwright && python3 -m playwright
-install chromium`) so JS-rendered pages work. Any failure falls back to
+## Browsing: headless Chromium (read-only)
+
+`fetch_page` renders pages in headless Chromium (Playwright, installed
+system-wide: `pip install playwright && python3 -m playwright install
+chromium`) so JS-rendered pages work — verified against a JS-only
+fixture (content only exists after script execution). Scope: this is
+READ-ONLY page reading (open, render, extract text) — no clicking,
+typing, or interactive sessions. Any Chromium failure falls back to
 plain urllib; `CHATCRAFT_BROWSER=0` disables Chromium entirely. NOTE:
 playwright is an OPTIONAL dependency — the server stays stdlib-only and
 falls back gracefully without it.

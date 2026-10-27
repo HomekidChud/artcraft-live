@@ -142,18 +142,21 @@ LOCATOR_MODEL_ID = os.environ.get("CHATCRAFT_LOCATOR_MODEL", "claude_haiku_5_5")
 
 
 def locator_for(advisor_id):
-    """A cheap scanner from the SAME family as the advisor, so only models
-    the user chose (or their cheaper siblings) ever read the conversation."""
-    a = str(advisor_id or "").lower()
-    if a.startswith("claude"):
+    """A cheap scanner from the SAME family as the advisor, so only the
+    user's chosen model (or its cheaper same-family sibling) ever reads
+    the conversation. Unknown/local/custom models scan themselves — never
+    a silently-configured default like Claude."""
+    a = str(advisor_id or "")
+    fam = a.lower()
+    if fam.startswith("claude"):
         return "claude_haiku_4_5"
-    if a.startswith("gpt"):
+    if fam.startswith("gpt"):
         return "gpt5_nano"
-    if a.startswith("gemini"):
+    if fam.startswith("gemini"):
         return "gemini_3_flash"
-    if a.startswith("grok"):
+    if fam.startswith("grok"):
         return "grok_4_3"
-    return LOCATOR_MODEL_ID
+    return a or LOCATOR_MODEL_ID  # the chosen model scans itself
 
 # ```lang filename.ext ... ```   (also accepts ```lang:filename.ext)
 # and the variant small local models often emit: ```lang\nfilename.ext\n...```
@@ -639,12 +642,17 @@ def build_obs(cmd_log, browse_log, cap=9000):
     explicitly marked with an omission note (never silently dropped)."""
     status = []
     for cmd, rc, out in cmd_log:
-        status.append(f"$ {cmd} — exit {rc}" if rc is not None
-                      else f"$ {cmd} — SKIPPED: {out}")
+        c = str(cmd)[:100]
+        status.append(f"$ {c} — exit {rc}" if rc is not None
+                      else f"$ {c} — SKIPPED: {str(out)[:100]}")
     for url, title, body in browse_log:
-        status.append(f"[{url} — {title}]" if title is not None
-                      else f"[{url} — {str(body)[:100]}]")
+        u = str(url)[:100]
+        status.append(f"[{u} — {title}]" if title is not None
+                      else f"[{u} — {str(body)[:100]}]")
     status_text = "\n".join(status)
+    if len(status_text) > cap - 800:
+        status_text = (status_text[:cap - 800]
+                       + "\n…[status list truncated to fit]")
     details, omitted = [], 0
     budget = cap - len(status_text) - 600
     for cmd, rc, out in cmd_log:

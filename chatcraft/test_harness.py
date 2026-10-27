@@ -372,6 +372,98 @@ def test_tool_loop_truncation():
 test_tool_loop_two_rounds()
 test_tool_loop_delivery()
 test_tool_loop_cross_round_budget()
+def test_build_obs_boundaries():
+    """Long real outputs: every identity+outcome ships, cap holds, cuts marked."""
+    import server as srv
+    long_out = "X" * 5000
+    cmd_log = [(f"echo long{i}", 0, long_out) for i in range(10)]
+    cmd_log.append(("echo skipped", None, "per-turn limit"))
+    browse_log = [("https://ok.example", "OK Page", "Y" * 5000),
+                  ("https://fail.example", None, "HTTP 404"),
+                  ("https://skip.example", None, "per-turn limit")]
+    obs = srv.build_obs(cmd_log, browse_log, cap=9000)
+    check("build_obs: every command status ships",
+          all(f"echo long{i} — exit 0" in obs for i in range(10)), True)
+    check("build_obs: skip status ships", "echo skipped — SKIPPED" in obs, True)
+    check("build_obs: browse ok/fail/skip statuses ship",
+          "https://ok.example — OK Page" in obs
+          and "https://fail.example" in obs and "https://skip.example" in obs, True)
+    check("build_obs: cap holds", len(obs) <= 9000, True)
+    check("build_obs: omissions explicitly marked", "omitted" in obs, True)
+
+
+def test_locator_for():
+    import server as srv
+    check("locator: claude family", srv.locator_for("claude_sonnet_5_5"), "claude_haiku_4_5")
+    check("locator: gpt family", srv.locator_for("gpt_5_1"), "gpt5_nano")
+    check("locator: gemini family", srv.locator_for("gemini_3_1_pro"), "gemini_3_flash")
+    check("locator: grok family", srv.locator_for("grok_4_3"), "grok_4_3")
+    check("locator: local model scans itself", srv.locator_for("qwen3:1.7b"), "qwen3:1.7b")
+    check("locator: unknown model scans itself", srv.locator_for("my_custom"), "my_custom")
+
+
+def test_unterminated_file_not_saved():
+    """A truncated file block must never reach the workspace disk."""
+    import tempfile
+    from pathlib import Path
+    import server as srv
+    real_files_dir = srv.FILES_DIR
+    with tempfile.TemporaryDirectory() as td:
+        srv.FILES_DIR = Path(td)
+        try:
+            r1 = "```run\necho A\n```\n```markdown partial.md\nhalf-written"
+            calls, evs = drive_chat(
+                [(r1, "max_tokens"), ("answer with A-OUT", "end_turn")],
+                {"model": "m1", "messages": [
+                    {"role": "user", "content": "go"}]})
+            check("unterminated: partial.md NOT on disk",
+                  not (Path(td) / "partial.md").exists(), True)
+            finals = [d for n, d in evs if n == "clean"]
+            check("unterminated: truncation note survives",
+                  "reply hit the token limit" in finals[-1]["text"], True)
+        finally:
+            srv.FILES_DIR = real_files_dir
+
+
+def test_chromium_js_rendering():
+    """Chromium must render JS-only content (fallback disabled for the test)."""
+    import http.server
+    import threading
+    import tempfile
+    from pathlib import Path
+    import server as srv
+    html = ("<html><head><title>Static Title</title></head><body>"
+            "<div id='x'>no-js-fallback</div>"
+            "<script>document.getElementById('x').textContent='JS-RENDERED-CONTENT';"
+            "document.title='JS Title';</script></body></html>")
+    with tempfile.TemporaryDirectory() as td:
+        Path(td, "fixture.html").write_text(html)
+        handler = lambda *a, **k: None
+        class S(http.server.SimpleHTTPRequestHandler):
+            def __init__(self, *a, **k):
+                super().__init__(*a, directory=td, **k)
+            def log_message(self, *a):
+                pass
+        srv_http = http.server.HTTPServer(("127.0.0.1", 0), S)
+        port = srv_http.server_address[1]
+        t = threading.Thread(target=srv_http.serve_forever, daemon=True)
+        t.start()
+        try:
+            page_html, title = srv._fetch_chromium(
+                f"http://127.0.0.1:{port}/fixture.html")
+            check("chromium: JS-only content rendered",
+                  "JS-RENDERED-CONTENT" in page_html, True)
+            check("chromium: JS-set title captured", "JS Title" in title, True)
+        except ImportError:
+            print("SKIP chromium test (playwright not installed)")
+        finally:
+            srv_http.shutdown()
+
+
+test_build_obs_boundaries()
+test_locator_for()
+test_unterminated_file_not_saved()
+test_chromium_js_rendering()
 test_obs_packing()
 test_truncation_note_persists()
 test_tool_loop_budget()
