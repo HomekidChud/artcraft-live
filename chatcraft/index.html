@@ -444,6 +444,19 @@
     transition: background 120ms;
   }
   .send:hover { background: var(--accent-hover); }
+  /* attached images in chat + composer thumbnails + file diffs */
+  .msg-images { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  .msg-images img { max-width: 180px; max-height: 180px; border-radius: 10px; border: 1px solid var(--border); cursor: zoom-in; object-fit: cover; }
+  .attach-thumbs { display: none; gap: 6px; padding: 8px 12px 0; }
+  .attach-thumb { position: relative; }
+  .attach-thumb img { width: 54px; height: 54px; border-radius: 8px; border: 1px solid var(--border); object-fit: cover; }
+  .attach-x { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; border: none; background: var(--text); color: var(--bg); font-size: 12px; line-height: 18px; text-align: center; cursor: pointer; }
+  .file-diff { margin-top: 6px; border-radius: 8px; border: 1px solid var(--border); overflow: auto; max-height: 260px; background: var(--surface-2); }
+  .file-diff pre { margin: 0; padding: 8px 10px; font-size: 11.5px; line-height: 1.5; white-space: pre; }
+  .diff-add { color: #3fb950; }
+  .diff-del { color: #f85149; }
+  .diff-hunk { color: var(--faint); }
+
   .composer-foot {
     text-align: center; font-size: 0.72rem; color: var(--faint);
     margin-top: 9px;
@@ -1676,6 +1689,10 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
           Automations
         </label>
+        <label class="nav-item" for="v-tasks">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11.5l2 2 4-5"/><rect x="3" y="4" width="18" height="17" rx="3"/></svg>
+          Tasks
+        </label>
         <label class="nav-item" for="v-dashboards">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M7 15l4-6 3 4 4-7"/></svg>
           Dashboards
@@ -1832,7 +1849,7 @@
             </div>
 
             <div class="quick-row">
-              <label class="quick-pill" for="v-docs">
+              <label class="quick-pill" for="v-tasks">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 11.5l2 2 4-5"/><rect x="3" y="4" width="18" height="17" rx="3"/></svg>
                 To-do
               </label>
@@ -2005,10 +2022,10 @@
             </aside>
             <div class="browser-main">
               <div class="browser-bar">
-                <button id="br-back" class="br-btn" title="Back">&#8592;</button>
-                <input id="br-url" class="br-input" placeholder="Type a URL or search" aria-label="URL">
-                <button id="br-go" class="br-btn br-go">Go</button>
-                <button id="br-star" class="br-btn" title="Bookmark this page">&#9734;</button>
+                <span class="br-locked">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                  Read-only live view — ask ChatCraft in chat to browse for you
+                </span>
               </div>
               <div id="br-notice" class="br-notice hidden"></div>
               <div class="browser-preview card">
@@ -2037,23 +2054,8 @@
             <p class="page-sub">On the phone, enable the ChatCraft accessibility service (the APK links you to the right settings screen) so the agent can see the screen and tap for you. No root needed; iOS does not allow this.</p>
           </div>
           <div class="card" style="margin-top:12px;">
-            <div class="run-top" style="margin-bottom:10px;"><h3 style="font-size:0.95rem;">Manual command</h3></div>
-            <div class="field-row">
-              <div class="field" style="flex:1"><label for="ph-action">Action</label>
-                <select id="ph-action">
-                  <option value="state">state</option>
-                  <option value="tap">tap</option>
-                  <option value="text">text</option>
-                  <option value="swipe">swipe</option>
-                  <option value="enter">enter</option>
-                  <option value="back">back</option>
-                  <option value="home">home</option>
-                  <option value="open">open</option>
-                </select></div>
-              <div class="field" style="flex:2"><label for="ph-params">Params (x, y / text / direction)</label><input type="text" id="ph-params" placeholder="540 1200"></div>
-            </div>
-            <button class="btn" id="ph-send">Send</button>
-            <pre id="ph-out" class="br-text hidden" style="margin-top:10px;"></pre>
+            <div class="run-top" style="margin-bottom:10px;"><h3 style="font-size:0.95rem;">Manual control is restricted to the AI</h3></div>
+            <p class="page-sub" style="margin:0;">Open apps, tap, type and read your phone's screen by asking ChatCraft in chat — e.g. "open my alarm clock on the phone". You'll see every action and the live screen state here.</p>
           </div>
           <div class="card" style="margin-top:12px;">
             <div class="run-top" style="margin-bottom:10px;"><h3 style="font-size:0.95rem;">Latest screen state</h3></div>
@@ -2147,6 +2149,23 @@
             <button class="btn" id="au-add">Create automation</button>
           </div>
           <div id="au-list" style="margin-top:12px;"></div>
+        </div>
+      </section>
+
+      <!-- ============ VIEW: TASKS ============ -->
+      <section class="view view-tasks" aria-label="Tasks">
+        <div class="pane">
+          <div class="pane-head">
+            <div>
+              <h2>Tasks</h2>
+              <p>Shared to-do list — add things yourself, or just ask ChatCraft in chat. The AI can manage these too.</p>
+            </div>
+          </div>
+          <div class="field" style="display:flex;gap:8px;align-items:flex-end;">
+            <div style="flex:1;"><label for="task-input">New task</label><input type="text" id="task-input" placeholder="Water the plants…" style="width:100%;"></div>
+            <button class="btn" id="task-add">Add</button>
+          </div>
+          <div id="task-list" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
         </div>
       </section>
 
@@ -2762,28 +2781,8 @@
   }
 
   (function brInit() {
-    var go = document.getElementById("br-go");
-    var input = document.getElementById("br-url");
-    var back = document.getElementById("br-back");
-    var star = document.getElementById("br-star");
-    if (go) go.onclick = function () { brGo(input.value.trim()); };
-    if (input) input.addEventListener("keydown", function (e) {
-      if (e.key === "Enter") brGo(input.value.trim());
-    });
-    if (back) back.onclick = function () { brAct("back"); };
-    if (star) star.onclick = function () {
-      var cur = document.querySelector("#v-browser:checked") &&
-                document.getElementById("br-cur");
-      var url = cur ? cur.textContent.trim() : "";
-      if (!url) { brNotice("Open a page first"); return; }
-      var title = (document.getElementById("br-title").textContent || "") || url;
-      apiFetch(API + "/api/browser/bookmarks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url, title: title })
-      }).then(function () { brNotice("Bookmarked", true); brSidebars(); })
-        .catch(function () { brNotice("Backend unreachable"); });
-    };
+    // browser control is AI-only: the manual URL bar / buttons are gone,
+    // this view is a read-only live watch (state + preview still poll)
     // refresh whenever the Browser view becomes active
     document.querySelectorAll("input[name='view']").forEach(function (r) {
       r.addEventListener("change", function () {
@@ -2834,30 +2833,99 @@
           if (st && j.latest_state) st.textContent = j.latest_state;
         }).catch(function () {});
     };
-    var sendBtn = phEl("ph-send");
-    if (sendBtn) sendBtn.addEventListener("click", function () {
-      var action = phEl("ph-action").value;
-      var raw = (phEl("ph-params").value || "").trim();
-      var params = {};
-      if (action === "tap") {
-        var xy = raw.split(/[\s,]+/);
-        params = { x: parseInt(xy[0] || "0", 10), y: parseInt(xy[1] || "0", 10) };
-      } else if (action === "text" || action === "open") {
-        params = (action === "text") ? { text: raw } : { target: raw };
-      } else if (action === "swipe") {
-        params = { dir: raw || "up" };
-      }
-      var out = phEl("ph-out");
-      out.classList.remove("hidden");
-      out.textContent = "Sending…";
-      apiFetch(API + "/api/phone/command", {
+  })();
+
+  /* ---------- tasks: shared to-do list (user + AI) ---------- */
+  (function () {
+    function tEl(id) { return document.getElementById(id); }
+    function esc(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&" + "amp;").replace(/</g, "&" + "lt;")
+        .replace(/>/g, "&" + "gt;").replace(/"/g, "&" + "quot;");
+    }
+    window.taskRefresh = function () {
+      if (API === null) return;
+      apiFetch(API + "/api/tasks", { credentials: "same-origin" })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          var list = tEl("task-list");
+          if (!list) return;
+          var tasks = d.tasks || [];
+          if (!tasks.length) {
+            list.innerHTML = '<span style="color:var(--muted);font-size:0.85rem;">Nothing yet — add a task above, or ask ChatCraft in chat.</span>';
+            return;
+          }
+          list.innerHTML = "";
+          tasks.forEach(function (t) {
+            var row = document.createElement("div");
+            row.className = "file-card";
+            row.style.alignItems = "center";
+            row.style.gap = "10px";
+            var cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.checked = !!t.done;
+            cb.style.accentColor = "var(--accent)";
+            cb.onchange = function () {
+              apiFetch(API + "/api/tasks/" + encodeURIComponent(t.id), {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ done: cb.checked }),
+                credentials: "same-origin"
+              }).then(function () { taskRefresh(); })
+                .catch(function () { toast("Backend unreachable"); });
+            };
+            var mid = document.createElement("span");
+            mid.className = "f-mid";
+            mid.style.flex = "1";
+            var nm = document.createElement("span");
+            nm.className = "f-name";
+            nm.textContent = t.title;
+            if (t.done) nm.style.textDecoration = "line-through";
+            mid.appendChild(nm);
+            var del = document.createElement("button");
+            del.type = "button";
+            del.className = "f-view";
+            del.style.color = "var(--danger, #f85149)";
+            del.textContent = "Delete";
+            del.onclick = function () {
+              apiFetch(API + "/api/tasks/" + encodeURIComponent(t.id), {
+                method: "DELETE", credentials: "same-origin"
+              }).then(function () { taskRefresh(); })
+                .catch(function () { toast("Backend unreachable"); });
+            };
+            row.appendChild(cb);
+            row.appendChild(mid);
+            row.appendChild(del);
+            list.appendChild(row);
+          });
+        })
+        .catch(function () {});
+    };
+    var addBtn = tEl("task-add");
+    var input = tEl("task-input");
+    function addTask() {
+      if (!input || API === null) return;
+      var title = (input.value || "").trim();
+      if (!title) return;
+      apiFetch(API + "/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: action, params: params })
-      }).then(function (r) { return r.json(); })
-        .then(function (j) { out.textContent = JSON.stringify(j, null, 2); })
-        .catch(function (e) { out.textContent = "Failed: " + e; });
+        body: JSON.stringify({ title: title }),
+        credentials: "same-origin"
+      }).then(function () { input.value = ""; taskRefresh(); })
+        .catch(function () { toast("Backend unreachable"); });
+    }
+    if (addBtn) addBtn.addEventListener("click", addTask);
+    if (input) input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") { e.preventDefault(); addTask(); }
     });
+    // refresh when the Tasks view becomes active
+    document.querySelectorAll("input[name='view']").forEach(function (r) {
+      r.addEventListener("change", function () {
+        if (r.id === "v-tasks") taskRefresh();
+      });
+    });
+    taskRefresh();
   })();
 
   var whoSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z"/></svg>';
@@ -2873,13 +2941,27 @@
     var th = $(".view-chat .thread");
     if (th) th.scrollTop = th.scrollHeight;
   }
-  function buildUserMsg(text) {
+  function buildUserMsg(text, images) {
     var m = document.createElement("div");
     m.className = "msg msg-user new-msg";
     var b = document.createElement("div");
     b.className = "bubble";
     b.textContent = text;
     m.appendChild(b);
+    // attached images render inline so the user sees exactly what the AI sees
+    var imgs = (images || []).slice(0, 4);
+    if (imgs.length) {
+      var row = document.createElement("div");
+      row.className = "msg-images";
+      imgs.forEach(function (src) {
+        var im = document.createElement("img");
+        im.src = src;
+        im.alt = "attached image";
+        im.onclick = function () { window.open(src, "_blank"); };
+        row.appendChild(im);
+      });
+      m.appendChild(row);
+    }
     return m;
   }
   function buildTypingMsg() {
@@ -3084,6 +3166,32 @@
     card.appendChild(ic);
     card.appendChild(mid);
     card.appendChild(view);
+    // every file the AI edits (or a command changes) ships with a real
+    // unified diff — rendered inline, colored, escaped
+    if (f.diff) {
+      var det = document.createElement("details");
+      det.className = "file-diff";
+      var sum = document.createElement("summary");
+      sum.textContent = (f.adds != null ? "+" + f.adds + " / -" + f.dels + " — " : "") + "diff";
+      var pre = document.createElement("pre");
+      f.diff.split("\n").forEach(function (ln) {
+        var sp = document.createElement("span");
+        if (/^\+/.test(ln)) sp.className = "diff-add";
+        else if (/^-/.test(ln)) sp.className = "diff-del";
+        else if (/^@@/.test(ln)) sp.className = "diff-hunk";
+        sp.textContent = ln + "\n";
+        pre.appendChild(sp);
+      });
+      det.appendChild(sum);
+      det.appendChild(pre);
+      mid.appendChild(det);
+    }
+    if (f.deleted) {
+      var dl = document.createElement("span");
+      dl.className = "f-meta";
+      dl.textContent = "deleted by command";
+      mid.appendChild(dl);
+    }
     card.addEventListener("click", function () { openFileViewer(f.name); });
     return card;
   }
@@ -3237,16 +3345,128 @@
       if (!txt) return;
       var t = txt.textContent.trim();
       if (!t || t.indexOf("ChatCraft is thinking") === 0) return;
+      if (isUser) {
+        // attached images must survive the whole history, not just the turn:
+        // data URLs are split into the server's {b64, media_type} format
+        var imgs = $$(".msg-images img", m).map(function (im) { return im.src; });
+        if (imgs.length) {
+          var b64s = [];
+          imgs.slice(0, 4).forEach(function (src) {
+            var mt = String(src).match(/^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/);
+            if (mt) b64s.push({ media_type: mt[1], b64: mt[2] });
+          });
+          if (b64s.length) {
+            out.push({ role: "user", content: t, images: b64s });
+            return;
+          }
+        }
+      }
       out.push({ role: isUser ? "user" : "assistant", content: t });
     });
     return out;
   }
 
 
-  function sendMessage(text) {
+  /* ---------- /skill slash commands (shared skills store) ---------- */
+  function skillMsg(conv, html) {
+    var m = document.createElement("div");
+    m.className = "msg msg-ai new-msg";
+    var b = document.createElement("div");
+    b.className = "bubble";
+    b.innerHTML = html;
+    m.appendChild(b);
+    conv.appendChild(m);
+    scrollThread();
+  }
+  function escHtml(s) {
+    // entity strings are concatenated so nothing pre-decodes them
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&" + "amp;")
+      .replace(/</g, "&" + "lt;")
+      .replace(/>/g, "&" + "gt;")
+      .replace(/"/g, "&" + "quot;");
+  }
+  function handleSkillCommand(text, conv) {
+    var rest = text.replace(/^\/skill\s*/, "").trim();
+    if (API === null) { toast("Backend offline"); return; }
+    apiFetch(API + "/api/skills", { credentials: "same-origin" })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var skills = d.skills || [];
+        if (!rest || rest === "list") {
+          if (!skills.length) {
+            skillMsg(conv, "No skills yet. Create one with <code>/skill -create name | description | prompt</code> — or just ask me in chat to make one.");
+            return;
+          }
+          skillMsg(conv, "<b>Skills</b> — run one with <code>/skill name request</code><br>" +
+            skills.map(function (s) {
+              return "\u2022 <b>" + escHtml(s.name) + "</b>" +
+                (s.description ? " — " + escHtml(s.description) : "") +
+                " <code>" + escHtml(s.id) + "</code>";
+            }).join("<br>"));
+          return;
+        }
+        if (rest.indexOf("-create") === 0) {
+          var body = rest.replace(/^-create\s*/, "");
+          var bits = body.split("|").map(function (x) { return x.trim(); });
+          if (bits.length < 2 || !bits[0] || !bits[bits.length - 1]) {
+            skillMsg(conv, "Usage: <code>/skill -create name | description | prompt</code><br>Or just ask me in chat: \u201ccreate a skill called X that \u2026\u201d.");
+            return;
+          }
+          var name = bits[0], desc = bits.length > 2 ? bits[1] : "", prompt = bits[bits.length - 1];
+          apiFetch(API + "/api/skills", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: name, description: desc, prompt: prompt }),
+            credentials: "same-origin"
+          }).then(function (r) { return r.json(); }).then(function (j) {
+            if (j.error) { skillMsg(conv, "Couldn\u2019t save: " + escHtml(j.error)); return; }
+            skillMsg(conv, "Skill <b>" + escHtml(j.skill.name) + "</b> saved. Run it with <code>/skill " + escHtml(j.skill.name) + " request</code>.");
+          }).catch(function () { toast("Backend unreachable"); });
+          return;
+        }
+        if (rest.indexOf("-delete") === 0) {
+          var target = rest.replace(/^-delete\s*/, "").trim();
+          var hit = skills.find(function (s) { return s.id === target || s.name === target; });
+          if (!hit) { skillMsg(conv, "No skill named \u201c" + escHtml(target) + "\u201d. Try <code>/skill list</code>."); return; }
+          apiFetch(API + "/api/skills/" + encodeURIComponent(hit.id), {
+            method: "DELETE", credentials: "same-origin"
+          }).then(function () {
+            skillMsg(conv, "Skill <b>" + escHtml(hit.name) + "</b> deleted.");
+          }).catch(function () { toast("Backend unreachable"); });
+          return;
+        }
+        if (rest.indexOf("-show") === 0) {
+          var t2 = rest.replace(/^-show\s*/, "").trim();
+          var h2 = skills.find(function (s) { return s.id === t2 || s.name === t2; });
+          if (!h2) { skillMsg(conv, "No skill named \u201c" + escHtml(t2) + "\u201d. Try <code>/skill list</code>."); return; }
+          skillMsg(conv, "<b>" + escHtml(h2.name) + "</b><br><pre style='white-space:pre-wrap;margin:8px 0;'>" + escHtml(h2.prompt) + "</pre>");
+          return;
+        }
+        // /skill <name> <request> — the skill's prompt becomes this turn's system
+        var mCmd = rest.match(/^(\S+)\s+([\s\S]*)$/) || [null, rest, ""];
+        var name2 = mCmd[1], req = mCmd[2];
+        var hit2 = skills.find(function (s) { return s.id === name2 || s.name === name2; });
+        if (!hit2) {
+          skillMsg(conv, "No skill named \u201c" + escHtml(name2) + "\u201d. Try <code>/skill list</code> — or ask me in chat to create it.");
+          return;
+        }
+        skillMsg(conv, "Running skill <b>" + escHtml(hit2.name) + "</b>\u2026");
+        sendMessage(req || "(run this skill)", null, hit2.prompt);
+      })
+      .catch(function () { toast("Backend unreachable"); });
+  }
+
+  function sendMessage(text, images, skillSystem) {
     var conv = activeConversation();
     if (!conv || !text) return;
-    conv.appendChild(buildUserMsg(text));
+    // /skill slash commands are handled client-side against the shared
+    // skills store (list / -create / -delete / -show / apply)
+    if (/^\/skill(\s|$)/.test(text)) {
+      handleSkillCommand(text, conv);
+      return;
+    }
+    conv.appendChild(buildUserMsg(text, images));
     scrollThread();
     var typing = buildTypingMsg();
     conv.appendChild(typing);
@@ -3268,7 +3488,7 @@
       model: chatState.model,
       advisor_model: chatState.advisorModel,
       max_tokens: chatState.maxTokens,
-      system_prompt: chatState.system
+      system_prompt: skillSystem || chatState.system
     });
 
     apiFetch(API + "/api/chat", {
@@ -3409,14 +3629,65 @@
   }
 
   var composer = $(".view-chat .composer textarea");
+  var pendingImages = []; // composer attachments: data URLs sent with the next message
   if (composer) {
     var sendBtn = $(".view-chat .composer .send");
+    // image attach: pick up to 4, show thumbnails, clear on send
+    var imgInput = document.createElement("input");
+    imgInput.type = "file";
+    imgInput.accept = "image/jpeg,image/png,image/webp,image/gif";
+    imgInput.multiple = true;
+    imgInput.style.display = "none";
+    composer.parentNode.appendChild(imgInput);
+    var attachBtn = $(".view-chat .composer .icon-btn[title='Attach file']");
+    var thumbs = null;
+    function renderThumbs() {
+      if (!thumbs) {
+        thumbs = document.createElement("div");
+        thumbs.className = "attach-thumbs";
+        composer.parentNode.insertBefore(thumbs, composer.parentNode.firstChild);
+      }
+      thumbs.innerHTML = "";
+      pendingImages.forEach(function (src, i) {
+        var wrap = document.createElement("span");
+        wrap.className = "attach-thumb";
+        var im = document.createElement("img");
+        im.src = src;
+        wrap.appendChild(im);
+        var x = document.createElement("button");
+        x.type = "button";
+        x.className = "attach-x";
+        x.textContent = "\u00d7";
+        x.onclick = function () {
+          pendingImages.splice(i, 1);
+          renderThumbs();
+        };
+        wrap.appendChild(x);
+        thumbs.appendChild(wrap);
+      });
+      thumbs.style.display = pendingImages.length ? "flex" : "none";
+    }
+    if (attachBtn) attachBtn.addEventListener("click", function () { imgInput.click(); });
+    imgInput.addEventListener("change", function () {
+      Array.prototype.slice.call(imgInput.files || []).forEach(function (f) {
+        if (pendingImages.length >= 4) return;
+        if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { toast("Images only: JPEG, PNG, WebP, GIF"); return; }
+        if (f.size > 5 * 1024 * 1024) { toast("Image too big — 5MB max each"); return; }
+        var rd = new FileReader();
+        rd.onload = function () { pendingImages.push(rd.result); renderThumbs(); };
+        rd.readAsDataURL(f);
+      });
+      imgInput.value = "";
+    });
     function submitComposer() {
       var text = composer.value.trim();
-      if (!text) return;
+      if (!text && !pendingImages.length) return;
       composer.value = "";
       composer.style.height = "auto";
-      sendMessage(text);
+      var imgs = pendingImages.slice(0, 4);
+      pendingImages = [];
+      renderThumbs();
+      sendMessage(text || "What's in this image?", imgs);
     }
     if (sendBtn) sendBtn.addEventListener("click", submitComposer);
     composer.addEventListener("keydown", function (e) {

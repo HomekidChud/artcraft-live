@@ -136,8 +136,48 @@ The harness is tuned for minimal tokens per COMPLETED task:
 
 - `chatcraft/index.html` — the whole frontend (single file, no build step)
 - `chatcraft/server.py` — the backend (stdlib-only Python, serves UI + API on :8000)
-- `chatcraft/test_harness.py` — 110 offline tests; run `python3 test_harness.py` after any change
+- `chatcraft/test_harness.py` — 150+ offline tests; run `python3 test_harness.py` after any change
+- `chatcraft/run_chatcraft.py` — launcher: imports `server` unmodified, patches CATALOG to route anthropic-kind models to the platform Anthropic proxy and openai-kind models to the local Responses adapter (see "Running the backend with real models")
+- `chatcraft/responses_adapter.py` — chat-completions -> Responses API shim on 127.0.0.1:8004 (never forwards `temperature`)
 - `chatcraft/files/`, `chatcraft/data/` — runtime state (gitignored)
+
+## Recent changes in this repo (2026-10-27, build 4)
+
+1. **Skills for the AI + `/skill` slash commands**: skills are a shared
+   store the user and the AI both manage. In chat, `/skill` lists,
+   `/skill -create name | description | prompt` creates, `-delete`,
+   `-show`, and `/skill <name> <request>` runs a skill (its prompt
+   becomes that turn's system). The AI creates skills itself via
+   ```skill blocks (name/description headers, `---`, prompt body) —
+   schema-validated records, never executable code. The system prompt
+   lists installed skills to the model each turn.
+2. **Tasks (shared to-do list)**: new Tasks view + `/api/tasks` CRUD +
+   ```task blocks the AI executes (`add <title>`, `done <n>`, `undo <n>`,
+   `delete <n>`, `list`). Same store, same validation as the UI. The
+   home "To-do" quick-pill now points at the Tasks view.
+3. **AI-created automations**: ```automation blocks (name /
+   interval_min headers, `---`, prompt) create automations in the
+   shared store — always PAUSED on create, same as the UI flow.
+4. **Tool permissions are enforced server-side**: the user-facing
+   endpoints for shell (`/api/run`), browser (`/api/browser/action`)
+   and phone (`/api/phone/command`) now 403 — those tools are
+   restricted to the AI, which drives them through ```run /
+   ```browser / ```phone blocks. The Browser view is a read-only live
+   watch (preview, state, bookmarks/history still update); the Phone
+   view keeps pairing + state but drops the manual command box.
+   Automations and Tasks remain fully usable by BOTH user and AI.
+5. **Real diffs on every file edit**: file writes from ```file blocks
+   and files changed by ```run commands now ship a bounded unified
+   diff (capped 400 lines / 16KB) that the chat renders inline as
+   colored +/- lines. Shell-command changes are detected by hashing
+   the workspace before/after each command batch.
+6. **Images (see + analyze)**: the composer attaches up to 4 images
+   (JPEG/PNG/WebP/GIF, 5MB each) as data URLs; they render in the
+   user's message, survive the whole history in `msg.images`
+   ({b64, media_type}), are validated server-side, and reach
+   Anthropic (image blocks) and OpenAI-compatible models
+   (image_url parts; the Responses adapter maps them to
+   `input_image`). The user sees exactly what the model sees.
 
 ## Recent changes in this repo (2026-10-27, build 3)
 
@@ -279,13 +319,13 @@ sandbox (2 cores / 7 GB RAM, no GPU, no `zstd` in apt):
    the proxy rewrites the Host header, so the default origin check 403s).
 5. `deploy_website(project_path=<deploy folder>, site_name="ChatCraft")`.
 
-## Sandbox-side files (not in this repo, recreate as needed)
+## Sandbox-side files
 
-- `chatcraft-sandbox/run_chatcraft.py` — launcher described above
-- `chatcraft-sandbox/responses_adapter.py` — chat-completions → Responses API
-  translation shim on 127.0.0.1:8004
-- `chatcraft-sandbox/mock_sandbox.py` — mock LLM server (unused now; was the
-  keyless test sandbox)
+`run_chatcraft.py` and `responses_adapter.py` now live IN THIS REPO
+(`chatcraft/`). The runtime sandbox keeps copies in `chatcraft-sandbox/`;
+after editing the repo, copy them over before restarting. The published
+site's backend needs the user's own API keys (Settings > Custom models) —
+the platform proxy credentials work only in the preview app.
 
 ## Known limitations
 

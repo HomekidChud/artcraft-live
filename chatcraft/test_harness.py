@@ -927,12 +927,180 @@ def test_mixed_tool_budget():
         srv.PHONES.clear()
 
 
+def test_shared_features():
+    """Tasks / skills / automations: the AI's chat blocks use the same
+    stores as the UI; every file change ships a real diff; images are
+    validated; restricted endpoints 403 for the browser."""
+    import tempfile as _tf2
+    import server as srv
+
+    td = _tf2.mkdtemp()
+    for attr in ("TASKS_FILE", "SKILLS_FILE", "AUTOMATIONS_FILE"):
+        setattr(srv, attr, Path(td) / (attr.lower() + ".json"))
+    srv.FILES_DIR = Path(td) / "files"
+    srv.FILES_DIR.mkdir()
+
+    # --- parse_blocks: new block kinds ---
+    blocks = srv.parse_blocks(
+        "```task\nadd Buy milk\n```\n"
+        "```skill\nname: terse\ndescription: short answers\n---\n"
+        "Answer in one sentence.\n```\n"
+        "```automation\nname: digest\ninterval_min: 30\n---\n"
+        "Summarise the workspace.\n```")
+    check("shared: block kinds", [b[0] for b in blocks],
+          ["task", "skill", "automation"])
+
+    # --- kv body parser ---
+    head, prompt = srv._parse_kv_body(
+        "name: terse\ndescription: short\n---\nAnswer in one sentence.")
+    check("shared: kv header", (head.get("name"), head.get("description")),
+          ("terse", "short"))
+    check("shared: kv prompt", prompt, "Answer in one sentence.")
+    head2, prompt2 = srv._parse_kv_body("name: x\nJust the prompt body.")
+    check("shared: kv no separator", (head2.get("name"), prompt2),
+          ("x", "Just the prompt body."))
+
+    # --- task actions ---
+    out, err = srv.apply_task_action("add Buy milk")
+    check("shared: task add", (out.startswith("added task"), err),
+          (True, None))
+    out, err = srv.apply_task_action("done 1")
+    check("shared: task done", (srv.load_tasks()[0]["done"], err), (True, None))
+    out, err = srv.apply_task_action("bogus verb")
+    check("shared: task bad verb rejected", err is not None, True)
+
+    # --- skill upsert with description ---
+    s = srv.upsert_skill("terse", "short answers", "Answer in one sentence.")
+    check("shared: skill saved with description",
+          (s["name"], s["description"], s["prompt"]),
+          ("terse", "short answers", "Answer in one sentence."))
+
+    # --- automation from block: created PAUSED ---
+    a = srv.upsert_automation_from_block("digest", "30", "Summarise the workspace.")
+    check("shared: automation paused on create",
+          (a["enabled"], a["interval_min"]), (False, 30))
+
+    # --- unified diff + workspace change detection ---
+    (srv.FILES_DIR / "notes.md").write_text("one\ntwo\n")
+    before = srv._ws_snapshot()
+    (srv.FILES_DIR / "notes.md").write_text("one\ntwo\nthree\n")
+    (srv.FILES_DIR / "new.txt").write_text("hello")
+    changed = srv._ws_changes(before)
+    by_name = {c["name"]: c for c in changed}
+    check("shared: changed file detected", "notes.md" in by_name, True)
+    check("shared: new file detected", "created" in by_name.get("new.txt", {}),
+          True)
+    check("shared: diff has + line", "+three" in by_name["notes.md"].get("diff", ""),
+          True)
+
+    # --- obs packing includes shared-store results ---
+    obs = srv.build_obs([], [], None, None,
+                        [("task", "add Buy milk", True, "added task: Buy milk")])
+    check("shared: tool_log in obs", "task add Buy milk — ok" in obs, True)
+
+    # --- image validation (server contract: msg.images = [{b64, media_type}]) ---
+    err = srv.sanitize_images({"role": "user", "content": "hi"})
+    check("images: text-only message passes", err, None)
+    m1 = {"role": "user", "content": "look",
+          "images": [{"b64": "A" * 100, "media_type": "image/png"}]}
+    err = srv.sanitize_images(m1)
+    check("images: valid image kept", (err, len(m1["images"])), (None, 1))
+    m2 = {"role": "user", "content": "x",
+          "images": [{"b64": "QQ==", "media_type": "image/bmp"},
+                     {"b64": "", "media_type": "image/png"}]}
+    err = srv.sanitize_images(m2)
+    check("images: bad mime dropped silently", (err, m2["images"]), (None, []))
+    err = srv.sanitize_images({"role": "user", "content": "x",
+                               "images": "not a list"})
+    check("images: non-list images rejected", err, "images must be a list")
+
+    # --- executor: AI blocks create real store entries (drive_chat) ---
+    srv.TASKS_FILE = Path(td) / "tasks2.json"
+    srv.SKILLS_FILE = Path(td) / "skills2.json"
+    srv.AUTOMATIONS_FILE = Path(td) / "autos2.json"
+    reply = ("```task\nadd Water plants\n```\n"
+             "```skill\nname: bullets\ndescription: bullet answers\n---\n"
+             "Answer in bullets.\n```\n"
+             "```automation\nname: nightly\ninterval_min: 15\n---\n"
+             "Summarise the day.\n```")
+    calls, evs = drive_chat(
+        [(reply, "end_turn"), ("all done", "end_turn")],
+        {"model": "m", "advisor_model": "",
+         "messages": [{"role": "user", "content": "set these up"}]})
+    names = [n for n, _ in evs]
+    task_steps = [x for n, x in evs
+                  if n == "step" and str(x.get("id", "")).startswith("task-")]
+    check("shared: executor ran task step", len(task_steps) >= 1, True)
+    check("shared: executor saved task",
+          any(t["title"] == "Water plants" for t in srv.load_tasks()), True)
+    check("shared: executor saved skill",
+          any(s["name"] == "bullets" for s in srv.load_skills()), True)
+    check("shared: executor saved paused automation",
+          any(a["name"] == "nightly" and not a["enabled"]
+              for a in srv.load_automations()), True)
+    check("shared: continuation got shared obs",
+          "task add Water plants" in calls[1]["messages"][-1]["content"], True)
+
+    # --- endpoints: browser/run/phone are AI-only (403); tasks CRUD ---
+    import threading as _th2
+    import urllib.request as _rq2
+    with _tf2.TemporaryDirectory() as td2:
+        for attr in ("TASKS_FILE", "SKILLS_FILE", "AUTOMATIONS_FILE",
+                     "PROJECTS_FILE", "AGENTS_FILE", "USAGE_LOG_FILE"):
+            setattr(srv, attr, Path(td2) / (attr.lower() + ".json"))
+        srv.FILES_DIR = Path(td2) / "files"
+        srv.FILES_DIR.mkdir()
+        srv.ALLOW_CMDS = True  # even with commands enabled: user path is 403
+        httpd = srv.ThreadingHTTPServer(("127.0.0.1", 0), srv.Handler)
+        port = httpd.server_address[1]
+        th = _th2.Thread(target=httpd.serve_forever, daemon=True)
+        th.start()
+        try:
+            def call(method, path, body=None):
+                req = _rq2.Request(
+                    f"http://127.0.0.1:{port}{path}", method=method,
+                    data=_json.dumps(body).encode() if body is not None else None,
+                    headers={"Content-Type": "application/json"})
+                try:
+                    with _rq2.urlopen(req, timeout=5) as r:
+                        return r.status, _json.loads(r.read().decode())
+                except _rq2.HTTPError as e:
+                    return e.code, _json.loads(e.read().decode() or "{}")
+
+            st, d = call("POST", "/api/run", {"command": "ls"})
+            check("gate: /api/run 403 for users", st, 403)
+            st, d = call("POST", "/api/browser/action", {"action": "goto", "url": "https://x.example"})
+            check("gate: /api/browser/action 403", st, 403)
+            st, d = call("POST", "/api/phone/command", {"action": "state"})
+            check("gate: /api/phone/command 403", st, 403)
+
+            st, d = call("POST", "/api/tasks", {"title": "Write tests"})
+            check("tasks: create", (st, d["task"]["title"]), (200, "Write tests"))
+            tid = d["task"]["id"]
+            st, d = call("GET", "/api/tasks")
+            check("tasks: list", len(d["tasks"]), 1)
+            st, d = call("POST", f"/api/tasks/{tid}", {"done": True})
+            check("tasks: toggle", (st, d["task"]["done"]), (200, True))
+            st, d = call("DELETE", f"/api/tasks/{tid}")
+            check("tasks: delete", (st, srv.load_tasks()), (200, []))
+            st, d = call("POST", "/api/tasks", {"title": "  "})
+            check("tasks: blank title rejected", st, 400)
+
+            st, d = call("POST", "/api/skills",
+                         {"name": "S", "prompt": "p", "description": "d"})
+            check("skills: description accepted",
+                  (st, d["skill"].get("description")), (200, "d"))
+        finally:
+            httpd.shutdown()
+
+
 test_phone_bridge()
 test_phone_chat_path()
 test_phone_chat_path()
 test_mixed_tool_budget()
 test_feature_stores()
 test_feature_endpoints()
+test_shared_features()
 
 if FAILURES:
     print(f"\n{len(FAILURES)} FAILURES")

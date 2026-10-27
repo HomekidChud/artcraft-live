@@ -20,6 +20,7 @@ Run:  python server.py   (serves the UI and API on http://localhost:8000)
 """
 import base64
 import difflib
+import hashlib
 import hmac
 import json
 import queue
@@ -43,6 +44,7 @@ CUSTOM_FILE = DATA_DIR / "custom_models.json"
 PROJECTS_FILE = DATA_DIR / "projects.json"
 AGENTS_FILE = DATA_DIR / "agents.json"
 SKILLS_FILE = DATA_DIR / "skills.json"
+TASKS_FILE = DATA_DIR / "tasks.json"
 AUTOMATIONS_FILE = DATA_DIR / "automations.json"
 USAGE_LOG_FILE = DATA_DIR / "usage-log.json"
 
@@ -137,6 +139,20 @@ DEFAULT_SYSTEM = (
     "tap <x> <y>, text <msg>, swipe up|down|left|right, enter, back, home, "
     "open <package-or-url>. Each action returns the new screen state. "
     "If no phone is paired, say so — never fake phone actions.\n"
+    "TASKS: the user's shared to-do list — you can manage it: emit a "
+    "```task block with ONE ACTION PER LINE: add <title>, done <n>, "
+    "undo <n>, delete <n>, list. The platform applies each action and "
+    "reports the resulting list.\n"
+    "SKILLS: reusable prompt presets you and the user share. To create or "
+    "update one, emit a ```skill block: first lines `name: <slug>` and "
+    "`description: <one line>`, then `---` and the skill's full system "
+    "prompt. Users run skills in chat with /skill <slug> <request>.\n"
+    "AUTOMATIONS: to schedule yourself, emit a ```automation block with "
+    "`name: <...>`, `interval_min: <minutes>`, `---`, then the prompt to run "
+    "each interval. Automations are created paused — the user enables them.\n"
+    "IMAGES: user messages may carry images (you receive them as image "
+    "content). Describe and analyse what is actually visible; if the model "
+    "cannot see images, say so honestly.\n"
     "When tool results come back, use them to finish the answer. Ordinary code "
     "snippets stay in plain fences with no filename or marker."
 )
@@ -335,17 +351,85 @@ def http_sse(url, payload, headers=None, timeout=180):
 
 # ---------------------------------------------------------- provider streams ---
 
+# ------------------------------------------------------------ images ---
+
+IMAGE_MEDIA = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+MAX_IMAGES_PER_MSG = 4
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+
+def sanitize_images(msg):
+    """Bound and validate a message's images list (in place).
+    Returns an error string, or None when the message is acceptable."""
+    imgs = msg.get("images")
+    if imgs in (None, []):
+        msg["images"] = []
+        return None
+    if not isinstance(imgs, list):
+        msg["images"] = []
+        return "images must be a list"
+    if len(imgs) > MAX_IMAGES_PER_MSG:
+        return f"too many images (max {MAX_IMAGES_PER_MSG})"
+    out = []
+    for im in imgs:
+        if not isinstance(im, dict):
+            continue
+        b64, mt = str(im.get("b64", "")), str(im.get("media_type", ""))
+        if mt not in IMAGE_MEDIA or not b64:
+            continue
+        try:
+            if len(base64.b64decode(b64, validate=False)) > MAX_IMAGE_BYTES:
+                return "image too large (max 5MB)"
+        except Exception:
+            continue
+        out.append({"b64": b64, "media_type": mt})
+    msg["images"] = out
+    return None
+
+
+def anthropic_messages(messages):
+    """messages -> Anthropic format (text + image content blocks)."""
+    out = []
+    for m in messages:
+        if m.get("images"):
+            parts = [{"type": "text", "text": m.get("content") or "(image)"}]
+            for im in m["images"]:
+                parts.append({"type": "image", "source": {
+                    "type": "base64", "media_type": im["media_type"],
+                    "data": im["b64"]}})
+            out.append({"role": m["role"], "content": parts})
+        else:
+            out.append({"role": m["role"], "content": m.get("content") or ""})
+    return out
+
+
+def openai_messages(messages):
+    """messages -> OpenAI chat-completions format (text + image_url parts)."""
+    out = []
+    for m in messages:
+        if m.get("images"):
+            parts = [{"type": "text", "text": m.get("content") or "(image)"}]
+            for im in m["images"]:
+                parts.append({"type": "image_url", "image_url": {
+                    "url": f"data:{im['media_type']};base64,{im['b64']}"}})
+            out.append({"role": m["role"], "content": parts})
+        else:
+            out.append({"role": m["role"], "content": m.get("content") or ""})
+    return out
+
+
 def stream_openai_compat(api, messages, system, max_tokens, temperature, api_key=""):
     """OpenAI-compatible chat completions (OpenAI, Gemini-compat, xAI, Ollama,
     LM Studio, vLLM...). Yields ('text', delta), ('usage', {...}) and
     ('model', provider-reported model name)."""
     base = api.get("base_url") or "https://api.openai.com/v1"
     body = {
-        "model": api["model"], "messages": messages, "stream": True,
+        "model": api["model"], "messages": openai_messages(messages),
+        "stream": True,
         "max_tokens": max_tokens, "stream_options": {"include_usage": True},
     }
     if system:
-        body["messages"] = [{"role": "system", "content": system}] + messages
+        body["messages"] = [{"role": "system", "content": system}] + body["messages"]
     if temperature is not None:
         body["temperature"] = temperature
     headers = {}
@@ -390,7 +474,7 @@ def stream_anthropic(api, messages, system, max_tokens, temperature, api_key="")
     base = (api.get("base_url") or "https://api.anthropic.com").rstrip("/")
     if base.endswith("/v1"):  # users often paste .../v1; we append /v1/... ourselves
         base = base[:-3]
-    body = {"model": api["model"], "messages": messages,
+    body = {"model": api["model"], "messages": anthropic_messages(messages),
             "max_tokens": max_tokens, "stream": True}
     if system:
         body["system"] = system
@@ -485,7 +569,8 @@ def _advisor_call(m, system, messages, max_tokens):
                 base = base[:-3]
             status, body = http_json(
                 base + "/v1/messages",
-                {"model": api["model"], "system": system, "messages": messages,
+                {"model": api["model"], "system": system,
+                 "messages": anthropic_messages(messages),
                  "max_tokens": max_tokens},
                 headers={"x-api-key": api_key,
                          "anthropic-version": "2023-06-01"}, timeout=60)
@@ -501,7 +586,8 @@ def _advisor_call(m, system, messages, max_tokens):
         base = (api.get("base_url") or "https://api.openai.com/v1").rstrip("/")
         status, body = http_json(
             base + "/chat/completions",
-            {"model": api["model"], "messages": [{"role": "system", "content": system}] + messages,
+            {"model": api["model"],
+             "messages": [{"role": "system", "content": system}] + openai_messages(messages),
              "max_tokens": max_tokens},
             headers={"Authorization": "Bearer " + api_key} if api_key else None, timeout=60)
         if status != 200:
@@ -664,7 +750,97 @@ def cleaned_text(blocks, rc_by_block, browse_by_block=None, cmds_pending=False):
     return "\n".join(parts)
 
 
-def build_obs(cmd_log, browse_log, browser_log=None, phone_log=None, cap=9000):
+def _unified_diff(old_lines, new_lines, max_lines=400):
+    """A bounded unified diff between two file versions (None for new files)."""
+    diff = list(difflib.unified_diff(old_lines, new_lines, lineterm="", n=2))
+    if len(diff) > max_lines:
+        diff = diff[:max_lines] + ["… (diff truncated)"]
+    return "\n".join(diff)[:16000]
+
+
+def _ws_snapshot():
+    """Hash + (small) text of every workspace file, to detect what a
+    ```run command changed — so shell edits get real diffs too."""
+    snap = {}
+    for p in FILES_DIR.glob("*"):
+        if not p.is_file():
+            continue
+        try:
+            raw = p.read_bytes()
+        except Exception:
+            continue
+        snap[p.name] = (hashlib.sha256(raw).hexdigest(), raw)
+    return snap
+
+
+def _ws_changes(before):
+    """File records (with unified diffs) for everything that changed since
+    the snapshot — new, edited or deleted by a shell command."""
+    after = _ws_snapshot()
+    changed = []
+    for name, (old_hash, old_raw) in before.items():
+        cur = after.pop(name, None)
+        if cur and cur[0] == old_hash:
+            continue
+        if cur is None:  # deleted
+            changed.append({"name": name, "deleted": True})
+            continue
+        old_lines = old_raw.decode("utf-8", "replace").splitlines()
+        new_lines = cur[1].decode("utf-8", "replace").splitlines()
+        rec = {"name": name, "size": len(cur[1]), "adds": 0, "dels": 0}
+        d = _unified_diff(old_lines, new_lines)
+        if d:
+            rec["diff"] = d
+        for ln in d.splitlines():
+            if ln.startswith("+") and not ln.startswith("+++"):
+                rec["adds"] += 1
+            elif ln.startswith("-") and not ln.startswith("---"):
+                rec["dels"] += 1
+        changed.append(rec)
+    for name, (h, raw) in after.items():  # newly created
+        changed.append({"name": name, "size": len(raw), "created": True})
+    return changed
+
+
+def _parse_kv_body(body):
+    """```skill / ```automation body: `key: value` header lines, then `---`,
+    then the free-text prompt. Falls back to treating everything after the
+    headers as the prompt when no `---` separator is present."""
+    head, prompt, seen_sep = {}, [], False
+    for ln in body.splitlines():
+        if not seen_sep:
+            if ln.strip() == "---":
+                seen_sep = True
+                continue
+            m = re.match(r"^([a-z_]+)\s*:\s*(.*)$", ln.strip(), re.I)
+            if m:
+                head[m.group(1).lower()] = m.group(2).strip()
+                continue
+            seen_sep = True
+        prompt.append(ln)
+    return head, "\n".join(prompt).strip()
+
+
+def upsert_automation_from_block(name, interval_min, prompt, model_id=""):
+    """Create/update an automation from an AI ```automation block.
+    Same store and semantics as the UI: created PAUSED, bounded fields."""
+    autos = load_automations()
+    try:
+        iv = max(1, int(interval_min))
+    except (TypeError, ValueError):
+        iv = 60
+    a = {"id": _slug_id("auto-" + str(name)), "name": str(name)[:60],
+         "prompt": str(prompt)[:500], "interval_min": iv,
+         "model": model_id, "enabled": False,
+         "runs": 0, "last_run": 0, "last_result": "", "created": time.time()}
+    autos = [x for x in autos if x["id"] != a["id"]]
+    autos.append(a)
+    save_automations(autos)
+    return a
+
+
+def build_obs(cmd_log, browse_log, browser_log=None, phone_log=None,
+               tool_log=None, cap=9000):
     """Bounded packing of tool results for the continuation: every
     operation's identity and outcome ALWAYS ships (compact status lines);
     output excerpts fill the remaining budget; anything left out is
@@ -683,6 +859,9 @@ def build_obs(cmd_log, browse_log, browser_log=None, phone_log=None, cap=9000):
                       + ("ok" if ok else f"FAILED: {str(detail)[:60]}"))
     for line, ok, detail in (phone_log or []):
         status.append(f"phone {str(line).strip()[:80]} — "
+                      + ("ok" if ok else f"FAILED: {str(detail)[:60]}"))
+    for kind, line, ok, detail in (tool_log or []):
+        status.append(f"{kind} {str(line).strip()[:80]} — "
                       + ("ok" if ok else f"FAILED: {str(detail)[:60]}"))
     status_text = "\n".join(status)
     if len(status_text) > cap - 800:
@@ -770,6 +949,9 @@ def parse_blocks(text):
         browse_open = re.match(r"^```browse[ \t]*$", ln, re.I)
         browser_open = re.match(r"^```browser[ \t]*$", ln, re.I)
         phone_open = re.match(r"^```phone[ \t]*$", ln, re.I)
+        task_open = re.match(r"^```tasks?[ \t]*$", ln, re.I)
+        skill_open = re.match(r"^```skill[ \t]*$", ln, re.I)
+        auto_open = re.match(r"^```automation[ \t]*$", ln, re.I)
         file_open = re.match(
             r"^```([\w+#-]*)[ \t]*:?[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*$", ln)
         bare_open = re.match(r"^```([\w+#-]*)[ \t]*$", ln)
@@ -820,6 +1002,23 @@ def parse_blocks(text):
             flush()
             blocks.append(("phone" if phone_open else "browser",
                            "\n".join(acts).strip()))
+            i = j + 1
+            continue
+        if task_open or skill_open or auto_open:
+            j = i + 1
+            body = []
+            while j < n and not lines[j].strip().startswith("```"):
+                body.append(lines[j])
+                j += 1
+            if j >= n:
+                # unterminated: keep as text, never apply a partial block
+                cur.append(ln)
+                i += 1
+                continue
+            flush()
+            kind = ("task" if task_open else
+                    "skill" if skill_open else "automation")
+            blocks.append((kind, "\n".join(body).strip()))
             i = j + 1
             continue
         if file_open:
@@ -1399,6 +1598,76 @@ def save_skills(s):
     _save_json(SKILLS_FILE, s)
 
 
+# ------- tasks: shared to-do store (user AND AI) -------
+
+def load_tasks():
+    return _load_json(TASKS_FILE, [])
+
+
+def save_tasks(t):
+    _save_json(TASKS_FILE, t)
+
+
+def upsert_skill(name, description, prompt):
+    """Create or update a skill from an AI ```skill block (same store the
+    UI writes). Returns the saved record; schema-validated, never code."""
+    skills = load_skills()
+    rec = {
+        "id": _slug_id(name), "name": name, "description": description,
+        "prompt": prompt[:8000], "created": time.time(),
+    }
+    skills = [s for s in skills if s.get("id") != rec["id"]]
+    skills.append(rec)
+    save_skills(skills)
+    return rec
+
+
+def _slug_id(name):
+    slug = re.sub(r"[^a-z0-9]+", "-", str(name).strip().lower()).strip("-")
+    return slug or _new_id()
+
+
+def apply_task_action(line):
+    """Apply ONE ```task action line to the shared store.
+    Returns (log_line, err)."""
+    line = line.strip()
+    if not line:
+        return None, None
+    tasks = load_tasks()
+    m = re.match(r"^(add|done|undo|delete|del|list)\b[ \t]*(.*)$", line, re.I)
+    if not m:
+        return line, f"unknown task action: {line[:60]}"
+    op, arg = m.group(1).lower(), m.group(2).strip()
+    if op == "add":
+        if not arg:
+            return line, "add needs a title"
+        t = {"id": _new_id(), "title": arg[:200], "done": False,
+             "created": time.time()}
+        tasks.append(t)
+        save_tasks(tasks)
+        return f"added task: {t['title'][:60]}", None
+    if op == "list":
+        if not tasks:
+            return "tasks: (empty)", None
+        return "tasks: " + "; ".join(
+            f"{i+1}.{'[x]' if t['done'] else '[ ]'}{t['title'][:40]}"
+            for i, t in enumerate(tasks[:20])), None
+    if not arg or not arg.isdigit() or not (1 <= int(arg) <= len(tasks)):
+        return line, f"task number out of range (1-{len(tasks)})"
+    idx = int(arg) - 1
+    if op == "done":
+        tasks[idx]["done"] = True
+    elif op == "undo":
+        tasks[idx]["done"] = False
+    else:
+        removed = tasks.pop(idx)["title"]
+        save_tasks(tasks)
+        return f"deleted task: {removed[:60]}", None
+    save_tasks(tasks)
+    return (f"{'done' if op == 'done' else 'reopened'}: "
+            f"{tasks[idx]['title'][:60]}", None)
+
+
 # ------- automations: scheduled prompt runs -------
 
 def load_automations():
@@ -1625,6 +1894,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, {"agents": load_agents()})
         if path == "/api/skills":
             return self._send(200, {"skills": load_skills()})
+        if path == "/api/tasks":
+            return self._send(200, {"tasks": load_tasks()})
         if path == "/api/automations":
             return self._send(200, {"automations": load_automations()})
         if path == "/api/usage":
@@ -1700,6 +1971,10 @@ class Handler(BaseHTTPRequestHandler):
             sid = urllib.parse.unquote(path.split("/api/skills/")[1])
             save_skills([s for s in load_skills() if s["id"] != sid])
             return self._send(200, {"ok": True})
+        if path.startswith("/api/tasks/"):
+            tid = urllib.parse.unquote(path.split("/api/tasks/")[1])
+            save_tasks([t for t in load_tasks() if t["id"] != tid])
+            return self._send(200, {"ok": True})
         if path.startswith("/api/automations/"):
             aid = urllib.parse.unquote(path.split("/api/automations/")[1])
             save_automations([a for a in load_automations() if a["id"] != aid])
@@ -1714,16 +1989,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(403, {"error": "cross-origin request rejected"})
         path = urllib.parse.urlparse(self.path).path
         if path == "/api/browser/action":
-            b = self._body()
-            if b.get("action") not in ("goto", "click", "type", "scroll", "back",
-                                       "click_xy", "press", "wait"):
-                return self._send(400, {"error": "unknown browser action"})
-            state, err = browser_action(
-                b["action"], url=b.get("url", ""), n=int(b.get("n", 0)),
-                text=b.get("text", ""), dy=int(b.get("dy", 600)),
-                x=int(b.get("x", 0)), y=int(b.get("y", 0)),
-                key=b.get("key", ""), ms=int(b.get("ms", 500)))
-            return self._send(200, {"state": state, "err": err})
+            # browser control is restricted to the AI: it drives the browser
+            # through ```browser blocks in chat. The UI keeps a read-only
+            # live view (state/history endpoints stay open).
+            return self._send(403, {"error": "browser control is restricted to "
+                                         "the AI — ask it in chat"})
         if path == "/api/browser/bookmarks":
             b = self._body()
             if not b.get("url"):
@@ -1749,14 +2019,10 @@ class Handler(BaseHTTPRequestHandler):
                 {k: v for k, v in x.items() if k != "api_key"} | {"custom": True}
                 for x in models]})
         if path == "/api/run":
-            body = self._body()
-            if not ALLOW_CMDS:
-                return self._send(403, {"error": "command execution is disabled "
-                                                 "(CHATCRAFT_ALLOW_CMDS=0)"})
-            if not body.get("command"):
-                return self._send(400, {"error": "command is required"})
-            rc, out = run_command(body["command"])
-            return self._send(200, {"returncode": rc, "output": out})
+            # shell commands are restricted to the AI: it runs them through
+            # ```run blocks in chat (same sandbox, per-turn budget)
+            return self._send(403, {"error": "command execution is restricted to "
+                                         "the AI — ask it in chat"})
         if path == "/api/chat":
             return self._api_chat(self._body())
         # ---- feature stores ----
@@ -1791,11 +2057,37 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(400, {"error": "name and prompt required"})
             skills = [s for s in load_skills() if s["id"] != b.get("id")]
             s = {"id": b.get("id") or _new_id(), "name": str(b["name"])[:60],
+                 "description": str(b.get("description") or "")[:200],
                  "prompt": str(b["prompt"])[:2000],
                  "created": b.get("created") or time.time()}
             skills.append(s)
             save_skills(skills)
             return self._send(200, {"ok": True, "skill": s})
+        if path == "/api/tasks":
+            b = self._body()
+            if not str(b.get("title") or "").strip():
+                return self._send(400, {"error": "title required"})
+            tasks = load_tasks()
+            t = {"id": _new_id(), "title": str(b["title"])[:200],
+                 "done": False, "created": time.time()}
+            tasks.append(t)
+            save_tasks(tasks)
+            return self._send(200, {"ok": True, "task": t})
+        if path.startswith("/api/tasks/"):
+            tid = urllib.parse.unquote(path.split("/api/tasks/")[1])
+            tasks = load_tasks()
+            t = next((x for x in tasks if x["id"] == tid), None)
+            if not t:
+                return self._send(404, {"error": "task not found"})
+            b = self._body()
+            if b.get("title") is not None:
+                if not str(b["title"]).strip():
+                    return self._send(400, {"error": "title required"})
+                t["title"] = str(b["title"])[:200]
+            if b.get("done") is not None:
+                t["done"] = bool(b["done"])
+            save_tasks(tasks)
+            return self._send(200, {"ok": True, "task": t})
         if path == "/api/automations":
             b = self._body()
             if not b.get("name") or not b.get("prompt"):
@@ -1846,17 +2138,11 @@ class Handler(BaseHTTPRequestHandler):
                     w["event"].set()
             return self._send(200, {"ok": True})
         if path == "/api/phone/command":
-            b = self._body()
-            did = b.get("device_id") or phone_default_device()
-            if not did:
-                return self._send(404, {"error": "no phone paired — install the "
-                                                 "ChatCraft APK and pair it first"})
-            cmd, err = phone_enqueue(did, b.get("action", ""),
-                                     b.get("params") or {}, wait=False)
-            if err:
-                return self._send(404, {"error": err})
-            return self._send(200, {"ok": True, "command": cmd,
-                                    "device": did})
+            # phone actions are restricted to the AI: it drives the paired
+            # phone through ```phone blocks in chat. The UI keeps pairing,
+            # device state and the live log.
+            return self._send(403, {"error": "phone control is restricted to "
+                                         "the AI — ask it in chat"})
         if path.startswith("/api/files/"):
             # write a file into the workspace (canvas saves; same rules as chat)
             name = Path(urllib.parse.unquote(path.split("/api/files/")[1])).name
@@ -1881,10 +2167,19 @@ class Handler(BaseHTTPRequestHandler):
                 return ev("step", d)
 
             # history bound: last 12 messages, full content (no truncation —
-            # silently cutting older messages would lose requirements)
-            messages = [m for m in (req.get("messages") or [])
-                        if m.get("role") in ("user", "assistant")
-                        and m.get("content")][-12:]
+            # silently cutting older messages would lose requirements);
+            # attached images are validated (type/size/count) and kept
+            # alongside the text so the model can actually see them
+            messages = []
+            for m in (req.get("messages") or []):
+                if m.get("role") not in ("user", "assistant") or not m.get("content"):
+                    continue
+                err = sanitize_images(m)
+                if err:
+                    yield ev("error", {"error": err})
+                    return
+                messages.append(m)
+            messages = messages[-12:]
             if not messages:
                 yield ev("error", {"error": "no messages"})
                 return
@@ -1965,6 +2260,17 @@ class Handler(BaseHTTPRequestHandler):
 
                 # 4. stream the main model's reply
                 system = req.get("system_prompt") or DEFAULT_SYSTEM
+                try:
+                    skills_now = load_skills()
+                except Exception:
+                    skills_now = []
+                if skills_now:
+                    s_list = "\n".join(
+                        f"- {s['name']}: {(s.get('description') or s['prompt'])[:100]}"
+                        for s in skills_now[:30])
+                    system += ("\n\nSKILLS available (the user can also create "
+                               "more with /skill in chat or in Settings > "
+                               "Skills):\n" + s_list)
                 if files_now:
                     system += ("\n\nWORKSPACE: the user's workspace already contains: "
                                + ", ".join(p.name for p in files_now[:30]) + ".")
@@ -2040,6 +2346,9 @@ class Handler(BaseHTTPRequestHandler):
                                    "size": safe.stat().st_size}
                             if existed:
                                 rec["adds"], rec["dels"] = adds, dels
+                                diff = _unified_diff(old_lines, new_lines)
+                                if diff:
+                                    rec["diff"] = diff
                                 label = f"Edited {safe.name} +{adds} -{dels}"
                             else:
                                 label = f"Created {safe.name}"
@@ -2050,6 +2359,7 @@ class Handler(BaseHTTPRequestHandler):
                                                blocks, {}, cmds_pending=True)})
                     rc_by_block, cmd_log = {}, []
                     run_slice = run_idx[:max(0, cmd_budget)]
+                    ws_before = _ws_snapshot()
                     for n_run, bi in enumerate(run_slice):
                         cmd = normalize_cmd(blocks[bi][1])
                         sid = f"cmd-{id_base + n_run + 1}"
@@ -2076,6 +2386,11 @@ class Handler(BaseHTTPRequestHandler):
                         skip_seq[0] += 1
                         yield step(f"cmd-skip-{skip_seq[0]}",
                                   f"Skipped: {cmd[:50]} (per-turn limit)", "skip")
+                    if run_slice:
+                        ws_changed = _ws_changes(ws_before)
+                        if ws_changed:
+                            saved.extend(ws_changed)
+                            yield ev("files", {"files": ws_changed})
                     if run_idx:
                         yield ev("clean", {"text": cleaned_text(blocks, rc_by_block)})
                     browse_log, browse_by_block = [], {}
@@ -2219,13 +2534,67 @@ class Handler(BaseHTTPRequestHandler):
                             skip_seq[0] += 1
                             yield step(f"ph-skip-{skip_seq[0]}",
                                       f"Skipped: {line.strip()[:45]} (limit)", "skip")
+                    # shared stores — tasks / skills / automations: the AI
+                    # manages them in chat through the exact same stores,
+                    # validation and PAUSED-on-create rule as the UI
+                    shared_log = []
+                    for kind, body in blocks:
+                        if kind == "task":
+                            for line in body.splitlines():
+                                line = line.strip()
+                                if not line or line.startswith("#"):
+                                    continue
+                                out, terr = apply_task_action(line)
+                                ok = terr is None
+                                out = out or terr or ""
+                                shared_log.append(("task", line, ok, out))
+                                yield step(f"task-{len(shared_log)}", out[:80],
+                                          "done" if ok else "fail", out[:200])
+                        elif kind == "skill":
+                            head, prompt = _parse_kv_body(body)
+                            name = head.get("name", "").strip()
+                            if name and prompt:
+                                s = upsert_skill(name,
+                                                 (head.get("description") or "").strip() or None,
+                                                 prompt)
+                                shared_log.append(("skill", name, True,
+                                                   f"saved '{s['name']}'"))
+                                yield step("skill", f"Skill saved: {s['name']}",
+                                          "done", s.get("description") or "")
+                            else:
+                                shared_log.append(("skill", name or "(no name)",
+                                                   False,
+                                                   "missing name or prompt"))
+                                yield step("skill",
+                                          "Skill block needs 'name:' + prompt",
+                                          "fail")
+                        elif kind == "automation":
+                            head, prompt = _parse_kv_body(body)
+                            name = head.get("name", "").strip()
+                            if name and prompt:
+                                a = upsert_automation_from_block(
+                                    name, head.get("interval_min", "60"), prompt)
+                                shared_log.append(("automation", name, True,
+                                                   f"created paused '{a['name']}'"))
+                                yield step("automation",
+                                           f"Automation created (paused): "
+                                           f"{a['name']} — every "
+                                           f"{a['interval_min']} min",
+                                           "done", a["prompt"][:200])
+                            else:
+                                shared_log.append(("automation",
+                                                   name or "(no name)", False,
+                                                   "missing name or prompt"))
+                                yield step("automation",
+                                          "Automation block needs 'name:' + prompt",
+                                          "fail")
                     return (rc_by_block, browse_by_block, cmd_log, browse_log,
-                            browser_log, phone_log, saved, len(run_slice),
-                            len(browse_slice) + actions_used)
+                            browser_log, phone_log, shared_log, saved,
+                            len(run_slice), len(browse_slice) + actions_used)
 
                 # 5-7. execute the reply's tool blocks (budgets shared per turn)
                 (rc_by_block, browse_by_block, cmd_log, browse_log,
-                 browser_log, phone_log, saved, uc, ub) = \
+                 browser_log, phone_log, shared_log, saved, uc, ub) = \
                     yield from execute_reply_tools(full_text)
                 cmd_left, browse_left, id_base = 10 - uc, 5 - ub, uc + ub
 
@@ -2249,10 +2618,11 @@ class Handler(BaseHTTPRequestHandler):
                 cont_msgs = messages + [
                     {"role": "assistant", "content": echo_text(full_text)}]
                 rounds = 0
-                while (cmd_log or browse_log or browser_log or phone_log) \
+                while (cmd_log or browse_log or browser_log or phone_log
+                        or shared_log) \
                         and rounds < CONT_MAX:
                     obs_text = build_obs(cmd_log, browse_log, browser_log,
-                                         phone_log)
+                                         phone_log, shared_log)
                     obs_text = ("TOOL RESULTS from the run/browse blocks in your "
                                 "reply — the platform ran them for you (skips and "
                                 "failures included). Use these results NOW to "
@@ -2287,7 +2657,7 @@ class Handler(BaseHTTPRequestHandler):
                     yield step("cont", "Used tool results", "done")
                     cont_msgs.append({"role": "assistant", "content": cont_text[:6000]})
                     # only NEW tool results feed the next round
-                    (crc, cbb, ccl, cbl, cbrl, cphl, saved2,
+                    (crc, cbb, ccl, cbl, cbrl, cphl, cshl, saved2,
                      uc2, ub2) = yield from execute_reply_tools(
                         cont_text, cmd_budget=cmd_left,
                         browse_budget=browse_left, id_base=id_base)
@@ -2302,6 +2672,7 @@ class Handler(BaseHTTPRequestHandler):
                             "possibly truncated]")
                     yield ev("clean", {"text": last_clean})
                     cmd_log, browse_log, browser_log, phone_log = ccl, cbl, cbrl, cphl
+                    shared_log = shared_log + cshl
                 pending_notes = list(truncation_notes)
                 if cmd_log or browse_log or browser_log or phone_log:
                     pending_notes.append(
