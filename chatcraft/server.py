@@ -491,12 +491,20 @@ def super_advisor_pass(advisor, locator, messages, available_files):
     usage = {"in": 0, "out": 0}
 
     # ---- stage 1: locator scans a compact index, not the conversation ----
-    # Cheap-mode rule: for a short conversation with no workspace files there
-    # is nothing to locate — the advisor just reads everything (skipping the
-    # locator call entirely saves its tokens + latency on most turns).
+    # Cheap-mode rule: for a short conversation where no workspace file is
+    # actually relevant there is nothing to locate — the advisor just reads
+    # everything (skipping the locator call saves its tokens + latency).
+    # Files count as relevant only if one is named in the latest user
+    # message, or the message refers to files/workspace generically.
     sel = {"messages": [], "files": []}
     indexed = [(i, m) for i, m in enumerate(messages) if m.get("content")]
-    use_locator = bool(locator) and (len(indexed) > 3 or bool(available_files))
+    last_user_text = next((str(m.get("content")) for m in reversed(messages)
+                            if m.get("role") == "user"), "")
+    files_relevant = bool(available_files) and (
+        any(p.name in last_user_text for p in available_files)
+        or bool(re.search(r"\b(files?|workspace|documents?)\b",
+                          last_user_text, re.I)))
+    use_locator = bool(locator) and (len(indexed) > 3 or files_relevant)
     info["locator_used"] = use_locator
     if use_locator:
         index = [{"n": i, "role": m.get("role", "user"),
@@ -555,21 +563,11 @@ def super_advisor_pass(advisor, locator, messages, available_files):
     return note, aerr, usage, info
 
 
-def bound_history(messages, keep=6, preview=400):
-    """Cheap-mode history bound: the last `keep` messages verbatim, older
-    ones compressed to a preview, so input cost stays flat as chats grow.
-    The latest user message always survives in full (it's within `keep`)."""
-    out = [dict(m) for m in messages]
-    for i in range(max(0, len(out) - keep)):
-        c = str(out[i].get("content") or "")
-        if len(c) > preview:
-            out[i]["content"] = c[:preview] + "\n…[truncated]"
-    return out
-
-
-def cleaned_text(blocks, rc_by_block, cmds_pending=False, browsed=False):
+def cleaned_text(blocks, rc_by_block, browse_by_block=None, cmds_pending=False):
     """The user-facing reply: model prose kept, tool blocks replaced by
-    one-line status notes (the steps UI expands on them)."""
+    one-line status notes (the steps UI expands on them). browse_by_block
+    maps block index -> (ok, detail) once browsing ran, so fetch failures
+    and budget-skips are labelled honestly per block."""
     parts = []
     for i, b in enumerate(blocks):
         if b[0] == "text":
@@ -578,7 +576,14 @@ def cleaned_text(blocks, rc_by_block, cmds_pending=False, browsed=False):
             parts.append("wrote file: " + Path(b[2]).name)
         elif b[0] == "browse":
             u = (b[1].splitlines() or [""])[0][:80]
-            parts.append("browsed: " + u if browsed else "(browsing " + u + "…)")
+            if browse_by_block is None:
+                parts.append("(browsing " + u + "…)")
+            elif i in browse_by_block:
+                ok, detail = browse_by_block[i]
+                parts.append("browsed: " + u if ok
+                             else f"couldn't fetch: {u} ({str(detail)[:40]})")
+            else:
+                parts.append("not fetched (per-turn limit reached): " + u)
         else:
             c = normalize_cmd(b[1])
             if not c:
@@ -591,8 +596,22 @@ def cleaned_text(blocks, rc_by_block, cmds_pending=False, browsed=False):
                              else f"failed (exit {rc}): {c[:60]}")
             else:
                 parts.append("skipped: commands disabled" if not ALLOW_CMDS
-                             else f"not run (over the 10-command limit): {c[:60]}")
+                             else f"not run (per-turn limit reached): {c[:60]}")
     return "\n".join(parts)
+
+
+def echo_text(rtext):
+    """Compact echo of a model reply for the continuation conversation:
+    file contents elided (the model just wrote them), tool blocks short."""
+    parts = []
+    for b in parse_blocks(rtext):
+        if b[0] == "text":
+            parts.append(b[1])
+        elif b[0] == "file":
+            parts.append(f"(wrote file {b[2]})")
+        else:
+            parts.append(b[1][:150])
+    return "\n".join(parts)[:6000]
 
 
 # ------------------------------------------------------------ file + command ---
@@ -987,9 +1006,11 @@ class Handler(BaseHTTPRequestHandler):
                     d["detail"] = detail
                 return ev("step", d)
 
-            messages = bound_history(
-                [m for m in (req.get("messages") or [])
-                 if m.get("role") in ("user", "assistant") and m.get("content")][-12:])
+            # history bound: last 12 messages, full content (no truncation —
+            # silently cutting older messages would lose requirements)
+            messages = [m for m in (req.get("messages") or [])
+                        if m.get("role") in ("user", "assistant")
+                        and m.get("content")][-12:]
             if not messages:
                 yield ev("error", {"error": "no messages"})
                 return
@@ -1092,14 +1113,18 @@ class Handler(BaseHTTPRequestHandler):
 
                 full_text = "".join(chunks)
 
-                def execute_reply_tools(rtext):
-                    """Run every file/command/browse block in a model reply and
-                    stream the steps live. parse_blocks scans line-by-line so
+                def execute_reply_tools(rtext, cmd_budget=10,
+                                       browse_budget=5, id_base=0):
+                    """Run every file/command/browse block in a model reply
+                    and stream the steps live. Budgets are SHARED across the
+                    whole turn (first reply + continuations), step ids are
+                    unique, and the logs include failures so they can be fed
+                    back to the model. parse_blocks scans line-by-line so
                     malformed merged fences can't swallow a later block; each
-                    block gets its OWN execution record (index -> exit code), so
-                    duplicate commands can never borrow a sibling's result.
-                    Returns (rc_by_block, cmd_log, browse_log, saved) so the
-                    caller can feed tool results back to the model.
+                    block gets its OWN execution record (index -> exit code),
+                    so duplicate commands can never borrow a sibling's result.
+                    Returns (rc_by_block, browse_by_block, cmd_log,
+                    browse_log, saved, cmds_used, browses_used).
                     """
                     blocks = parse_blocks(rtext)
                     run_idx = [i for i, b in enumerate(blocks) if b[0] == "run"
@@ -1142,9 +1167,10 @@ class Handler(BaseHTTPRequestHandler):
                                            "cleaned_text": cleaned_text(
                                                blocks, {}, cmds_pending=True)})
                     rc_by_block, cmd_log = {}, []
-                    for n_run, bi in enumerate(run_idx[:10]):
+                    run_slice = run_idx[:max(0, cmd_budget)]
+                    for n_run, bi in enumerate(run_slice):
                         cmd = normalize_cmd(blocks[bi][1])
-                        sid = f"cmd-{n_run + 1}"
+                        sid = f"cmd-{id_base + n_run + 1}"
                         if not ALLOW_CMDS:
                             yield step(sid, "Commands disabled", "skip",
                                        "set CHATCRAFT_ALLOW_CMDS=1 to enable")
@@ -1162,14 +1188,23 @@ class Handler(BaseHTTPRequestHandler):
                         cmd_log.append((cmd, rc, out))
                     if run_idx:
                         yield ev("clean", {"text": cleaned_text(blocks, rc_by_block)})
-                    browses = extract_browses(rtext)
-                    browse_log = []
-                    for n_br, url in enumerate(browses[:5]):
-                        sid = f"browse-{n_br + 1}"
+                    browse_log, browse_by_block = [], {}
+                    browse_blocks = [(i, b) for i, b in enumerate(blocks)
+                                     if b[0] == "browse"]
+                    browse_slice = browse_blocks[:max(0, browse_budget)]
+                    for n_br, (bi, b) in enumerate(browse_slice):
+                        url = (b[1].splitlines() or [""])[0].strip()
+                        if not url:
+                            continue
+                        if not url.startswith(("http://", "https://")):
+                            url = "https://" + url
+                        sid = f"browse-{id_base + n_br + 1}"
                         yield step(sid, f"Browsing {url[:70]}", "run")
                         text_body, title, berr = fetch_page(url)
                         if berr:
                             yield step(sid, f"Couldn't fetch {url[:60]}", "fail", berr)
+                            browse_by_block[bi] = (False, berr)
+                            browse_log.append((url, None, berr))
                             continue
                         domain = urllib.parse.urlparse(url).netloc or "page"
                         safe_name = re.sub(r"[^\w.-]+", "-", domain)[:40] or "page"
@@ -1180,49 +1215,56 @@ class Handler(BaseHTTPRequestHandler):
                         saved.append({"name": fname, "lang": "markdown",
                                       "size": len(content)})
                         yield ev("browse", {"url": url, "title": title,
-                                             "chars": len(text_body), "file": fname})
+                                            "chars": len(text_body), "file": fname})
                         yield step(sid, f"Browsed {domain[:40]}", "done",
                                    f"saved {len(text_body)} chars to {fname}")
+                        browse_by_block[bi] = (True, title)
                         browse_log.append((url, title, text_body))
-                    if browses:
-                        yield ev("clean", {"text": cleaned_text(blocks, rc_by_block,
-                                                               browsed=True)})
-                    return rc_by_block, cmd_log, browse_log, saved
+                    if browse_blocks:
+                        yield ev("clean", {"text": cleaned_text(
+                            blocks, rc_by_block, browse_by_block)})
+                    return (rc_by_block, browse_by_block, cmd_log, browse_log,
+                            saved, len(run_slice), len(browse_slice))
 
-                # 5-7. execute the reply's tool blocks: files, commands, browses
-                rc_by_block, cmd_log, browse_log, saved = yield from execute_reply_tools(full_text)
+                # 5-7. execute the reply's tool blocks (budgets shared per turn)
+                rc_by_block, browse_by_block, cmd_log, browse_log, saved, uc, ub = \
+                    yield from execute_reply_tools(full_text)
+                cmd_left, browse_left, id_base = 10 - uc, 5 - ub, uc + ub
 
-                # 8. tool feedback: if tools ran, ONE continuation call feeds the
-                #    command outputs and page text back to the model so it can
-                #    actually finish the task with them (bounded: never more than
-                #    one extra call per turn — cheap, and it saves whole turns).
-                if cmd_log or browse_log:
+                # 8. tool feedback loop: execute -> observe -> resume, budgeted.
+                #    Each round feeds the command outputs / page text (and any
+                #    fetch failures) back to the model so it can finish the
+                #    task in the same turn. Bounded: max 2 continuation calls,
+                #    shared 10-command / 5-browse budgets, and if the budget
+                #    runs out the user sees an honest note instead of silence.
+                CONT_MAX = 2
+                last_clean = cleaned_text(parse_blocks(full_text),
+                                         rc_by_block, browse_by_block)
+                cont_msgs = messages + [
+                    {"role": "assistant", "content": echo_text(full_text)}]
+                rounds = 0
+                while (cmd_log or browse_log) and rounds < CONT_MAX:
                     obs = []
                     for cmd, rc, out in cmd_log:
                         obs.append(f"$ {cmd}\n(exit {rc})\n{out.strip()[:1200]}")
                     for url, title, body in browse_log:
-                        obs.append(f"[browsed {url} — {title or 'page'}]\n{body[:2500]}")
-                    obs_text = ("TOOL RESULTS from the run/browse blocks in your reply "
-                                "— the platform ran them for you. Use these results NOW "
-                                "to give the user the final, complete answer. Do not "
-                                "repeat, re-run, or re-announce them.\n\n"
-                                + "\n\n".join(obs))[:9000]
-                    # cheap echo of the model's own reply: file contents elided
-                    echo = []
-                    for b in parse_blocks(full_text):
-                        if b[0] == "text":
-                            echo.append(b[1])
-                        elif b[0] == "file":
-                            echo.append(f"(wrote file {b[2]})")
+                        if title is None:
+                            obs.append(f"[browsed {url} — FAILED: {str(body)[:200]}]")
                         else:
-                            echo.append(b[1][:150])
-                    cont_messages = messages + [
-                        {"role": "assistant", "content": "\n".join(echo)[:6000]},
-                        {"role": "user", "content": obs_text}]
-                    yield step("cont", "Using tool results", "run")
+                            obs.append(f"[browsed {url} — {title}]\n{body[:2500]}")
+                    obs_text = ("TOOL RESULTS from the run/browse blocks in your "
+                                "reply — the platform ran them for you. Use these "
+                                "results NOW to give the user the final, complete "
+                                "answer. Do not re-announce commands that already "
+                                "ran; if something failed or never ran and it "
+                                "matters, you may emit one new run block.\n\n"
+                                + "\n\n".join(obs))[:9000]
+                    cont_msgs.append({"role": "user", "content": obs_text})
+                    rounds += 1
+                    yield step("cont", f"Using tool results ({rounds}/{CONT_MAX})", "run")
                     cont_chunks, cont_usage = [], {"in": 0, "out": 0}
                     for kind, payload in model_stream(
-                            model, cont_messages, system, 512,
+                            model, cont_msgs, system, 768,
                             float(req.get("temperature") or 0.7)):
                         if kind == "text" and payload:
                             cont_chunks.append(payload)
@@ -1231,17 +1273,29 @@ class Handler(BaseHTTPRequestHandler):
                             cont_usage = payload
                         elif kind == "model" and not reported_model:
                             reported_model = payload
-                    yield step("cont", "Used tool results", "done")
                     usage["in"] += cont_usage.get("in", 0)
                     usage["out"] += cont_usage.get("out", 0)
                     cont_text = "".join(cont_chunks)
-                    if cont_text.strip():
-                        # anything the continuation itself emitted runs too
-                        # (bounded: no further model calls after this one)
-                        crc, _, _, saved2 = yield from execute_reply_tools(cont_text)
-                        saved = saved + saved2
-                        yield ev("clean", {"text": cleaned_text(
-                            parse_blocks(cont_text), crc, browsed=True)})
+                    if not cont_text.strip():
+                        break
+                    cont_msgs.append({"role": "assistant", "content": cont_text[:6000]})
+                    # only NEW tool results feed the next round
+                    cmd_log, browse_log = [], []
+                    crc, cbb, ccl, cbl, saved2, uc2, ub2 = yield from execute_reply_tools(
+                        cont_text, cmd_budget=cmd_left,
+                        browse_budget=browse_left, id_base=id_base)
+                    cmd_left -= uc2
+                    browse_left -= ub2
+                    id_base += uc2 + ub2
+                    saved = saved + saved2
+                    last_clean = cleaned_text(parse_blocks(cont_text), crc, cbb)
+                    yield ev("clean", {"text": last_clean})
+                if cmd_log or browse_log:
+                    # budget reached with unsummarized results: honest note
+                    yield ev("clean", {"text": last_clean +
+                                       "\n\n[continuation budget reached — the "
+                                       "latest tool results above were not "
+                                       "summarized]"})
 
                 custom = bool(model.get("custom"))
                 local = bool(model.get("local"))

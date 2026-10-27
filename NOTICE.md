@@ -41,25 +41,30 @@ ChatCraft is now a full agent in its cloud workspace:
 
 ## Cheapness policy (keep it cheap)
 
-The harness is tuned for minimal tokens per completed task:
+The harness is tuned for minimal tokens per COMPLETED task:
 
-- **Locator bypass**: conversations of ≤3 messages with no workspace files
-  skip the locator call entirely — the advisor just reads everything.
+- **Locator bypass**: short chats (<=3 messages) skip the locator call
+  entirely unless a workspace file is actually relevant (named in the
+  latest user message, or the message refers to files/workspace) — the
+  advisor just reads everything.
 - **Terse system prompt**: ~half the tokens of the old one; advisor brief
   capped at 50 words (one line for simple requests).
-- **History bound** (`bound_history`): last 6 messages verbatim, older ones
-  compressed to 400-char previews. The latest user message always survives
-  in full.
-- **Tool feedback loop** (step 8 of `/api/chat`): after commands/browses run,
-  ONE continuation call (max_tokens 512) feeds the outputs back to the model
-  so it finishes the task in the same turn — cheaper than a second user
-  turn. Bounded: never more than one continuation, and if the continuation
-  itself emits tool blocks they run but get no further model calls.
-- **No prompt caching**: the platform proxy ignores `cache_control`
-  (verified empirically — identical 1217-token requests billed full input
-  twice, no cache fields in usage). Don't bother adding it.
-- Cost display per message includes locator + advisor + main + continuation
-  usage, honestly merged.
+- **History**: last 12 messages in full, no truncation — silently cutting
+  older messages would lose requirements.
+- **Tool feedback loop** (step 8 of `/api/chat`): execute -> observe ->
+  resume, budgeted. After commands/browses run, their outputs (and fetch
+  failures) are fed back to the model in a continuation so it finishes the
+  task in the same turn. Max 2 continuation calls per turn; command
+  budgets are shared across the whole turn (10 commands / 5 browses
+  total, unique step ids); if the budget runs out the user sees an honest
+  "[continuation budget reached]" note.
+- **Prompt caching**: cache savings NOT verified — the platform proxy
+  returned no cache fields in usage when `cache_control` was sent.
+  Currently disabled; re-verify against the proxy before relying on it.
+- Cost display per message includes locator + advisor + main +
+  continuation usage, honestly merged. Measured (identical prompt,
+  2026-10-27): a shell+browse task costs ~$0.012 total and completes in
+  one turn; a trivial "hi" costs ~$0.003.
 
 ## Repo layout
 

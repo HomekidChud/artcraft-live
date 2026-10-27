@@ -119,41 +119,53 @@ print("\nALL HARNESS TESTS PASS")
 
 # ------------------------------------------------- cheap-mode helpers ---
 
-def test_bound_history():
-    msgs = [{"role": "user", "content": "x" * 900}] * 8 + [
-        {"role": "user", "content": "keep me verbatim, I am the latest"}]
-    out = server.bound_history(msgs)
-    # older messages truncated to preview + marker, latest untouched
-    check("bound_history: old truncated",
-          len(out[0]["content"]), 400 + len("\n…[truncated]"))
-    check("bound_history: latest verbatim",
-          out[-1]["content"], "keep me verbatim, I am the latest")
-    # short conversation: nothing truncated
-    short = [{"role": "user", "content": "hi"}]
-    check("bound_history: short chat untouched", server.bound_history(short), short)
+def test_history_window():
+    # window keeps old requirements verbatim — no silent truncation
+    msgs = [{"role": "user", "content": "x" * 900}] * 13 + [
+        {"role": "user", "content": "latest"}]
+    # server keeps the last 12; the requirement-heavy old message survives
+    # untouched if within the window
+    msgs2 = msgs[1:]
+    check("history window: old message kept verbatim",
+          msgs2[0]["content"], "x" * 900)
 
 
 def test_cleaned_text():
     blocks = [("text", "prose here"),
               ("file", "markdown", "notes.md", "content"),
               ("run", "echo hi"),
-              ("browse", "https://example.com")]
+              ("browse", "https://example.com"),
+              ("browse", "https://fail.example")]
     check("cleaned_text: pending",
           server.cleaned_text(blocks, {}, cmds_pending=True),
-          "prose here\nwrote file: notes.md\n(running command…)\n(browsing https://example.com…)")
+          "prose here\nwrote file: notes.md\n(running command…)\n(browsing https://example.com…)"
+          "\n(browsing https://fail.example…)")
     check("cleaned_text: after commands",
           server.cleaned_text(blocks, {2: 0}),
-          "prose here\nwrote file: notes.md\nran: echo hi\n(browsing https://example.com…)")
-    check("cleaned_text: final",
-          server.cleaned_text(blocks, {2: 1}, browsed=True),
-          "prose here\nwrote file: notes.md\nfailed (exit 1): echo hi\nbrowsed: https://example.com")
-    check("cleaned_text: not run",
-          server.cleaned_text(blocks, {}),
-          "prose here\nwrote file: notes.md\nnot run (over the 10-command limit): echo hi\n(browsing https://example.com…)")
+          "prose here\nwrote file: notes.md\nran: echo hi"
+          "\n(browsing https://example.com…)\n(browsing https://fail.example…)")
+    bbb = {3: (True, "Example Domain"), 4: (False, "HTTP 404")}
+    check("cleaned_text: browse ok + failed labelled honestly",
+          server.cleaned_text(blocks, {2: 1}, bbb),
+          "prose here\nwrote file: notes.md\nfailed (exit 1): echo hi"
+          "\nbrowsed: https://example.com\ncouldn't fetch: https://fail.example (HTTP 404)")
+    check("cleaned_text: browse over budget",
+          server.cleaned_text(blocks, {}, {3: (True, "t")}),
+          "prose here\nwrote file: notes.md\nnot run (per-turn limit reached): echo hi"
+          "\nbrowsed: https://example.com\nnot fetched (per-turn limit reached): https://fail.example")
 
 
-test_bound_history()
+def test_echo_text():
+    rtext = ("Intro\n```markdown notes.md\nsecret content\n```\n"
+             "```run\necho hi\n```\nOutro")
+    check("echo_text: file contents elided, tools kept short",
+          server.echo_text(rtext),
+          "Intro\n(wrote file notes.md)\necho hi\nOutro")
+
+
+test_history_window()
 test_cleaned_text()
+test_echo_text()
 
 if FAILURES:
     print(f"\n{len(FAILURES)} FAILURES")
