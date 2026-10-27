@@ -2804,10 +2804,15 @@
     window.phRefresh = function () {
       var base = phEl("ph-base");
       if (base && !base.textContent) {
-        // show a URL the APK can actually reach: an empty/relative API base
-        // means same-origin, so use the page's own origin
-        base.textContent = (API && API.indexOf("://") > 0) ? API
-          : window.location.origin;
+        // show the exact URL the APK can POST to: resolve the API base
+        // against the page URL (works for same-origin AND proxy-relative
+        // bases, e.g. "port/8000" behind the deployed preview)
+        try {
+          base.textContent = new URL((API || "") + "/api/phone/pair",
+                                     window.location.href).href;
+        } catch (e) {
+          base.textContent = window.location.origin;
+        }
       }
       apiFetch(API + "/api/phone/devices", { method: "GET" })
         .then(function (r) { return r.json(); })

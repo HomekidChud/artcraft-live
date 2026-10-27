@@ -10,11 +10,20 @@ section).
 ## Build 3: computer use + phone control (the Android APK)
 
 The agent can now use a computer (browser-level pointer/keyboard control)
-and drive a real Android phone. Deep research first: on Android the only
-no-root mechanism the products we reviewed (PhoneClaw, Melaya, FoneClaw,
-Opposable) rely on is an AccessibilityService; on iOS, Apple's platform
-rules forbid third-party apps from injecting touches or reading other
-apps' screens — so the phone bridge is Android-only and says so honestly.
+and drive a real Android phone. Deep research first (sources):
+- Android AccessibilityService — the only no-root mechanism to read the
+  UI tree and inject gestures; official docs:
+  https://developer.android.com/reference/android/accessibilityservice/AccessibilityService
+  and https://developer.android.com/guide/topics/accessibility/custom-views
+  (canRetrieveWindowContent, canPerformGestures)
+- How AI agents control smartphones (AccessibilityService walkthrough):
+  https://dev.to/sanjeevsharma327/how-ai-agents-control-smartphones
+- The phone-control products we reviewed (PhoneClaw, Melaya, FoneClaw,
+  Opposable) all ship an Android accessibility service for exactly this
+- iOS: Apple's platform rules forbid third-party apps from injecting
+  touches or reading other apps' screens (see the iOS Security Guide,
+  https://support.apple.com/guide/iphone-13/security-ipsj979a1a54/1.0/ios/13)
+  — so the phone bridge is Android-only and says so honestly.
 
 ### 9. Computer use in the browser agent
 - New browser actions: `click_xy <x> <y>` (raw viewport-coordinate click),

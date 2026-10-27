@@ -759,7 +759,7 @@ def test_phone_bridge():
             cmd2, _ = srv.phone_enqueue(did2, "tap", {"x": 1, "y": 2})
             res2 = srv.phone_wait_result(did2, cmd2["id"], 0.2)
             check("phone: timeout reported honestly",
-                  (res2["ok"], "did not respond" in res2["detail"]), (False, True))
+                  (res2["ok"], "outcome unknown" in res2["detail"]), (False, True))
             with srv._PHONE_LOCK:
                 still_queued = [c for c in srv.PHONES[did2]["queue"]
                                 if c["id"] == cmd2["id"]]
@@ -880,8 +880,57 @@ def test_phone_chat_path():
             srv.PHONES.clear()
 
 
+def test_mixed_tool_budget():
+    """Browse fetches, browser actions and phone actions share ONE budget:
+    5 per turn, across the initial reply and continuations. A reply with
+    2 fetches may only run 3 more actions — not 5 fetches plus 5 actions."""
+    import server as srv
+
+    _td = _tempfile.mkdtemp()
+    srv.DATA_DIR = Path(_td)
+    srv.FILES_DIR = Path(_td) / "files"
+    srv.FILES_DIR.mkdir()
+    with srv._PHONE_LOCK:
+        srv.PHONES.clear()
+
+    # 2 browse fetches + 4 browser actions in the first reply: only 3 of
+    # the 4 actions may run (5 - 2 fetches), the 4th must be skipped
+    r1 = ("```browse\nhttps://a.example\n```\n```browse\nhttps://b.example\n```\n"
+          "```browser\nclick 1\nclick 2\nclick 3\nclick 4\n```")
+    r2 = ("done", "end_turn")
+    calls, evs = drive_chat([(r1, "end_turn"), r2],
+                            {"model": "m", "advisor_model": "",
+                             "messages": [{"role": "user", "content": "go"}]})
+    # each executed action yields a run step + a done step with the same
+    # id — count the done steps
+    br_steps = [x for n, x in evs
+               if n == "step" and str(x.get("id", "")).startswith("br-")
+               and x.get("state") == "done"]
+    br_skips = [x for n, x in evs
+                if n == "step" and str(x.get("id", "")).startswith("br-skip")]
+    check("budget: 2 fetches + only 3 of 4 actions ran",
+          (len(br_steps), len(br_skips)), (3, 1))
+
+    # continuation with a phone action: the shared budget is already
+    # spent (2 fetches + 3 actions = 5), so a phone action must be skipped
+    r3 = "```phone\nstate\n```"
+    calls, evs = drive_chat(
+        [(r1, "end_turn"), (r3, "end_turn"), ("done", "end_turn")],
+        {"model": "m", "advisor_model": "",
+         "messages": [{"role": "user", "content": "go"}]})
+    ph_skips = [x for n, x in evs
+                if n == "step" and str(x.get("id", "")).startswith("ph-skip")]
+    check("budget: continuation phone action skipped (budget spent)",
+          len(ph_skips), 1)
+
+    with srv._PHONE_LOCK:
+        srv.PHONES.clear()
+
+
 test_phone_bridge()
 test_phone_chat_path()
+test_phone_chat_path()
+test_mixed_tool_budget()
 test_feature_stores()
 test_feature_endpoints()
 

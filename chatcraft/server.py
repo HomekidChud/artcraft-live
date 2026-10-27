@@ -1309,7 +1309,9 @@ def phone_wait_result(did, cmd_id, timeout=30):
             # cannot execute it after we already reported failure
             d["queue"] = [c for c in d.get("queue", [])
                           if c.get("id") != cmd_id]
-            return {"ok": False, "detail": "device did not respond in time"}
+            return {"ok": False,
+                    "detail": "no result in time — outcome unknown "
+                              "(the device may still complete the command)"}
         return w2["result"]
 
 
@@ -2092,6 +2094,9 @@ class Handler(BaseHTTPRequestHandler):
                     if browse_blocks:
                         yield ev("clean", {"text": cleaned_text(
                             blocks, rc_by_block, browse_by_block)})
+                    # the fetches above consumed the shared budget too —
+                    # browser/phone actions only get what is LEFT
+                    browse_budget -= len(browse_slice)
                     # browser: drive the shared Chromium session (shares the
                     # browse budget: 5 actions per turn, one action per line)
                     browser_log = []
@@ -2166,8 +2171,10 @@ class Handler(BaseHTTPRequestHandler):
                                 yield step(sid, "Phone timeout", "fail",
                                            f"{cmd['action']} timed out after 30s")
                                 phone_log.append((line, None,
-                                                  "timeout waiting for the phone "
-                                                  "(is the app in the background?)"))
+                                                  "no result within 30s — outcome "
+                                                  "UNKNOWN (the phone may still "
+                                                  "complete it; is the app in the "
+                                                  "background?)"))
                                 continue
                             ok, detail, pstate = (res["ok"], res["detail"],
                                                   res.get("state") or "")
