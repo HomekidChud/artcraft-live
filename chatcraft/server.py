@@ -103,7 +103,7 @@ CATALOG = [
 ]
 
 DEFAULT_MODEL = "claude_sonnet_5_5"
-DEFAULT_ADVISOR = "claude_haiku_5_5"
+DEFAULT_ADVISOR = "claude_sonnet_5_5"
 
 DEFAULT_SYSTEM = (
     "You are ChatCraft, a warm, concise personal-workspace assistant. "
@@ -116,16 +116,36 @@ DEFAULT_SYSTEM = (
     "COMMANDS: when running a shell command would genuinely help (checking something, "
     "building, testing), emit it as a fenced block starting with ```run, like: "
     "```run\\npython script.py\\n```. The platform executes it in the workspace and shows "
-    "the output. Only use this when a command is genuinely useful; never use it for "
+    "the output. Use commands freely - you have a full shell in the user's cloud "
+    "workspace (up to 10 commands per turn). "
+    "BROWSING: to read a web page, emit a fenced block starting with ```browse "
+    "containing just the URL, like: ```browse\\nhttps://example.com\\n```. The "
+    "platform fetches the page, saves its readable text as browse-<site>.md in "
+    "the workspace, and shows it as a file card. Use it whenever fresh web "
+    "content would help. "
+    "Only use run blocks when a command is genuinely useful; never use it for "
     "destructive operations. Ordinary code snippets stay in plain fences with no marker."
 )
 
 ADVISOR_SYSTEM = (
-    "You are the Advisor: a fast, cheap reviewer that always runs before the main model. "
-    "Given a conversation, produce a tight brief for it: (1) what the user really wants, "
-    "(2) pitfalls or missing context to avoid, (3) how to make the answer high quality. "
-    "Maximum 70 words. Plain text, no preamble."
+    "You are the Advisor: a strong reviewer that always runs before the main model. "
+    "Given the selected parts of a conversation, produce a tight brief for it: "
+    "(1) what the user really wants, (2) pitfalls or missing context to avoid, "
+    "(3) how to make the answer high quality. Maximum 70 words. Plain text, "
+    "no preamble."
 )
+
+LOCATOR_SYSTEM = (
+    "You are the Advisor Locator: a fast, cheap scanner. You see an index of a "
+    "conversation (message number, role, preview) and the workspace file list. "
+    "Pick the MINIMAL set of parts a reviewer must read in full to brief the "
+    "main model: the messages that carry the user's actual request or decisions, "
+    "and files whose content matters. Reply with ONLY a JSON object, no prose "
+    "or preamble: {\"messages\": [2, 4], \"files\": [\"notes.md\"]} "
+    "Always include the latest user message."
+)
+
+LOCATOR_MODEL_ID = os.environ.get("CHATCRAFT_LOCATOR_MODEL", "claude_haiku_5_5")
 
 # ```lang filename.ext ... ```   (also accepts ```lang:filename.ext)
 # and the variant small local models often emit: ```lang\nfilename.ext\n...```
@@ -400,14 +420,14 @@ def model_stream(m, messages, system, max_tokens, temperature):
         yield ("model", reported)
 
 
-def advisor_pass(m, messages):
-    """One-shot (non-streaming) advisor call. Returns (note, error, usage)."""
+def _advisor_call(m, system, messages, max_tokens):
+    """One-shot (non-streaming) call to a model's API.
+    Returns (text, error, usage)."""
     api = dict(m.get("api") or {})
     api_key = resolve_credentials(m)
     if m.get("custom"):
         api = {"kind": "anthropic" if m.get("provider") == "anthropic-compat" else "openai",
                "model": m.get("model_name", ""), "base_url": m.get("base_url")}
-    trimmed = [x for x in messages if x.get("content")][-4:]
     usage = {"in": 0, "out": 0}
     try:
         if api.get("kind") == "anthropic":
@@ -416,36 +436,122 @@ def advisor_pass(m, messages):
                 base = base[:-3]
             status, body = http_json(
                 base + "/v1/messages",
-                {"model": api["model"], "system": ADVISOR_SYSTEM, "messages": trimmed,
-                 "max_tokens": 200},
+                {"model": api["model"], "system": system, "messages": messages,
+                 "max_tokens": max_tokens},
                 headers={"x-api-key": api_key,
                          "anthropic-version": "2023-06-01"}, timeout=60)
-            note = ""
-            if status == 200 and body.get("content"):
-                note = (body["content"][0].get("text") or "").strip()
-                u = body.get("usage") or {}
-                usage = {"in": u.get("input_tokens", 0) or 0, "out": u.get("output_tokens", 0) or 0}
-            elif status != 200:
+            if status != 200:
                 return "", f"HTTP {status}: {str(body)[:150]}", usage
-        else:
-            base = (api.get("base_url") or "https://api.openai.com/v1").rstrip("/")
-            status, body = http_json(
-                base + "/chat/completions",
-                {"model": api["model"], "messages": [{"role": "system", "content": ADVISOR_SYSTEM}] + trimmed,
-                 "max_tokens": 200},
-                headers={"Authorization": "Bearer " + api_key} if api_key else None, timeout=60)
-            note = ""
-            if status == 200:
-                note = ((body.get("choices") or [{}])[0].get("message") or {}).get("content", "") or ""
-                u = body.get("usage") or {}
-                usage = {"in": u.get("prompt_tokens", 0) or 0, "out": u.get("completion_tokens", 0) or 0}
-            else:
-                return "", f"HTTP {status}: {str(body)[:150]}", usage
-        if not note:
-            return "", "advisor returned an empty review", usage
-        return note, "", usage
+            # gather text from every text block (thinking blocks carry none)
+            text = "".join(b.get("text") or ""
+                           for b in body.get("content") or []
+                           if isinstance(b, dict)).strip()
+            u = body.get("usage") or {}
+            usage = {"in": u.get("input_tokens", 0) or 0, "out": u.get("output_tokens", 0) or 0}
+            return text, "", usage
+        base = (api.get("base_url") or "https://api.openai.com/v1").rstrip("/")
+        status, body = http_json(
+            base + "/chat/completions",
+            {"model": api["model"], "messages": [{"role": "system", "content": system}] + messages,
+             "max_tokens": max_tokens},
+            headers={"Authorization": "Bearer " + api_key} if api_key else None, timeout=60)
+        if status != 200:
+            return "", f"HTTP {status}: {str(body)[:150]}", usage
+        text = ((body.get("choices") or [{}])[0].get("message") or {}).get("content", "") or ""
+        u = body.get("usage") or {}
+        usage = {"in": u.get("prompt_tokens", 0) or 0, "out": u.get("completion_tokens", 0) or 0}
+        return text, "", usage
     except Exception as e:
         return "", str(e)[:200], usage
+
+
+def parse_locator_json(text):
+    """Best-effort parse of the locator's selection."""
+    import re as _re
+    sel = {"messages": [], "files": []}
+    try:
+        m = _re.search(r"\{[^{}]*\}", text or "", _re.S)
+        data = json.loads(m.group(0)) if m else {}
+        if isinstance(data.get("messages"), list):
+            sel["messages"] = [int(x) for x in data["messages"]
+                              if isinstance(x, (int, float))]
+        if isinstance(data.get("files"), list):
+            sel["files"] = [str(x) for x in data["files"]]
+    except Exception:
+        pass
+    return sel
+
+
+def super_advisor_pass(advisor, locator, messages, available_files):
+    """Two-stage advisor — big brain, minimal tokens.
+
+    Stage 1 (cheap locator): sees only an index (role + 120-char preview per
+    message, file names) and picks the minimal parts worth reading.
+    Stage 2 (the advisor model): reads ONLY those messages/files in full and
+    writes the brief.
+
+    Returns (note, error, usage, info); usage is combined across stages and
+    info carries the selection for honest step reporting.
+    """
+    info = {"total_messages": len(messages), "read_messages": 0,
+            "located_files": [], "locator_usage": {"in": 0, "out": 0}}
+    usage = {"in": 0, "out": 0}
+
+    # ---- stage 1: locator scans a compact index, not the conversation ----
+    sel = {"messages": [], "files": []}
+    indexed = [(i, m) for i, m in enumerate(messages) if m.get("content")]
+    if locator and len(indexed) > 1:
+        index = [{"n": i, "role": m.get("role", "user"),
+                  "preview": str(m["content"])[:120]} for i, m in indexed]
+        files_idx = [f"{p.name} ({p.stat().st_size}B)" for p in available_files[:30]]
+        text, lerr, lusage = _advisor_call(
+            locator, LOCATOR_SYSTEM,
+            [{"role": "user",
+              "content": json.dumps({"conversation_index": index,
+                                     "workspace_files": files_idx})}],
+            150)
+        info["locator_usage"] = lusage
+        usage["in"] += lusage["in"]
+        usage["out"] += lusage["out"]
+        if not lerr and text:
+            sel = parse_locator_json(text)
+
+    # the latest user message is always read
+    last_user = max((i for i, m in indexed if m.get("role") == "user"), default=None)
+    if last_user is not None and last_user not in sel["messages"]:
+        sel["messages"].append(last_user)
+
+    # ---- stage 2: the advisor reads only the located parts ----
+    selected = [messages[i] for i in sorted(set(sel["messages"]))
+                if 0 <= i < len(messages) and messages[i].get("content")]
+    if not selected:  # locator unavailable/failed: honest fallback
+        selected = [m for m in messages if m.get("content")][-4:]
+    info["read_messages"] = len(selected)
+
+    file_parts = []
+    by_name = {p.name: p for p in available_files}
+    for fname in sel["files"][:3]:
+        p = by_name.get(fname)
+        if p is None:
+            continue
+        try:
+            content = p.read_text(encoding="utf-8")[:8000]
+            file_parts.append(f"[workspace file {p.name}]\n{content}")
+            info["located_files"].append(p.name)
+        except Exception:
+            pass
+    if file_parts:
+        selected = selected + [{"role": "user",
+                                "content": "(workspace files for reference)\n" +
+                                            "\n\n".join(file_parts)}]
+
+    # generous budget: thinking blocks can consume tokens before the brief
+    note, aerr, ausage = _advisor_call(advisor, ADVISOR_SYSTEM, selected, 700)
+    usage["in"] += ausage["in"]
+    usage["out"] += ausage["out"]
+    if not aerr and not note:
+        aerr = "advisor returned an empty review"
+    return note, aerr, usage, info
 
 
 # ------------------------------------------------------------ file + command ---
@@ -478,6 +584,7 @@ def parse_blocks(text):
     while i < n:
         ln = lines[i]
         run_open = re.match(r"^```run[ \t]*$", ln, re.I)
+        browse_open = re.match(r"^```browse[ \t]*$", ln, re.I)
         file_open = re.match(
             r"^```([\w+#-]*)[ \t]*:?[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*$", ln)
         bare_open = re.match(r"^```([\w+#-]*)[ \t]*$", ln)
@@ -497,6 +604,21 @@ def parse_blocks(text):
                 continue
             flush()
             blocks.append(("run", "\n".join(cmd).strip()))
+            i = j + 1
+            continue
+        if browse_open:
+            j = i + 1
+            url = []
+            while j < n and not lines[j].strip().startswith("```"):
+                url.append(lines[j])
+                j += 1
+            if j >= n:
+                # unterminated: keep as text, never fetch a partial URL
+                cur.append(ln)
+                i += 1
+                continue
+            flush()
+            blocks.append(("browse", "\n".join(url).strip()))
             i = j + 1
             continue
         if file_open:
@@ -561,6 +683,8 @@ def extract_files(text):
             files.append({"name": Path(b[2]).name, "lang": b[1] or "text",
                           "content": b[3].rstrip("\n")})
             parts.append("wrote file: " + Path(b[2]).name)
+        elif b[0] == "browse":
+            parts.append("(browsing " + b[1].splitlines()[0][:80] + "…)")
         else:
             parts.append("```run\n" + b[1] + "\n```")
     return "\n".join(parts), files
@@ -583,6 +707,45 @@ def normalize_cmd(cmd):
 def extract_runs(text):
     return [normalize_cmd(b[1]) for b in parse_blocks(text)
             if b[0] == "run" and normalize_cmd(b[1])]
+
+
+def extract_browses(text):
+    """URLs from ```browse blocks: first line, scheme-normalized."""
+    urls = []
+    for b in parse_blocks(text):
+        if b[0] != "browse":
+            continue
+        first = (b[1].splitlines() or [""])[0].strip()
+        if not first:
+            continue
+        if not first.startswith(("http://", "https://")):
+            first = "https://" + first
+        if first not in urls:
+            urls.append(first)
+    return urls
+
+
+def fetch_page(url):
+    """Fetch a page and extract its readable text. Returns (text, title, err)."""
+    import html as _html
+    try:
+        req = urllib.request.Request(
+            url, headers={"User-Agent":
+                          "Mozilla/5.0 (compatible; ChatCraftBot/1.0)"})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            raw = r.read(500_000).decode("utf-8", "replace")
+        title = ""
+        m = re.search(r"<title[^>]*>(.*?)</title>", raw, re.I | re.S)
+        if m:
+            title = re.sub(r"\s+", " ", _html.unescape(m.group(1))).strip()[:120]
+        body = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw,
+                      flags=re.I | re.S)
+        body = re.sub(r"<[^>]+>", " ", body)
+        body = _html.unescape(re.sub(r"[ \t]+", " ", body))
+        body = re.sub(r"\n\s*\n+", "\n", body).strip()
+        return body[:8000], title, ""
+    except Exception as e:
+        return "", "", str(e)[:150]
 
 
 def run_command(cmd):
@@ -829,11 +992,27 @@ class Handler(BaseHTTPRequestHandler):
                 advisor_usage, advisor_cost = {"in": 0, "out": 0}, 0.0
                 advisor_note = ""
                 if advisor:
+                    locator = find_model(LOCATOR_MODEL_ID)
+                    if locator:
+                        yield step("advisor-locate", "Locating relevant parts", "run")
                     yield step("advisor", f"Advisor review ({advisor['label']})", "run")
-                    note, aerr, advisor_usage = advisor_pass(advisor, messages)
+                    note, aerr, advisor_usage, ainfo = super_advisor_pass(
+                        advisor, locator, messages, files_now)
                     am = find_model(advisor_id) or {}
+                    lm = find_model(LOCATOR_MODEL_ID) or {}
+                    if lm and not lm.get("custom") and not lm.get("local"):
+                        advisor_cost = estimate_cost(
+                            lm, ainfo["locator_usage"]["in"], ainfo["locator_usage"]["out"])
                     if am and not am.get("custom") and not am.get("local"):
-                        advisor_cost = estimate_cost(am, advisor_usage["in"], advisor_usage["out"])
+                        advisor_cost += estimate_cost(
+                            am,
+                            advisor_usage["in"] - ainfo["locator_usage"]["in"],
+                            advisor_usage["out"] - ainfo["locator_usage"]["out"])
+                    if locator:
+                        loc_detail = (f"{ainfo['read_messages']}/{ainfo['total_messages']} messages"
+                                      + (f", {len(ainfo['located_files'])} files"
+                                         if ainfo["located_files"] else ""))
+                        yield step("advisor-locate", "Located relevant parts", "done", loc_detail)
                     if aerr:
                         # honest failure surfaced in the UI; the turn continues
                         yield ev("advisor-error", {"error": aerr})
@@ -930,7 +1109,7 @@ class Handler(BaseHTTPRequestHandler):
 
                 # 6. run commands the reply contains (max 5 per turn)
                 rc_by_block = {}  # block index -> exit code, only blocks run
-                for n_run, bi in enumerate(run_idx[:5]):
+                for n_run, bi in enumerate(run_idx[:10]):
                     cmd = normalize_cmd(blocks[bi][1])
                     sid = f"cmd-{n_run + 1}"
                     if not ALLOW_CMDS:
@@ -953,6 +1132,10 @@ class Handler(BaseHTTPRequestHandler):
                             parts.append(b[1])
                         elif b[0] == "file":
                             parts.append("wrote file: " + Path(b[2]).name)
+                        elif b[0] == "browse":
+                            u = (b[1].splitlines() or [""])[0][:80]
+                            parts.append("(browsing " + u + "…)")
+                            continue
                         else:
                             c = normalize_cmd(b[1])
                             if not c:
@@ -963,7 +1146,51 @@ class Handler(BaseHTTPRequestHandler):
                                              else f"failed (exit {rc}): {c[:60]}")
                             else:
                                 parts.append("skipped: commands disabled" if not ALLOW_CMDS
-                                             else f"not run (over the 5-command limit): {c[:60]}")
+                                             else f"not run (over the 10-command limit): {c[:60]}")
+                    yield ev("clean", {"text": "\n".join(parts)})
+
+                # 7. browse: fetch pages the reply references (max 5 per turn)
+                browses = extract_browses(full_text)
+                for n_br, url in enumerate(browses[:5]):
+                    sid = f"browse-{n_br + 1}"
+                    yield step(sid, f"Browsing {url[:70]}", "run")
+                    text_body, title, berr = fetch_page(url)
+                    if berr:
+                        yield step(sid, f"Couldn\'t fetch {url[:60]}", "fail", berr)
+                        continue
+                    domain = urllib.parse.urlparse(url).netloc or "page"
+                    safe_name = re.sub(r"[^\w.-]+", "-", domain)[:40] or "page"
+                    fname = f"browse-{safe_name}.md"
+                    content = (f"# {title or url}\n\nsource: {url}\n\n"
+                              + text_body)
+                    (FILES_DIR / fname).write_text(content, encoding="utf-8")
+                    saved.append({"name": fname, "lang": "markdown",
+                                  "size": len(content)})
+                    yield ev("browse", {"url": url, "title": title,
+                                         "chars": len(text_body), "file": fname})
+                    yield step(sid, f"Browsed {domain[:40]}", "done",
+                               f"saved {len(text_body)} chars to {fname}")
+                if browses:
+                    parts = []
+                    for i, b in enumerate(blocks):
+                        if b[0] == "text":
+                            parts.append(b[1])
+                        elif b[0] == "file":
+                            parts.append("wrote file: " + Path(b[2]).name)
+                        elif b[0] == "browse":
+                            u = (b[1].splitlines() or [""])[0][:80]
+                            parts.append("browsed: " + u)
+                        else:
+                            c = normalize_cmd(b[1])
+                            if not c:
+                                continue
+                            if i in rc_by_block:
+                                rc = rc_by_block[i]
+                                parts.append(f"ran: {c[:60]}" if rc == 0
+                                             else f"failed (exit {rc}): {c[:60]}")
+                            else:
+                                parts.append("skipped: commands disabled" if not ALLOW_CMDS
+                                             else f"not run (over the 10-command limit): {c[:60]}")
                     yield ev("clean", {"text": "\n".join(parts)})
 
                 custom = bool(model.get("custom"))

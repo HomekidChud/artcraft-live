@@ -3,6 +3,42 @@
 This file documents how to run, model-enable, and deploy ChatCraft from this
 repo on Perplexity Computer, so a future session doesn't have to rediscover it.
 
+## The advisor (two-stage, big brain / minimal tokens)
+
+The advisor now works in two stages (`super_advisor_pass` in `server.py`):
+
+1. **Locator** (cheap model, `claude_haiku_5_5` by default, override with
+   `CHATCRAFT_LOCATOR_MODEL`): sees only an index — message number, role,
+   120-char preview, file names — and replies with a JSON selection of the
+   minimal parts worth reading.
+2. **Advisor** (the configured advisor model, default now the big
+   `claude_sonnet_5_5`): reads ONLY the selected messages/files and writes
+   the brief. If the locator fails, it honestly falls back to the last 4
+   messages.
+
+The step timeline shows both stages ("Located relevant parts · 2/5 messages,
+1 files"). Advisor usage/cost is the sum of both stages. Two gotchas:
+
+- The proxy's Claude models emit `thinking` blocks on longer inputs — the
+  non-streaming advisor call concatenates text from all `text` blocks and
+  uses a generous `max_tokens` (700) so thinking can't starve the brief.
+- The locator always includes the latest user message even if it forgets it.
+
+## The agent: shell + browsing (computer-use style)
+
+ChatCraft is now a full agent in its cloud workspace:
+
+- **Shell**: `CHATCRAFT_ALLOW_CMDS=1` — the model's ```run blocks execute
+  for real in the workspace (up to 10 commands per turn, 20s timeout each,
+  output capped at 4KB). The UI shows each as a compact step with exit code
+  and first output line.
+- **Browsing**: ```browse blocks (first line = URL) are fetched server-side
+  (`fetch_page`): scripts/styles stripped, readable text (first 8KB) saved as
+  `browse-<site>.md` in the workspace and shown as a file card. Up to 5 per
+  turn. `DEFAULT_SYSTEM` documents both tools to the model.
+- The workspace (`chatcraft/files/`) is the agent's persistent cloud space —
+  files, command cwd, and browse results all live there.
+
 ## Repo layout
 
 - `chatcraft/index.html` — the whole frontend (single file, no build step)
