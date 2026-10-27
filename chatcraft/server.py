@@ -149,24 +149,30 @@ DEFAULT_SYSTEM = (
     "prompt. Users run skills in chat with /skill <slug> <request>.\n"
     "AUTOMATIONS: to schedule yourself, emit a ```automation block with "
     "`name: <...>`, `interval_min: <minutes>`, `---`, then the prompt to run "
-    "each interval. Automations are created paused — the user enables them.\n"
+    "each interval. Automations are created paused — the user enables them. "
+    "To enable/pause an existing one, emit `id: <automation id>` and "
+    "`enabled: true|false` (no prompt body needed).\n"
     "IMAGES: user messages may carry images (you receive them as image "
     "content). Describe and analyse what is actually visible; if the model "
     "cannot see images, say so honestly.\n"
     "CAPABILITIES & LIMITS — know them and be upfront:\n"
     "- You have: file writes with real diffs shown to the user, shell "
     "(```run), page reading (```browse), a real browser (```browser), a "
-    "paired Android phone (```phone), tasks, skills, automations, and "
-    "image understanding (up to 4 images per message, JPEG/PNG/WebP/GIF).\n"
+    "paired Android phone (```phone, only when one is paired), tasks, "
+    "skills, automations, and image understanding (up to 4 images per "
+    "message, JPEG/PNG/WebP/GIF — only when the chosen model supports "
+    "vision; otherwise say you cannot see them).\n"
     "- Budgets per turn: 10 shell commands, 5 browser/browse actions, "
     "2 continuation rounds. If you hit one, finish with what you have "
     "and say what you could not do.\n"
     "- The user WATCHES every tool action live (browser, phone, diffs) — "
     "act like someone is looking over your shoulder, because they are.\n"
     "- You cannot: access the user's accounts or logins (no passwords, "
-    "no cookies — if a site needs login, say so), see or edit files "
-    "outside the workspace, run long background jobs, or control the "
-    "phone when none is paired (say so, never fake it).\n"
+    "no cookies — if a site needs login, say so), run long background "
+    "jobs, or control the phone when none is paired (say so, never fake "
+    "it). Shell commands run in your cloud workspace directory — that is "
+    "a working convention, not a security boundary: stay inside the "
+    "workspace and never read or write files outside it.\n"
     "- Small local models may be weaker: for hard reasoning, suggest a "
     "bigger model instead of guessing.\n"
     "- Automations you create start paused — tell the user to enable them.\n"
@@ -185,8 +191,8 @@ ADVISOR_SYSTEM = (
     "name the closest supported alternative. The main model's tools: file "
     "writes (with visible diffs), shell commands, web-page reading, a real "
     "browser, a paired Android phone, tasks/skills/automations, image "
-    "understanding (max 4 per message). Its limits: no logins/passwords or "
-    "account access, no files outside the workspace, no long background "
+    "understanding (max 4 per message, only if the model supports vision). "
+    "Its limits: no logins/passwords or account access, no long background "
     "jobs, per-turn budgets (10 shell commands, 5 browser/browse actions), "
     "and automations start paused. If the user asks for something outside "
     "these bounds — or asks the model to do a user-restricted action — the "
@@ -791,14 +797,19 @@ def _ws_snapshot():
     """Hash + (small) text of every workspace file, to detect what a
     ```run command changed — so shell edits get real diffs too."""
     snap = {}
-    for p in FILES_DIR.glob("*"):
+    try:
+        entries = FILES_DIR.rglob("*")
+    except Exception:
+        return snap
+    for p in entries:
         if not p.is_file():
             continue
         try:
             raw = p.read_bytes()
         except Exception:
             continue
-        snap[p.name] = (hashlib.sha256(raw).hexdigest(), raw)
+        rel = p.relative_to(FILES_DIR).as_posix()
+        snap[rel] = (hashlib.sha256(raw).hexdigest(), raw)
     return snap
 
 
@@ -1619,7 +1630,55 @@ def save_agents(a):
 
 # ------- skills: reusable system-prompt presets -------
 
+SEED_SKILLS = [
+    {"name": "browser-use", "description": "Drive the real browser to research, click and read pages",
+     "prompt": ("You are driving a real browser for the user. Plan a short route: "
+                "goto the best URL, read the page state, click through to what "
+                "matters, and summarise findings with links. Use ```browser "
+                "blocks with one action per line, chaining the numbered elements "
+                "each state returns. Prefer ```browse for plain page reading; "
+                "use the browser when clicking, forms or JS rendering is needed. "
+                "Never fake page contents — if a page needs login, say so.")},
+    {"name": "skill-creator", "description": "Design and save new skills from a description",
+     "prompt": ("Turn the user's description into a reusable skill: a clear name "
+                "(slug), a one-line description, and a tight system prompt ("
+                "purpose, style, steps, constraints). Emit it as a ```skill "
+                "block: `name:`, `description:`, then `---` and the prompt "
+                "body. Keep prompts under 300 words. Then confirm how to run "
+                "it: /skill <name> <request>.")},
+    {"name": "web-research", "description": "Multi-source research with cited takeaways",
+     "prompt": ("Research the question across several sources: ```browse the "
+                "most authoritative 3-5 pages, cross-check claims, then "
+                "answer with a short summary and a sources list (title + "
+                "URL). Flag disagreements between sources instead of "
+                "smoothing them over.")},
+    {"name": "code-reviewer", "description": "Review workspace code and propose patches",
+     "prompt": ("Review the code in the user's workspace like a senior "
+                "engineer: correctness bugs first, then security, then "
+                "style. Read the relevant files, quote exact lines, and "
+                "provide fixes as ```<lang> filename``` file blocks with the "
+                "full corrected content. Be concrete — no generic advice.")},
+    {"name": "concise", "description": "Maximum brevity mode",
+     "prompt": ("Answer with the least words that fully solve the request. "
+                "One paragraph or a short list. No preamble, no "
+                "restating the question, no sign-off.")},
+]
+
+
+def seed_skills():
+    """Install the starter skill library once, on a fresh store. The user's
+    own edits and deletions are never overwritten."""
+    try:
+        existing = json.loads(SKILLS_FILE.read_text())
+    except Exception:
+        existing = None
+    if existing is None:
+        save_skills([dict(s, id=_slug_id("skill-" + s["name"]),
+                          created=time.time()) for s in SEED_SKILLS])
+
+
 def load_skills():
+
     return _load_json(SKILLS_FILE, [])
 
 
@@ -2185,6 +2244,19 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- the harness
     def _api_chat(self, req):
+        # optional shared-secret gate for public deployments: set
+        # CHATCRAFT_ACCESS_KEY=<key> and the chat endpoint requires it
+        # (header X-Access-Key or ?key=). Tools stay AI-only regardless.
+        gate = os.environ.get("CHATCRAFT_ACCESS_KEY", "")
+        if gate:
+            supplied = (self.headers.get("X-Access-Key")
+                       or urllib.parse.parse_qs(
+                           urllib.parse.urlparse(self.path).query).get(
+                               "key", [""])[0] or "")
+            if not hmac.compare_digest(str(supplied), gate):
+                return self._send(403, {"error": "access key required "
+                                              "(X-Access-Key header)"})
+
         def sse():
             def ev(name, data):
                 return f"event: {name}\ndata: {json.dumps(data)}\n\n"
@@ -2231,7 +2303,10 @@ class Handler(BaseHTTPRequestHandler):
                 yield step("read", f"Read conversation ({len(messages)} messages)", "done")
 
                 # 2. list the workspace files; bounded-read any file the user references
-                files_now = [p for p in FILES_DIR.iterdir() if p.is_file()]
+                # (defensive: a missing/removed workspace dir must never kill the turn)
+                files_now = []
+                if FILES_DIR.is_dir():
+                    files_now = [p for p in FILES_DIR.iterdir() if p.is_file()]
                 if files_now:
                     listing = ", ".join(f"{p.name} ({p.stat().st_size}B)" for p in files_now[:30])
                     yield step("workspace", "Listing workspace files", "done", listing)
@@ -2289,6 +2364,13 @@ class Handler(BaseHTTPRequestHandler):
 
                 # 4. stream the main model's reply
                 system = req.get("system_prompt") or DEFAULT_SYSTEM
+                # a skill invoked with /skill is an ADDITIVE layer on top of
+                # the platform instructions — it must never strip the tool
+                # syntax, budgets and limits the model needs to operate
+                skill_prompt = str(req.get("skill_prompt") or "")[:6000]
+                if skill_prompt:
+                    system += ("\n\nACTIVE SKILL (the user ran /skill — follow "
+                               "this style/purpose for the turn):\n" + skill_prompt)
                 try:
                     skills_now = load_skills()
                 except Exception:
@@ -2599,24 +2681,53 @@ class Handler(BaseHTTPRequestHandler):
                                           "fail")
                         elif kind == "automation":
                             head, prompt = _parse_kv_body(body)
-                            name = head.get("name", "").strip()
-                            if name and prompt:
-                                a = upsert_automation_from_block(
-                                    name, head.get("interval_min", "60"), prompt)
-                                shared_log.append(("automation", name, True,
-                                                   f"created paused '{a['name']}'"))
-                                yield step("automation",
-                                           f"Automation created (paused): "
-                                           f"{a['name']} — every "
-                                           f"{a['interval_min']} min",
-                                           "done", a["prompt"][:200])
+                            aid = head.get("id", "").strip()
+                            if aid and not prompt:
+                                # manage an existing automation by id
+                                # (enable/disable) — full create stays
+                                # paused-on-create like the UI
+                                autos = load_automations()
+                                a = next((x for x in autos
+                                          if x["id"] == aid), None)
+                                if not a:
+                                    shared_log.append(("automation", aid, False,
+                                                      "no automation with that id"))
+                                    yield step("automation",
+                                               f"No automation id {aid}", "fail")
+                                else:
+                                    want = head.get(
+                                        "enabled", "true").strip().lower() != "false"
+                                    a["enabled"] = bool(want)
+                                    if prompt:
+                                        a["prompt"] = prompt[:500]
+                                    save_automations(autos)
+                                    shared_log.append(
+                                        ("automation", aid, True,
+                                         f"{'enabled' if want else 'paused'}: "
+                                         f"{a['name']}"))
+                                    yield step("automation",
+                                               f"Automation {'enabled' if want else 'paused'}: "
+                                               f"{a['name']}", "done")
                             else:
-                                shared_log.append(("automation",
-                                                   name or "(no name)", False,
-                                                   "missing name or prompt"))
-                                yield step("automation",
-                                          "Automation block needs 'name:' + prompt",
-                                          "fail")
+                                name = head.get("name", "").strip()
+                                if name and prompt:
+                                    a = upsert_automation_from_block(
+                                        name, head.get("interval_min", "60"),
+                                        prompt)
+                                    shared_log.append(("automation", name, True,
+                                                       f"created paused '{a['name']}'"))
+                                    yield step("automation",
+                                               f"Automation created (paused): "
+                                               f"{a['name']} — every "
+                                               f"{a['interval_min']} min",
+                                               "done", a["prompt"][:200])
+                                else:
+                                    shared_log.append(("automation",
+                                                       name or "(no name)", False,
+                                                       "missing name or prompt"))
+                                    yield step("automation",
+                                              "Automation block needs 'name:' + prompt",
+                                              "fail")
                     return (rc_by_block, browse_by_block, cmd_log, browse_log,
                             browser_log, phone_log, shared_log, saved,
                             len(run_slice), len(browse_slice) + actions_used)
@@ -2701,7 +2812,9 @@ class Handler(BaseHTTPRequestHandler):
                             "possibly truncated]")
                     yield ev("clean", {"text": last_clean})
                     cmd_log, browse_log, browser_log, phone_log = ccl, cbl, cbrl, cphl
-                    shared_log = shared_log + cshl
+                    # only NEW shared-store results feed the next round —
+                    # stale ones must not re-trigger continuations forever
+                    shared_log = cshl
                 pending_notes = list(truncation_notes)
                 if cmd_log or browse_log or browser_log or phone_log:
                     pending_notes.append(
@@ -2753,5 +2866,6 @@ if __name__ == "__main__":
     print(f"  workspace: {FILES_DIR}")
     print(f"  commands:  {'enabled' if ALLOW_CMDS else 'DISABLED (CHATCRAFT_ALLOW_CMDS=0)'}")
     print(f"  ollama:    {OLLAMA_URL} (auto-detected if running)")
+    seed_skills()  # starter library (browser-use, skill-creator, ...)
     start_scheduler()
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

@@ -1452,8 +1452,8 @@
 
   /* ============ TOAST ============ */
   .toast {
-    position: fixed; left: 50%; top: 62px;
-    transform: translate(-50%, -12px); z-index: 90;
+    position: fixed; left: 50%; bottom: 86px;
+    transform: translate(-50%, 12px); z-index: 90;
     background: color-mix(in srgb, var(--surface) 96%, var(--bg));
     backdrop-filter: blur(6px); color: var(--text);
     border: 1px solid var(--border); border-radius: 12px;
@@ -1465,8 +1465,7 @@
   }
   .toast.show { opacity: 1; transform: translate(-50%, 0); }
   @media (max-width: 880px) {
-    .toast { bottom: auto; top: 62px; transform: translate(-50%, -12px); }
-    .toast.show { transform: translate(-50%, 0); }
+    .toast { bottom: calc(70px + env(safe-area-inset-bottom)); }
   }
 
   /* typing indicator reuse for new messages */
@@ -3189,6 +3188,9 @@
       });
       det.appendChild(sum);
       det.appendChild(pre);
+      // clicking the diff must expand it, not bubble into the card's
+      // open-file-viewer click handler
+      det.addEventListener("click", function (e) { e.stopPropagation(); });
       mid.appendChild(det);
     }
     if (f.deleted) {
@@ -3493,7 +3495,10 @@
       model: chatState.model,
       advisor_model: chatState.advisorModel,
       max_tokens: chatState.maxTokens,
-      system_prompt: skillSystem || chatState.system
+      system_prompt: chatState.system,
+      // a skill is an ADDITIVE layer on the platform instructions — it
+      // never replaces the tool syntax/budgets the model needs
+      skill_prompt: skillSystem || null
     });
 
     apiFetch(API + "/api/chat", {

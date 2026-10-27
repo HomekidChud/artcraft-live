@@ -348,3 +348,46 @@ the platform proxy credentials work only in the preview app.
   must restart the servers (launcher + adapter + ollama) and redeploy.
 - The proxy reports its own model names in cost captions (e.g. a request for
   `claude_sonnet_5_5` is reported as `claude_sonnet_3_5` by the provider).
+
+## Build 6 — advisor review fixes + phone/models readiness
+
+Advisor-review round (all items below are covered by `test_harness.py`,
+`test_build6_fixes`):
+
+1. **Continuation loop**: only NEW shared-store (task/skill/automation) results
+   trigger a continuation round — stale ones can no longer re-trigger
+   continuations forever. A reply with a `task` block + a plain continuation
+   answer = exactly 2 model calls, one `done` event.
+2. **Skills are additive**: `/skill` now sends `skill_prompt` as its own field;
+   the platform instructions (tool syntax, budgets, limits) are never replaced.
+3. **Starter skill library**: fresh installs auto-seed 5 skills
+   (`browser-use`, `skill-creator`, `web-research`, `code-reviewer`,
+   `concise`). User edits/deletions are never overwritten on re-seed.
+4. **Automation toggle by id**: the model can enable/pause an existing
+   automation with `id:` + `enabled:` headers (no prompt body needed) — so the
+   user doesn't have to open Settings to turn one on.
+5. **Honest capability wording**: the shell cwd is described as a working
+   convention, not a security boundary; vision is conditional ("if the model
+   cannot see images, say so").
+6. **Diff expansion fixed**: clicking the inline diff no longer opens the file
+   viewer underneath it (stopPropagation).
+7. **Toast moved to the bottom** so it can never cover the header.
+8. **Workspace snapshot is recursive** (subfolders included, posix-relative
+   paths) and the workspace listing step no longer dies if the files dir is
+   missing.
+9. **Optional access key** for public deployments: set
+   `CHATCRAFT_ACCESS_KEY=<key>` and `/api/chat` requires it (header
+   `X-Access-Key` or `?key=`), compared in constant time. Origin checks are
+   CORS, not authentication — use this on public sites.
+10. **Images E2E**: a real PNG survives attach → message render →
+    `collectHistory` → server sanitize → anthropic `image` block /
+    openai `image_url` part → adapter `input_image`.
+
+### Phone pairing + models on the public site
+
+- Pair URL: `https://chatcraft.pplx.app/port/8000` (the APK falls back to it).
+- Models: catalog models show "configured: false" on the public site because
+  the platform proxy credentials cannot ship in published code (they would be
+  public). Add your own key in Settings → Custom models (OpenAI-compatible or
+  Anthropic-compatible base URL) and those models become fully usable,
+  including from the paired phone.

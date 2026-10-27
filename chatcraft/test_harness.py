@@ -1125,7 +1125,8 @@ def test_advisor_capabilities():
         srv.FILES_DIR = Path(td) / "files"
         srv.FILES_DIR.mkdir()
         saved = {k: getattr(srv, k) for k in ("super_advisor_pass", "model_stream",
-                                               "find_model", "model_status")}
+                                               "find_model", "model_status",
+                                               "FILES_DIR")}
         seen_systems = []
         srv.find_model = lambda mid: {"id": mid, "label": mid, "api": {}}
         srv.model_status = lambda m: ({"id": m, "label": m, "api": {}}, None)
@@ -1168,9 +1169,196 @@ def test_advisor_capabilities():
               any("Capability flag" in s for s in seen_systems), True)
 
 
+def test_build6_fixes():
+    """Build 6: continuation rounds use only NEW shared-store results;
+    skills seed; automation id toggles; skill prompts are additive;
+    the optional access key gates /api/chat; real images survive every hop."""
+    import os as _os6
+    import tempfile as _tf4
+    import server as srv
+    from pathlib import Path as P4
+    import struct as _struct
+    import zlib as _zlib
+
+    td = _tf4.mkdtemp()
+    for attr in ("TASKS_FILE", "SKILLS_FILE", "AUTOMATIONS_FILE"):
+        setattr(srv, attr, P4(td) / (attr.lower() + ".json"))
+    saved_files_dir = srv.FILES_DIR
+    srv.FILES_DIR = P4(td) / "files"
+    srv.FILES_DIR.mkdir(exist_ok=True)
+
+    # --- continuation: a task block then a plain answer = EXACTLY 2 calls ---
+    calls = []
+    reply1 = "```task\nadd one thing\n```\ndone"
+    def fake_ms(m, messages, system, max_tokens, temperature):
+        calls.append([dict(x) for x in messages])
+
+        def gen():
+            text = reply1 if len(calls) == 1 else "all set"
+            yield ("text", text)
+            yield ("finish", "end_turn")
+            yield ("usage", {"in": 10, "out": 5})
+            yield ("model", m["id"])
+        return gen()
+    saved = {k: getattr(srv, k) for k in ("model_stream", "super_advisor_pass",
+                                          "find_model", "model_status")}
+    srv.model_stream = fake_ms
+    srv.super_advisor_pass = lambda a, l, ms, fs: ("", None, {"in": 0, "out": 0},
+                                                   {"locator_used": False, "total_messages": 1,
+                                                    "read_messages": 1, "located_files": [],
+                                                    "locator_usage": {"in": 0, "out": 0}})
+    srv.find_model = lambda mid: {"id": mid, "label": mid, "in": 3.0, "out": 15.0,
+                                   "api": {"kind": "anthropic", "model": mid, "base_url": "http://mock"}}
+    srv.model_status = lambda m: (m, None)
+    class Stub:
+        def _sse(self, gen):
+            self.events = list(gen)
+    s = Stub()
+    srv.Handler._api_chat(s, {"model": "m", "advisor_model": "m",
+                              "messages": [{"role": "user", "content": "add a task"}]})
+    for k, v in saved.items():
+        setattr(srv, k, v)
+    evs = [e for e in s.events if e.startswith("event:")]
+    names = [e.split(chr(10))[0].replace("event: ", "") for e in evs]
+    check("build6: exactly two model calls", len(calls), 2)
+    check("build6: one done event", names.count("done"), 1)
+    check("build6: no error events", "error" in names, False)
+
+    # --- seed skills: fresh store gets the starter library ---
+    srv.SKILLS_FILE = P4(td) / "skills_fresh.json"
+    srv.seed_skills()
+    seeded = srv.load_skills()
+    check("build6: starter library seeded", len(seeded) >= 5, True)
+    check("build6: browser-use skill present",
+          any(x["name"] == "browser-use" for x in seeded), True)
+    # user deletions survive re-seeding
+    srv.save_skills([x for x in seeded if x["name"] != "concise"])
+    srv.seed_skills()
+    check("build6: user deletions preserved",
+          any(x["name"] == "concise" for x in srv.load_skills()), False)
+
+    # --- automation toggle by id ---
+    a = srv.upsert_automation_from_block("nightly", "15", "Summarise the day.")
+    blocks = srv.parse_blocks(
+        "```automation\nid: %s\nenabled: true\n```" % a["id"])
+    check("build6: id-toggle block parsed", blocks[0][0], "automation")
+    head, prompt = srv._parse_kv_body(blocks[0][1])
+    autos = srv.load_automations()
+    tgt = next(x for x in autos if x["id"] == a["id"])
+    tgt["enabled"] = True
+    srv.save_automations(autos)
+    check("build6: toggle applied", next(x for x in srv.load_automations()
+                                        if x["id"] == a["id"])["enabled"], True)
+
+    # --- skill prompt is ADDITIVE (platform instructions preserved) ---
+    seen = []
+    def ms2(m, messages, system, max_tokens, temperature):
+        seen.append(system)
+
+        def gen():
+            yield ("text", "ok")
+            yield ("finish", "end_turn")
+            yield ("usage", {"in": 1, "out": 1})
+            yield ("model", m["id"])
+        return gen()
+    saved2 = {k: getattr(srv, k) for k in ("model_stream", "super_advisor_pass",
+                                            "find_model", "model_status")}
+    srv.find_model = lambda mid: {"id": mid, "label": mid, "in": 3.0,
+                                   "out": 15.0, "api": {"kind": "anthropic",
+                                                        "model": mid,
+                                                        "base_url": "http://mock"}}
+    srv.model_status = lambda m: (m, None)
+    srv.model_stream = ms2
+    srv.super_advisor_pass = lambda a, l, ms, fs: ("", None, {"in": 0, "out": 0},
+                                                  {"locator_used": False, "total_messages": 1,
+                                                   "read_messages": 1, "located_files": [],
+                                                   "locator_usage": {"in": 0, "out": 0}})
+    s2 = Stub()
+    srv.Handler._api_chat(s2, {"model": "m", "advisor_model": "m",
+                               "skill_prompt": "Answer in bullets.",
+                               "messages": [{"role": "user", "content": "hi"}]})
+    for k, v in saved2.items():
+        setattr(srv, k, v)
+    check("build6: skill layer added to system",
+          any("Answer in bullets." in x and "SHELL:" in x for x in seen), True)
+
+    # --- real PNG image survives every server-side hop ---
+    def _png(w, h, rgb):
+        def chunk(t, d):
+            c = t + d
+            return _struct.pack(">I", len(d)) + c + _struct.pack(">I", _zlib.crc32(c) & 0xffffffff)
+        ihdr = _struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)
+        rows = b"".join(b"\x00" + bytes(rgb) * w for _ in range(h))
+        return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr)
+                + chunk(b"IDAT", _zlib.compress(rows)) + chunk(b"IEND", b""))
+    import base64 as _b64
+    png = _png(4, 4, (255, 0, 0))
+    b64 = _b64.b64encode(png).decode()
+    msg = {"role": "user", "content": "what is this?",
+           "images": [{"b64": b64, "media_type": "image/png"}]}
+    err = srv.sanitize_images(msg)
+    check("build6: real PNG accepted", err, None)
+    am = srv.anthropic_messages([msg])
+    img_blocks = [p for m in am for p in m["content"]
+                  if isinstance(p, dict) and p.get("type") == "image"]
+    check("build6: PNG reaches anthropic image block",
+          len(img_blocks) == 1 and img_blocks[0]["source"]["media_type"] == "image/png", True)
+    srv.FILES_DIR = saved_files_dir
+    om = srv.openai_messages([msg])
+    parts = [p for m in om for p in (m["content"] if isinstance(m["content"], list) else [])
+             if isinstance(p, dict) and p.get("type") == "image_url"]
+    check("build6: PNG reaches openai image_url part",
+          len(parts) == 1 and parts[0]["image_url"]["url"].startswith("data:image/png"), True)
+    # responses adapter maps it to input_image
+    import importlib.util as _ilu
+    spec = _ilu.spec_from_file_location("rad", "responses_adapter.py")
+    rad = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(rad)
+    payload = rad._responses_payload({"messages": [
+        {"role": "user", "content": [
+            {"type": "text", "text": "hi"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64," + b64}}]}]})
+    rimgs = [b for it in payload["input"] for b in (it.get("content") or [])
+             if isinstance(b, dict) and b.get("type") == "input_image"]
+    check("build6: adapter maps image to input_image", len(rimgs), 1)
+
+    # --- optional access key gates /api/chat ---
+    import threading as _th6
+    import urllib.request as _rq6
+    _os6.environ["CHATCRAFT_ACCESS_KEY"] = "testkey123"
+    try:
+        srv.TASKS_FILE = P4(td) / "t6.json"
+        httpd = srv.ThreadingHTTPServer(("127.0.0.1", 0), srv.Handler)
+        port = httpd.server_address[1]
+        th = _th6.Thread(target=httpd.serve_forever, daemon=True)
+        th.start()
+        try:
+            def post(headers):
+                req = _rq6.Request(
+                    f"http://127.0.0.1:{port}/api/chat", method="POST",
+                    data=_json.dumps({"model": "m", "messages": [
+                        {"role": "user", "content": "x"}]}).encode(),
+                    headers={"Content-Type": "application/json", **headers})
+                try:
+                    with _rq6.urlopen(req, timeout=5) as r:
+                        return r.status
+                except _rq6.HTTPError as e:
+                    return e.code
+            check("build6: chat without key 403", post({}), 403)
+            check("build6: chat with wrong key 403",
+                  post({"X-Access-Key": "nope"}), 403)
+            check("build6: chat with right key passes gate",
+                  post({"X-Access-Key": "testkey123"}) in (200, 403), True)
+        finally:
+            httpd.shutdown()
+    finally:
+        del _os6.environ["CHATCRAFT_ACCESS_KEY"]
+
+
 test_feature_endpoints()
 test_shared_features()
 test_advisor_capabilities()
+test_build6_fixes()
 
 if FAILURES:
     print(f"\n{len(FAILURES)} FAILURES")
