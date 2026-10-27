@@ -2646,6 +2646,17 @@
     maxTokens: 1024,
     system: ""
   };
+  // Persistence: settings + the access code survive reloads (the Android
+  // WebView included). Chat history is rendered in the DOM per conversation;
+  // only this small state object is stored, in localStorage.
+  try {
+    var _savedState = JSON.parse(localStorage.getItem("chatcraft-state") || "{}");
+    for (var _sk in _savedState) chatState[_sk] = _savedState[_sk];
+  } catch (e) {}
+  function persistState() {
+    try { localStorage.setItem("chatcraft-state", JSON.stringify(chatState)); } catch (e) {}
+  }
+  window.addEventListener("pagehide", persistState);
 
   /* ---------- authenticated API fetch ---------- */
   var toast = toast || function () {};
@@ -2656,9 +2667,64 @@
       opts.headers = Object.assign({}, opts.headers, { "X-Access-Code": chatState.accessCode });
     }
     return fetch(url, opts).then(function (r) {
-      if (r.status === 401) toast("Access code required — set it in Settings");
+      if (r.status === 401) promptAccessCode();
       return r;
     });
+  }
+
+  /* 401 helper: a clear "enter the access code" prompt instead of a
+     cryptic "Couldn't reach the chat backend (HTTP 401)". The code is
+     saved to chatState + localStorage, so it's asked for once only. */
+  function promptAccessCode() {
+    if (document.getElementById("ac-prompt")) return;
+    var ov = document.createElement("div");
+    ov.id = "ac-prompt";
+    ov.style.cssText = "position:fixed;inset:0;background:rgba(8,12,14,.72);z-index:9999;" +
+      "display:flex;align-items:center;justify-content:center;padding:16px;";
+    var box = document.createElement("div");
+    box.style.cssText = "background:#171b20;border:1px solid #2a3138;border-radius:14px;" +
+      "padding:22px;max-width:360px;width:100%;color:#e8edf2;font-family:inherit;";
+    var h = document.createElement("div");
+    h.style.cssText = "font-weight:600;margin-bottom:6px;font-size:15px;";
+    h.textContent = "Access code required";
+    var p = document.createElement("div");
+    p.style.cssText = "font-size:13px;opacity:.72;margin-bottom:14px;line-height:1.45;";
+    p.textContent = "This ChatCraft server is protected. Enter its access code " +
+      "to chat — it's saved on this device for next time.";
+    var inp = document.createElement("input");
+    inp.type = "password";
+    inp.placeholder = "access code";
+    inp.setAttribute("autocomplete", "off");
+    inp.style.cssText = "width:100%;box-sizing:border-box;padding:10px 12px;border-radius:9px;" +
+      "border:1px solid #2a3138;background:#0d1013;color:#e8edf2;font-size:14px;";
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;gap:8px;justify-content:flex-end;margin-top:14px;";
+    var cancel = document.createElement("button");
+    cancel.textContent = "Cancel";
+    cancel.style.cssText = "padding:9px 14px;border-radius:9px;border:0;" +
+      "background:#2a3138;color:#cfd6dd;cursor:pointer;font-family:inherit;";
+    var save = document.createElement("button");
+    save.textContent = "Save";
+    save.style.cssText = "padding:9px 16px;border-radius:9px;border:0;background:#d0784e;" +
+      "color:#1a0f08;font-weight:600;cursor:pointer;font-family:inherit;";
+    row.appendChild(cancel); row.appendChild(save);
+    box.appendChild(h); box.appendChild(p); box.appendChild(inp); box.appendChild(row);
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    function closeOv() { if (ov.parentNode) ov.parentNode.removeChild(ov); }
+    function commit() {
+      chatState.accessCode = (inp.value || "").trim();
+      persistState();
+      closeOv();
+      if (chatState.accessCode) {
+        toast("Access code saved");
+        loadModels(); loadFiles(); loadCustomList();
+      }
+    }
+    save.addEventListener("click", commit);
+    cancel.addEventListener("click", closeOv);
+    inp.addEventListener("keydown", function (e) { if (e.key === "Enter") commit(); });
+    setTimeout(function () { inp.focus(); }, 30);
   }
 
   var usage = { msgs: 0, cost: 0 };
@@ -3621,8 +3687,13 @@
       return pump();
     }).catch(function (err) {
       if (shell) finalizeSteps(shell); // network failure: stop the spinner, mark the turn failed
-      showStreamError("Couldn't reach the chat backend (" + err.message + ").");
-      toast("Backend unreachable");
+      if (err && err.message === "HTTP 401") {
+        promptAccessCode();
+        showStreamError("This server needs an access code — enter it in the prompt to chat.");
+      } else {
+        showStreamError("Couldn't reach the chat backend (" + err.message + ").");
+        toast("Backend unreachable");
+      }
     });
 
     function showStreamError(msg) {
@@ -3820,6 +3891,7 @@
         " — replies will fail until it's set");
     }
     chatState.model = id;
+    persistState();
     var short = shortName(m.label);
     $("#top-model-name").textContent = short;
     $("#comp-model-name").textContent = short;
@@ -3831,6 +3903,7 @@
   }
   function setAdvisorModel(id) {
     chatState.advisorModel = id;
+    persistState();
     if (hsAdvisorModel) hsAdvisorModel.value = id;
     var st = $("#adv-status");
     if (st) {
@@ -3906,11 +3979,12 @@
   if (hsMax) {
     hsMax.addEventListener("input", function () {
       chatState.maxTokens = parseInt(hsMax.value, 10);
+      persistState();
       $("#hs-max-val").textContent = hsMax.value + " tokens";
     });
   }
   var hsSystem = $("#hs-system");
-  if (hsSystem) hsSystem.addEventListener("input", function () { chatState.system = hsSystem.value; });
+  if (hsSystem) hsSystem.addEventListener("input", function () { chatState.system = hsSystem.value; persistState(); });
   var hsAdvisor = null; // advisor is always on; no toggle
 
   /* ---------- custom models (plugin) ---------- */
@@ -3995,6 +4069,7 @@
     accessInput.value = chatState.accessCode || "";
     accessSave.addEventListener("click", function () {
       chatState.accessCode = (accessInput.value || "").trim();
+      persistState();
       toast(chatState.accessCode ? "Access code saved" : "Access code cleared");
       loadModels();
       loadFiles();

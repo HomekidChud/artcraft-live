@@ -402,6 +402,16 @@ site**, not a static page proxying a session sandbox.
   across pause/resume, but a REPUBLISH can lose them (custom models, skills,
   tasks, automations, workspace files). Disclose this before republishing;
   important data needs its own backup.
+- **Frontend 401 UX + persistence (2026-10-27, later same day)**: the APK's
+  "Couldn't reach the chat backend (HTTP 401)" was the access-code gate
+  firing with no code saved — chatState (incl. accessCode) was memory-only,
+  so every reload lost it. Fixed in `index.html`: chatState now persists to
+  `localStorage` (key `chatcraft-state`, loaded at startup, saved on every
+  mutation + pagehide), and any 401 (apiFetch or the chat POST) now opens a
+  clear "Access code required" prompt (id `ac-prompt`) that saves the code
+  and retries, instead of the cryptic backend-unreachable error. QA'd
+  headless-Chromium end-to-end: prompt on first load, code saved, real
+  chat reply through the proxy launcher, reload keeps the code (no prompt).
 - **Security fixes shipped with this build** (from the pre-publish review):
   `do_DELETE` now checks `_origin_ok()` before ANY route (the bookmarks
   branch previously ran before the origin check); custom-model `base_url`
