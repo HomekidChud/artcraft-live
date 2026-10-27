@@ -53,7 +53,31 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         web.setWebViewClient(new WebViewClient());
         web.loadUrl(base);
-        setContentView(web);
+
+        // small "change server" control: saved credentials never lock the
+        // user out (also the re-pair path after a backend restart wipes
+        // the paired-device list)
+        Button rePair = new Button(this);
+        rePair.setText("Change server");
+        rePair.setTextSize(12);
+        rePair.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                SharedPreferences p = prefs();
+                showPairing(p.getString("base_url", ""));
+            }
+        });
+        LinearLayout bar = new LinearLayout(this);
+        bar.setOrientation(LinearLayout.HORIZONTAL);
+        bar.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        bar.setBackgroundColor(0xCC14141F);
+        bar.addView(rePair);
+
+        LinearLayout wrap = new LinearLayout(this);
+        wrap.setOrientation(LinearLayout.VERTICAL);
+        wrap.addView(bar);
+        wrap.addView(web, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        setContentView(wrap);
     }
 
     /** Simple programmatic pairing form: server URL + device name. */
@@ -73,24 +97,28 @@ public class MainActivity extends Activity {
         final EditText url = edit(prefill == null ? "https://your-chatcraft-url" : prefill,
                 "ChatCraft server URL");
         final EditText name = edit(android.os.Build.MODEL, "Device name");
+        final EditText code = edit("", "Access code (optional)");
         url.setImeOptions(EditorInfo.IME_ACTION_NEXT);
+        name.setImeOptions(EditorInfo.IME_ACTION_NEXT);
 
         Button pair = new Button(this);
         pair.setText("Pair and open ChatCraft");
         pair.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { pair(url.getText().toString().trim(),
-                    name.getText().toString().trim()); }
+                    name.getText().toString().trim(),
+                    code.getText().toString().trim()); }
         });
 
         box.addView(title);
         box.addView(sub);
         box.addView(url);
         box.addView(name);
+        box.addView(code);
         box.addView(pair);
         setContentView(box);
     }
 
-    private void pair(String base, String name) {
+    private void pair(String base, String name, String accessCode) {
         if (!base.startsWith("http")) {
             toast("The server URL must start with http:// or https://");
             return;
@@ -98,17 +126,20 @@ public class MainActivity extends Activity {
         if (!base.contains("://") || base.endsWith("/")) { /* keep as typed */ }
         final String baseN = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
         final String nameF = name.isEmpty() ? android.os.Build.MODEL : name;
+        final String codeF = accessCode == null ? "" : accessCode.trim();
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
                     String body = post(baseN + "/api/phone/pair",
-                            ("{\"name\":" + jsonStr(nameF) + "}").getBytes(StandardCharsets.UTF_8));
+                            ("{\"name\":" + jsonStr(nameF) + "}").getBytes(StandardCharsets.UTF_8),
+                            codeF);
                     String id = jsonField(body, "device_id");
                     String secret = jsonField(body, "secret");
                     if (id == null || secret == null) throw new Exception("server sent no credentials");
                     final SharedPreferences.Editor ed = prefs().edit();
                     ed.putString("base_url", baseN).putString("device_id", id)
-                      .putString("secret", secret).apply();
+                      .putString("secret", secret).putString("access_code", codeF)
+                      .apply();
                     ui.post(new Runnable() {
                         @Override public void run() {
                             toast("Paired. Now enable the ChatCraft accessibility service.");
@@ -181,10 +212,12 @@ public class MainActivity extends Activity {
         return json.substring(i, j).trim();
     }
 
-    static String post(String url, byte[] body) throws Exception {
+    static String post(String url, byte[] body, String accessCode) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setRequestMethod("POST");
         c.setRequestProperty("Content-Type", "application/json");
+        if (accessCode != null && !accessCode.isEmpty())
+            c.setRequestProperty("X-Access-Code", accessCode);
         c.setDoOutput(true);
         c.setConnectTimeout(10000);
         c.setReadTimeout(10000);
@@ -200,9 +233,11 @@ public class MainActivity extends Activity {
         return resp;
     }
 
-    static String get(String url) throws Exception {
+    static String get(String url, String accessCode) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setRequestMethod("GET");
+        if (accessCode != null && !accessCode.isEmpty())
+            c.setRequestProperty("X-Access-Code", accessCode);
         c.setConnectTimeout(15000);
         c.setReadTimeout(35000); // long-poll friendly
         InputStream in = c.getResponseCode() >= 400 ? c.getErrorStream() : c.getInputStream();

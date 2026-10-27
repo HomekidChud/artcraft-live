@@ -1272,31 +1272,45 @@ def phone_default_device():
     return max(candidates)[1]
 
 
-def phone_enqueue(did, action, params):
-    cmd = {"id": _secrets.token_hex(6), "action": action, "params": params}
+def phone_enqueue(did, action, params, wait=True):
+    """Queue a command for the device. With wait=True the result slot is
+    registered BEFORE the command becomes visible to the poller, so a
+    fast result can never be missed. Commands expire after 45s: a phone
+    that polls late will not run an action the caller already gave up on."""
+    cmd = {"id": _secrets.token_hex(6), "action": action, "params": params,
+           "expires": time.time() + 45}
     with _PHONE_LOCK:
         d = PHONES.get(did)
         if d is None:
             return None, "no such device"
+        if wait:
+            d["waiters"][cmd["id"]] = {"event": threading.Event(), "result": None}
         d["queue"].append(cmd)
     return cmd, ""
 
 
 def phone_wait_result(did, cmd_id, timeout=30):
-    """Block until the device reports this command's result."""
-    done = threading.Event()
+    """Block until the device reports this command's result. The waiter
+    slot was registered at enqueue time, so a result that arrives before
+    this call is still collected."""
     with _PHONE_LOCK:
         d = PHONES.get(did)
         if d is None:
             return {"ok": False, "detail": "device disappeared"}
-        d["waiters"][cmd_id] = {"event": done, "result": None}
-    done.wait(timeout)
+        w = d["waiters"].get(cmd_id)
+        if w is None:
+            return {"ok": False, "detail": "command not tracked"}
+    w["event"].wait(timeout)
     with _PHONE_LOCK:
         d = PHONES.get(did) or {}
-        w = d.get("waiters", {}).pop(cmd_id, None)
-    if w is None or w["result"] is None:
-        return {"ok": False, "detail": "device did not respond in time"}
-    return w["result"]
+        w2 = d.get("waiters", {}).pop(cmd_id, None)
+        if w2 is None or w2["result"] is None:
+            # timed out: expire the queued command so an offline phone
+            # cannot execute it after we already reported failure
+            d["queue"] = [c for c in d.get("queue", [])
+                          if c.get("id") != cmd_id]
+            return {"ok": False, "detail": "device did not respond in time"}
+        return w2["result"]
 
 
 def phone_devices():
@@ -1597,12 +1611,15 @@ class Handler(BaseHTTPRequestHandler):
             d = phone_auth(did, (q.get("secret") or [""])[0])
             if d is None:
                 return self._send(403, {"error": "bad device credentials"})
-            # long-poll: hand over queued commands, up to 25s
+            # long-poll: hand over queued, unexpired commands, up to 25s
             deadline = time.time() + 25
             while time.time() < deadline:
                 with _PHONE_LOCK:
-                    cmds = d["queue"][:]
-                    d["queue"] = d["queue"][len(cmds):]
+                    now = time.time()
+                    live = [c for c in d["queue"] if c.get("expires", 0) > now]
+                    d["queue"] = live
+                    cmds = live[:]
+                    d["queue"] = []
                     if cmds:
                         d["last_seen"] = time.time()
                 if cmds:
@@ -1806,7 +1823,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, {"error": "no phone paired — install the "
                                                  "ChatCraft APK and pair it first"})
             cmd, err = phone_enqueue(did, b.get("action", ""),
-                                     b.get("params") or {})
+                                     b.get("params") or {}, wait=False)
             if err:
                 return self._send(404, {"error": err})
             return self._send(200, {"ok": True, "command": cmd,
@@ -2078,6 +2095,7 @@ class Handler(BaseHTTPRequestHandler):
                     # browser: drive the shared Chromium session (shares the
                     # browse budget: 5 actions per turn, one action per line)
                     browser_log = []
+                    actions_used = 0
                     browser_blocks = [(i, b) for i, b in enumerate(blocks)
                                       if b[0] == "browser"]
                     for bi, b in browser_blocks:
@@ -2085,6 +2103,7 @@ class Handler(BaseHTTPRequestHandler):
                         block_budget = browse_budget
                         for line in act_lines[:max(0, browse_budget)]:
                             browse_budget -= 1
+                            actions_used += 1
                             act = parse_browser_action(line)
                             if act is None:
                                 browser_log.append((line, None, "unknown action"))
@@ -2122,6 +2141,7 @@ class Handler(BaseHTTPRequestHandler):
                         block_budget = browse_budget
                         for line in act_lines[:max(0, browse_budget)]:
                             browse_budget -= 1
+                            actions_used += 1
                             act = parse_phone_action(line)
                             if act is None:
                                 phone_log.append((line, None, "unknown action"))
@@ -2167,7 +2187,7 @@ class Handler(BaseHTTPRequestHandler):
                                       f"Skipped: {line.strip()[:45]} (limit)", "skip")
                     return (rc_by_block, browse_by_block, cmd_log, browse_log,
                             browser_log, phone_log, saved, len(run_slice),
-                            len(browse_slice))
+                            len(browse_slice) + actions_used)
 
                 # 5-7. execute the reply's tool blocks (budgets shared per turn)
                 (rc_by_block, browse_by_block, cmd_log, browse_log,

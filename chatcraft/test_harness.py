@@ -723,9 +723,9 @@ def test_phone_bridge():
                 except _rq.HTTPError as e:
                     return _json.loads(e.read().decode())
 
-            # simulate the phone posting the result in a background thread
+            # simulate the phone replying IMMEDIATELY (no sleep): a result
+            # that lands before the caller starts waiting must not be lost
             def phone_replies():
-                time.sleep(0.3)
                 call("POST", "/api/phone/result", {
                     "device_id": did, "secret": secret,
                     "cmd_id": cmd["id"], "ok": True,
@@ -752,6 +752,18 @@ def test_phone_bridge():
             # pair endpoint round-trip
             d3 = call("POST", "/api/phone/pair", {"name": "S24"})
             check("phone: pair endpoint", "secret" in d3, True)
+
+            # timed-out commands expire: a phone that polls late must not
+            # receive (and run) an action the caller already gave up on
+            did2, sec2 = d3["device_id"], d3["secret"]
+            cmd2, _ = srv.phone_enqueue(did2, "tap", {"x": 1, "y": 2})
+            res2 = srv.phone_wait_result(did2, cmd2["id"], 0.2)
+            check("phone: timeout reported honestly",
+                  (res2["ok"], "did not respond" in res2["detail"]), (False, True))
+            with srv._PHONE_LOCK:
+                still_queued = [c for c in srv.PHONES[did2]["queue"]
+                                if c["id"] == cmd2["id"]]
+            check("phone: timed-out command expired", still_queued, [])
         finally:
             httpd.shutdown()
 
@@ -790,7 +802,86 @@ def test_phone_bridge():
               ("wait", {"ms": 300}))
 
 
+def test_phone_chat_path():
+    """Full chat-to-phone path: a fake phone consumes the REAL /api/phone/poll
+    endpoint and posts results through /api/phone/result while a fake model
+    emits a ```phone block — the same path the Android APK uses."""
+    import threading
+    import urllib.request as _rq
+    import json as _json2
+    import server as srv
+
+    # earlier tests point FILES_DIR/DATA_DIR at deleted temp dirs —
+    # give this test its own live workspace
+    _td = _tempfile.mkdtemp()
+    srv.DATA_DIR = Path(_td)
+    srv.FILES_DIR = Path(_td) / "files"
+    srv.FILES_DIR.mkdir()
+
+    with srv._PHONE_LOCK:
+        srv.PHONES.clear()
+    d = srv.phone_pair("Fake phone")
+    did, secret = d["device_id"], d["secret"]
+
+    httpd = srv.ThreadingHTTPServer(("127.0.0.1", 0), srv.Handler)
+    port = httpd.server_address[1]
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+
+    stop = threading.Event()
+    executed = []
+
+    def fake_phone():
+        while not stop.is_set():
+            try:
+                req = _rq.Request(
+                    f"http://127.0.0.1:{port}/api/phone/poll"
+                    f"?device_id={did}&secret={secret}")
+                with _rq.urlopen(req, timeout=30) as r:
+                    cmds = _json2.loads(r.read().decode()).get("commands") or []
+                for c in cmds:
+                    executed.append(c["action"])
+                    body = _json2.dumps({
+                        "device_id": did, "secret": secret,
+                        "cmd_id": c["id"], "ok": True, "detail": "done",
+                        "state": "[1] Home (540,1200)\n[2] Messages (540,1400)"
+                    }).encode()
+                    req = _rq.Request(
+                        f"http://127.0.0.1:{port}/api/phone/result",
+                        data=body,
+                        headers={"Content-Type": "application/json"})
+                    with _rq.urlopen(req, timeout=10) as r:
+                        r.read()
+            except Exception:
+                return
+
+    phone_th = threading.Thread(target=fake_phone, daemon=True)
+    phone_th.start()
+    try:
+        r1 = "Driving the phone.\n```phone\nstate\n```"
+        r2 = "The screen shows Home and Messages."
+        calls, evs = drive_chat(
+            [(r1, "end_turn"), (r2, "end_turn")],
+            {"model": "m", "advisor_model": "",
+             "messages": [{"role": "user", "content": "read my phone screen"}]})
+        ph_steps = [x for n, x in evs
+                    if n == "step" and str(x.get("id", "")).startswith("ph-")]
+        check("phone chat: action ran as a live step",
+              len(ph_steps) >= 1 and ph_steps[0].get("state") in ("done", "run"),
+              True)
+        check("phone chat: fake phone executed the action", executed, ["state"])
+        check("phone chat: screen state fed back to model",
+              "[1] Home" in calls[1]["messages"][-1]["content"], True)
+        bev = [x for n, x in evs if n == "phone"]
+        check("phone chat: SSE phone event emitted", len(bev), 1)
+    finally:
+        stop.set()
+        httpd.shutdown()
+        with srv._PHONE_LOCK:
+            srv.PHONES.clear()
+
+
 test_phone_bridge()
+test_phone_chat_path()
 test_feature_stores()
 test_feature_endpoints()
 

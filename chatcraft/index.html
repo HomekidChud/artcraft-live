@@ -2803,7 +2803,12 @@
     }
     window.phRefresh = function () {
       var base = phEl("ph-base");
-      if (base && !base.textContent) base.textContent = API;
+      if (base && !base.textContent) {
+        // show a URL the APK can actually reach: an empty/relative API base
+        // means same-origin, so use the page's own origin
+        base.textContent = (API && API.indexOf("://") > 0) ? API
+          : window.location.origin;
+      }
       apiFetch(API + "/api/phone/devices", { method: "GET" })
         .then(function (r) { return r.json(); })
         .then(function (j) {

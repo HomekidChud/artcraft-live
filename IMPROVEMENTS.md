@@ -1,16 +1,20 @@
 # ChatCraft improvements — all changes, this build
 
-Everything below is implemented, tested (131/131 harness tests, 13/13 + 11/11
-e2e checks), and live.
+Everything below is implemented; the server-side work is tested (137/137
+harness tests, 13/13 + 11/11 e2e checks) and the site is deployed and
+verified live. The Android app was built and statically verified only —
+no emulator or device run happened in this sandbox (no KVM), so on-device
+behavior is expected but untested (see the honest-status notes in each
+section).
 
 ## Build 3: computer use + phone control (the Android APK)
 
 The agent can now use a computer (browser-level pointer/keyboard control)
 and drive a real Android phone. Deep research first: on Android the only
-no-root way to read the screen and inject taps is an AccessibilityService
-(the approach used by every phone-control agent product); on iOS this is
-impossible for third-party apps — so the phone bridge is Android-only and
-says so honestly.
+no-root mechanism the products we reviewed (PhoneClaw, Melaya, FoneClaw,
+Opposable) rely on is an AccessibilityService; on iOS, Apple's platform
+rules forbid third-party apps from injecting touches or reading other
+apps' screens — so the phone bridge is Android-only and says so honestly.
 
 ### 9. Computer use in the browser agent
 - New browser actions: `click_xy <x> <y>` (raw viewport-coordinate click),
@@ -44,9 +48,18 @@ says so honestly.
     answers each with a numbered screen dump (elements + coordinates).
 - Built with the Android SDK build tools (aapt2/javac/d8/zipalign/apksigner),
   minSdk 26 (Android 8+), signed, verified. Sideload-ready
-  `ChatCraft-phone-bridge.apk`. Note honestly: it was built and verified
-  statically (manifest, signing, dex) — no emulator run happened in this
-  sandbox (no KVM), so on-device behavior is expected but untested here.
+  `ChatCraft-phone-bridge.apk`. Honest limits, stated up front:
+  - It was verified statically only (badging, manifest, signature, dex) —
+    no emulator or device run happened in this sandbox (no KVM), so
+    on-device behavior is expected but untested.
+  - The phone must reach the backend over HTTP(S) with a URL you type
+    into the pairing screen. For the deployed preview this means the
+    sandbox proxy URL (it changes when the backend restarts — re-pair via
+    the "Change server" button); for a self-hosted ChatCraft it is your
+    server's URL. The app also supports an optional access code.
+  - Gestures are dispatched and awaited, but some apps ignore injected
+    input; "enter" appends a newline (per-app IME actions vary and are
+    reported honestly as best-effort).
 
 ## This build: every "not built yet" view, implemented
 

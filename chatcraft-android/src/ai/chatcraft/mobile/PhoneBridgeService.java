@@ -21,26 +21,31 @@ import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /** The phone side of the ChatCraft phone bridge.
  *
  *  When the user enables this accessibility service, it long-polls the
  *  ChatCraft backend (GET /api/phone/poll) for commands and executes them:
  *  - state: dumps the active window as numbered elements with coordinates
- *  - tap x y / swipe: dispatched as real gestures (dispatchGesture)
+ *  - tap x y / swipe: dispatched as real gestures (dispatchGesture), and we
+ *    wait for the gesture's completion callback before reporting success
  *  - text: ACTION_SET_TEXT on the focused editable
  *  - back / home: performGlobalAction
  *  - open: launch an app by package or open a URL
  *  Every command is answered with POST /api/phone/result (ok, detail, state).
  *
- *  This is the same no-root approach used by the research finding: an
- *  AccessibilityService is the only way a third-party app can read the
- *  screen and inject taps on Android. iOS does not allow it at all. */
+ *  This uses an AccessibilityService — the no-root approach the research
+ *  landed on (the phone-control products we reviewed use it too). iOS does
+ *  not offer this to third-party apps, which is why there is no iOS build.
+ *  Honesty notes: gestures are dispatched and awaited, but some apps ignore
+ *  injected input; "enter" appends a newline (per-app IME actions vary) and
+ *  is reported as best-effort in the result detail. */
 public class PhoneBridgeService extends AccessibilityService {
 
     private Thread poller;
     private volatile boolean running;
-    private final Handler main = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onServiceConnected() {
@@ -72,17 +77,23 @@ public class PhoneBridgeService extends AccessibilityService {
 
     // ---------- poll loop ----------
 
+    /** Runs until the service dies. If not paired yet, waits for credentials
+     *  instead of exiting — pairing after enabling the service works. */
     private void pollLoop() {
-        SharedPreferences p = prefs();
-        String base = p.getString("base_url", "");
-        String did = p.getString("device_id", "");
-        String secret = p.getString("secret", "");
-        if (base.isEmpty() || did.isEmpty()) return; // not paired yet
         while (running) {
+            SharedPreferences p = prefs();
+            String base = p.getString("base_url", "");
+            String did = p.getString("device_id", "");
+            String secret = p.getString("secret", "");
+            if (base.isEmpty() || did.isEmpty()) {
+                sleepQuiet(3000); // wait for pairing
+                continue;
+            }
             try {
                 String qs = "?device_id=" + URLEncoder.encode(did, "UTF-8")
                         + "&secret=" + URLEncoder.encode(secret, "UTF-8");
-                String resp = MainActivity.get(base + "/api/phone/poll" + qs);
+                String resp = MainActivity.get(base + "/api/phone/poll" + qs,
+                        p.getString("access_code", ""));
                 JSONObject j = new JSONObject(resp);
                 JSONArray cmds = j.optJSONArray("commands");
                 if (cmds != null) {
@@ -93,54 +104,57 @@ public class PhoneBridgeService extends AccessibilityService {
                 }
             } catch (Exception e) {
                 // backend unreachable / not paired: back off, then retry
-                sleep(5000);
+                sleepQuiet(5000);
             }
         }
     }
 
-    private void sleep(long ms) {
+    private void sleepQuiet(long ms) {
         try { Thread.sleep(ms); } catch (InterruptedException ignored) {}
     }
 
-    // ---------- command execution (state read + result post on main thread) ----------
+    // ---------- command execution ----------
 
     private void execOne(final String base, final String did, final String secret,
                          final JSONObject cmd) {
         final String id = cmd.optString("id");
         final String action = cmd.optString("action");
         final JSONObject params = cmd.optJSONObject("params");
-        final String[] out = new String[]{null}; // ok/detail written on main thread
-        final Object done = new Object();
+        // 0 = running, 1 = ok, -1 = failed (never conflate "running" with "failed")
+        final int[] outcome = new int[]{0};
+        final String[] detail = new String[]{""};
+        final CountDownLatch done = new CountDownLatch(1);
+        final Handler main = new Handler(Looper.getMainLooper());
         main.post(new Runnable() {
             @Override public void run() {
                 try {
-                    out[0] = perform(action, params);
+                    detail[0] = perform(action, params);
+                    outcome[0] = detail[0] != null ? 1 : -1;
                 } catch (Exception e) {
-                    out[0] = null;
+                    outcome[0] = -1;
+                    detail[0] = e.getClass().getSimpleName() + ": " + e.getMessage();
                 }
-                synchronized (done) { done.notifyAll(); }
+                done.countDown();
             }
         });
-        // wait for the main thread (max 20s)
-        long deadline = System.currentTimeMillis() + 20000;
-        synchronized (done) {
-            while (out[0] == null && System.currentTimeMillis() < deadline) {
-                try { done.wait(1000); } catch (InterruptedException ignored) {}
-            }
+        try { done.await(20, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+        boolean ok = outcome[0] == 1;
+        if (outcome[0] == 0) { // never resolved on the main thread
+            ok = false;
+            detail[0] = "action did not complete in time";
         }
-        boolean ok = out[0] != null;
-        String detail = ok ? out[0] : (action + " failed");
-        String state = readState(); // fresh screen state after the action
+        String state = readState(main); // fresh screen state after the action
         try {
             JSONObject body = new JSONObject();
             body.put("device_id", did);
             body.put("secret", secret);
             body.put("cmd_id", id);
             body.put("ok", ok);
-            body.put("detail", detail);
+            body.put("detail", ok ? detail[0] : (action + " failed: " + detail[0]));
             if (state != null) body.put("state", state);
             MainActivity.post(base + "/api/phone/result",
-                    body.toString().getBytes(StandardCharsets.UTF_8));
+                    body.toString().getBytes(StandardCharsets.UTF_8),
+                    prefs().getString("access_code", ""));
         } catch (Exception ignored) {
         }
     }
@@ -156,10 +170,9 @@ public class PhoneBridgeService extends AccessibilityService {
             }
             case "swipe": {
                 String dir = params.optString("dir", "up");
-                int cx = 540, cy = 1200; // will be replaced by real metrics
                 android.util.DisplayMetrics dm = getResources().getDisplayMetrics();
-                cx = dm.widthPixels / 2;
-                cy = dm.heightPixels / 2;
+                int cx = dm.widthPixels / 2;
+                int cy = dm.heightPixels / 2;
                 int dx = 0, dy = 0, span = Math.min(dm.widthPixels, dm.heightPixels) / 2;
                 if ("up".equals(dir)) dy = -span;
                 else if ("down".equals(dir)) dy = span;
@@ -170,7 +183,7 @@ public class PhoneBridgeService extends AccessibilityService {
             }
             case "text": {
                 String t = params.optString("text");
-                AccessibilityNodeInfo node = findFocusedEditable();
+                AccessibilityNodeInfo node = focusedEditable();
                 if (node == null) return null;
                 Bundle args = new Bundle();
                 args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, t);
@@ -178,7 +191,11 @@ public class PhoneBridgeService extends AccessibilityService {
                 return ok ? "typed" : null;
             }
             case "enter": {
-                AccessibilityNodeInfo node = findFocusedEditable();
+                // Best effort: append a newline to the focused editable. Real
+                // IME actions (Send/Search/Done) vary per app and are not
+                // exposed to accessibility services, so this is reported
+                // honestly as a newline, not a guaranteed submit.
+                AccessibilityNodeInfo node = focusedEditable();
                 if (node != null) {
                     CharSequence cur = node.getText();
                     Bundle args = new Bundle();
@@ -186,7 +203,7 @@ public class PhoneBridgeService extends AccessibilityService {
                             AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
                             (cur == null ? "" : cur.toString()) + "\n");
                     if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args))
-                        return "enter";
+                        return "enter (newline; IME submit varies by app)";
                 }
                 return null;
             }
@@ -213,18 +230,43 @@ public class PhoneBridgeService extends AccessibilityService {
         }
     }
 
+    /** Dispatch a gesture and WAIT for its completion/cancellation callback —
+     *  dispatchGesture() returning true only means it was accepted. */
     private boolean gesture(int x1, int y1, int x2, int y2, long ms) {
         Path p = new Path();
         p.moveTo(x1, y1);
         p.lineTo(x2, y2);
         GestureDescription.Builder b = new GestureDescription.Builder();
         b.addStroke(new GestureDescription.StrokeDescription(p, 0, ms));
-        return dispatchGesture(b.build(), null, null);
+        final CountDownLatch done = new CountDownLatch(1);
+        final boolean[] ok = new boolean[]{false};
+        boolean accepted = dispatchGesture(b.build(), new GestureResultCallback() {
+            @Override public void onCompleted(GestureDescription gesture) {
+                ok[0] = true;
+                done.countDown();
+            }
+
+            @Override public void onCancelled(GestureDescription gesture) {
+                ok[0] = false;
+                done.countDown();
+            }
+        }, null);
+        if (!accepted) return false;
+        try { done.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
+        return ok[0];
     }
 
-    private AccessibilityNodeInfo findFocusedEditable() {
+    /** The FOCUSED editable, not just the first editable on screen. */
+    private AccessibilityNodeInfo focusedEditable() {
         AccessibilityNodeInfo root = getRootInActiveWindow();
         if (root == null) return null;
+        AccessibilityNodeInfo focus = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+        if (focus != null && focus.isEditable()) return focus;
+        if (focus != null && !focus.isEditable()) {
+            // the focus target itself isn't editable: search its subtree
+            AccessibilityNodeInfo in = findEditable(focus);
+            if (in != null) return in;
+        }
         return findEditable(root);
     }
 
@@ -240,10 +282,10 @@ public class PhoneBridgeService extends AccessibilityService {
     }
 
     /** Numbered screen dump: "[n] text (x,y)" lines, like the browser agent's
-     *  element list. Called on the main thread. */
-    private String readState() {
+     *  element list. Bounded at 40 elements. */
+    private String readState(Handler main) {
         final String[] result = new String[]{null};
-        final Object done = new Object();
+        final CountDownLatch done = new CountDownLatch(1);
         main.post(new Runnable() {
             @Override public void run() {
                 try {
@@ -258,15 +300,10 @@ public class PhoneBridgeService extends AccessibilityService {
                 } catch (Exception e) {
                     result[0] = "";
                 }
-                synchronized (done) { done.notifyAll(); }
+                done.countDown();
             }
         });
-        long deadline = System.currentTimeMillis() + 5000;
-        synchronized (done) {
-            while (result[0] == null && System.currentTimeMillis() < deadline) {
-                try { done.wait(500); } catch (InterruptedException ignored) {}
-            }
-        }
+        try { done.await(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) {}
         return result[0];
     }
 
@@ -282,8 +319,9 @@ public class PhoneBridgeService extends AccessibilityService {
             int cx = r.exactCenterX() < 0 ? 0 : Math.round(r.exactCenterX());
             int cy = r.exactCenterY() < 0 ? 0 : Math.round(r.exactCenterY());
             count++;
-            sb.append('[').append(count).append("] ")
-              .append(cs.toString().replace('\n', ' '), 0, Math.min(cs.length(), 40))
+            String s = cs.toString().replace('\n', ' ');
+            if (s.length() > 40) s = s.substring(0, 40);
+            sb.append('[').append(count).append("] ").append(s)
               .append(" (").append(cx).append(',').append(cy).append(")\n");
         }
         for (int i = 0; i < n.getChildCount(); i++) {

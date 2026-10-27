@@ -170,8 +170,19 @@ The harness is tuned for minimal tokens per COMPLETED task:
    <android.jar> --release --output build <classes> && zipalign + apksigner`.
    Verified statically (badging, manifest, signature); no emulator run in
    this sandbox (no KVM), so on-device behavior is untested here.
-4. Tests: 131/131 harness (21 new phone-bridge/computer-use checks),
-   13/13 + 11/11 Playwright e2e.
+4. **Phone-bridge hardening** (post-review): command results are
+   registered BEFORE the command becomes visible to the poller (a fast
+   reply can no longer be lost), commands expire after 45s so a phone
+   that polls late cannot run an action the caller already gave up on,
+   gestures in the APK are awaited via their completion callbacks (not
+   just "accepted"), text targets the FOCUSED editable, the APK's poller
+   waits for pairing instead of exiting, and the APK gained a
+   "Change server" re-pair button plus an optional access-code field
+   (sent as X-Access-Code, same mechanism as the web UI).
+5. Tests: 137/137 harness (27 new phone-bridge/computer-use checks incl.
+   a full chat->phone round trip through the real poll/result endpoints),
+   13/13 + 11/11 Playwright e2e. Android runtime still untested on a
+   device (no KVM in the sandbox) — statically verified only.
 
 ## Recent changes in this repo (2026-10-27, build 2)
 
