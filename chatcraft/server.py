@@ -140,6 +140,21 @@ LOCATOR_SYSTEM = (
 
 LOCATOR_MODEL_ID = os.environ.get("CHATCRAFT_LOCATOR_MODEL", "claude_haiku_5_5")
 
+
+def locator_for(advisor_id):
+    """A cheap scanner from the SAME family as the advisor, so only models
+    the user chose (or their cheaper siblings) ever read the conversation."""
+    a = str(advisor_id or "").lower()
+    if a.startswith("claude"):
+        return "claude_haiku_4_5"
+    if a.startswith("gpt"):
+        return "gpt5_nano"
+    if a.startswith("gemini"):
+        return "gemini_3_flash"
+    if a.startswith("grok"):
+        return "grok_4_3"
+    return LOCATOR_MODEL_ID
+
 # ```lang filename.ext ... ```   (also accepts ```lang:filename.ext)
 # and the variant small local models often emit: ```lang\nfilename.ext\n...```
 # The last two alternatives close on a \x00CMDn\x00 mark (a run block that
@@ -844,27 +859,63 @@ def extract_browses(text):
     return urls
 
 
-def fetch_page(url):
-    """Fetch a page and extract its readable text. Returns (text, title, err)."""
+# headless Chromium (Playwright) for JS-rendered pages; off => urllib only
+BROWSER_ENABLED = os.environ.get("CHATCRAFT_BROWSER", "1") not in ("0", "false", "no")
+
+
+def _page_text(raw):
+    """Readable text from HTML: scripts/styles stripped, tags flattened."""
     import html as _html
-    try:
-        req = urllib.request.Request(
-            url, headers={"User-Agent":
-                          "Mozilla/5.0 (compatible; ChatCraftBot/1.0)"})
-        with urllib.request.urlopen(req, timeout=20) as r:
-            raw = r.read(500_000).decode("utf-8", "replace")
-        title = ""
-        m = re.search(r"<title[^>]*>(.*?)</title>", raw, re.I | re.S)
-        if m:
-            title = re.sub(r"\s+", " ", _html.unescape(m.group(1))).strip()[:120]
-        body = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw,
-                      flags=re.I | re.S)
-        body = re.sub(r"<[^>]+>", " ", body)
-        body = _html.unescape(re.sub(r"[ \t]+", " ", body))
-        body = re.sub(r"\n\s*\n+", "\n", body).strip()
-        return body[:8000], title, ""
-    except Exception as e:
-        return "", "", str(e)[:150]
+    body = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", raw,
+                  flags=re.I | re.S)
+    body = re.sub(r"<[^>]+>", " ", body)
+    body = _html.unescape(re.sub(r"[ \t]+", " ", body))
+    return re.sub(r"\n\s*\n+", "\n", body).strip()
+
+
+def _fetch_chromium(url):
+    """JS-rendered fetch via headless Chromium. Returns (html, title).
+    Raises on ANY failure so the caller can fall back to plain urllib."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        try:
+            page = browser.new_page(
+                user_agent="Mozilla/5.0 (compatible; ChatCraftBot/1.0)")
+            page.goto(url, timeout=15000, wait_until="domcontentloaded")
+            try:
+                page.wait_for_load_state("networkidle", timeout=5000)
+            except Exception:
+                pass  # some pages never go idle; DOM content is still fine
+            return page.content()[:500_000], (page.title() or "")[:120]
+        finally:
+            browser.close()
+
+
+def fetch_page(url):
+    """Fetch a page and extract its readable text: headless Chromium
+    (JS-rendered) when Playwright is available, plain urllib otherwise.
+    Returns (text, title, err)."""
+    import html as _html
+    raw, title = "", ""
+    if BROWSER_ENABLED:
+        try:
+            raw, title = _fetch_chromium(url)
+        except Exception:
+            raw, title = "", ""
+    if not raw:
+        try:
+            req = urllib.request.Request(
+                url, headers={"User-Agent":
+                              "Mozilla/5.0 (compatible; ChatCraftBot/1.0)"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                raw = r.read(500_000).decode("utf-8", "replace")
+            m = re.search(r"<title[^>]*>(.*?)</title>", raw, re.I | re.S)
+            title = (re.sub(r"\s+", " ", _html.unescape(m.group(1))).strip()[:120]
+                    if m else "")
+        except Exception as e:
+            return "", "", str(e)[:150]
+    return _page_text(raw)[:8000], title, ""
 
 
 def run_command(cmd):
@@ -1080,7 +1131,10 @@ class Handler(BaseHTTPRequestHandler):
                 yield ev("error", {"error": err + " — see Settings > Models to add Ollama or a custom endpoint"})
                 return
 
-            advisor_id = req.get("advisor_model") or DEFAULT_ADVISOR
+            # The advisor defaults to the user's CHOSEN model — no model the
+            # user didn't pick reads the conversation. A different advisor
+            # can still be chosen explicitly in Settings.
+            advisor_id = req.get("advisor_model") or model["id"]
             advisor = find_model(advisor_id)
             advisor, adv_err = model_status(advisor)
 
@@ -1114,12 +1168,12 @@ class Handler(BaseHTTPRequestHandler):
                 advisor_usage, advisor_cost = {"in": 0, "out": 0}, 0.0
                 advisor_note = ""
                 if advisor:
-                    locator = find_model(LOCATOR_MODEL_ID)
+                    locator = find_model(locator_for(advisor_id))
                     yield step("advisor", f"Advisor review ({advisor['label']})", "run")
                     note, aerr, advisor_usage, ainfo = super_advisor_pass(
                         advisor, locator, messages, files_now)
                     am = find_model(advisor_id) or {}
-                    lm = find_model(LOCATOR_MODEL_ID) or {}
+                    lm = find_model(locator_for(advisor_id)) or {}
                     if lm and not lm.get("custom") and not lm.get("local"):
                         advisor_cost = estimate_cost(
                             lm, ainfo["locator_usage"]["in"], ainfo["locator_usage"]["out"])

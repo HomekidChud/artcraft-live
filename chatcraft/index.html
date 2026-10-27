@@ -2139,7 +2139,7 @@
                 <select id="hs-model"></select>
               </div>
               <div class="h-field">
-                <label for="hs-advisor-model">Advisor model <span class="h-val">(runs first, always)</span></label>
+                <label for="hs-advisor-model">Advisor model <span class="h-val">(runs first, always — default: your chosen model)</span></label>
                 <select id="hs-advisor-model"></select>
               </div>
               <div class="h-field">
@@ -2461,7 +2461,7 @@
   var chatState = {
     model: "claude_sonnet_5_5",
     advisorEnabled: true,
-    advisorModel: "claude_sonnet_5_5",
+    advisorModel: "", // empty = same as the chosen main model
     temperature: 0.7,
     maxTokens: 1024,
     system: ""
@@ -3089,6 +3089,12 @@
     var models = platformOnly ? MODELS.filter(function (m) { return !m.custom; }) : MODELS;
     if (isSelect) {
       menuEl.innerHTML = "";
+      if (platformOnly) {
+        var auto = document.createElement("option");
+        auto.value = "";
+        auto.textContent = "Same as main model";
+        menuEl.appendChild(auto);
+      }
       models.forEach(function (m) {
         var o = document.createElement("option");
         o.value = m.id;
@@ -3166,6 +3172,12 @@
     if (hsAdvisorModel) hsAdvisorModel.value = id;
     var st = $("#adv-status");
     if (st) {
+      if (!id) {
+        var mm = MODELS.find(function (x) { return x.id === chatState.model; });
+        st.textContent = "Always on · same as your model" +
+          (mm ? " (" + shortName(mm.label) + ")" : "");
+        return;
+      }
       var m = MODELS.find(function (x) { return x.id === id; });
       st.textContent = "Always on · " + (m ? m.label : id);
     }

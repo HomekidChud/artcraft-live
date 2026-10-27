@@ -39,6 +39,24 @@ ChatCraft is now a full agent in its cloud workspace:
 - The workspace (`chatcraft/files/`) is the agent's persistent cloud space —
   files, command cwd, and browse results all live there.
 
+## Advisor follows your model (privacy default)
+
+The advisor is a separate always-on reviewer that runs BEFORE the main
+model — by default it is now the model YOU picked (empty advisor_model
+from the UI), so no model the user didn't choose reads the conversation.
+A different advisor can still be picked in Settings. The cheap locator
+scanner follows the same family as the advisor (claude → haiku,
+gpt → nano, gemini → flash, grok → grok) for the same reason.
+
+## Browsing: headless Chromium
+
+`fetch_page` now renders pages in headless Chromium (Playwright,
+installed system-wide: `pip install playwright && python3 -m playwright
+install chromium`) so JS-rendered pages work. Any failure falls back to
+plain urllib; `CHATCRAFT_BROWSER=0` disables Chromium entirely. NOTE:
+playwright is an OPTIONAL dependency — the server stays stdlib-only and
+falls back gracefully without it.
+
 ## Cheapness policy (keep it cheap)
 
 The harness is tuned for minimal tokens per COMPLETED task:
