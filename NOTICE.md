@@ -360,15 +360,20 @@ site**, not a static page proxying a session sandbox.
 
 - **How it's published**: `publish_website(project_path=chatcraft-publish/,
   dist_path=chatcraft-publish/dist, run_command, port=8000,
-  subdomain="chatcraft")`. Static files (index.html with
+  subdomain="chatcraft1", site_id=33dcce93-e865-4849-9b8f-9e008346802e)`.
+  The requested subdomain "chatcraft" was taken by the user's OLD published
+  site (a static page whose API proxied the old session sandbox), so the
+  platform assigned **chatcraft1.pplx.app**. The old chatcraft.pplx.app can
+  be retired by the user (Unpublish button on its app card) and this site
+  republished as "chatcraft" later if wanted. Static files (index.html with
   `window.__API_BASE__ = "__PORT_8000__"` + wallpaper.jpg) are served from
-  S3; every API call goes to `https://chatcraft.pplx.app/port/8000/api/...`,
+  S3; every API call goes to `https://chatcraft1.pplx.app/port/8000/api/...`,
   which routes to the published site's own sandbox running
   `python3 server.py`. That sandbox auto-pauses when idle and resumes on
   the next request — **the backend survives the session that published it**.
 - **run_command**:
   `CHATCRAFT_HOST=0.0.0.0 CHATCRAFT_ALLOW_CMDS=0
-  CHATCRAFT_ACCESS_CODE=<secret> CHATCRAFT_ALLOWED_ORIGINS=https://chatcraft.pplx.app
+  CHATCRAFT_ACCESS_CODE=<secret> CHATCRAFT_ALLOWED_ORIGINS=https://chatcraft1.pplx.app
   python3 server.py`. The access code gates EVERY `/api/*` route
   (X-Access-Code header, constant-time) — required because the published
   backend is on the public internet and will hold the user's own provider
@@ -380,11 +385,13 @@ site**, not a static page proxying a session sandbox.
   So catalog models show "needs KEY" there until the user adds their own
   provider key: Settings → Custom models (any OpenAI- or
   Anthropic-compatible endpoint + key; e.g. a free Google AI Studio
-  Gemini key via Google's OpenAI-compatible endpoint, or their own
-  Anthropic/OpenAI key). The custom model then appears in every menu,
-  web and APK alike. `model_configured()` only checks the env var — for
-  env-keyed models set via publish `credentials` this still doesn't prove
-  the key works; the honest path is a real chat request.
+  Gemini key via Google's OpenAI-compatible endpoint — the catalog's
+  `gemini_3_1_pro` / `gemini_3_flash` entries already point at
+  `https://generativelanguage.googleapis.com/v1beta/openai` and need only
+  `GEMINI_API_KEY` in the backend env, or add the same endpoint as a
+  Custom model from the UI). The custom model then appears in every menu,
+  web and APK alike. Verified live (2026-10-27): origin-corrected mutations
+  200, no-code API calls 401, phone-pair native path 200.
 - **What still dies with the session**: only the `/computer/a` preview app
   (its `__PORT_8000__` points at the SESSION sandbox backend started with
   `run_chatcraft.py` + llm-api creds, where all catalog models work). A
