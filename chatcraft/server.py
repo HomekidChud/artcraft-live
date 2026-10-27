@@ -617,6 +617,48 @@ def cleaned_text(blocks, rc_by_block, browse_by_block=None, cmds_pending=False):
     return "\n".join(parts)
 
 
+def build_obs(cmd_log, browse_log, cap=9000):
+    """Bounded packing of tool results for the continuation: every
+    operation's identity and outcome ALWAYS ships (compact status lines);
+    output excerpts fill the remaining budget; anything left out is
+    explicitly marked with an omission note (never silently dropped)."""
+    status = []
+    for cmd, rc, out in cmd_log:
+        status.append(f"$ {cmd} — exit {rc}" if rc is not None
+                      else f"$ {cmd} — SKIPPED: {out}")
+    for url, title, body in browse_log:
+        status.append(f"[{url} — {title}]" if title is not None
+                      else f"[{url} — {str(body)[:100]}]")
+    status_text = "\n".join(status)
+    details, omitted = [], 0
+    budget = cap - len(status_text) - 600
+    for cmd, rc, out in cmd_log:
+        if rc is None:
+            continue  # skips carry no output; their status line shipped
+        details.append(f"$ {cmd}\n(exit {rc})\n{out.strip()[:1200]}")
+    for url, title, body in browse_log:
+        if title is None:
+            continue  # failures shipped as status lines
+        details.append(f"[browsed {url} — {title}]\n{body[:2500]}")
+    packed, used = [], 0
+    for d in details:
+        if used + len(d) <= budget:
+            packed.append(d)
+            used += len(d)
+        else:
+            room = budget - used
+            if room > 300:
+                packed.append(d[:room] + "\n…[excerpt truncated to fit]")
+                used = budget
+            else:
+                omitted += 1
+    note = (f"\n\n[{omitted} operation(s) had output details omitted to fit "
+            "the context — the compact status above is complete; ask to re-run "
+            "a command or read the saved browse file for the full output]"
+            if omitted else "")
+    return status_text + "\n\n" + "\n\n".join(packed) + note
+
+
 def echo_text(rtext):
     """Compact echo of a model reply for the continuation conversation:
     file contents elided (the model just wrote them), tool blocks short."""
@@ -1290,25 +1332,14 @@ class Handler(BaseHTTPRequestHandler):
                     {"role": "assistant", "content": echo_text(full_text)}]
                 rounds = 0
                 while (cmd_log or browse_log) and rounds < CONT_MAX:
-                    obs = []
-                    for cmd, rc, out in cmd_log:
-                        if rc is None:  # skipped: still honest feedback
-                            obs.append(f"[{cmd} — SKIPPED: {out}]")
-                        else:
-                            obs.append(f"$ {cmd}\n(exit {rc})\n{out.strip()[:1200]}")
-                    for url, title, body in browse_log:
-                        if title is None:
-                            obs.append(f"[browsed {url} — {str(body)[:200]}]")
-                        else:
-                            obs.append(f"[browsed {url} — {title}]\n{body[:2500]}")
+                    obs_text = build_obs(cmd_log, browse_log)
                     obs_text = ("TOOL RESULTS from the run/browse blocks in your "
                                 "reply — the platform ran them for you (skips and "
                                 "failures included). Use these results NOW to "
                                 "give the user the final, complete answer. Do "
                                 "not re-announce commands that already ran; if "
                                 "something failed or never ran and it matters, "
-                                "you may emit one new run block.\n\n"
-                                + "\n\n".join(obs))[:9000]
+                                "you may emit one new run block.\n\n" + obs_text)
                     cont_msgs.append({"role": "user", "content": obs_text})
                     rounds += 1
                     yield step("cont", f"Using tool results ({rounds}/{CONT_MAX})", "run")

@@ -305,9 +305,26 @@ def test_tool_loop_cross_round_budget():
           "SKIPPED" in obs2, True)
 
 
+def test_obs_packing():
+    """Long command outputs must not silently drop later browse results."""
+    r1 = "\n".join([f"```run\necho long{i}\n```" for i in range(4)])
+    r1 += "\n```browse\nhttps://example.com\n```"
+    calls, evs = drive_chat(
+        [(r1, "end_turn"), ("ok", "end_turn")],
+        {"model": "m1", "messages": [{"role": "user", "content": "go"}]})
+    obs = calls[1]["messages"][-1]["content"]
+    # every operation's identity + outcome ships even when excerpts are cut
+    check("packing: all 4 command statuses present",
+          all(f"echo long{i} — exit 0" in obs for i in range(4)), True)
+    check("packing: browse result survives long outputs",
+          "example.com" in obs, True)
+    check("packing: omission is explicit or nothing dropped",
+          ("omitted" in obs) or ("Example" not in obs and "PAGE" in obs), True)
+
+
 def test_truncation_note_persists():
     """A truncated reply keeps its warning even after a successful continuation."""
-    r1 = "```run\necho A\n```\npartial file, cut off"
+    r1 = "```run\necho A\n```\n```markdown notes2.md\npartial content"
     r2 = "here is the answer with A-OUT"
     calls, evs = drive_chat(
         [(r1, "max_tokens"), (r2, "end_turn")],
@@ -318,6 +335,10 @@ def test_truncation_note_persists():
           "reply hit the token limit" in finals[-1]["text"], True)
     check("truncation: final answer still present",
           "A-OUT" in finals[-1]["text"], True)
+    # the unterminated file block must NOT have been saved
+    saved_files = [d["files"] for n, d in evs if n == "done" for d in [d] if "files" in d]
+    check("truncation: partial file not saved",
+          all("notes2.md" not in (f or []) for f in saved_files), True)
 
 
 def test_tool_loop_budget():
@@ -351,6 +372,7 @@ def test_tool_loop_truncation():
 test_tool_loop_two_rounds()
 test_tool_loop_delivery()
 test_tool_loop_cross_round_budget()
+test_obs_packing()
 test_truncation_note_persists()
 test_tool_loop_budget()
 test_tool_loop_truncation()

@@ -49,8 +49,10 @@ The harness is tuned for minimal tokens per COMPLETED task:
   advisor just reads everything.
 - **Terse system prompt**: ~half the tokens of the old one; advisor brief
   capped at 50 words (one line for simple requests).
-- **History**: last 12 messages in full, no truncation — silently cutting
-  older messages would lose requirements.
+- **History**: the model and advisor see the last 12 messages in full, no
+  truncation — silently cutting older messages would lose requirements.
+  Messages older than twelve are simply unavailable to the model and the
+  advisor (the window is the whole context; there is no retrieval path).
 - **Tool feedback loop** (step 8 of `/api/chat`): execute -> observe ->
   resume, budgeted. After commands/browses run, their outputs (and fetch
   failures) are fed back to the model in a continuation so it finishes the
@@ -68,9 +70,15 @@ The harness is tuned for minimal tokens per COMPLETED task:
   returned no cache fields in usage when `cache_control` was sent.
   Currently disabled; re-verify against the proxy before relying on it.
 - Cost display per message includes locator + advisor + main +
-  continuation usage, honestly merged. Measured (identical prompt,
-  2026-10-27): a shell+browse task costs ~$0.012 total and completes in
-  one turn; a trivial "hi" costs ~$0.003.
+  continuation usage, honestly merged. Dollar figures are ESTIMATES from
+  the configured per-model rates, not verified billing. Measured
+  (identical prompt, 2026-10-27): a shell+browse task costs ~$0.012
+  total (estimated) and completes in one turn; a trivial "hi" costs
+  ~$0.003 (estimated).
+- **Tool-result packing** (`build_obs`): every operation's identity and
+  outcome always ships to the continuation as compact status lines;
+  output excerpts fill the remaining context budget; anything left out is
+  explicitly marked with an omission note, never silently dropped.
 
 ## Repo layout
 
