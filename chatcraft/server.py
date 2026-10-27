@@ -161,7 +161,7 @@ def locator_for(advisor_id):
     a = str(advisor_id or "")
     fam = a.lower()
     if fam.startswith("claude"):
-        return "claude_haiku_4_5"
+        return "claude_haiku_5_5"
     if fam.startswith("gpt"):
         return "gpt5_nano"
     if fam.startswith("gemini"):
