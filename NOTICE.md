@@ -39,6 +39,28 @@ ChatCraft is now a full agent in its cloud workspace:
 - The workspace (`chatcraft/files/`) is the agent's persistent cloud space —
   files, command cwd, and browse results all live there.
 
+## Cheapness policy (keep it cheap)
+
+The harness is tuned for minimal tokens per completed task:
+
+- **Locator bypass**: conversations of ≤3 messages with no workspace files
+  skip the locator call entirely — the advisor just reads everything.
+- **Terse system prompt**: ~half the tokens of the old one; advisor brief
+  capped at 50 words (one line for simple requests).
+- **History bound** (`bound_history`): last 6 messages verbatim, older ones
+  compressed to 400-char previews. The latest user message always survives
+  in full.
+- **Tool feedback loop** (step 8 of `/api/chat`): after commands/browses run,
+  ONE continuation call (max_tokens 512) feeds the outputs back to the model
+  so it finishes the task in the same turn — cheaper than a second user
+  turn. Bounded: never more than one continuation, and if the continuation
+  itself emits tool blocks they run but get no further model calls.
+- **No prompt caching**: the platform proxy ignores `cache_control`
+  (verified empirically — identical 1217-token requests billed full input
+  twice, no cache fields in usage). Don't bother adding it.
+- Cost display per message includes locator + advisor + main + continuation
+  usage, honestly merged.
+
 ## Repo layout
 
 - `chatcraft/index.html` — the whole frontend (single file, no build step)

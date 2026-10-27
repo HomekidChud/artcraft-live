@@ -18,6 +18,7 @@ added from the Settings view.
 
 Run:  python server.py   (serves the UI and API on http://localhost:8000)
 """
+import difflib
 import json
 import os
 import re
@@ -106,33 +107,25 @@ DEFAULT_MODEL = "claude_sonnet_5_5"
 DEFAULT_ADVISOR = "claude_sonnet_5_5"
 
 DEFAULT_SYSTEM = (
-    "You are ChatCraft, a warm, concise personal-workspace assistant. "
-    "Answer directly and helpfully. Use short paragraphs. Prefer plain language. "
-    "FILE WRITING: when the user asks you to create, write or save a file, emit its full "
-    "content as a fenced code block whose opening fence includes the language and filename, "
-    "exactly like: ```markdown notes.md\\n...content...\\n```. The platform saves that file "
-    "for the user automatically and shows it as a file card, so do NOT explain how to save "
-    "or create the file manually - just confirm it was written. "
-    "COMMANDS: when running a shell command would genuinely help (checking something, "
-    "building, testing), emit it as a fenced block starting with ```run, like: "
-    "```run\\npython script.py\\n```. The platform executes it in the workspace and shows "
-    "the output. Use commands freely - you have a full shell in the user's cloud "
-    "workspace (up to 10 commands per turn). "
-    "BROWSING: to read a web page, emit a fenced block starting with ```browse "
-    "containing just the URL, like: ```browse\\nhttps://example.com\\n```. The "
-    "platform fetches the page, saves its readable text as browse-<site>.md in "
-    "the workspace, and shows it as a file card. Use it whenever fresh web "
-    "content would help. "
-    "Only use run blocks when a command is genuinely useful; never use it for "
-    "destructive operations. Ordinary code snippets stay in plain fences with no marker."
+    "You are ChatCraft, a concise personal-workspace assistant. Answer directly, "
+    "short paragraphs, plain language.\n"
+    "FILES: to write a file, emit its full content in a fenced block whose opening "
+    "fence carries language + filename: ```markdown notes.md\\n...content...\\n``` "
+    "— the platform saves it automatically; just confirm, never explain manual saving.\n"
+    "SHELL: to run a command in the user's cloud workspace emit ```run\\n<command>\\n``` "
+    "(max 10/turn, never destructive). The platform runs it and returns the output.\n"
+    "BROWSE: to read a web page emit ```browse\\n<url>\\n``` — the platform fetches "
+    "it and saves the readable text as browse-<site>.md.\n"
+    "When tool results come back, use them to finish the answer. Ordinary code "
+    "snippets stay in plain fences with no filename or marker."
 )
 
 ADVISOR_SYSTEM = (
     "You are the Advisor: a strong reviewer that always runs before the main model. "
-    "Given the selected parts of a conversation, produce a tight brief for it: "
+    "Given the selected parts of a conversation, produce a tight brief: "
     "(1) what the user really wants, (2) pitfalls or missing context to avoid, "
-    "(3) how to make the answer high quality. Maximum 70 words. Plain text, "
-    "no preamble."
+    "(3) how to make the answer high quality. Maximum 50 words — if the request "
+    "is simple, one short line is enough. Plain text, no preamble."
 )
 
 LOCATOR_SYSTEM = (
@@ -498,9 +491,14 @@ def super_advisor_pass(advisor, locator, messages, available_files):
     usage = {"in": 0, "out": 0}
 
     # ---- stage 1: locator scans a compact index, not the conversation ----
+    # Cheap-mode rule: for a short conversation with no workspace files there
+    # is nothing to locate — the advisor just reads everything (skipping the
+    # locator call entirely saves its tokens + latency on most turns).
     sel = {"messages": [], "files": []}
     indexed = [(i, m) for i, m in enumerate(messages) if m.get("content")]
-    if locator and len(indexed) > 1:
+    use_locator = bool(locator) and (len(indexed) > 3 or bool(available_files))
+    info["locator_used"] = use_locator
+    if use_locator:
         index = [{"n": i, "role": m.get("role", "user"),
                   "preview": str(m["content"])[:120]} for i, m in indexed]
         files_idx = [f"{p.name} ({p.stat().st_size}B)" for p in available_files[:30]]
@@ -515,6 +513,9 @@ def super_advisor_pass(advisor, locator, messages, available_files):
         usage["out"] += lusage["out"]
         if not lerr and text:
             sel = parse_locator_json(text)
+    elif indexed:
+        # bypassed: short conversation, nothing to locate — read it all
+        sel["messages"] = [i for i, _ in indexed]
 
     # the latest user message is always read
     last_user = max((i for i, m in indexed if m.get("role") == "user"), default=None)
@@ -552,6 +553,46 @@ def super_advisor_pass(advisor, locator, messages, available_files):
     if not aerr and not note:
         aerr = "advisor returned an empty review"
     return note, aerr, usage, info
+
+
+def bound_history(messages, keep=6, preview=400):
+    """Cheap-mode history bound: the last `keep` messages verbatim, older
+    ones compressed to a preview, so input cost stays flat as chats grow.
+    The latest user message always survives in full (it's within `keep`)."""
+    out = [dict(m) for m in messages]
+    for i in range(max(0, len(out) - keep)):
+        c = str(out[i].get("content") or "")
+        if len(c) > preview:
+            out[i]["content"] = c[:preview] + "\n…[truncated]"
+    return out
+
+
+def cleaned_text(blocks, rc_by_block, cmds_pending=False, browsed=False):
+    """The user-facing reply: model prose kept, tool blocks replaced by
+    one-line status notes (the steps UI expands on them)."""
+    parts = []
+    for i, b in enumerate(blocks):
+        if b[0] == "text":
+            parts.append(b[1])
+        elif b[0] == "file":
+            parts.append("wrote file: " + Path(b[2]).name)
+        elif b[0] == "browse":
+            u = (b[1].splitlines() or [""])[0][:80]
+            parts.append("browsed: " + u if browsed else "(browsing " + u + "…)")
+        else:
+            c = normalize_cmd(b[1])
+            if not c:
+                continue
+            if cmds_pending:
+                parts.append("(running command…)")
+            elif i in rc_by_block:
+                rc = rc_by_block[i]
+                parts.append(f"ran: {c[:60]}" if rc == 0
+                             else f"failed (exit {rc}): {c[:60]}")
+            else:
+                parts.append("skipped: commands disabled" if not ALLOW_CMDS
+                             else f"not run (over the 10-command limit): {c[:60]}")
+    return "\n".join(parts)
 
 
 # ------------------------------------------------------------ file + command ---
@@ -946,8 +987,9 @@ class Handler(BaseHTTPRequestHandler):
                     d["detail"] = detail
                 return ev("step", d)
 
-            messages = [m for m in (req.get("messages") or [])
-                        if m.get("role") in ("user", "assistant") and m.get("content")][-12:]
+            messages = bound_history(
+                [m for m in (req.get("messages") or [])
+                 if m.get("role") in ("user", "assistant") and m.get("content")][-12:])
             if not messages:
                 yield ev("error", {"error": "no messages"})
                 return
@@ -993,8 +1035,6 @@ class Handler(BaseHTTPRequestHandler):
                 advisor_note = ""
                 if advisor:
                     locator = find_model(LOCATOR_MODEL_ID)
-                    if locator:
-                        yield step("advisor-locate", "Locating relevant parts", "run")
                     yield step("advisor", f"Advisor review ({advisor['label']})", "run")
                     note, aerr, advisor_usage, ainfo = super_advisor_pass(
                         advisor, locator, messages, files_now)
@@ -1008,7 +1048,7 @@ class Handler(BaseHTTPRequestHandler):
                             am,
                             advisor_usage["in"] - ainfo["locator_usage"]["in"],
                             advisor_usage["out"] - ainfo["locator_usage"]["out"])
-                    if locator:
+                    if ainfo.get("locator_used"):
                         loc_detail = (f"{ainfo['read_messages']}/{ainfo['total_messages']} messages"
                                       + (f", {len(ainfo['located_files'])} files"
                                          if ainfo["located_files"] else ""))
@@ -1052,146 +1092,156 @@ class Handler(BaseHTTPRequestHandler):
 
                 full_text = "".join(chunks)
 
-                # 5. extract files + commands, then show the cleaned reply.
-                # parse_blocks scans line-by-line so malformed merged fences
-                # can't swallow a later block; each block gets its OWN
-                # execution record (index -> exit code), so duplicate command
-                # strings can never borrow a sibling's result. The final
-                # `clean` event reports ran/failed/not-run honestly AFTER
-                # execution.
-                blocks = parse_blocks(full_text)
-                run_idx = [i for i, b in enumerate(blocks) if b[0] == "run"
-                           and normalize_cmd(b[1])]
-                cleaned, files = extract_files(full_text)
-                saved = []
-                if files:
-                    import difflib
-                    for f in files:
-                        sid = "file-" + Path(f["name"]).name
-                        safe = FILES_DIR / Path(f["name"]).name
-                        existed = safe.exists()
-                        old_lines = (safe.read_text(encoding="utf-8",
-                                                    errors="replace").splitlines()
-                                     if existed else [])
-                        yield step(sid, f"Writing {f['name']}", "run")
-                        safe.write_text(f["content"], encoding="utf-8")
-                        new_lines = f["content"].splitlines()
-                        adds = dels = 0
-                        if existed:
-                            for op, i1, i2, j1, j2 in difflib.SequenceMatcher(
-                                    None, old_lines, new_lines,
-                                    autojunk=False).get_opcodes():
-                                if op == "insert":
-                                    adds += j2 - j1
-                                elif op == "delete":
-                                    dels += i2 - i1
-                                elif op == "replace":
-                                    adds += j2 - j1
-                                    dels += i2 - i1
-                        rec = {"name": safe.name, "lang": f.get("lang") or "text",
-                               "size": safe.stat().st_size}
-                        if existed:
-                            rec["adds"], rec["dels"] = adds, dels
-                            label = f"Edited {safe.name} +{adds} -{dels}"
-                        else:
-                            label = f"Created {safe.name}"
-                        saved.append(rec)
-                        yield step(sid, label, "done")
-                    pre = []
-                    for b in blocks:
-                        if b[0] == "text":
-                            pre.append(b[1])
-                        elif b[0] == "file":
-                            pre.append("wrote file: " + Path(b[2]).name)
-                        elif normalize_cmd(b[1]):
-                            pre.append("(running command…)")
-                    yield ev("files", {"files": saved, "cleaned_text": "\n".join(pre)})
-
-                # 6. run commands the reply contains (max 5 per turn)
-                rc_by_block = {}  # block index -> exit code, only blocks run
-                for n_run, bi in enumerate(run_idx[:10]):
-                    cmd = normalize_cmd(blocks[bi][1])
-                    sid = f"cmd-{n_run + 1}"
-                    if not ALLOW_CMDS:
-                        yield step(sid, "Commands disabled", "skip",
-                                   "set CHATCRAFT_ALLOW_CMDS=1 to enable")
-                        continue
-                    yield step(sid, f"Running: {cmd[:60]}", "run")
-                    rc, out = run_command(cmd)
-                    first = (out.strip().splitlines() or [""])[0][:120]
-                    state = "done" if rc == 0 else "fail"
-                    label = (f"Ran: {cmd[:60]} (exit {rc})" if rc == 0
-                             else f"Failed: {cmd[:60]} (exit {rc})")
-                    yield step(sid, label, state, first)
-                    yield ev("command", {"command": cmd, "returncode": rc, "output": out[:2000]})
-                    rc_by_block[bi] = rc
-                if run_idx:
-                    parts = []
-                    for i, b in enumerate(blocks):
-                        if b[0] == "text":
-                            parts.append(b[1])
-                        elif b[0] == "file":
-                            parts.append("wrote file: " + Path(b[2]).name)
-                        elif b[0] == "browse":
-                            u = (b[1].splitlines() or [""])[0][:80]
-                            parts.append("(browsing " + u + "…)")
+                def execute_reply_tools(rtext):
+                    """Run every file/command/browse block in a model reply and
+                    stream the steps live. parse_blocks scans line-by-line so
+                    malformed merged fences can't swallow a later block; each
+                    block gets its OWN execution record (index -> exit code), so
+                    duplicate commands can never borrow a sibling's result.
+                    Returns (rc_by_block, cmd_log, browse_log, saved) so the
+                    caller can feed tool results back to the model.
+                    """
+                    blocks = parse_blocks(rtext)
+                    run_idx = [i for i, b in enumerate(blocks) if b[0] == "run"
+                               and normalize_cmd(b[1])]
+                    cleaned, files = extract_files(rtext)
+                    saved = []
+                    if files:
+                        for f in files:
+                            sid = "file-" + Path(f["name"]).name
+                            safe = FILES_DIR / Path(f["name"]).name
+                            existed = safe.exists()
+                            old_lines = (safe.read_text(encoding="utf-8",
+                                                       errors="replace").splitlines()
+                                         if existed else [])
+                            yield step(sid, f"Writing {f['name']}", "run")
+                            safe.write_text(f["content"], encoding="utf-8")
+                            new_lines = f["content"].splitlines()
+                            adds = dels = 0
+                            if existed:
+                                for op, i1, i2, j1, j2 in difflib.SequenceMatcher(
+                                        None, old_lines, new_lines,
+                                        autojunk=False).get_opcodes():
+                                    if op == "insert":
+                                        adds += j2 - j1
+                                    elif op == "delete":
+                                        dels += i2 - i1
+                                    elif op == "replace":
+                                        adds += j2 - j1
+                                        dels += i2 - i1
+                            rec = {"name": safe.name, "lang": f.get("lang") or "text",
+                                   "size": safe.stat().st_size}
+                            if existed:
+                                rec["adds"], rec["dels"] = adds, dels
+                                label = f"Edited {safe.name} +{adds} -{dels}"
+                            else:
+                                label = f"Created {safe.name}"
+                            saved.append(rec)
+                            yield step(sid, label, "done")
+                        yield ev("files", {"files": saved,
+                                           "cleaned_text": cleaned_text(
+                                               blocks, {}, cmds_pending=True)})
+                    rc_by_block, cmd_log = {}, []
+                    for n_run, bi in enumerate(run_idx[:10]):
+                        cmd = normalize_cmd(blocks[bi][1])
+                        sid = f"cmd-{n_run + 1}"
+                        if not ALLOW_CMDS:
+                            yield step(sid, "Commands disabled", "skip",
+                                       "set CHATCRAFT_ALLOW_CMDS=1 to enable")
                             continue
-                        else:
-                            c = normalize_cmd(b[1])
-                            if not c:
-                                continue
-                            if i in rc_by_block:
-                                rc = rc_by_block[i]
-                                parts.append(f"ran: {c[:60]}" if rc == 0
-                                             else f"failed (exit {rc}): {c[:60]}")
-                            else:
-                                parts.append("skipped: commands disabled" if not ALLOW_CMDS
-                                             else f"not run (over the 10-command limit): {c[:60]}")
-                    yield ev("clean", {"text": "\n".join(parts)})
+                        yield step(sid, f"Running: {cmd[:60]}", "run")
+                        rc, out = run_command(cmd)
+                        first = (out.strip().splitlines() or [""])[0][:120]
+                        state = "done" if rc == 0 else "fail"
+                        label = (f"Ran: {cmd[:60]} (exit {rc})" if rc == 0
+                                 else f"Failed: {cmd[:60]} (exit {rc})")
+                        yield step(sid, label, state, first)
+                        yield ev("command", {"command": cmd, "returncode": rc,
+                                             "output": out[:2000]})
+                        rc_by_block[bi] = rc
+                        cmd_log.append((cmd, rc, out))
+                    if run_idx:
+                        yield ev("clean", {"text": cleaned_text(blocks, rc_by_block)})
+                    browses = extract_browses(rtext)
+                    browse_log = []
+                    for n_br, url in enumerate(browses[:5]):
+                        sid = f"browse-{n_br + 1}"
+                        yield step(sid, f"Browsing {url[:70]}", "run")
+                        text_body, title, berr = fetch_page(url)
+                        if berr:
+                            yield step(sid, f"Couldn't fetch {url[:60]}", "fail", berr)
+                            continue
+                        domain = urllib.parse.urlparse(url).netloc or "page"
+                        safe_name = re.sub(r"[^\w.-]+", "-", domain)[:40] or "page"
+                        fname = f"browse-{safe_name}.md"
+                        content = (f"# {title or url}\n\nsource: {url}\n\n"
+                                  + text_body)
+                        (FILES_DIR / fname).write_text(content, encoding="utf-8")
+                        saved.append({"name": fname, "lang": "markdown",
+                                      "size": len(content)})
+                        yield ev("browse", {"url": url, "title": title,
+                                             "chars": len(text_body), "file": fname})
+                        yield step(sid, f"Browsed {domain[:40]}", "done",
+                                   f"saved {len(text_body)} chars to {fname}")
+                        browse_log.append((url, title, text_body))
+                    if browses:
+                        yield ev("clean", {"text": cleaned_text(blocks, rc_by_block,
+                                                               browsed=True)})
+                    return rc_by_block, cmd_log, browse_log, saved
 
-                # 7. browse: fetch pages the reply references (max 5 per turn)
-                browses = extract_browses(full_text)
-                for n_br, url in enumerate(browses[:5]):
-                    sid = f"browse-{n_br + 1}"
-                    yield step(sid, f"Browsing {url[:70]}", "run")
-                    text_body, title, berr = fetch_page(url)
-                    if berr:
-                        yield step(sid, f"Couldn\'t fetch {url[:60]}", "fail", berr)
-                        continue
-                    domain = urllib.parse.urlparse(url).netloc or "page"
-                    safe_name = re.sub(r"[^\w.-]+", "-", domain)[:40] or "page"
-                    fname = f"browse-{safe_name}.md"
-                    content = (f"# {title or url}\n\nsource: {url}\n\n"
-                              + text_body)
-                    (FILES_DIR / fname).write_text(content, encoding="utf-8")
-                    saved.append({"name": fname, "lang": "markdown",
-                                  "size": len(content)})
-                    yield ev("browse", {"url": url, "title": title,
-                                         "chars": len(text_body), "file": fname})
-                    yield step(sid, f"Browsed {domain[:40]}", "done",
-                               f"saved {len(text_body)} chars to {fname}")
-                if browses:
-                    parts = []
-                    for i, b in enumerate(blocks):
+                # 5-7. execute the reply's tool blocks: files, commands, browses
+                rc_by_block, cmd_log, browse_log, saved = yield from execute_reply_tools(full_text)
+
+                # 8. tool feedback: if tools ran, ONE continuation call feeds the
+                #    command outputs and page text back to the model so it can
+                #    actually finish the task with them (bounded: never more than
+                #    one extra call per turn — cheap, and it saves whole turns).
+                if cmd_log or browse_log:
+                    obs = []
+                    for cmd, rc, out in cmd_log:
+                        obs.append(f"$ {cmd}\n(exit {rc})\n{out.strip()[:1200]}")
+                    for url, title, body in browse_log:
+                        obs.append(f"[browsed {url} — {title or 'page'}]\n{body[:2500]}")
+                    obs_text = ("TOOL RESULTS from the run/browse blocks in your reply "
+                                "— the platform ran them for you. Use these results NOW "
+                                "to give the user the final, complete answer. Do not "
+                                "repeat, re-run, or re-announce them.\n\n"
+                                + "\n\n".join(obs))[:9000]
+                    # cheap echo of the model's own reply: file contents elided
+                    echo = []
+                    for b in parse_blocks(full_text):
                         if b[0] == "text":
-                            parts.append(b[1])
+                            echo.append(b[1])
                         elif b[0] == "file":
-                            parts.append("wrote file: " + Path(b[2]).name)
-                        elif b[0] == "browse":
-                            u = (b[1].splitlines() or [""])[0][:80]
-                            parts.append("browsed: " + u)
+                            echo.append(f"(wrote file {b[2]})")
                         else:
-                            c = normalize_cmd(b[1])
-                            if not c:
-                                continue
-                            if i in rc_by_block:
-                                rc = rc_by_block[i]
-                                parts.append(f"ran: {c[:60]}" if rc == 0
-                                             else f"failed (exit {rc}): {c[:60]}")
-                            else:
-                                parts.append("skipped: commands disabled" if not ALLOW_CMDS
-                                             else f"not run (over the 10-command limit): {c[:60]}")
-                    yield ev("clean", {"text": "\n".join(parts)})
+                            echo.append(b[1][:150])
+                    cont_messages = messages + [
+                        {"role": "assistant", "content": "\n".join(echo)[:6000]},
+                        {"role": "user", "content": obs_text}]
+                    yield step("cont", "Using tool results", "run")
+                    cont_chunks, cont_usage = [], {"in": 0, "out": 0}
+                    for kind, payload in model_stream(
+                            model, cont_messages, system, 512,
+                            float(req.get("temperature") or 0.7)):
+                        if kind == "text" and payload:
+                            cont_chunks.append(payload)
+                            yield ev("text", {"delta": payload})
+                        elif kind == "usage":
+                            cont_usage = payload
+                        elif kind == "model" and not reported_model:
+                            reported_model = payload
+                    yield step("cont", "Used tool results", "done")
+                    usage["in"] += cont_usage.get("in", 0)
+                    usage["out"] += cont_usage.get("out", 0)
+                    cont_text = "".join(cont_chunks)
+                    if cont_text.strip():
+                        # anything the continuation itself emitted runs too
+                        # (bounded: no further model calls after this one)
+                        crc, _, _, saved2 = yield from execute_reply_tools(cont_text)
+                        saved = saved + saved2
+                        yield ev("clean", {"text": cleaned_text(
+                            parse_blocks(cont_text), crc, browsed=True)})
 
                 custom = bool(model.get("custom"))
                 local = bool(model.get("local"))

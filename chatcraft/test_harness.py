@@ -115,3 +115,47 @@ if FAILURES:
     print(f"\n{len(FAILURES)} FAILURE(S): {FAILURES}")
     sys.exit(1)
 print("\nALL HARNESS TESTS PASS")
+
+
+# ------------------------------------------------- cheap-mode helpers ---
+
+def test_bound_history():
+    msgs = [{"role": "user", "content": "x" * 900}] * 8 + [
+        {"role": "user", "content": "keep me verbatim, I am the latest"}]
+    out = server.bound_history(msgs)
+    # older messages truncated to preview + marker, latest untouched
+    check("bound_history: old truncated",
+          len(out[0]["content"]), 400 + len("\n…[truncated]"))
+    check("bound_history: latest verbatim",
+          out[-1]["content"], "keep me verbatim, I am the latest")
+    # short conversation: nothing truncated
+    short = [{"role": "user", "content": "hi"}]
+    check("bound_history: short chat untouched", server.bound_history(short), short)
+
+
+def test_cleaned_text():
+    blocks = [("text", "prose here"),
+              ("file", "markdown", "notes.md", "content"),
+              ("run", "echo hi"),
+              ("browse", "https://example.com")]
+    check("cleaned_text: pending",
+          server.cleaned_text(blocks, {}, cmds_pending=True),
+          "prose here\nwrote file: notes.md\n(running command…)\n(browsing https://example.com…)")
+    check("cleaned_text: after commands",
+          server.cleaned_text(blocks, {2: 0}),
+          "prose here\nwrote file: notes.md\nran: echo hi\n(browsing https://example.com…)")
+    check("cleaned_text: final",
+          server.cleaned_text(blocks, {2: 1}, browsed=True),
+          "prose here\nwrote file: notes.md\nfailed (exit 1): echo hi\nbrowsed: https://example.com")
+    check("cleaned_text: not run",
+          server.cleaned_text(blocks, {}),
+          "prose here\nwrote file: notes.md\nnot run (over the 10-command limit): echo hi\n(browsing https://example.com…)")
+
+
+test_bound_history()
+test_cleaned_text()
+
+if FAILURES:
+    print(f"\n{len(FAILURES)} FAILURES")
+    sys.exit(1)
+print("ALL HARNESS TESTS PASS")
