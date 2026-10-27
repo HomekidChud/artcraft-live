@@ -344,10 +344,62 @@ the platform proxy credentials work only in the preview app.
 
 ## Known limitations
 
-- The deployed preview's backend lives in the session sandbox: a new session
-  must restart the servers (launcher + adapter + ollama) and redeploy.
+- The `/computer/a` preview app's backend lives in the session sandbox: a new
+  session must restart the servers (launcher + adapter + ollama) to make the
+  preview's models work again. The PUBLISHED site (chatcraft.pplx.app) no
+  longer has this problem — see Build 7: its backend runs in the published
+  site's own auto-resuming sandbox.
 - The proxy reports its own model names in cost captions (e.g. a request for
   `claude_sonnet_5_5` is reported as `claude_sonnet_3_5` by the provider).
+
+## Build 7 — persistent published backend (2026-10-27)
+
+The structural fix for "models work in the sandbox preview but the published
+site's backend dies": **chatcraft.pplx.app is now a FULLSTACK published
+site**, not a static page proxying a session sandbox.
+
+- **How it's published**: `publish_website(project_path=chatcraft-publish/,
+  dist_path=chatcraft-publish/dist, run_command, port=8000,
+  subdomain="chatcraft")`. Static files (index.html with
+  `window.__API_BASE__ = "__PORT_8000__"` + wallpaper.jpg) are served from
+  S3; every API call goes to `https://chatcraft.pplx.app/port/8000/api/...`,
+  which routes to the published site's own sandbox running
+  `python3 server.py`. That sandbox auto-pauses when idle and resumes on
+  the next request — **the backend survives the session that published it**.
+- **run_command**:
+  `CHATCRAFT_HOST=0.0.0.0 CHATCRAFT_ALLOW_CMDS=0
+  CHATCRAFT_ACCESS_CODE=<secret> CHATCRAFT_ALLOWED_ORIGINS=https://chatcraft.pplx.app
+  python3 server.py`. The access code gates EVERY `/api/*` route
+  (X-Access-Code header, constant-time) — required because the published
+  backend is on the public internet and will hold the user's own provider
+  key (see below). Users enter the code once in Settings (web) or in the
+  APK pairing form (it has the field; native bridge posts send it too).
+- **Models on the published backend**: the platform LLM proxy
+  (`llm-api:website` / agent-proxy.perplexity.ai) is available ONLY in
+  development sandboxes — it does NOT work in published-site sandboxes.
+  So catalog models show "needs KEY" there until the user adds their own
+  provider key: Settings → Custom models (any OpenAI- or
+  Anthropic-compatible endpoint + key; e.g. a free Google AI Studio
+  Gemini key via Google's OpenAI-compatible endpoint, or their own
+  Anthropic/OpenAI key). The custom model then appears in every menu,
+  web and APK alike. `model_configured()` only checks the env var — for
+  env-keyed models set via publish `credentials` this still doesn't prove
+  the key works; the honest path is a real chat request.
+- **What still dies with the session**: only the `/computer/a` preview app
+  (its `__PORT_8000__` points at the SESSION sandbox backend started with
+  `run_chatcraft.py` + llm-api creds, where all catalog models work). A
+  new session that wants the preview fully working must re-run the
+  "Running the backend with real models" procedure — the published site
+  no longer needs it.
+- **Persistence caveat**: the published sandbox keeps `data/` and `files/`
+  across pause/resume, but a REPUBLISH can lose them (custom models, skills,
+  tasks, automations, workspace files). Disclose this before republishing;
+  important data needs its own backup.
+- **Security fixes shipped with this build** (from the pre-publish review):
+  `do_DELETE` now checks `_origin_ok()` before ANY route (the bookmarks
+  branch previously ran before the origin check); custom-model `base_url`
+  is rejected if it points at an internal/private host (same
+  `_is_private_host` rule as `fetch_page`). 185/185 harness tests pass.
 
 ## Build 6 — advisor review fixes + phone/models readiness
 

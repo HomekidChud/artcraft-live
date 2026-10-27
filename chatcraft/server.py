@@ -2019,6 +2019,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_DELETE(self):
         if self.path.startswith("/api/") and not self._authorized():
             return self._send(401, {"error": "access code required"})
+        if not self._origin_ok():
+            return self._send(403, {"error": "cross-origin request rejected"})
         path = urllib.parse.urlparse(self.path).path
         if path == "/api/browser/bookmarks":
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -2030,12 +2032,6 @@ class Handler(BaseHTTPRequestHandler):
             BROWSER_DATA["bookmarks"].write_text(json.dumps(bms))
             return self._send(200, {"ok": True, "bookmarks": bms})
 
-        if self.path.startswith("/api/") and not self._authorized():
-            return self._send(401, {"error": "access code required"})
-
-        if not self._origin_ok():
-            return self._send(403, {"error": "cross-origin request rejected"})
-        path = urllib.parse.urlparse(self.path).path
         if path.startswith("/api/files/"):
             name = Path(urllib.parse.unquote(path.split("/api/files/")[1])).name
             fp = FILES_DIR / name
@@ -2096,6 +2092,12 @@ class Handler(BaseHTTPRequestHandler):
             m = self._body()
             if not m.get("base_url") or not m.get("model_name"):
                 return self._send(400, {"error": "base_url and model_name are required"})
+            # SSRF guard: a custom endpoint must not point at internal or
+            # private addresses the server can reach (same rule as fetch_page)
+            chost = (urllib.parse.urlparse(m["base_url"]).hostname or "").lower()
+            if chost and _is_private_host(chost):
+                return self._send(400, {"error": "refusing to save an "
+                                         "internal/private base_url"})
             models = [x for x in load_custom_models() if x["id"] != m.get("id")]
             models.append({
                 "id": m.get("id") or m["model_name"], "label": m.get("label") or m["model_name"],
