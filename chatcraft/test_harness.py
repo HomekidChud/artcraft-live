@@ -195,7 +195,8 @@ def drive_chat(scripted_replies, req):
     def fake_model_stream(m, messages, system, max_tokens, temperature):
         i = len(calls)
         calls.append({"max_tokens": max_tokens,
-                     "roles": [x["role"] for x in messages]})
+                     "roles": [x["role"] for x in messages],
+                     "messages": [dict(x) for x in messages]})
         text, fin = scripted_replies[i]
 
         def gen():
@@ -266,6 +267,59 @@ def test_tool_loop_two_rounds():
           [s["state"] for s in cont_steps], ["run", "done", "run", "done"])
 
 
+def test_tool_loop_delivery():
+    """The observations actually delivered to each model call."""
+    r1 = "```run\necho A\n```"
+    r2 = "```run\necho B\n```"
+    r3 = "final answer"
+    calls, evs = drive_chat(
+        [(r1, "end_turn"), (r2, "end_turn"), (r3, "end_turn")],
+        {"model": "m1", "messages": [
+            {"role": "user", "content": "go"}]})
+    obs1 = calls[1]["messages"][-1]["content"]
+    obs2 = calls[2]["messages"][-1]["content"]
+    ctx2 = "\n".join(str(m.get("content")) for m in calls[2]["messages"])
+    check("delivery: round 1 obs contains A-OUT", "A-OUT" in obs1, True)
+    check("delivery: round 2 obs contains B-OUT", "B-OUT" in obs2, True)
+    check("delivery: round 2 context retains A-OUT", "A-OUT" in ctx2, True)
+    check("delivery: continuation echoes the assistant reply",
+          calls[1]["messages"][1]["role"], "assistant")
+
+
+def test_tool_loop_cross_round_budget():
+    """9 commands in the first reply + 2 in the continuation = 10 run, 1 skip."""
+    r1 = "\n".join([f"```run\necho D{i}\n```" for i in range(1, 10)])
+    r2 = "```run\necho E1\n```\n```run\necho E2\n```"
+    calls, evs = drive_chat(
+        [(r1, "end_turn"), (r2, "end_turn"), ("done", "end_turn")],
+        {"model": "m1", "messages": [
+            {"role": "user", "content": "go"}]})
+    cmds = [d for n, d in evs if n == "command"]
+    check("cross-budget: exactly 10 commands run across rounds", len(cmds), 10)
+    check("cross-budget: E2 skipped (budget gone)",
+          any(d["id"].startswith("cmd-skip-")
+              for n, d in evs if n == "step"), True)
+    # round-1 obs shows 9 results; round-2 obs shows E1 result + E2 skip
+    obs2 = calls[2]["messages"][-1]["content"]
+    check("cross-budget: skip fed back to the model",
+          "SKIPPED" in obs2, True)
+
+
+def test_truncation_note_persists():
+    """A truncated reply keeps its warning even after a successful continuation."""
+    r1 = "```run\necho A\n```\npartial file, cut off"
+    r2 = "here is the answer with A-OUT"
+    calls, evs = drive_chat(
+        [(r1, "max_tokens"), (r2, "end_turn")],
+        {"model": "m1", "messages": [
+            {"role": "user", "content": "go"}]})
+    finals = [d for n, d in evs if n == "clean"]
+    check("truncation: note survives the continuation",
+          "reply hit the token limit" in finals[-1]["text"], True)
+    check("truncation: final answer still present",
+          "A-OUT" in finals[-1]["text"], True)
+
+
 def test_tool_loop_budget():
     r1 = "\n".join([f"```run\necho C{i}\n```" for i in range(1, 12)])
     calls, evs = drive_chat(
@@ -295,6 +349,9 @@ def test_tool_loop_truncation():
 
 
 test_tool_loop_two_rounds()
+test_tool_loop_delivery()
+test_tool_loop_cross_round_budget()
+test_truncation_note_persists()
 test_tool_loop_budget()
 test_tool_loop_truncation()
 

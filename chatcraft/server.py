@@ -1133,6 +1133,8 @@ class Handler(BaseHTTPRequestHandler):
 
                 full_text = "".join(chunks)
 
+                skip_seq = [0]  # turn-wide, unique skip step ids
+
                 def execute_reply_tools(rtext, cmd_budget=10,
                                        browse_budget=5, id_base=0):
                     """Run every file/command/browse block in a model reply
@@ -1211,7 +1213,8 @@ class Handler(BaseHTTPRequestHandler):
                         cmd = normalize_cmd(blocks[bi][1])
                         cmd_log.append((cmd, None,
                                        "skipped: per-turn command limit reached"))
-                        yield step(f"cmd-skip-{id_base + k}",
+                        skip_seq[0] += 1
+                        yield step(f"cmd-skip-{skip_seq[0]}",
                                   f"Skipped: {cmd[:50]} (per-turn limit)", "skip")
                     if run_idx:
                         yield ev("clean", {"text": cleaned_text(blocks, rc_by_block)})
@@ -1252,6 +1255,9 @@ class Handler(BaseHTTPRequestHandler):
                         if url:
                             browse_log.append((url, None,
                                                 "skipped: per-turn browse limit reached"))
+                            skip_seq[0] += 1
+                            yield step(f"browse-skip-{skip_seq[0]}",
+                                       f"Skipped: {url[:55]} (per-turn limit)", "skip")
                     if browse_blocks:
                         yield ev("clean", {"text": cleaned_text(
                             blocks, rc_by_block, browse_by_block)})
@@ -1272,10 +1278,14 @@ class Handler(BaseHTTPRequestHandler):
                 CONT_MAX = 2
                 last_clean = cleaned_text(parse_blocks(full_text),
                                          rc_by_block, browse_by_block)
+                truncation_notes = []
                 if finish in ("max_tokens", "length"):
-                    # the reply itself was cut off by the token limit
-                    last_clean += ("\n\n[reply hit the token limit — possibly "
-                                   "truncated; raise the reply budget to finish it]")
+                    # the reply itself was cut off by the token limit; the
+                    # note persists across the whole turn (a continuation
+                    # answering later must not silently clear it)
+                    truncation_notes.append(
+                        "[reply hit the token limit — possibly truncated; "
+                        "raise the reply budget to finish it]")
                 cont_msgs = messages + [
                     {"role": "assistant", "content": echo_text(full_text)}]
                 rounds = 0
@@ -1335,20 +1345,21 @@ class Handler(BaseHTTPRequestHandler):
                     saved = saved + saved2
                     last_clean = cleaned_text(parse_blocks(cont_text), crc, cbb)
                     if cont_finish in ("max_tokens", "length"):
-                        last_clean += ("\n\n[continuation hit the token limit — "
-                                       "possibly truncated]")
+                        truncation_notes.append(
+                            "[continuation hit the token limit — "
+                            "possibly truncated]")
                     yield ev("clean", {"text": last_clean})
                     cmd_log, browse_log = ccl, cbl
-                if finish in ("max_tokens", "length") and rounds == 0:
-                    # truncated reply, no continuation ran: surface the note
-                    yield ev("clean", {"text": last_clean})
-                else:
-                    if cmd_log or browse_log:
-                        # continuation budget reached with unsummarized results
-                        yield ev("clean", {"text": last_clean +
-                                           "\n\n[continuation budget reached — the "
-                                           "latest tool results above were not "
-                                           "summarized]"})
+                pending_notes = list(truncation_notes)
+                if cmd_log or browse_log:
+                    pending_notes.append(
+                        "[continuation budget reached — the latest tool "
+                        "results above were not summarized]")
+                if pending_notes:
+                    # one honest final display: last clean + every note that
+                    # must survive the turn (truncation, budget stop)
+                    yield ev("clean", {"text": last_clean + "\n\n" +
+                                       "\n".join(pending_notes)})
 
                 custom = bool(model.get("custom"))
                 local = bool(model.get("local"))
