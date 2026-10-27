@@ -470,7 +470,8 @@ def test_build_obs_boundaries():
 
 def test_locator_for():
     import server as srv
-    check("locator: claude family", srv.locator_for("claude_sonnet_5_5"), "claude_haiku_4_5")
+    check("locator: claude family", srv.locator_for("claude_sonnet_5_5"), "claude_haiku_5_5")
+    check("locator: claude id resolves in catalog", srv.find_model("claude_haiku_5_5") is not None, True)
     check("locator: gpt family", srv.locator_for("gpt_5_1"), "gpt5_nano")
     check("locator: gemini family", srv.locator_for("gemini_3_1_pro"), "gemini_3_flash")
     check("locator: grok family", srv.locator_for("grok_4_3"), "grok_4_3")
