@@ -136,10 +136,25 @@ The harness is tuned for minimal tokens per COMPLETED task:
 
 - `chatcraft/index.html` — the whole frontend (single file, no build step)
 - `chatcraft/server.py` — the backend (stdlib-only Python, serves UI + API on :8000)
-- `chatcraft/test_harness.py` — 150+ offline tests; run `python3 test_harness.py` after any change
+- `chatcraft/test_harness.py` — 185 offline checks; run `python3 test_harness.py` after any change
 - `chatcraft/run_chatcraft.py` — launcher: imports `server` unmodified, patches CATALOG to route anthropic-kind models to the platform Anthropic proxy and openai-kind models to the local Responses adapter (see "Running the backend with real models")
 - `chatcraft/responses_adapter.py` — chat-completions -> Responses API shim on 127.0.0.1:8004 (never forwards `temperature`)
 - `chatcraft/files/`, `chatcraft/data/` — runtime state (gitignored)
+
+## Recent changes in this repo (2026-10-27, build 5)
+
+1. **Advisor capability upgrade**: the system prompt now carries an
+   explicit CAPABILITIES & LIMITS block (tools, per-turn budgets, the
+   no-logins/no-outside-workspace/no-background-jobs rules, paused
+   automations, "never fake it" honesty rules), and the advisor brief
+   gained a CAPABILITY FIT clause — it knows the tool list and limits,
+   and must flag requests outside them plus name the closest supported
+   alternative. The advisor note is injected into the system prompt the
+   main model actually sees (harness-verified).
+2. **Harness fine-tuned**: 185 checks (was 172) — advisor capability
+   tests, advisor-note injection end-to-end, and the build-4 shared
+   features (skills/tasks/automations blocks, diffs, image validation,
+   endpoint gating).
 
 ## Recent changes in this repo (2026-10-27, build 4)
 

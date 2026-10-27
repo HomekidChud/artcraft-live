@@ -1099,8 +1099,78 @@ test_phone_chat_path()
 test_phone_chat_path()
 test_mixed_tool_budget()
 test_feature_stores()
+def test_advisor_capabilities():
+    """The advisor and system prompt teach the model its capabilities and
+    limits, so it proposes supported paths instead of guessing."""
+    import server as srv
+
+    # system prompt: capabilities block with budgets + hard limits
+    sys_text = srv.DEFAULT_SYSTEM
+    for needed in ("CAPABILITIES", "10 shell commands", "5 browser/browse",
+                   "no passwords", "start paused", "never fake"):
+        check("advisor: system mentions " + needed, needed in sys_text, True)
+
+    # advisor prompt: capability-fit brief + the tool/limit list
+    adv = srv.ADVISOR_SYSTEM
+    for needed in ("CAPABILITY FIT", "paired Android phone",
+                   "no logins/passwords", "10 shell commands",
+                   "start paused", "Maximum 60 words"):
+        check("advisor: prompt mentions " + needed, needed in adv, True)
+
+    # the advisor brief must reach the main model: run a turn with a fake
+    # advisor that flags a capability mismatch and confirm the note is
+    # injected into the system prompt the model actually sees
+    import tempfile as _tf3
+    with _tf3.TemporaryDirectory() as td:
+        srv.FILES_DIR = Path(td) / "files"
+        srv.FILES_DIR.mkdir()
+        saved = {k: getattr(srv, k) for k in ("super_advisor_pass", "model_stream",
+                                               "find_model", "model_status")}
+        seen_systems = []
+        srv.find_model = lambda mid: {"id": mid, "label": mid, "api": {}}
+        srv.model_status = lambda m: ({"id": m, "label": m, "api": {}}, None)
+
+        def fake_advisor(advisor, locator, messages, files):
+            return ("Capability flag: the user asks for email access, which "
+                    "needs logins the platform does not have — suggest the "
+                    "browser instead.", None,
+                    {"in": 0, "out": 0}, {"locator_usage": {"in": 0, "out": 0},
+                                          "locator_used": False,
+                                          "read_messages": 0,
+                                          "total_messages": 0,
+                                          "located_files": []})
+
+        def fake_model_stream(m, messages, system, max_tokens, temperature):
+            seen_systems.append(system)
+
+            def gen():
+                yield ("text", "I cannot access email logins — I can drive "
+                               "the browser to the login page though.")
+                yield ("finish", "end_turn")
+                yield ("usage", {"in": 10, "out": 5})
+                yield ("model", m["id"])
+            return gen()
+
+        srv.super_advisor_pass = fake_advisor
+        srv.model_stream = fake_model_stream
+        try:
+            class Stub:
+                def _sse(self, gen):
+                    list(gen)
+            srv.Handler._api_chat(Stub(), {
+                "model": "m", "advisor_model": "m",
+                "messages": [{"role": "user",
+                              "content": "read my gmail and summarise it"}]})
+        finally:
+            for k, v in saved.items():
+                setattr(srv, k, v)
+        check("advisor: note injected into model system",
+              any("Capability flag" in s for s in seen_systems), True)
+
+
 test_feature_endpoints()
 test_shared_features()
+test_advisor_capabilities()
 
 if FAILURES:
     print(f"\n{len(FAILURES)} FAILURES")
