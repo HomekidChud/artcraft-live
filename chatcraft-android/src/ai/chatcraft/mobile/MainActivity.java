@@ -39,11 +39,24 @@ public class MainActivity extends Activity {
         SharedPreferences prefs = prefs();
         String base = prefs.getString("base_url", "");
         if (base.isEmpty()) showPairing(null);
-        else showWeb(base);
+        else showWeb(uiUrl(base));
     }
 
     private SharedPreferences prefs() {
         return getSharedPreferences("chatcraft", MODE_PRIVATE);
+    }
+
+    /** The URL to show in the WebView: for a hosted deployment the API
+     *  lives under /port/NNN — the actual UI is the site root. */
+    static String uiUrl(String base) {
+        try {
+            java.net.URL u = new java.net.URL(base);
+            String p = u.getPath();
+            if (p != null && p.matches("/port/\\d+"))
+                return u.getProtocol() + "://" + u.getHost()
+                        + (u.getPort() > 0 && u.getPort() != 443 && u.getPort() != 80 ? ":" + u.getPort() : "") + "/";
+        } catch (Exception ignored) { }
+        return base;
     }
 
     private void showWeb(String base) {
@@ -123,28 +136,52 @@ public class MainActivity extends Activity {
             toast("The server URL must start with http:// or https://");
             return;
         }
-        if (!base.contains("://") || base.endsWith("/")) { /* keep as typed */ }
-        final String baseN = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        // Accept the full pair URL shown on the Phone page — the app
+        // appends /api/phone/pair itself, so strip it if pasted.
+        final String PAIR_PATH = "/api/phone/pair";
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        if (base.endsWith(PAIR_PATH))
+            base = base.substring(0, base.length() - PAIR_PATH.length());
+        final String baseN = base;
         final String nameF = name.isEmpty() ? android.os.Build.MODEL : name;
         final String codeF = accessCode == null ? "" : accessCode.trim();
         new Thread(new Runnable() {
             @Override public void run() {
                 try {
-                    String body = post(baseN + "/api/phone/pair",
-                            ("{\"name\":" + jsonStr(nameF) + "}").getBytes(StandardCharsets.UTF_8),
-                            codeF);
+                    String body;
+                    String apiBase = baseN;
+                    try {
+                        body = post(baseN + "/api/phone/pair",
+                                ("{\"name\":" + jsonStr(nameF) + "}").getBytes(StandardCharsets.UTF_8),
+                                codeF);
+                    } catch (Exception first) {
+                        // A bare site URL (no path) can't reach the backend on
+                        // hosted deployments — retry with the backend prefix.
+                        boolean bareOrigin = false;
+                        try {
+                            java.net.URL u = new java.net.URL(baseN);
+                            String p = u.getPath();
+                            bareOrigin = p == null || p.isEmpty() || p.equals("/");
+                        } catch (Exception ignored) { }
+                        if (!bareOrigin) throw first;
+                        apiBase = baseN + "/port/8000";
+                        body = post(apiBase + "/api/phone/pair",
+                                ("{\"name\":" + jsonStr(nameF) + "}").getBytes(StandardCharsets.UTF_8),
+                                codeF);
+                    }
                     String id = jsonField(body, "device_id");
                     String secret = jsonField(body, "secret");
                     if (id == null || secret == null) throw new Exception("server sent no credentials");
+                    final String useBase = apiBase;
                     final SharedPreferences.Editor ed = prefs().edit();
-                    ed.putString("base_url", baseN).putString("device_id", id)
+                    ed.putString("base_url", useBase).putString("device_id", id)
                       .putString("secret", secret).putString("access_code", codeF)
                       .apply();
                     ui.post(new Runnable() {
                         @Override public void run() {
                             toast("Paired. Now enable the ChatCraft accessibility service.");
                             startActivity(new Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                            showWeb(baseN);
+                            showWeb(uiUrl(useBase));
                         }
                     });
                 } catch (final Exception e) {
