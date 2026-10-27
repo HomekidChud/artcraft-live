@@ -20,6 +20,7 @@ Run:  python server.py   (serves the UI and API on http://localhost:8000)
 """
 import base64
 import difflib
+import hmac
 import json
 import queue
 import os
@@ -958,10 +959,34 @@ def _fetch_chromium(url):
             browser.close()
 
 
+def _is_private_host(host):
+    """True for hostnames/IPs that must not be fetched server-side
+    (loopback, private ranges, link-local, cloud metadata)."""
+    import socket, ipaddress
+    if host in ("localhost", "metadata.google.internal") or host.endswith(".local"):
+        return True
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False  # unresolvable: let the fetch fail on its own
+    for info in infos:
+        try:
+            ip = ipaddress.ip_address(info[4][0])
+            if (ip.is_private or ip.is_loopback or ip.is_link_local
+                    or ip.is_reserved or ip.is_multicast):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
 def fetch_page(url):
     """Fetch a page and extract its readable text: headless Chromium
     (JS-rendered) when Playwright is available, plain urllib otherwise.
     Returns (text, title, err)."""
+    host = (urllib.parse.urlparse(url).hostname or "").lower()
+    if host and _is_private_host(host):
+        return "", None, "refusing to fetch an internal/private address"
     import html as _html
     raw, title = "", ""
     if BROWSER_ENABLED:
@@ -1476,7 +1501,9 @@ class Handler(BaseHTTPRequestHandler):
         """True when the request carries the access code (if one is set)."""
         if not ACCESS_CODE:
             return True
-        return (self.headers.get("X-Access-Code") or "") == ACCESS_CODE
+        return hmac.compare_digest(
+            (self.headers.get("X-Access-Code") or "").encode("utf-8"),
+            ACCESS_CODE.encode("utf-8"))
 
     def do_OPTIONS(self):
         """CORS preflight for the GitHub Pages frontend (and any allowed origin)."""
