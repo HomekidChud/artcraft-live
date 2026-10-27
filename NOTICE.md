@@ -58,6 +58,12 @@ The harness is tuned for minimal tokens per COMPLETED task:
   budgets are shared across the whole turn (10 commands / 5 browses
   total, unique step ids); if the budget runs out the user sees an honest
   "[continuation budget reached]" note.
+- **Truncation honesty**: finish reasons are captured from both protocols;
+  a reply or continuation that hits the token limit gets an explicit
+  "[hit the token limit — possibly truncated]" note instead of silently
+  passing as complete.
+- **Skips are observations too**: over-budget commands/browses and disabled
+  commands are logged, shown as skip step rows, and fed back to the model.
 - **Prompt caching**: cache savings NOT verified — the platform proxy
   returned no cache fields in usage when `cache_control` was sent.
   Currently disabled; re-verify against the proxy before relying on it.

@@ -167,6 +167,137 @@ test_history_window()
 test_cleaned_text()
 test_echo_text()
 
+
+# ---------------------------------------------- budgeted tool loop (mocked) ---
+
+import json as _json
+
+
+def parse_sse(events):
+    out = []
+    for chunk in events:
+        name, data = None, {}
+        for line in chunk.split("\n"):
+            if line.startswith("event: "):
+                name = line[7:].strip()
+            elif line.startswith("data: "):
+                data = _json.loads(line[6:])
+        out.append((name, data))
+    return out
+
+
+def drive_chat(scripted_replies, req):
+    """Run Handler._api_chat with every model/tool call mocked. Each entry
+    of scripted_replies is (text, finish_reason) for the Nth model call."""
+    import server as srv
+    calls = []
+
+    def fake_model_stream(m, messages, system, max_tokens, temperature):
+        i = len(calls)
+        calls.append({"max_tokens": max_tokens,
+                     "roles": [x["role"] for x in messages]})
+        text, fin = scripted_replies[i]
+
+        def gen():
+            yield ("text", text)
+            yield ("finish", fin)
+            yield ("usage", {"in": 10, "out": 5})
+            yield ("model", m["id"])
+        return gen()
+
+    def fake_run_command(cmd):
+        return (0, cmd.replace("echo ", "", 1).upper() + "-OUT")
+
+    def fake_super_advisor(advisor, locator, messages, files):
+        return ("brief", None, {"in": 0, "out": 0},
+                {"locator_used": False, "total_messages": 1,
+                 "read_messages": 1, "located_files": [],
+                 "locator_usage": {"in": 0, "out": 0}})
+
+    def fake_find_model(mid):
+        return {"id": mid, "label": mid, "in": 3.0, "out": 15.0,
+                "api": {"kind": "anthropic", "model": mid,
+                        "base_url": "http://mock"}}
+
+    saved = {k: getattr(srv, k) for k in
+             ("model_stream", "run_command", "super_advisor_pass",
+              "find_model", "model_status", "fetch_page")}
+    srv.model_stream = fake_model_stream
+    srv.run_command = fake_run_command
+    srv.super_advisor_pass = fake_super_advisor
+    srv.find_model = fake_find_model
+    srv.model_status = lambda m: (m, None)
+    srv.fetch_page = lambda u: ("PAGE", "T", None)
+    events = []
+    try:
+        class Stub:
+            def _sse(self, gen):
+                events.extend(list(gen))
+        srv.Handler._api_chat(Stub(), req)
+    finally:
+        for k, v in saved.items():
+            setattr(srv, k, v)
+    return calls, parse_sse(events)
+
+
+def test_tool_loop_two_rounds():
+    r1 = "Checking.\n```run\necho A\n```"
+    r2 = "```run\necho B\n```\n"
+    r3 = "A said A-OUT; B said B-OUT. Done."
+    calls, evs = drive_chat(
+        [(r1, "end_turn"), (r2, "end_turn"), (r3, "end_turn")],
+        {"model": "m1", "messages": [
+            {"role": "user", "content": "run echo A then report"}]})
+    # three model calls: main + two continuations
+    check("loop: three model calls", len(calls), 3)
+    check("loop: continuations carry the tool obs",
+          calls[1]["roles"], ["user", "assistant", "user"])
+    cmds = [d for n, d in evs if n == "command"]
+    check("loop: each command executed once",
+          sorted(d["command"] for d in cmds), ["echo A", "echo B"])
+    finals = [d for n, d in evs if n == "clean"]
+    check("loop: final answer uses both results",
+          "A-OUT" in finals[-1]["text"] and "B-OUT" in finals[-1]["text"], True)
+    done = [d for n, d in evs if n == "done"][-1]
+    check("loop: usage merged across all calls",
+          (done["usage"]["in"], done["usage"]["out"]), (30, 15))
+    cont_steps = [d for n, d in evs if n == "step" and d["id"] == "cont"]
+    check("loop: cont steps complete honestly",
+          [s["state"] for s in cont_steps], ["run", "done", "run", "done"])
+
+
+def test_tool_loop_budget():
+    r1 = "\n".join([f"```run\necho C{i}\n```" for i in range(1, 12)])
+    calls, evs = drive_chat(
+        [(r1, "end_turn"), ("All done.", "end_turn")],
+        {"model": "m1", "messages": [
+            {"role": "user", "content": "run everything"}]})
+    check("budget: main + one continuation", len(calls), 2)
+    cmds = [d for n, d in evs if n == "command"]
+    check("budget: exactly 10 commands run", len(cmds), 10)
+    finals = [d for n, d in evs if n == "clean"]
+    check("budget: 11th command labelled not-run",
+          any("not run (per-turn limit reached)" in d["text"] for d in finals), True)
+    skip_rows = [d for n, d in evs if n == "step"
+                 and d["id"].startswith("cmd-skip-")]
+    check("budget: skip row shown in steps", len(skip_rows), 1)
+
+
+def test_tool_loop_truncation():
+    calls, evs = drive_chat(
+        [("cut off mid", "max_tokens")],
+        {"model": "m1", "messages": [
+            {"role": "user", "content": "hello"}]})
+    check("truncation: no tools, no continuation", len(calls), 1)
+    finals = [d for n, d in evs if n == "clean"]
+    check("truncation: honest note in reply",
+          "reply hit the token limit" in finals[-1]["text"], True)
+
+
+test_tool_loop_two_rounds()
+test_tool_loop_budget()
+test_tool_loop_truncation()
+
 if FAILURES:
     print(f"\n{len(FAILURES)} FAILURES")
     sys.exit(1)

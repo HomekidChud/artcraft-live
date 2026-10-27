@@ -315,6 +315,7 @@ def stream_openai_compat(api, messages, system, max_tokens, temperature, api_key
     usage = {"in": 0, "out": 0}
     got_text = False
     reported = None
+    finish = None
     try:
         for ev in http_sse(base.rstrip("/") + "/chat/completions", body, headers):
             if ev.get("model"):
@@ -325,6 +326,9 @@ def stream_openai_compat(api, messages, system, max_tokens, temperature, api_key
                 if delta:
                     got_text = True
                     yield ("text", delta)
+                fr = choices[0].get("finish_reason")
+                if fr:
+                    finish = fr
             if ev.get("usage"):
                 usage = {"in": ev["usage"].get("prompt_tokens", 0) or 0,
                          "out": ev["usage"].get("completion_tokens", 0) or 0}
@@ -334,6 +338,8 @@ def stream_openai_compat(api, messages, system, max_tokens, temperature, api_key
         raise RuntimeError(f"provider unreachable: {str(e)[:200]}")
     if not got_text:
         raise RuntimeError("provider streamed no text (check the model name)")
+    if finish:
+        yield ("finish", finish)
     yield ("usage", usage)
     if reported:
         yield ("model", reported)
@@ -355,6 +361,7 @@ def stream_anthropic(api, messages, system, max_tokens, temperature, api_key="")
     usage = {"in": 0, "out": 0}
     got_text = False
     reported = None
+    finish = None
     try:
         for ev in http_sse(base + "/v1/messages", body, headers):
             etype = ev.get("type", "")
@@ -368,12 +375,17 @@ def stream_anthropic(api, messages, system, max_tokens, temperature, api_key="")
                     reported = msg["model"]
             elif etype == "message_delta":
                 usage["out"] = ev.get("usage", {}).get("output_tokens", 0)
+                sr = (ev.get("delta") or {}).get("stop_reason")
+                if sr:
+                    finish = sr
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"Anthropic returned HTTP {e.code}: {e.read().decode('utf-8','replace')[:200]}")
     except Exception as e:
         raise RuntimeError(f"Anthropic unreachable: {str(e)[:200]}")
     if not got_text:
         raise RuntimeError("Anthropic streamed no text (check the model name)")
+    if finish:
+        yield ("finish", finish)
     yield ("usage", usage)
     if reported:
         yield ("model", reported)
@@ -398,6 +410,7 @@ def model_stream(m, messages, system, max_tokens, temperature):
         gen = stream_openai_compat(api, messages, system, max_tokens, temperature, api_key)
     usage = {"in": 0, "out": 0}
     reported = None
+    finish = None
     for kind_, payload in gen:
         if kind_ == "text":
             yield ("text", payload)
@@ -405,9 +418,13 @@ def model_stream(m, messages, system, max_tokens, temperature):
             usage = payload
         elif kind_ == "model":
             reported = payload
+        elif kind_ == "finish":
+            finish = payload
     if usage["in"] == 0 and usage["out"] == 0:
         # no usage reported: honest rough estimate so the cost line still shows
         usage = {"in": 0, "out": 0, "estimated": True}
+    if finish:
+        yield ("finish", finish)
     yield ("usage", usage)
     if reported:
         yield ("model", reported)
@@ -1098,6 +1115,7 @@ class Handler(BaseHTTPRequestHandler):
                                f"\"{advisor_note}\" Follow the advisor's guidance where it helps.")
                 yield step("write", f"Writing reply ({model['label']})", "run")
                 chunks, usage, reported_model = [], {"in": 0, "out": 0}, None
+                finish = None
                 for kind, payload in model_stream(
                         model, messages, system,
                         int(req.get("max_tokens") or 1024),
@@ -1109,6 +1127,8 @@ class Handler(BaseHTTPRequestHandler):
                         usage = payload
                     elif kind == "model":
                         reported_model = payload
+                    elif kind == "finish":
+                        finish = payload
                 yield step("write", "Writing reply", "done")
 
                 full_text = "".join(chunks)
@@ -1174,6 +1194,7 @@ class Handler(BaseHTTPRequestHandler):
                         if not ALLOW_CMDS:
                             yield step(sid, "Commands disabled", "skip",
                                        "set CHATCRAFT_ALLOW_CMDS=1 to enable")
+                            cmd_log.append((cmd, None, "skipped: commands disabled"))
                             continue
                         yield step(sid, f"Running: {cmd[:60]}", "run")
                         rc, out = run_command(cmd)
@@ -1186,6 +1207,12 @@ class Handler(BaseHTTPRequestHandler):
                                              "output": out[:2000]})
                         rc_by_block[bi] = rc
                         cmd_log.append((cmd, rc, out))
+                    for k, bi in enumerate(run_idx[len(run_slice):]):
+                        cmd = normalize_cmd(blocks[bi][1])
+                        cmd_log.append((cmd, None,
+                                       "skipped: per-turn command limit reached"))
+                        yield step(f"cmd-skip-{id_base + k}",
+                                  f"Skipped: {cmd[:50]} (per-turn limit)", "skip")
                     if run_idx:
                         yield ev("clean", {"text": cleaned_text(blocks, rc_by_block)})
                     browse_log, browse_by_block = [], {}
@@ -1220,6 +1247,11 @@ class Handler(BaseHTTPRequestHandler):
                                    f"saved {len(text_body)} chars to {fname}")
                         browse_by_block[bi] = (True, title)
                         browse_log.append((url, title, text_body))
+                    for bi, b in browse_blocks[len(browse_slice):]:
+                        url = (b[1].splitlines() or [""])[0].strip()
+                        if url:
+                            browse_log.append((url, None,
+                                                "skipped: per-turn browse limit reached"))
                     if browse_blocks:
                         yield ev("clean", {"text": cleaned_text(
                             blocks, rc_by_block, browse_by_block)})
@@ -1240,29 +1272,37 @@ class Handler(BaseHTTPRequestHandler):
                 CONT_MAX = 2
                 last_clean = cleaned_text(parse_blocks(full_text),
                                          rc_by_block, browse_by_block)
+                if finish in ("max_tokens", "length"):
+                    # the reply itself was cut off by the token limit
+                    last_clean += ("\n\n[reply hit the token limit — possibly "
+                                   "truncated; raise the reply budget to finish it]")
                 cont_msgs = messages + [
                     {"role": "assistant", "content": echo_text(full_text)}]
                 rounds = 0
                 while (cmd_log or browse_log) and rounds < CONT_MAX:
                     obs = []
                     for cmd, rc, out in cmd_log:
-                        obs.append(f"$ {cmd}\n(exit {rc})\n{out.strip()[:1200]}")
+                        if rc is None:  # skipped: still honest feedback
+                            obs.append(f"[{cmd} — SKIPPED: {out}]")
+                        else:
+                            obs.append(f"$ {cmd}\n(exit {rc})\n{out.strip()[:1200]}")
                     for url, title, body in browse_log:
                         if title is None:
-                            obs.append(f"[browsed {url} — FAILED: {str(body)[:200]}]")
+                            obs.append(f"[browsed {url} — {str(body)[:200]}]")
                         else:
                             obs.append(f"[browsed {url} — {title}]\n{body[:2500]}")
                     obs_text = ("TOOL RESULTS from the run/browse blocks in your "
-                                "reply — the platform ran them for you. Use these "
-                                "results NOW to give the user the final, complete "
-                                "answer. Do not re-announce commands that already "
-                                "ran; if something failed or never ran and it "
-                                "matters, you may emit one new run block.\n\n"
+                                "reply — the platform ran them for you (skips and "
+                                "failures included). Use these results NOW to "
+                                "give the user the final, complete answer. Do "
+                                "not re-announce commands that already ran; if "
+                                "something failed or never ran and it matters, "
+                                "you may emit one new run block.\n\n"
                                 + "\n\n".join(obs))[:9000]
                     cont_msgs.append({"role": "user", "content": obs_text})
                     rounds += 1
                     yield step("cont", f"Using tool results ({rounds}/{CONT_MAX})", "run")
-                    cont_chunks, cont_usage = [], {"in": 0, "out": 0}
+                    cont_chunks, cont_usage, cont_finish = [], {"in": 0, "out": 0}, None
                     for kind, payload in model_stream(
                             model, cont_msgs, system, 768,
                             float(req.get("temperature") or 0.7)):
@@ -1273,14 +1313,19 @@ class Handler(BaseHTTPRequestHandler):
                             cont_usage = payload
                         elif kind == "model" and not reported_model:
                             reported_model = payload
+                        elif kind == "finish":
+                            cont_finish = payload
                     usage["in"] += cont_usage.get("in", 0)
                     usage["out"] += cont_usage.get("out", 0)
                     cont_text = "".join(cont_chunks)
                     if not cont_text.strip():
+                        yield step("cont", "Used tool results", "fail",
+                                   "continuation returned no text")
+                        cmd_log, browse_log = [], []  # results were sent, model failed
                         break
+                    yield step("cont", "Used tool results", "done")
                     cont_msgs.append({"role": "assistant", "content": cont_text[:6000]})
                     # only NEW tool results feed the next round
-                    cmd_log, browse_log = [], []
                     crc, cbb, ccl, cbl, saved2, uc2, ub2 = yield from execute_reply_tools(
                         cont_text, cmd_budget=cmd_left,
                         browse_budget=browse_left, id_base=id_base)
@@ -1289,13 +1334,21 @@ class Handler(BaseHTTPRequestHandler):
                     id_base += uc2 + ub2
                     saved = saved + saved2
                     last_clean = cleaned_text(parse_blocks(cont_text), crc, cbb)
+                    if cont_finish in ("max_tokens", "length"):
+                        last_clean += ("\n\n[continuation hit the token limit — "
+                                       "possibly truncated]")
                     yield ev("clean", {"text": last_clean})
-                if cmd_log or browse_log:
-                    # budget reached with unsummarized results: honest note
-                    yield ev("clean", {"text": last_clean +
-                                       "\n\n[continuation budget reached — the "
-                                       "latest tool results above were not "
-                                       "summarized]"})
+                    cmd_log, browse_log = ccl, cbl
+                if finish in ("max_tokens", "length") and rounds == 0:
+                    # truncated reply, no continuation ran: surface the note
+                    yield ev("clean", {"text": last_clean})
+                else:
+                    if cmd_log or browse_log:
+                        # continuation budget reached with unsummarized results
+                        yield ev("clean", {"text": last_clean +
+                                           "\n\n[continuation budget reached — the "
+                                           "latest tool results above were not "
+                                           "summarized]"})
 
                 custom = bool(model.get("custom"))
                 local = bool(model.get("local"))
