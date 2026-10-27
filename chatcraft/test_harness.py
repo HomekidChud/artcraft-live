@@ -220,15 +220,27 @@ def drive_chat(scripted_replies, req):
                 "api": {"kind": "anthropic", "model": mid,
                         "base_url": "http://mock"}}
 
+    browser_actions = []
+
+    def fake_browser_action(action, **kw):
+        browser_actions.append((action, dict(kw)))
+        if kw.get("url") == "https://fail.example":
+            return (None, "no element number 99")
+        return ({"url": kw.get("url") or "https://example.com/",
+                 "title": "Example Domain", "text": "Example text",
+                 "elements": [{"n": 1, "tag": "a", "text": "Learn more",
+                              "href": "/more"}], "shot": ""}, "")
+
     saved = {k: getattr(srv, k) for k in
              ("model_stream", "run_command", "super_advisor_pass",
-              "find_model", "model_status", "fetch_page")}
+              "find_model", "model_status", "fetch_page", "browser_action")}
     srv.model_stream = fake_model_stream
     srv.run_command = fake_run_command
     srv.super_advisor_pass = fake_super_advisor
     srv.find_model = fake_find_model
     srv.model_status = lambda m: (m, None)
     srv.fetch_page = lambda u: ("PAGE", "T", None)
+    srv.browser_action = fake_browser_action
     events = []
     try:
         class Stub:
@@ -372,6 +384,65 @@ def test_tool_loop_truncation():
 test_tool_loop_two_rounds()
 test_tool_loop_delivery()
 test_tool_loop_cross_round_budget()
+def test_browser_block_executes():
+    """A ```browser block runs, streams br steps + browser events, and the
+    result feeds the continuation round."""
+    r1 = ("```browser\ngoto https://example.com\nclick 1\n```\nlooking",
+          "stop")
+    r2 = ("The link worked.", "stop")
+    calls, evs = drive_chat([r1, r2],
+                            {"model": "m", "advisor_model": "",
+                             "messages": [{"role": "user",
+                                           "content": "open example.com"}]})
+    ids = [d.get("id") for n, d in evs if n == "step"]
+    check("browser: both actions ran as br steps", "br-1" in ids and "br-2" in ids, True)
+    bev = [d for n, d in evs if n == "browser"]
+    check("browser: SSE browser event per action", len(bev), 2)
+    check("browser: event carries url+title",
+          bool(bev and bev[0].get("url") and bev[0].get("title")), True)
+    # the continuation round must see the compact state
+    obs = calls[1]["messages"][-1]["content"]
+    check("browser: continuation sees page state",
+          "Example Domain" in obs and "Learn more" in obs, True)
+    check("browser: model called twice (continuation)", len(calls), 2)
+
+
+def test_browser_budget_and_failure():
+    """Over-budget browser lines are skipped; failures are honest."""
+    lines = "\n".join(f"click {i}" for i in range(1, 7))  # 6 actions, budget 5
+    r1 = (f"```browser\n{lines}\n```", "stop")
+    r2 = ("done", "stop")
+    calls, evs = drive_chat([r1, r2],
+                            {"model": "m", "advisor_model": "",
+                             "messages": [{"role": "user",
+                                           "content": "click things"}]})
+    skips = [d for n, d in evs if n == "step" and d.get("id", "").startswith("br-skip")]
+    check("browser: 6th action skipped by budget", len(skips), 1)
+
+    r1 = ("```browser\ngoto https://fail.example\n```", "stop")
+    calls, evs = drive_chat([r1, r2],
+                            {"model": "m", "advisor_model": "",
+                             "messages": [{"role": "user",
+                                           "content": "open a bad page"}]})
+    fails = [d for n, d in evs if n == "step"
+             and d.get("state") == "fail" and d.get("id", "").startswith("br-")]
+    check("browser: failure surfaces as failed step", len(fails), 1)
+    obs = calls[1]["messages"][-1]["content"]
+    check("browser: failure fed back to model", "no element number 99" in obs, True)
+
+
+def test_browser_parse_action():
+    """Action line parsing: shapes and the unknown-action path."""
+    import server as srv
+    check("parse: goto", srv.parse_browser_action("goto https://a.b"),
+          ("goto", {"url": "https://a.b"}))
+    check("parse: click", srv.parse_browser_action("click 3"),
+          ("click", {"n": 3}))
+    check("parse: type", srv.parse_browser_action("type 2: hello"),
+          ("type", {"n": 2, "text": "hello"}))
+    check("parse: garbage is None", srv.parse_browser_action("explode now"), None)
+
+
 def test_build_obs_boundaries():
     """Long real outputs: every identity+outcome ships, cap holds, cuts marked."""
     import server as srv
@@ -468,6 +539,9 @@ test_obs_packing()
 test_truncation_note_persists()
 test_tool_loop_budget()
 test_tool_loop_truncation()
+test_browser_block_executes()
+test_browser_budget_and_failure()
+test_browser_parse_action()
 
 if FAILURES:
     print(f"\n{len(FAILURES)} FAILURES")

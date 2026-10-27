@@ -1797,6 +1797,7 @@
                 <div class="sys-row"><span class="sdot"></span><span class="sr-label">Multi-model chat</span><span class="sr-time">live</span></div>
                 <div class="sys-row"><span class="sdot"></span><span class="sr-label">Advisor pass</span><span class="sr-time">always on</span></div>
                 <div class="sys-row"><span class="sdot"></span><span class="sr-label">Files written by chat</span><span class="sr-time">live</span></div>
+                <div class="sys-row"><span class="sdot"></span><span class="sr-label">Browser agent: chat drives a real browser</span><span class="sr-time">live</span></div>
                 <div class="sys-row"><span class="sdot idle"></span><span class="sr-label">Agents & automations</span><span class="sr-time">not built yet</span></div>
                 <div class="sys-row"><span class="sdot idle"></span><span class="sr-label">Canvas, video & dashboards</span><span class="sr-time">not built yet</span></div>
               </div>
@@ -1898,13 +1899,38 @@
 
       <!-- ============ VIEW: BROWSER AGENT ============ -->
       <section class="view view-browser" aria-label="Browser agent">
-        <div class="page">
+        <div class="page page-browser">
           <div class="page-head"><h2>Browser agent</h2></div>
-          <div class="card">
-            <div class="run-top"><h3>Not built yet</h3><span class="status-badge st-queue">Planned</span></div>
-            <p class="sandbox-sub">A browser the agent can drive, with bookmarks and history on the side, is planned. Chat is the live way to work today.</p>
+          <div class="browser-wrap">
+            <aside class="browser-side">
+              <div class="bs-group">
+                <h4>Bookmarks</h4>
+                <ul id="bm-list" class="bs-list"></ul>
+              </div>
+              <div class="bs-group">
+                <h4>History</h4>
+                <ul id="bh-list" class="bs-list"></ul>
+              </div>
+            </aside>
+            <div class="browser-main">
+              <div class="browser-bar">
+                <button id="br-back" class="br-btn" title="Back">&#8592;</button>
+                <input id="br-url" class="br-input" placeholder="Type a URL or search" aria-label="URL">
+                <button id="br-go" class="br-btn br-go">Go</button>
+                <button id="br-star" class="br-btn" title="Bookmark this page">&#9734;</button>
+              </div>
+              <div id="br-notice" class="br-notice hidden"></div>
+              <div class="browser-preview card">
+                <div class="br-head">
+                  <span id="br-title" class="br-title">Not browsing yet</span>
+                  <span id="br-cur" class="br-cur"></span>
+                </div>
+                <img id="br-shot" class="br-shot hidden" alt="Page preview">
+                <pre id="br-text" class="br-text hidden"></pre>
+                <div id="br-els" class="br-els"></div>
+              </div>
+            </div>
           </div>
-
         </div>
       </section>
 
@@ -2484,6 +2510,157 @@
   var usage = { msgs: 0, cost: 0 };
   var MODELS = [];
 
+  // ------------------------------------------------------- browser agent ---
+  function brNotice(msg, ok) {
+    var n = document.getElementById("br-notice");
+    if (!n) return;
+    if (!msg) { n.classList.add("hidden"); n.textContent = ""; return; }
+    n.classList.remove("hidden");
+    n.classList.toggle("ok", !!ok);
+    n.textContent = msg;
+  }
+
+  function brRender(state) {
+    var t = document.getElementById("br-title");
+    var c = document.getElementById("br-cur");
+    var shot = document.getElementById("br-shot");
+    var txt = document.getElementById("br-text");
+    var els = document.getElementById("br-els");
+    if (!t) return;
+    if (!state) {
+      t.textContent = "Not browsing yet";
+      c.textContent = "";
+      shot.classList.add("hidden"); txt.classList.add("hidden");
+      els.innerHTML = "";
+      return;
+    }
+    t.textContent = state.title || state.url;
+    c.textContent = state.url || "";
+    if (state.shot) {
+      shot.src = "data:image/jpeg;base64," + state.shot;
+      shot.classList.remove("hidden");
+    } else shot.classList.add("hidden");
+    if (state.text) {
+      txt.textContent = state.text.slice(0, 2000);
+      txt.classList.remove("hidden");
+    } else txt.classList.add("hidden");
+    els.innerHTML = "";
+    (state.elements || []).forEach(function (e) {
+      var b = document.createElement("button");
+      b.className = "br-el";
+      var n = document.createElement("span");
+      n.className = "n"; n.textContent = e.n;
+      b.appendChild(n);
+      b.appendChild(document.createTextNode((e.text || e.href || e.tag).slice(0, 40)));
+      b.title = (e.tag || "") + " " + (e.href || e.text || "");
+      b.onclick = function () { brAct("click", { n: e.n }); };
+      els.appendChild(b);
+    });
+    var u = document.getElementById("br-url");
+    if (u && state.url) u.value = state.url;
+  }
+
+  function brRefresh() {
+    apiFetch(API_BASE + "/api/browser/state").then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.err) brNotice(d.err);
+        else brRender(d.state);
+      }).catch(function () { brNotice("Backend unreachable"); });
+    brSidebars();
+  }
+
+  function brSidebars() {
+    apiFetch(API_BASE + "/api/browser/bookmarks").then(function (r) { return r.json(); })
+      .then(function (d) { brRenderList("bm-list", d.bookmarks, true); })
+      .catch(function () {});
+    apiFetch(API_BASE + "/api/browser/history").then(function (r) { return r.json(); })
+      .then(function (d) { brRenderList("bh-list", d.history, false); })
+      .catch(function () {});
+  }
+
+  function brRenderList(ulId, items, deletable) {
+    var ul = document.getElementById(ulId);
+    if (!ul) return;
+    ul.innerHTML = "";
+    (items || []).slice(0, 12).forEach(function (it) {
+      var li = document.createElement("li");
+      var open = document.createElement("button");
+      open.className = "bk-open";
+      open.textContent = it.title || it.url;
+      open.title = it.url;
+      open.onclick = function () { brGo(it.url); };
+      li.appendChild(open);
+      if (deletable) {
+        var del = document.createElement("button");
+        del.className = "bk-del"; del.textContent = "\u00d7"; del.title = "Remove bookmark";
+        del.onclick = function () {
+          apiFetch(API_BASE + "/api/browser/bookmarks?url=" + encodeURIComponent(it.url),
+                   { method: "DELETE" }).then(function () { brSidebars(); });
+        };
+        li.appendChild(del);
+      }
+      ul.appendChild(li);
+    });
+    if (!(items || []).length) {
+      var li = document.createElement("li");
+      li.style.opacity = ".5";
+      li.textContent = deletable ? "No bookmarks yet" : "No history yet";
+      ul.appendChild(li);
+    }
+  }
+
+  function brAct(action, kw) {
+    var body = { action: action };
+    if (kw) Object.assign(body, kw);
+    brNotice("Working…", true);
+    apiFetch(API_BASE + "/api/browser/action", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.err) brNotice(d.err);
+        else { brNotice(""); brRender(d.state); brSidebars(); }
+      }).catch(function () { brNotice("Backend unreachable"); });
+  }
+
+  function brGo(url) {
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    brAct("goto", { url: url });
+  }
+
+  (function brInit() {
+    var go = document.getElementById("br-go");
+    var input = document.getElementById("br-url");
+    var back = document.getElementById("br-back");
+    var star = document.getElementById("br-star");
+    if (go) go.onclick = function () { brGo(input.value.trim()); };
+    if (input) input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") brGo(input.value.trim());
+    });
+    if (back) back.onclick = function () { brAct("back"); };
+    if (star) star.onclick = function () {
+      var cur = document.querySelector("#v-browser:checked") &&
+                document.getElementById("br-cur");
+      var url = cur ? cur.textContent.trim() : "";
+      if (!url) { brNotice("Open a page first"); return; }
+      var title = (document.getElementById("br-title").textContent || "") || url;
+      apiFetch(API_BASE + "/api/browser/bookmarks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: url, title: title })
+      }).then(function () { brNotice("Bookmarked", true); brSidebars(); })
+        .catch(function () { brNotice("Backend unreachable"); });
+    };
+    // refresh whenever the Browser view becomes active
+    document.querySelectorAll("input[name='view']").forEach(function (r) {
+      r.addEventListener("change", function () {
+        if (r.id === "v-browser") brRefresh();
+      });
+    });
+  })();
+
   var whoSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.1 6.3L20 10l-5.9 1.7L12 18l-2.1-6.3L4 10l5.9-1.7L12 2z"/></svg>';
 
   function activeConversation() {
@@ -2671,6 +2848,49 @@
     if (host && host.parentNode) host.parentNode.insertBefore(chip, host);
     scrollThread();
   }
+
+  /* -------------------------------------------------- browser agent --- */
+  .page-browser { max-width: 1080px; }
+  .browser-wrap { display: grid; grid-template-columns: 220px 1fr; gap: 14px; }
+  .browser-side { display: flex; flex-direction: column; gap: 14px; }
+  .bs-group { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px; padding: 12px; }
+  .bs-group h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; opacity: .6; margin: 0 0 8px; }
+  .bs-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .bs-list li { display: flex; align-items: center; gap: 6px; }
+  .bs-list .bk-open { flex: 1; min-width: 0; text-align: left; background: none; border: 0;
+    color: inherit; font-size: 13px; padding: 4px 6px; border-radius: 8px; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bs-list .bk-open:hover { background: rgba(255,255,255,.07); }
+  .bs-list .bk-del { background: none; border: 0; color: #c77; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 6px; }
+  .bs-list .bk-del:hover { background: rgba(200,80,80,.2); }
+  .browser-main { min-width: 0; }
+  .browser-bar { display: flex; gap: 8px; margin-bottom: 10px; }
+  .br-btn { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); color: inherit;
+    border-radius: 10px; padding: 0 12px; cursor: pointer; font-size: 14px; }
+  .br-btn:hover { background: rgba(255,255,255,.13); }
+  .br-btn.br-go { font-weight: 600; }
+  .br-input { flex: 1; min-width: 0; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.1);
+    border-radius: 10px; padding: 8px 12px; color: inherit; font-size: 14px; }
+  .br-input:focus { outline: 1px solid #8b6bd6; }
+  .br-notice { font-size: 13px; padding: 8px 10px; border-radius: 10px; margin-bottom: 10px;
+    background: rgba(200,80,80,.15); border: 1px solid rgba(200,80,80,.35); }
+  .br-notice.ok { background: rgba(80,200,120,.12); border-color: rgba(80,200,120,.35); }
+  .browser-preview { padding: 12px; }
+  .br-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+  .br-title { font-weight: 600; }
+  .br-cur { font-size: 12px; opacity: .6; word-break: break-all; }
+  .br-shot { width: 100%; border-radius: 10px; border: 1px solid rgba(255,255,255,.08); margin-bottom: 10px; }
+  .br-text { font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    max-height: 260px; overflow: auto; margin: 0 0 10px; opacity: .85; }
+  .br-els { display: flex; flex-wrap: wrap; gap: 6px; }
+  .br-el { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); border-radius: 8px;
+    font-size: 12px; padding: 4px 9px; cursor: pointer; color: inherit; max-width: 240px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .br-el:hover { background: rgba(139,107,214,.25); border-color: rgba(139,107,214,.5); }
+  .br-el .n { color: #8b6bd6; font-weight: 700; margin-right: 4px; }
+  .br-notice.hidden, .br-shot.hidden, .br-text.hidden { display: none; }
+  @media (max-width: 760px) { .browser-wrap { grid-template-columns: 1fr; } }
 
   /* ---------- files: cards, viewer, browser ---------- */
   function fmtSize(n) {
@@ -2951,6 +3171,9 @@
               fullText += data.delta;
               txtEl.appendChild(document.createTextNode(data.delta));
               scrollThread();
+            } else if (ev === "browser" && data.url) {
+              // chat drove the shared browser: refresh the Browser view live
+              if (document.querySelector("#v-browser:checked")) brRefresh();
             } else if (ev === "command" && data.command) {
               if (!shell) {
                 shell = buildAiShell();

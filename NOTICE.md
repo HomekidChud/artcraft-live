@@ -55,6 +55,30 @@ Two precise details:
 - so the honest claim is: only your chosen model and (for the cheap scan)
   its same-family sibling ever read the conversation
 
+## Browser agent (driving a real browser)
+
+The agent can now DRIVE a browser, not just read pages:
+
+- In chat: ```browser blocks (one action per line — `goto <url>`,
+  `click <n>`, `type <n> <text>`, `scroll <down|up|down_bottom>`, `back`).
+  The model sees a fresh page snapshot after every action: URL, title,
+  first 3KB of text, up to 40 numbered interactive elements, and a JPEG
+  screenshot. Shares the 5-action browse budget per turn.
+- Playwright runs in a dedicated worker thread (the HTTP server is
+  single-threaded sync — the browser blocks must never block it). The
+  browser page is one persistent session, so you can navigate in the
+  UI and the model picks up from where you are.
+- Live "Browser agent" view: URL bar (back / go / star), preview
+  (screenshot + page text + numbered elements — click one to click it
+  in the page), History and Bookmarks sidebars (persisted in
+  `browser-history.json` / `browser-bookmarks.json` in the data dir).
+  Chat-driven actions emit SSE `browser` events and the view refreshes
+  live while you're in it.
+- Agent actions run un-gated (no action whitelist) — treat the
+  workspace sandbox as the security boundary; the browser shares the
+  sandbox's network position. Works without Playwright too: the state
+  API falls back to a plain urllib fetch of the current URL.
+
 ## Browsing: headless Chromium (read-only)
 
 `fetch_page` renders pages in headless Chromium (Playwright, installed

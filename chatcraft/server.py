@@ -18,8 +18,10 @@ added from the Settings view.
 
 Run:  python server.py   (serves the UI and API on http://localhost:8000)
 """
+import base64
 import difflib
 import json
+import queue
 import os
 import re
 import subprocess
@@ -116,6 +118,11 @@ DEFAULT_SYSTEM = (
     "(max 10/turn, never destructive). The platform runs it and returns the output.\n"
     "BROWSE: to read a web page emit ```browse\\n<url>\\n``` — the platform fetches "
     "it and saves the readable text as browse-<site>.md.\n"
+    "BROWSER: to drive a real browser (click links, fill forms), emit a "
+    "```browser block with ONE ACTION PER LINE: goto <url>, click <n>, "
+    "type <n>: <text>, scroll up|down, back. Each action returns the page "
+    "state with numbered elements (numbered from 1) — chain actions across "
+    "lines using those numbers.\n"
     "When tool results come back, use them to finish the answer. Ordinary code "
     "snippets stay in plain fences with no filename or marker."
 )
@@ -609,6 +616,10 @@ def cleaned_text(blocks, rc_by_block, browse_by_block=None, cmds_pending=False):
             parts.append(b[1])
         elif b[0] == "file":
             parts.append("wrote file: " + Path(b[2]).name)
+        elif b[0] == "browser":
+            blines = b[1].splitlines() or [""]
+            parts.append("browser: " + blines[0][:60]
+                         + ("…" if len(blines) > 1 else ""))
         elif b[0] == "browse":
             u = (b[1].splitlines() or [""])[0][:80]
             if browse_by_block is None:
@@ -635,7 +646,7 @@ def cleaned_text(blocks, rc_by_block, browse_by_block=None, cmds_pending=False):
     return "\n".join(parts)
 
 
-def build_obs(cmd_log, browse_log, cap=9000):
+def build_obs(cmd_log, browse_log, browser_log=None, cap=9000):
     """Bounded packing of tool results for the continuation: every
     operation's identity and outcome ALWAYS ships (compact status lines);
     output excerpts fill the remaining budget; anything left out is
@@ -649,6 +660,9 @@ def build_obs(cmd_log, browse_log, cap=9000):
         u = str(url)[:100]
         status.append(f"[{u} — {title}]" if title is not None
                       else f"[{u} — {str(body)[:100]}]")
+    for line, ok, detail in (browser_log or []):
+        status.append(f"browser {str(line).strip()[:80]} — "
+                      + ("ok" if ok else f"FAILED: {str(detail)[:60]}"))
     status_text = "\n".join(status)
     if len(status_text) > cap - 800:
         status_text = (status_text[:cap - 800]
@@ -663,6 +677,9 @@ def build_obs(cmd_log, browse_log, cap=9000):
         if title is None:
             continue  # failures shipped as status lines
         details.append(f"[browsed {url} — {title}]\n{body[:2500]}")
+    for line, ok, detail in (browser_log or []):
+        if ok:
+            details.append(f"[browser {str(line).strip()[:60]} →\n{detail}]")
     packed, used = [], 0
     for d in details:
         if used + len(d) <= budget:
@@ -727,6 +744,7 @@ def parse_blocks(text):
         ln = lines[i]
         run_open = re.match(r"^```run[ \t]*$", ln, re.I)
         browse_open = re.match(r"^```browse[ \t]*$", ln, re.I)
+        browser_open = re.match(r"^```browser[ \t]*$", ln, re.I)
         file_open = re.match(
             r"^```([\w+#-]*)[ \t]*:?[ \t]*([\w./-]+\.[\w+#-]+)[ \t]*$", ln)
         bare_open = re.match(r"^```([\w+#-]*)[ \t]*$", ln)
@@ -761,6 +779,21 @@ def parse_blocks(text):
                 continue
             flush()
             blocks.append(("browse", "\n".join(url).strip()))
+            i = j + 1
+            continue
+        if browser_open:
+            j = i + 1
+            acts = []
+            while j < n and not lines[j].strip().startswith("```"):
+                acts.append(lines[j])
+                j += 1
+            if j >= n:
+                # unterminated: keep as text, never run partial actions
+                cur.append(ln)
+                i += 1
+                continue
+            flush()
+            blocks.append(("browser", "\n".join(acts).strip()))
             i = j + 1
             continue
         if file_open:
@@ -926,6 +959,176 @@ def fetch_page(url):
     return _page_text(raw)[:8000], title, ""
 
 
+# ------------------------------------------------------------ browser agent ---
+# The agent-driven browser: ONE shared headless-Chromium page. Playwright's
+# sync API requires every call to happen in the thread that started it, so
+# all page operations run on a dedicated worker via a queue.
+
+BROWSER_ENABLED = os.environ.get("CHATCRAFT_BROWSER", "1") not in ("0", "false", "no")
+_browser_q = queue.Queue()
+_browser_thread = None
+BROWSER_DATA = {"history": DATA_DIR / "browser-history.json",
+                "bookmarks": DATA_DIR / "browser-bookmarks.json"}
+
+
+def _load_json(path, default):
+    try:
+        return json.loads(path.read_text())
+    except Exception:
+        return default
+
+
+def _browser_worker():
+    import playwright.sync_api as pw_api
+    with pw_api.sync_playwright() as pw:
+        browser = pw.chromium.launch(headless=True)
+        page = browser.new_page(
+            user_agent="Mozilla/5.0 (compatible; ChatCraftBot/1.0)")
+        while True:
+            job, rq = _browser_q.get()
+            if job is None:
+                break
+            try:
+                rq.put(("ok", job(page)))
+            except Exception as e:
+                rq.put(("err", str(e)[:200]))
+            _browser_q.task_done()
+
+
+def _browser_call(fn):
+    """Run fn(page) on the browser thread. Returns (ok, value_or_error)."""
+    global _browser_thread
+    if not BROWSER_ENABLED:
+        return (False, "browser disabled (CHATCRAFT_BROWSER=0)")
+    if _browser_thread is None or not _browser_thread.is_alive():
+        _browser_thread = threading.Thread(target=_browser_worker, daemon=True)
+        _browser_thread.start()
+    rq = queue.Queue(maxsize=1)
+    _browser_q.put((fn, rq))
+    try:
+        return rq.get(timeout=60)
+    except queue.Empty:
+        return (False, "browser action timed out")
+
+
+def _page_snapshot(page):
+    """The state the UI and the model both consume after each action."""
+    els = []
+    try:
+        nodes = page.query_selector_all("a, button, input, textarea, select")
+    except Exception:
+        nodes = []
+    for n, el in enumerate(nodes[:40], start=1):
+        try:
+            txt = (el.inner_text() or el.get_attribute("value")
+                   or el.get_attribute("placeholder") or "").strip()[:60]
+            href = el.get_attribute("href") or ""
+            if txt or href:
+                els.append({"n": n, "tag": (el.evaluate("e => e.tagName.toLowerCase()")
+                                           or "?"), "text": txt, "href": href})
+        except Exception:
+            continue
+    try:
+        shot = base64.b64encode(
+            page.screenshot(type="jpeg", quality=70)).decode()
+    except Exception:
+        shot = ""
+    try:
+        content, title, url = page.content()[:500_000], (page.title() or ""), page.url
+    except Exception:
+        content, title, url = "", "", ""
+    return {"url": url, "title": title[:120],
+            "text": _page_text(content)[:3000], "elements": els, "shot": shot}
+
+
+def _browser_record(url, title):
+    try:
+        hist = _load_json(BROWSER_DATA["history"], [])
+        hist = ([{"url": url, "title": (title or "")[:100], "at": time.time()}]
+                + [h for h in hist if h.get("url") != url])[:50]
+        BROWSER_DATA["history"].write_text(json.dumps(hist))
+    except Exception:
+        pass
+
+
+def browser_action(action, **kw):
+    """One browser action on the shared session. Returns (state, err)."""
+    def op(page):
+        if action == "goto":
+            url = kw.get("url", "")
+            if not url.startswith(("http://", "https://")):
+                url = "https://" + url
+            page.goto(url, timeout=20000, wait_until="domcontentloaded")
+            try:
+                page.wait_for_load_state("networkidle", timeout=5000)
+            except Exception:
+                pass
+            _browser_record(page.url, page.title())
+        elif action == "click":
+            els = page.query_selector_all("a, button, input, textarea, select")
+            if not (1 <= kw["n"] <= len(els)):
+                raise ValueError("no element number %d" % kw["n"])
+            els[kw["n"] - 1].click(timeout=10000)
+            try:
+                page.wait_for_load_state("networkidle", timeout=5000)
+            except Exception:
+                pass
+        elif action == "type":
+            els = page.query_selector_all("a, button, input, textarea, select")
+            if not (1 <= kw["n"] <= len(els)):
+                raise ValueError("no element number %d" % kw["n"])
+            els[kw["n"] - 1].fill(kw.get("text", ""))
+        elif action == "scroll":
+            page.mouse.wheel(0, kw.get("dy", 600))
+        elif action == "back":
+            page.go_back()
+        try:
+            _browser_record(page.url, page.title())
+        except Exception:
+            pass
+        return _page_snapshot(page)
+    tag, val = _browser_call(op)
+    return (val, "") if tag == "ok" else (None, str(val)[:150])
+
+
+def browser_state():
+    """Current snapshot, or (None, reason) when the session never started."""
+    if not BROWSER_ENABLED:
+        return None, "browser disabled"
+    tag, val = _browser_call(lambda page: _page_snapshot(page))
+    return (val, "") if tag == "ok" else (None, str(val)[:150])
+
+
+def parse_browser_action(line):
+    """One action line from a ```browser block:
+    goto <url> | click <n> | type <n>: <text> | scroll up|down | back"""
+    line = line.strip()
+    m = re.match(r"^goto\s+(\S+)$", line, re.I)
+    if m:
+        return ("goto", {"url": m.group(1)})
+    m = re.match(r"^click\s+(\d+)$", line, re.I)
+    if m:
+        return ("click", {"n": int(m.group(1))})
+    m = re.match(r"^type\s+(\d+)\s*:\s*(.*)$", line, re.I)
+    if m:
+        return ("type", {"n": int(m.group(1)), "text": m.group(2)})
+    if re.match(r"^back$", line, re.I):
+        return ("back", {})
+    m = re.match(r"^scroll\s+(up|down)$", line, re.I)
+    if m:
+        return ("scroll", {"dy": -600 if m.group(1).lower() == "up" else 600})
+    return None
+
+
+def _compact_browser_state(state):
+    """Compact state summary the model reads after each browser action."""
+    els = "; ".join(f"[{e['n']}] {e['tag']} '{e['text'][:40]}'"
+                    + (f" -> {e['href'][:60]}" if e["href"] else "")
+                    for e in state["elements"][:25])
+    return (f"url={state['url']} title={state['title']!r}\n"
+            f"text: {state['text'][:1200]}\nelements: {els or 'none'}")
+
+
 def run_command(cmd):
     """Run one command inside the workspace. Returns (returncode, output)."""
     try:
@@ -1053,6 +1256,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, {"error": "no such file"})
             return self._send(200, {"name": name, "content": fp.read_text(encoding="utf-8"),
                                     "size": fp.stat().st_size})
+        if path == "/api/browser/state":
+            state, err = browser_state()
+            return self._send(200, {"state": state, "err": err})
+        if path == "/api/browser/history":
+            return self._send(200, {"history": _load_json(
+                BROWSER_DATA["history"], [])})
+        if path == "/api/browser/bookmarks":
+            return self._send(200, {"bookmarks": _load_json(
+                BROWSER_DATA["bookmarks"], [])})
         if path == "/api/custom-models":
             return self._send(200, {"models": [
                 {k: v for k, v in m.items() if k != "api_key"} | {"custom": True}
@@ -1060,6 +1272,19 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(404, {"error": "not found"})
 
     def do_DELETE(self):
+        if self.path.startswith("/api/") and not self._authorized():
+            return self._send(401, {"error": "access code required"})
+        path = urllib.parse.urlparse(self.path).path
+        if path == "/api/browser/bookmarks":
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            url = (q.get("url") or [""])[0]
+            if not url:
+                return self._send(400, {"error": "url required"})
+            bms = [x for x in _load_json(BROWSER_DATA["bookmarks"], [])
+                   if x.get("url") != url]
+            BROWSER_DATA["bookmarks"].write_text(json.dumps(bms))
+            return self._send(200, {"ok": True, "bookmarks": bms})
+
         if self.path.startswith("/api/") and not self._authorized():
             return self._send(401, {"error": "access code required"})
 
@@ -1085,6 +1310,25 @@ class Handler(BaseHTTPRequestHandler):
         if not self._origin_ok():
             return self._send(403, {"error": "cross-origin request rejected"})
         path = urllib.parse.urlparse(self.path).path
+        if path == "/api/browser/action":
+            b = self._body()
+            if b.get("action") not in ("goto", "click", "type",
+                                       "scroll", "back"):
+                return self._send(400, {"error": "unknown browser action"})
+            state, err = browser_action(
+                b["action"], url=b.get("url", ""), n=int(b.get("n", 0)),
+                text=b.get("text", ""), dy=int(b.get("dy", 600)))
+            return self._send(200, {"state": state, "err": err})
+        if path == "/api/browser/bookmarks":
+            b = self._body()
+            if not b.get("url"):
+                return self._send(400, {"error": "url required"})
+            bms = [x for x in _load_json(BROWSER_DATA["bookmarks"], [])
+                   if x.get("url") != b["url"]]
+            bms.insert(0, {"url": b["url"], "title": (b.get("title") or "")[:100],
+                          "at": time.time()})
+            BROWSER_DATA["bookmarks"].write_text(json.dumps(bms[:200]))
+            return self._send(200, {"ok": True, "bookmarks": bms})
         if path == "/api/custom-models":
             m = self._body()
             if not m.get("base_url") or not m.get("model_name"):
@@ -1365,11 +1609,48 @@ class Handler(BaseHTTPRequestHandler):
                     if browse_blocks:
                         yield ev("clean", {"text": cleaned_text(
                             blocks, rc_by_block, browse_by_block)})
+                    # browser: drive the shared Chromium session (shares the
+                    # browse budget: 5 actions per turn, one action per line)
+                    browser_log = []
+                    browser_blocks = [(i, b) for i, b in enumerate(blocks)
+                                      if b[0] == "browser"]
+                    for bi, b in browser_blocks:
+                        act_lines = [l for l in b[1].splitlines() if l.strip()]
+                        block_budget = browse_budget
+                        for line in act_lines[:max(0, browse_budget)]:
+                            browse_budget -= 1
+                            act = parse_browser_action(line)
+                            if act is None:
+                                browser_log.append((line, None, "unknown action"))
+                                continue
+                            skip_seq[0] += 1
+                            sid = f"br-{skip_seq[0]}"
+                            yield step(sid, f"Browser: {line.strip()[:60]}", "run")
+                            state, err = browser_action(act[0], **act[1])
+                            if err:
+                                yield step(sid, f"Browser failed: {line.strip()[:45]}",
+                                          "fail", err)
+                                browser_log.append((line, None, err))
+                                continue
+                            yield step(sid, f"Browser: {line.strip()[:60]}", "done",
+                                       state["title"][:60])
+                            browser_log.append(
+                                (line, True, _compact_browser_state(state)))
+                            yield ev("browser", {"action": line.strip()[:80],
+                                                 "url": state["url"],
+                                                 "title": state["title"]})
+                        for line in act_lines[max(0, block_budget):]:
+                            browser_log.append((line, None,
+                                               "skipped: per-turn browser budget"))
+                            skip_seq[0] += 1
+                            yield step(f"br-skip-{skip_seq[0]}",
+                                      f"Skipped: {line.strip()[:45]} (limit)", "skip")
                     return (rc_by_block, browse_by_block, cmd_log, browse_log,
-                            saved, len(run_slice), len(browse_slice))
+                            browser_log, saved, len(run_slice), len(browse_slice))
 
                 # 5-7. execute the reply's tool blocks (budgets shared per turn)
-                rc_by_block, browse_by_block, cmd_log, browse_log, saved, uc, ub = \
+                (rc_by_block, browse_by_block, cmd_log, browse_log,
+                 browser_log, saved, uc, ub) = \
                     yield from execute_reply_tools(full_text)
                 cmd_left, browse_left, id_base = 10 - uc, 5 - ub, uc + ub
 
@@ -1393,8 +1674,8 @@ class Handler(BaseHTTPRequestHandler):
                 cont_msgs = messages + [
                     {"role": "assistant", "content": echo_text(full_text)}]
                 rounds = 0
-                while (cmd_log or browse_log) and rounds < CONT_MAX:
-                    obs_text = build_obs(cmd_log, browse_log)
+                while (cmd_log or browse_log or browser_log) and rounds < CONT_MAX:
+                    obs_text = build_obs(cmd_log, browse_log, browser_log)
                     obs_text = ("TOOL RESULTS from the run/browse blocks in your "
                                 "reply — the platform ran them for you (skips and "
                                 "failures included). Use these results NOW to "
@@ -1424,12 +1705,13 @@ class Handler(BaseHTTPRequestHandler):
                     if not cont_text.strip():
                         yield step("cont", "Used tool results", "fail",
                                    "continuation returned no text")
-                        cmd_log, browse_log = [], []  # results were sent, model failed
+                        cmd_log, browse_log, browser_log = [], [], []
                         break
                     yield step("cont", "Used tool results", "done")
                     cont_msgs.append({"role": "assistant", "content": cont_text[:6000]})
                     # only NEW tool results feed the next round
-                    crc, cbb, ccl, cbl, saved2, uc2, ub2 = yield from execute_reply_tools(
+                    (crc, cbb, ccl, cbl, cbrl, saved2,
+                     uc2, ub2) = yield from execute_reply_tools(
                         cont_text, cmd_budget=cmd_left,
                         browse_budget=browse_left, id_base=id_base)
                     cmd_left -= uc2
@@ -1442,7 +1724,7 @@ class Handler(BaseHTTPRequestHandler):
                             "[continuation hit the token limit — "
                             "possibly truncated]")
                     yield ev("clean", {"text": last_clean})
-                    cmd_log, browse_log = ccl, cbl
+                    cmd_log, browse_log, browser_log = ccl, cbl, cbrl
                 pending_notes = list(truncation_notes)
                 if cmd_log or browse_log:
                     pending_notes.append(
