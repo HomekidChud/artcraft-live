@@ -257,3 +257,27 @@ Measured (real runs, estimates from configured rates):
 | Plugin marketplace | not built | A curated directory + install protocol; custom model endpoints are the live integration today |
 
 Everything else that was on this list is now live (see the top of this file).
+
+## Published deployment (chatcraftpllx.pplx.app)
+
+- The app is published to `https://chatcraftpllx.pplx.app` (public). The
+  backend is reached under the `/port/8000/` prefix — the site does not
+  auto-route `/api/` paths, so native clients (the APK) must use
+  `https://chatcraftpllx.pplx.app/port/8000` as their server URL.
+- The published instance runs hardened: an access code is required
+  (fail-closed launcher), shell commands are disabled, access-code checks
+  are constant-time, and ```browse fetches refuse internal/private hosts.
+- Phone pairing on the published site was verified end-to-end via the
+  native contract: POST /api/phone/pair (register), GET /api/phone/poll
+  (long-poll commands), POST /api/phone/result (report outcome), and
+  GET /api/phone/devices (device list + latest screen state).
+- APK pairing now accepts any URL form: the full pair URL shown on the
+  Phone page, the `/port/8000` base, or a bare site URL (auto-retried
+  with the backend prefix). After pairing, the WebView shows the site UI
+  rather than the raw API root.
+- Known limitation: the published sandbox has no LLM credential proxy,
+  so models show "needs API key" until you add your own key in
+  Settings → Custom models (or use your own API endpoint). Phone
+  bridging, files, projects, and all non-LLM features work.
+- Data (chats, files, usage log) lives in the published sandbox's
+  filesystem and is not guaranteed to survive a republish.
