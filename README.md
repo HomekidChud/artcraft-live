@@ -22,6 +22,7 @@ Hosted on GitHub Pages, one path per app:
 | FigCraft | Interface design and prototyping | [/figcraft/](https://homekidchud.github.io/artcraft-live/figcraft/) |
 | UnityCraft | Unity Hub + Editor-style 3D workspace reconstruction | [/unitycraft/](https://homekidchud.github.io/artcraft-live/unitycraft/) |
 | RobloxCraft | Roblox player reconstruction (launcher + playable world) | [/robloxcraft/](https://homekidchud.github.io/artcraft-live/robloxcraft/) |
+| VideoCraft | Draw, build 3D scenes, create characters and animate on a keyframe timeline | [/videocraft/](https://homekidchud.github.io/artcraft-live/videocraft/) |
 | PlaneCraft | Plane project-management reconstruction (work items, cycles, modules, views, pages) | [/planecraft/](https://homekidchud.github.io/artcraft-live/planecraft/) |
 | EditCraft | Full text editor with a Claude AI panel (rich text, Markdown, code, find & replace, snippets, sandboxes, agent teams) | [/editcraft/](https://homekidchud.github.io/artcraft-live/editcraft/) |
 | AirplaneCraft | Owner-supplied flight simulator — workshop airframe builder and open-world flying (v17.2) | [/airplanecraft/](https://homekidchud.github.io/artcraft-live/airplanecraft/) |
