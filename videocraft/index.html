@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VideoCraft — Movie Studio</title>
+<title>VideoCraft — 3D Movie Studio</title>
 <meta name="description" content="VideoCraft: draw, build 3D scenes, create characters and turn them into full movies with shots, camera moves, audio and video export — a free browser studio from the ArtCraft family.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%23f2b25c'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e05d5d'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%234fb3a4'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%23c77b9e'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -225,6 +225,21 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
 #playbar { display: flex; align-items: center; gap: var(--space-2); }
 #playbar .time { font-size: var(--text-xs); color: var(--text-muted); min-width: 74px; font-variant-numeric: tabular-nums; }
 #rec-status { font-size: var(--text-xs); color: var(--accent-2); }
+#actor-tools { display: flex; flex-direction: column; gap: var(--space-2); }
+.studio-select { width: 100%; min-width: 0; text-align: left; }
+.rig-badge { color: var(--accent-3); font-size: var(--text-xs); line-height: 1.5; }
+details.studio-details { border-block: 1px solid var(--line); padding-block: var(--space-2); }
+details.studio-details summary { cursor: pointer; font-size: var(--text-xs); padding-block: var(--space-1); }
+.joint-editor { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }
+#main { grid-template-rows: auto minmax(0, 1fr); }
+#topbar { flex-wrap: wrap; min-height: 48px; padding-block: var(--space-2); }
+#anim-side { min-height: 0; }
+#ws-anim.active { grid-template-columns: 240px minmax(0, 1fr); }
+#anim-viewport, #scene-viewport { min-width: 0; min-height: 0; }
+#scene-props input, #scene-props select { min-width: 0; }
+#tl-head { min-height: 32px; }
+#timeline { grid-template-rows: 32px minmax(0, 1fr); }
+.tl-track-label, #tl-track-labels, .shot-chip, .shot-chip .t { font-size: 12px; }
 #timeline {
   grid-column: 1 / 3; background: var(--panel); border-top: 1px solid var(--line-soft);
   display: grid; grid-template-rows: 26px 1fr; min-height: 0;
@@ -276,6 +291,7 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
 #tl-tracks { width: 158px; flex: none; border-right: 1px solid var(--line-soft); overflow: hidden; background: var(--panel); }
 #tl-track-labels { height: 26px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; padding: 0 var(--space-2); font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
 #tl-track-list { overflow-y: auto; overflow-x: hidden; }
+#tl-track-list { height: calc(100% - 26px); }
 .tl-track-label {
   height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 var(--space-2);
   font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; border-bottom: 1px solid var(--line-soft);
@@ -286,7 +302,7 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
 .tl-track-label .chip img { width: 100%; height: 100%; object-fit: contain; }
 .tl-track-label .dotmark { width: 8px; height: 8px; border-radius: 99px; background: var(--text-faint); flex: none; }
 .tl-track-label.has-keys .dotmark { background: var(--accent); }
-#tl-scroll { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; position: relative; background: var(--bg); }
+#tl-scroll { flex: 1; min-width: 0; overflow: auto; position: relative; background: var(--bg); }
 #tl-canvas-wrap { position: relative; height: 100%; min-width: 100%; }
 #tl-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
 #tl-keys { position: absolute; inset: 0; }
@@ -335,7 +351,15 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
   #topbar { flex-wrap: wrap; height: auto; min-height: 48px; padding: 8px 12px; row-gap: 6px; }
   #topbar h1 { font-size: 15px; }
   #topbar .tag, #save-state, #btn-download-video { display: none; }
+  #app { grid-template-columns: 44px minmax(0, 1fr); }
+  #main, #content { min-height: 0; }
+  #topbar { gap: var(--space-1); padding-inline: var(--space-2); }
+  #topbar .btn { padding: 5px 7px; font-size: var(--text-xs); }
+  #anim-viewport { min-height: 240px; }
+  #timeline { min-height: 220px; }
+  #anim-side, #scene-side, #scene-props { flex-shrink: 0; }
 }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
@@ -355,6 +379,7 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
       <span class="spacer"></span>
       <span id="save-state"></span>
       <button class="btn ghost" id="btn-starter">Starter scene</button>
+      <button class="btn primary" id="btn-race">3D race movie</button>
       <button class="btn ghost" id="btn-new">New</button>
       <button class="btn ghost" id="btn-open">Open</button>
       <input type="file" id="file-open" accept=".videocraft,.json" class="sr-only">
@@ -476,21 +501,64 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
             <button class="btn" id="btn-key-add">Add key</button>
             <button class="btn" id="btn-key-del">Delete key</button>
           </div>
+          <div id="key-editor" hidden>
+            <label class="side-title" for="key-time">Key time (s)</label>
+            <input class="btn studio-select" id="key-time" type="number" step="0.01" min="0">
+            <label class="side-title" for="key-value">Key value</label>
+            <input class="btn studio-select" id="key-value" type="number" step="0.1">
+          </div>
           <div class="field-row"><label for="key-ease">Easing</label></div>
           <select class="btn" id="key-ease" style="width:100%" aria-label="Key easing">
             <option value="linear">Linear</option>
             <option value="ease" selected>Smooth (ease)</option>
             <option value="step">Step (hold)</option>
           </select>
+          <div class="side-title">Actor performance</div>
+          <div id="actor-tools"></div>
+          <details class="studio-details">
+            <summary>Cinematography</summary>
+            <div class="joint-editor">
+              <label class="side-title" for="camera-preset">Camera move</label>
+              <select class="btn studio-select" id="camera-preset">
+                <option value="dolly">Dolly in</option><option value="pullback">Pull back</option>
+                <option value="orbit">Orbit subject</option><option value="crane">Crane reveal</option>
+                <option value="tracking">Track selected actor</option>
+              </select>
+              <button class="btn" id="btn-camera-preset">Apply camera move</button>
+              <label class="side-title" for="camera-lens">Lens (full-frame equivalent)</label>
+              <select class="btn studio-select" id="camera-lens">
+                <option value="24">24mm wide</option><option value="35" selected>35mm cinema</option>
+                <option value="50">50mm natural</option><option value="85">85mm portrait</option>
+              </select>
+              <button class="btn" id="btn-camera-lens">Set lens</button>
+              <label class="side-title" for="shot-lighting">Shot lighting</label>
+              <select class="btn studio-select" id="shot-lighting">
+                <option value="studio">Warm studio</option><option value="daylight">Daylight stadium</option>
+                <option value="sunset">Golden hour</option><option value="night">Blue-hour floodlights</option>
+              </select>
+              <div class="empty-note">Camera moves become editable timeline keys. Lighting is saved independently for each shot.</div>
+            </div>
+          </details>
           <div class="side-title">Audio</div>
           <button class="btn" id="btn-audio-add">+ Add audio file</button>
           <input type="file" id="file-audio" accept="audio/*" class="sr-only">
           <div id="audio-list"></div>
           <div class="side-title">Export movie</div>
+          <label class="side-title" for="export-mode">Render mode</label>
+          <select class="btn studio-select" id="export-mode">
+            <option value="offline" selected>Frame-accurate (video only)</option>
+            <option value="realtime">Real-time recording (with audio)</option>
+          </select>
           <div class="field-row"><label for="export-res">Resolution</label></div>
           <select class="btn" id="export-res" style="width:100%" aria-label="Export resolution">
-            <option value="1280">1280 × 720 (HD)</option>
-            <option value="1920">1920 × 1080 (Full HD)</option>
+            <option value="1280">1280 px wide (HD landscape)</option>
+            <option value="1920">1920 px wide (Full HD landscape)</option>
+            <option value="3840">3840 wide (4K landscape; demanding)</option>
+          </select>
+          <label class="side-title" for="export-aspect">Frame shape</label>
+          <select class="btn studio-select" id="export-aspect">
+            <option value="16:9">16:9 widescreen</option><option value="2.39:1">2.39:1 cinema</option>
+            <option value="9:16">9:16 vertical</option><option value="1:1">1:1 square</option>
           </select>
           <div class="field-row"><label for="export-quality">Quality</label></div>
           <select class="btn" id="export-quality" style="width:100%" aria-label="Export bitrate">
@@ -500,7 +568,7 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
           </select>
           <button class="btn primary" id="btn-record">Export movie (webm)</button>
           <span id="rec-status"></span>
-          <div class="empty-note">The movie exports in real time with sound — all shots, back to back. Keep the tab visible while it records.</div>
+          <div class="empty-note">Frame-accurate mode renders every frame, even on slow devices, but does not include audio yet. Choose real-time recording for sound and keep the tab visible. Both modes export all shots back to back.</div>
         </aside>
         <div id="anim-viewport"></div>
         <div id="timeline">
@@ -528,6 +596,6 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
   }
 }
 </script>
-<script type="module" src="app.js?v=0.3.5"></script>
+<script type="module" src="app.js?v=0.4.0"></script>
 </body>
 </html>

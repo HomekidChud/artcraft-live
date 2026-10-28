@@ -2,6 +2,8 @@
 // v0.2 — movie studio: shots, per-shot camera, audio, fixed-res export.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { buildAvatar } from './avatar3d.js';
+import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js';
 
 /* ============================================================
    Shared project model — a movie is a sequence of shots
@@ -13,7 +15,8 @@ function newShot(name = 'Shot 1', duration = 5) {
     id: uid('shot'), name, duration,
     sceneObjects: [],   // per-shot 3D objects (see below)
     keyframes: {},      // [sceneObjectId][channel] -> [{t, v, ease}]
-    camera: null,        // reserved: per-shot camera base (currently keys live in keyframes.__camera__)
+    camera: null,
+    lighting: 'studio',
   };
 }
 function defaultProject() {
@@ -22,6 +25,7 @@ function defaultProject() {
     version: 2,
     name: 'Untitled movie',
     fps: 30,
+    exportAspect: '16:9',
     drawings: [],        // { id, name, dataURL } raster assets (movie-wide)
     characters: [],      // character rigs (movie-wide)
     shots: [shot],
@@ -64,6 +68,7 @@ function migrateProject(data) {
   data.version = 2;
   data.name = data.name || 'Untitled movie';
   data.fps = data.fps || 30;
+  data.exportAspect = ['16:9', '2.39:1', '9:16', '1:1'].includes(data.exportAspect) ? data.exportAspect : '16:9';
   data.drawings = Array.isArray(data.drawings) ? data.drawings : [];
   data.characters = Array.isArray(data.characters) ? data.characters : [];
   data.audioAssets = Array.isArray(data.audioAssets) ? data.audioAssets : [];
@@ -74,7 +79,7 @@ function migrateProject(data) {
 // canonical serialization — shots own their scene/keyframe data; no mirror duplication
 function serializeProject() {
   return {
-    version: 2, name: project.name, fps: project.fps,
+    version: 2, name: project.name, fps: project.fps, exportAspect: project.exportAspect,
     drawings: project.drawings, characters: project.characters,
     shots: project.shots, activeShotId: project.activeShotId,
     audioAssets: project.audioAssets, audioClips: project.audioClips,
@@ -207,7 +212,7 @@ document.getElementById('project-tag').textContent = project.name;
 function applyShot(id) {
   if (moviePlaying) stopMovie();
   if (recMode) return;
-  captureCameraBase(); // remember the outgoing shot's framing
+  if (id !== project.activeShotId) captureCameraBase();
   project.activeShotId = id;
   const s = activeShot();
   project.sceneObjects = s.sceneObjects;
@@ -218,6 +223,7 @@ function applyShot(id) {
   if (!s.camera) s.camera = cameraBaseSnapshot(); // pin new shots to the current view
   applyCameraBase(s);
   syncSceneObjects();
+  evaluateAt(animTime);
   renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
   renderShotsUI(); syncShotControls(); updatePlayhead();
 }
@@ -232,15 +238,18 @@ function cameraBaseSnapshot() {
 // remember the current editor camera as the active shot's base framing
 function captureCameraBase() {
   const s = activeShot(); if (!s) return;
+  if (Object.keys(s.keyframes?.__camera__ || {}).length) return;
   s.camera = cameraBaseSnapshot();
 }
 // restore a shot's base framing (used when switching, playing back and exporting)
 function applyCameraBase(s) {
+  applyLighting(s?.lighting || 'studio');
   if (!s || !s.camera) return false;
   camera.position.fromArray(s.camera.pos);
   controls.target.fromArray(s.camera.tgt);
   camera.fov = s.camera.fov;
   camera.updateProjectionMatrix();
+  camera.lookAt(controls.target);
   return true;
 }
 // lightweight variant used mid-playback / mid-export (no UI churn)
@@ -263,6 +272,8 @@ function applyShotPlayback(id) {
   });
 }
 function syncShotControls() {
+  document.getElementById('shot-lighting').value = activeShot().lighting || 'studio';
+  document.getElementById('export-aspect').value = project.exportAspect || '16:9';
   const inp = document.getElementById('shot-duration');
   if (inp) inp.value = project.duration;
   const out = document.getElementById('shot-duration-out');
@@ -333,6 +344,7 @@ function duplicateShot() {
   const src = activeShot();
   const copy = newShot(src.name + ' copy', src.duration);
   if (src.camera) copy.camera = JSON.parse(JSON.stringify(src.camera));
+  copy.lighting = src.lighting || 'studio';
   // regenerate object ids so the copy is fully independent
   const idMap = {};
   copy.sceneObjects = src.sceneObjects.map(o => {
@@ -750,7 +762,7 @@ charCanvas.addEventListener('pointerdown', e => {
   if (best) {
     e.target.setPointerCapture(e.pointerId);
     const [px, py] = pivotPos(rig, best);
-    charDrag = { key, rig, startAngle: Math.atan2(my - py, mx - px), startRot: rig.pivots[best] };
+    charDrag = { key: best, rig, startAngle: Math.atan2(my - py, mx - px), startRot: rig.pivots[best] };
     toast('Rotating ' + PIVOTS.find(p => p[0] === best)[1].toLowerCase());
   }
 });
@@ -764,7 +776,7 @@ charCanvas.addEventListener('pointermove', e => {
   charDrag.rig.pivots[charDrag.key] = clamp(charDrag.startRot + d, -160, 160);
   drawCharPreview();
 });
-charCanvas.addEventListener('pointerup', () => { if (charDrag) { charDrag = null; markDirty(); renderSceneObjects3D(); } });
+charCanvas.addEventListener('pointerup', () => { if (charDrag) { charDrag = null; markDirty(); syncSceneObjects(); } });
 function clamp(v, a, b) { return Math.min(b, Math.max(a, v)); }
 
 function renderCharList() {
@@ -906,6 +918,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, preser
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
 sceneViewport.appendChild(renderer.domElement);
 
 const three = new THREE.Scene();
@@ -917,6 +931,9 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true; controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI / 2 - 0.02;
 controls.target.set(0, 1.2, 0);
+controls.addEventListener('end', () => {
+  if (!recMode && !moviePlaying && !playing && !dragState) { captureCameraBase(); markDirty(); }
+});
 
 // lights
 three.add(new THREE.HemisphereLight('#fff4e0', '#3a3226', 1.15));
@@ -929,6 +946,22 @@ sun.shadow.camera.right = sun.shadow.camera.top = 16;
 sun.shadow.camera.updateProjectionMatrix();
 sun.shadow.bias = -0.0004;
 three.add(sun);
+const rimLight = new THREE.DirectionalLight('#a6c9ff', 1.5);
+rimLight.position.set(-6, 5, -8);
+three.add(rimLight);
+function applyLighting(preset) {
+  const looks = {
+    studio: ['#211d18', '#ffe3b0', 1.9, '#a6c9ff', 1.1, 1.1],
+    daylight: ['#9ab9ce', '#fff2d9', 2.8, '#c7e4ff', 1.2, 1.15],
+    sunset: ['#493b47', '#ffb56b', 3.4, '#759eff', 2.3, 1.0],
+    night: ['#101b2b', '#d3e8ff', 2.1, '#70a8ff', 3.0, 0.95],
+  };
+  const [bg, key, intensity, rim, rimIntensity, exposure] = looks[preset] || looks.studio;
+  three.background.set(bg); three.fog.color.set(bg);
+  sun.color.set(key); sun.intensity = intensity;
+  rimLight.color.set(rim); rimLight.intensity = rimIntensity;
+  renderer.toneMappingExposure = exposure;
+}
 
 // ground
 const groundMat = new THREE.MeshStandardMaterial({ color: '#2b2620', roughness: 1 });
@@ -1027,13 +1060,15 @@ function build3DObject(o) {
     group.userData.redraw = () => { plane.material.map = textTexture(o.text, o.color); plane.material.needsUpdate = true; };
   } else if (o.type === 'character') {
     const rig = project.characters.find(c => c.id === o.assetId);
-    if (rig) {
+    if (rig && o.rigMode === '3d') {
+      group.add(buildAvatar(rig));
+    } else if (rig) {
       const plane = makeMesh(new THREE.PlaneGeometry(2.6, 2.6), new THREE.MeshStandardMaterial({ map: rigTexture(rig), transparent: true, side: THREE.DoubleSide, roughness: 0.85, alphaTest: 0.02 }));
       group.add(plane);
       group.userData.rigId = rig.id;
-      group.userData.redraw = () => {
+      group.userData.redraw = (poseOverride = null) => {
         const cur = project.characters.find(c => c.id === o.assetId);
-        if (cur) { plane.material.map = rigTexture(cur); plane.material.needsUpdate = true; }
+        if (cur) { plane.material.map?.dispose(); plane.material.map = rigTexture(poseOverride || cur); plane.material.needsUpdate = true; }
       };
     }
   }
@@ -1115,11 +1150,13 @@ function syncSceneObjects() {
   // add new / refresh
   project.sceneObjects.forEach(o => {
     let g = objectGroups.get(o.id);
-    const needsRebuild = !g || g.userData.builtFrom !== JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text]);
+    const signature = JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text, o.rigMode,
+      o.rigMode === '3d' ? project.characters.find(c => c.id === o.assetId) : null]);
+    const needsRebuild = !g || g.userData.builtFrom !== signature;
     if (needsRebuild) {
       if (g) { three.remove(g); disposeGroup(g); }
       g = build3DObject(o);
-      g.userData.builtFrom = JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text]);
+      g.userData.builtFrom = signature;
       objectGroups.set(o.id, g);
       three.add(g);
     }
@@ -1127,10 +1164,8 @@ function syncSceneObjects() {
     g.position.fromArray(o.pos);
     g.rotation.set(...o.rot.map(r => r * Math.PI / 180));
     g.scale.fromArray(o.scale);
-    // propagate opacity to materials (for primitives)
-    if (o.opacity !== undefined && o.opacity < 1) {
-      g.traverse(m => { if (m.material) { m.material.transparent = true; m.material.opacity = o.opacity; } });
-    }
+    g.traverse(m => { if (m.isMesh && o.castShadow === false) m.castShadow = false; });
+    setGroupOpacity(g, o.opacity ?? 1);
     if (o.type === 'character' && g.userData.redraw && g.userData.lastRigRev !== rigRevision(o.assetId)) {
       g.userData.lastRigRev = rigRevision(o.assetId);
       g.userData.redraw();
@@ -1139,8 +1174,21 @@ function syncSceneObjects() {
   updateSelectionVisuals();
 }
 // free GPU memory held by a removed group (geometries, materials, textures)
+function setGroupOpacity(group, value) {
+  if (group.userData.appliedOpacity === value) return;
+  group.userData.appliedOpacity = value;
+  group.traverse(m => {
+    if (!m.material) return;
+    for (const material of Array.isArray(m.material) ? m.material : [m.material]) {
+      const transparent = value < 1 || !!material.map;
+      if (material.transparent !== transparent) { material.transparent = transparent; material.needsUpdate = true; }
+      material.opacity = value;
+    }
+  });
+}
 function disposeGroup(g) {
   g.traverse(m => {
+    m.userData.skeleton?.dispose();
     m.geometry?.dispose?.();
     if (m.material) {
       const mats = Array.isArray(m.material) ? m.material : [m.material];
@@ -1372,7 +1420,8 @@ function addDrawingPlane(d) {
 function addCharacterObject(c) {
   const o = {
     id: uid('obj'), name: c.name, type: 'character', assetId: c.id,
-    color: '#ffffff', pos: (() => { const [x, z] = freeSpot(); return [x, 1.3, z]; })(), rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1,
+    color: '#ffffff', rigMode: '3d', motion: { clip: 'idle', speed: 1 },
+    pos: (() => { const [x, z] = freeSpot(); return [x, 0, z]; })(), rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1,
   };
   project.sceneObjects.push(o);
   syncSceneObjects();
@@ -1419,6 +1468,7 @@ function renderSceneProps() {
     ci.addEventListener('input', () => { o.color = ci.value; syncSceneObjects(); markDirty(); });
     panel.appendChild(ci);
   }
+  if (o.type === 'character') renderActorControls(panel, o);
   const t = document.createElement('div'); t.className = 'side-title'; t.textContent = 'Name';
   panel.appendChild(t);
   const nameIn = document.createElement('input'); nameIn.className = 'btn'; nameIn.style.width = '100%'; nameIn.style.textAlign = 'left';
@@ -1462,6 +1512,7 @@ function mkNum(label, arr, key, onChange, min, max, step) {
   row.append(l, out);
   const range = document.createElement('input'); range.type = 'range'; range.min = min; range.max = max; range.step = step;
   range.value = typeof key === 'number' ? arr[key] : arr[key];
+  range.setAttribute('aria-label', label);
   range.addEventListener('input', () => { onChange(+range.value); out.textContent = range.value; });
   wrap.append(row, range);
   return wrap;
@@ -1495,7 +1546,11 @@ const CAM_CHANNELS = [
   { ch: 'cam.tx', label: 'Target X' }, { ch: 'cam.ty', label: 'Target Y' }, { ch: 'cam.tz', label: 'Target Z' },
   { ch: 'cam.fov', label: 'FOV' },
 ];
-function channelsFor(o) { return o && o.type === 'camera' ? CAM_CHANNELS : CHANNELS; }
+function channelsFor(o) {
+  if (o?.type === 'camera') return CAM_CHANNELS;
+  if (o?.rigMode === '3d') return [...CHANNELS, ...JOINTS.flatMap(j => ['x', 'y', 'z'].map(a => ({ ch: 'joint.' + j + '.' + a, label: j + ' ' + a.toUpperCase() })))];
+  return CHANNELS;
+}
 function objChannelValue(o, ch, t) {
   const kfs = (project.keyframes[o.id] || {})[ch] || [];
   if (!kfs.length) return null;
@@ -1536,17 +1591,20 @@ function evaluateAt(t) {
     if (kf['scale']) { const s = sampleTrack(kf['scale'], T); g.scale.set(o.scale[0] * s, o.scale[1] * s, o.scale[2] * s); }
     else g.scale.fromArray(o.scale);
     // opacity
-    if (kf['opacity']) {
-      const v = sampleTrack(kf['opacity'], T);
-      g.traverse(m => { if (m.material) { m.material.transparent = true; m.material.opacity = v; } });
+    setGroupOpacity(g, kf.opacity ? sampleTrack(kf.opacity, T) : o.opacity ?? 1);
+    if (o.rigMode === '3d') {
+      const joints = { ...(o.joints || {}) };
+      Object.keys(kf).filter(ch => ch.startsWith('joint.')).forEach(ch => { joints[ch.slice(6)] = sampleTrack(kf[ch], T); });
+      g.children[0]?.userData.animate?.(o.motion, T, project.duration, joints, kf.pose ? sampleTrack(kf.pose, T) : null);
     }
-    // pose (character)
+    // Legacy billboard pose: clone the asset, never mutate a shared rig.
     if (kf['pose'] && g.userData.redraw) {
       const rig = project.characters.find(c => c.id === o.assetId);
       if (rig) {
         const u = sampleTrack(kf['pose'], T);
-        applyPose(rig, u);
-        g.userData.redraw();
+        const posed = { ...rig, pivots: { ...rig.pivots } };
+        applyPose(posed, u);
+        g.userData.redraw(posed);
       }
     }
   });
@@ -1577,6 +1635,11 @@ function applyPose(rig, u) {
 }
 
 function renderAnimObjectSelect() {
+  const actorPanel = document.getElementById('actor-tools');
+  actorPanel.innerHTML = '';
+  const actor = project.sceneObjects.find(o => o.id === selectedId && o.type === 'character');
+  if (actor) renderActorControls(actorPanel, actor);
+  else actorPanel.innerHTML = '<div class="empty-note">Select a character to direct its performance.</div>';
   const sel = document.getElementById('anim-object');
   sel.innerHTML = '';
   const camOp = document.createElement('option');
@@ -1600,6 +1663,14 @@ document.getElementById('anim-object').addEventListener('change', e => {
 });
 
 function renderTimeline() {
+  const trackScrollTop = tlTrackList.scrollTop;
+  const editKey = selectedKey && project.keyframes[selectedKey.id]?.[selectedKey.ch]?.[selectedKey.index];
+  document.getElementById('key-editor').hidden = !editKey;
+  if (editKey) {
+    document.getElementById('key-time').value = editKey.t;
+    document.getElementById('key-value').value = editKey.v;
+    document.getElementById('key-ease').value = editKey.ease || 'ease';
+  }
   // track list on the left
   tlTrackList.innerHTML = '';
   const o = selObj();
@@ -1625,25 +1696,29 @@ function renderTimeline() {
   const wrapW = Math.round(project.duration * pxPerSec) + 30;
   const wrapH = tlKeys.parentElement.clientHeight || 160;
   document.getElementById('tl-canvas-wrap').style.width = wrapW + 'px';
+  document.getElementById('tl-canvas-wrap').style.height = Math.max(tlScroll.clientHeight, 26 + (o ? channelsFor(o).length : 1) * 26) + 'px';
   sizeTlCanvas();
   drawTimelineCanvas();
   renderKeys();
   updatePlayhead();
+  tlTrackList.scrollTop = trackScrollTop;
 }
 // canvas covers only the visible viewport (moved + redrawn on scroll)
 function sizeTlCanvas() {
   const viewW = Math.max(1, tlScroll.clientWidth);
-  const wrapH = tlKeys.parentElement.clientHeight || 160;
+  const wrapH = tlScroll.clientHeight || 160;
   tlCanvas.width = Math.round(viewW * devicePixelRatio);
   tlCanvas.height = Math.round(wrapH * devicePixelRatio);
   tlCanvas.style.width = viewW + 'px';
   tlCanvas.style.height = wrapH + 'px';
   tlCanvas.style.left = tlScroll.scrollLeft + 'px';
+  tlCanvas.style.top = tlScroll.scrollTop + 'px';
 }
 function drawTimelineCanvas() {
   const dpr = devicePixelRatio;
   const W = tlCanvas.width / dpr, H = tlCanvas.height / dpr;
   const x0 = tlScroll.scrollLeft; // canvas left edge in wrap coordinates
+  const y0 = tlScroll.scrollTop;
   tlCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   tlCtx.clearRect(0, 0, W, H);
   // seconds grid — only the visible window, step widens automatically so labels never collide
@@ -1660,7 +1735,7 @@ function drawTimelineCanvas() {
   const o = selObj();
   if (!o) return;
   channelsFor(o).forEach((c, i) => {
-    const y = 26 + i * 26;
+    const y = 26 + i * 26 - y0;
     const kfs = (project.keyframes[o.id] || {})[c.ch] || [];
     // row bg
     tlCtx.fillStyle = selectedTrack?.ch === c.ch ? 'rgba(242,178,92,0.07)' : 'transparent';
@@ -1748,7 +1823,12 @@ function updatePlayhead() {
 let tlScrollRaf = 0;
 tlScroll.addEventListener('scroll', () => {
   tlCanvas.style.left = tlScroll.scrollLeft + 'px';
+  tlCanvas.style.top = tlScroll.scrollTop + 'px';
+  if (Math.abs(tlTrackList.scrollTop - tlScroll.scrollTop) > 1) tlTrackList.scrollTop = tlScroll.scrollTop;
   if (!tlScrollRaf) tlScrollRaf = requestAnimationFrame(() => { tlScrollRaf = 0; drawTimelineCanvas(); });
+}, { passive: true });
+tlTrackList.addEventListener('scroll', () => {
+  if (Math.abs(tlScroll.scrollTop - tlTrackList.scrollTop) > 1) tlScroll.scrollTop = tlTrackList.scrollTop;
 }, { passive: true });
 window.addEventListener('resize', () => {
   if (activeWs !== 'anim' || recMode) return;
@@ -1822,6 +1902,7 @@ document.getElementById('btn-key-add').addEventListener('click', () => {
   toast('Keyframe added at ' + animTime.toFixed(2) + 's');
 });
 function currentChannelValue(o, ch) {
+  if (ch.startsWith('joint.')) return o.joints?.[ch.slice(6)] ?? 0;
   switch (ch) {
     case 'pos.x': return o.pos[0];
     case 'pos.y': return o.pos[1];
@@ -1839,6 +1920,18 @@ function currentChannelValue(o, ch) {
     case 'cam.fov': return camera.fov;
   }
 }
+function editSelectedKey() {
+  const track = selectedKey && project.keyframes[selectedKey.id]?.[selectedKey.ch], key = track?.[selectedKey.index];
+  if (!key) return;
+  const time = +document.getElementById('key-time').value, value = +document.getElementById('key-value').value;
+  if (!Number.isFinite(time) || !Number.isFinite(value)) return;
+  key.t = clamp(time, 0, project.duration); key.v = value; key.ease = document.getElementById('key-ease').value;
+  track.sort((a, b) => a.t - b.t); selectedKey.index = track.indexOf(key);
+  evaluateAt(animTime); markDirty(); renderTimeline();
+}
+document.getElementById('key-time').addEventListener('change', editSelectedKey);
+document.getElementById('key-value').addEventListener('change', editSelectedKey);
+document.getElementById('key-ease').addEventListener('change', editSelectedKey);
 document.getElementById('btn-key-del').addEventListener('click', () => {
   if (!selectedKey) { toast('Select a keyframe diamond first'); return; }
   const kf = project.keyframes[selectedKey.id]?.[selectedKey.ch];
@@ -1873,6 +1966,7 @@ let lastFrameTs = performance.now();
 let moviePlayStart = 0, moviePlayOffset = 0; // wall-clock anchor: no drift vs audio
 function tick(now) {
   requestAnimationFrame(tick);
+  if (offlineRendering) return; // the offline renderer owns the scene and frame clock
   const dt = Math.min((now - lastFrameTs) / 1000, 0.1);
   lastFrameTs = now;
   if (moviePlaying) {
@@ -1902,7 +1996,14 @@ function tick(now) {
     updatePlayhead();
     renderKeys();
   }
-  controls.update();
+  if (activeWs === 'scene' && !playing && !moviePlaying && !recMode) evaluateAt(animTime);
+  const cameraIsAnimated = (playing || moviePlaying || recMode) && Object.keys(project.keyframes[CAMERA_ID] || {}).length;
+  controls.enabled = !recMode && !moviePlaying && !cameraIsAnimated && !dragState;
+  // A damping update can overwrite an authored camera move, so don't orbit during playback.
+  if (!moviePlaying && !recMode && !cameraIsAnimated) controls.update();
+  else camera.lookAt(controls.target);
+  grid.visible = !moviePlaying && !recMode;
+  if (moviePlaying || recMode) { gizmo.visible = false; selRing.visible = false; }
   drawAxisBadge();
   renderer.render(three, camera);
 }
@@ -2056,6 +2157,10 @@ function playMovie() {
   moviePlayOffset = globalTime();
   moviePlayStart = performance.now();
   movieTime = moviePlayOffset;
+  if (movieTime >= totalDuration() - 0.05) {
+    applyShotPlayback(project.shots[0].id); animTime = 0;
+    moviePlayOffset = 0; movieTime = 0;
+  }
   applyShotPlayback(activeShot().id); // apply this shot's base framing right away
   getAudioCtx(); // unlock audio with the user gesture
   const btn = document.getElementById('btn-movie');
@@ -2068,6 +2173,7 @@ function stopMovie() {
   const btn = document.getElementById('btn-movie');
   if (btn) { btn.textContent = 'Play movie'; btn.classList.remove('primary'); }
   renderShotsUI(); syncShotControls(); updatePlayhead();
+  renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline(); updateSelectionVisuals();
 }
 document.getElementById('btn-movie')?.addEventListener('click', () => { moviePlaying ? stopMovie() : playMovie(); });
 
@@ -2080,10 +2186,25 @@ window.addEventListener('beforeunload', e => {
    Movie export (MediaRecorder, fixed resolution, with audio)
    ============================================================ */
 const recStatus = document.getElementById('rec-status');
+const exportDisabled = new Map();
+function lockExportControls(lock) {
+  if (lock) {
+    document.querySelectorAll('button, input, select').forEach(el => {
+      if (el.id === 'btn-record') return;
+      if (!exportDisabled.has(el)) exportDisabled.set(el, el.disabled);
+      el.disabled = true;
+    });
+    document.getElementById('timeline').inert = true;
+  } else {
+    exportDisabled.forEach((disabled, el) => { el.disabled = disabled; }); exportDisabled.clear();
+    document.getElementById('timeline').inert = false;
+  }
+}
 let mediaRecorder = null, recordedChunks = [];
 let recStart = 0, recHiddenTotal = 0, recHiddenSince = 0;
 
 async function exportMovie() {
+  if (offlineRendering) { offlineCancel = true; return; }
   if (recMode) { // acts as Stop while exporting — saves what was recorded
     recStatus.textContent = 'Stopping — saving partial movie…';
     finishExport(exportRestore.shotId, exportRestore.cam);
@@ -2092,10 +2213,12 @@ async function exportMovie() {
   if (exportPreparing) { toast('Preparing the export…'); return; }
   if (exportFinalizing) { toast('Still saving the previous export…'); return; }
   if (!project.shots.length) { toast('Add a shot first'); return; }
+  if (document.getElementById('export-mode').value === 'offline') return exportOfflineMovie();
   if (!window.MediaRecorder) { toast('This browser cannot record video'); return; }
   const mimes = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
   const mime = mimes.find(m => MediaRecorder.isTypeSupported(m));
   if (!mime) { toast('No supported video format'); return; }
+  if (activeWs !== 'anim') setWorkspace('anim');
   if (moviePlaying) stopMovie();
   setPlaying(false);
   // unlock/resume audio INSIDE the click gesture, before any await
@@ -2105,7 +2228,7 @@ async function exportMovie() {
   const resSel = document.getElementById('export-res');
   const qualSel = document.getElementById('export-quality');
   const W = parseInt(resSel ? resSel.value : '1280', 10) || 1280;
-  const H = Math.round(W * 9 / 16);
+  const [, H] = exportSize(W, project.exportAspect);
   const kbps = { high: 8000, medium: 4000, low: 2500 }[qualSel ? qualSel.value : 'high'] || 8000;
 
   const ext = mime.includes('webm') ? 'webm' : 'mp4';
@@ -2117,9 +2240,11 @@ async function exportMovie() {
     animTime,
     cam: { pos: camera.position.clone(), tgt: controls.target.clone(), fov: camera.fov },
     pixelRatio: renderer.getPixelRatio(),
+    gridVisible: grid.visible,
   };
 
   exportPreparing = true; // no second export while the picker/writable is being set up
+  lockExportControls(true);
   try {
     // ask for the save file FIRST (inside the click gesture) so no movie time is lost to the dialog;
     // if the browser can't / the user cancels, we fall back to an in-memory recording + download.
@@ -2140,10 +2265,12 @@ async function exportMovie() {
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
     controls.enabled = false;
+    grid.visible = false; gizmo.visible = false; selRing.visible = false;
 
     // one video track + one mixed audio track
     const tracks = [renderer.domElement.captureStream(project.fps).getVideoTracks()[0]];
-    if (exportDest) tracks.push(exportDest.stream.getAudioTracks()[0]);
+    const hasAudio = project.audioClips.some(clip => project.audioAssets.some(asset => asset.id === clip.assetId));
+    if (exportDest && hasAudio) tracks.push(exportDest.stream.getAudioTracks()[0]);
     const stream = new MediaStream(tracks);
 
     recordedChunks = [];
@@ -2200,6 +2327,8 @@ async function exportMovie() {
       }
       savePending = false;
       exportFinalizing = false;
+      lockExportControls(false);
+      stream.getVideoTracks().forEach(track => track.stop());
       recStatus.textContent = '';
       const rBtn = document.getElementById('btn-record');
       rBtn.disabled = false; rBtn.textContent = 'Export movie';
@@ -2252,6 +2381,7 @@ async function exportMovie() {
     if (recMode) {
       finishExport(exportRestore.shotId, exportRestore.cam); // recording had started — normal teardown
     } else {
+      lockExportControls(false);
       // never started: restore manually without arming the save-finalizing flag
       applyShotPlayback(exportRestore.shotId);
       renderer.setPixelRatio(exportRestore.pixelRatio);
@@ -2259,7 +2389,7 @@ async function exportMovie() {
       controls.target.copy(exportRestore.cam.tgt);
       camera.fov = exportRestore.cam.fov;
       camera.updateProjectionMatrix();
-      controls.enabled = true;
+      controls.enabled = true; grid.visible = exportRestore.gridVisible;
       renderTimeline();
       resize3D();
     }
@@ -2281,9 +2411,11 @@ function finishExport(prevShotId, prevCam) {
   // overwrite the last exported shot's framing with the restored editor camera)
   applyShotPlayback(prevShotId);
   if (exportRestore) {
+    grid.visible = exportRestore.gridVisible;
     renderer.setPixelRatio(exportRestore.pixelRatio);
     animTime = clamp(exportRestore.animTime, 0, activeShot().duration);
   }
+  evaluateAt(animTime);
   camera.position.copy(prevCam.pos);
   controls.target.copy(prevCam.tgt);
   camera.fov = prevCam.fov;
@@ -2311,6 +2443,88 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 document.getElementById('btn-record').addEventListener('click', exportMovie);
+
+let offlineRendering = false, offlineCancel = false;
+function shotAtGlobal(time) {
+  let offset = 0;
+  for (const shot of project.shots) {
+    const duration = Math.max(0.5, shot.duration);
+    if (time < offset + duration) return { shot, local: Math.max(0, time - offset) };
+    offset += duration;
+  }
+  const shot = project.shots[project.shots.length - 1];
+  return { shot, local: shot.duration };
+}
+async function exportOfflineMovie() {
+  if (!window.VideoEncoder || !window.VideoFrame) { toast('Frame-accurate export needs WebCodecs. Choose real-time recording in this browser.'); return; }
+  if (project.audioClips.length) { toast('Frame-accurate mode is video-only. Choose real-time recording to include your audio.'); return; }
+  if (totalDuration() > 300 && !confirm('Frame-accurate export currently keeps the compressed video in memory. For long movies, export shorter sections. Continue?')) return;
+  if (moviePlaying) stopMovie(); setPlaying(false); setWorkspace('anim');
+  const width = +document.getElementById('export-res').value;
+  const [, height] = exportSize(width, project.exportAspect);
+  const fps = Math.max(1, Math.min(60, Number(project.fps) || 30));
+  const frameCount = Math.ceil(totalDuration() * fps);
+  const bitrate = { high: 8000000, medium: 4000000, low: 2500000 }[document.getElementById('export-quality').value] || 8000000;
+  const config = { codec: 'vp8', width, height, bitrate, framerate: fps, latencyMode: 'quality' };
+  const restore = { shotId: project.activeShotId, time: animTime, pixelRatio: renderer.getPixelRatio(),
+    pos: camera.position.clone(), target: controls.target.clone(), fov: camera.fov };
+  let encoder, encoderError, framesWritten = 0;
+  exportPreparing = true; lockExportControls(true);
+  try {
+    const support = await VideoEncoder.isConfigSupported(config);
+    if (!support.supported) throw new Error('This frame size is not supported by the video encoder. Try a smaller frame or real-time mode.');
+    const { Muxer, ArrayBufferTarget } = await import('./vendor/webm-muxer.mjs');
+    const target = new ArrayBufferTarget();
+    const muxer = new Muxer({ target, video: { codec: 'V_VP8', width, height, frameRate: fps }, firstTimestampBehavior: 'strict' });
+    encoder = new VideoEncoder({
+      output: (chunk, metadata) => { try { muxer.addVideoChunk(chunk, metadata); } catch (e) { encoderError = e; } },
+      error: e => { encoderError = e; },
+    });
+    encoder.configure(config);
+    offlineCancel = false; offlineRendering = true; recMode = true; exportPreparing = false;
+    document.getElementById('btn-record').textContent = 'Stop export';
+    renderer.setPixelRatio(1); renderer.setSize(width, height, false);
+    camera.aspect = width / height; camera.updateProjectionMatrix(); controls.enabled = false;
+    grid.visible = false; gizmo.visible = false; selRing.visible = false;
+    for (let frame = 0; frame < frameCount && !offlineCancel; frame++) {
+      if (encoderError) throw encoderError;
+      const time = frame / fps;
+      const hit = shotAtGlobal(time);
+      if (project.activeShotId !== hit.shot.id) applyShotPlayback(hit.shot.id);
+      animTime = hit.local; movieTime = time; evaluateAt(animTime);
+      camera.lookAt(controls.target); renderer.render(three, camera);
+      const videoFrame = new VideoFrame(renderer.domElement, { timestamp: Math.round(frame * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      try { encoder.encode(videoFrame, { keyFrame: frame % (fps * 2) === 0 }); } finally { videoFrame.close(); }
+      framesWritten++;
+      recStatus.textContent = `Rendering ${Math.round(framesWritten / frameCount * 100)}% · frame ${framesWritten}/${frameCount}. Slower than real time is normal.`;
+      if (encoder.encodeQueueSize > 4) await encoder.flush();
+      await new Promise(resolve => setTimeout(resolve, 0)); // allow stop/progress, without advancing the movie clock
+    }
+    await encoder.flush();
+    if (encoderError) throw encoderError;
+    if (framesWritten) {
+      muxer.finalize();
+      const blob = new Blob([target.buffer], { type: 'video/webm' });
+      const fileName = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + (offlineCancel ? '_partial' : '') + '.webm';
+      downloadBlob(blob, fileName);
+      recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps · ${(blob.size / 1e6).toFixed(1)} MB`;
+      toast('Frame-accurate movie saved');
+    } else recStatus.textContent = 'Export cancelled.';
+  } catch (e) {
+    recStatus.textContent = 'Export failed: ' + e.message;
+    toast('Frame-accurate export failed. Try a smaller frame or real-time mode.');
+  } finally {
+    try { encoder?.close(); } catch {}
+    offlineRendering = false; recMode = false; exportPreparing = false;
+    applyShotPlayback(restore.shotId); animTime = restore.time; evaluateAt(animTime);
+    camera.position.copy(restore.pos); controls.target.copy(restore.target); camera.fov = restore.fov;
+    camera.lookAt(controls.target); renderer.setPixelRatio(restore.pixelRatio); controls.enabled = true; grid.visible = true;
+    resize3D(); lockExportControls(false);
+    document.getElementById('btn-record').textContent = 'Export movie (webm)';
+    document.getElementById('btn-download-video').disabled = false;
+    renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline(); renderShotsUI(); syncShotControls();
+  }
+}
 document.getElementById('btn-download-video').addEventListener('click', exportMovie);
 
 function downloadBlob(blob, name) {
@@ -2340,7 +2554,11 @@ document.getElementById('file-open').addEventListener('change', e => {
     try {
       const data = JSON.parse(reader.result);
       if (!data.shots && !data.sceneObjects) throw new Error('bad file');
+      if (recMode || exportPreparing || exportFinalizing) { toast('Finish exporting before opening a project'); return; }
+      if (moviePlaying) stopMovie();
+      setPlaying(false);
       loadProjectData(data);
+      objectGroups.forEach(g => { three.remove(g); disposeGroup(g); }); objectGroups.clear();
       selectedId = null; currentCharId = project.characters[0]?.id || null;
       document.getElementById('project-tag').textContent = project.name;
       applyShot(project.activeShotId);
@@ -2453,6 +2671,199 @@ function loadStarterScene() {
 }
 
 /* ============================================================
+   Cinematic tools — additive v2 fields preserve old project files
+   ============================================================ */
+function labeledSelect(panel, label, options, value, onChange) {
+  const wrap = document.createElement('label'); wrap.className = 'joint-editor';
+  const title = document.createElement('span'); title.className = 'side-title'; title.textContent = label;
+  const select = document.createElement('select'); select.className = 'btn studio-select';
+  select.setAttribute('aria-label', label);
+  options.forEach(([v, text]) => { const op = document.createElement('option'); op.value = v; op.textContent = text; select.appendChild(op); });
+  select.value = value; select.addEventListener('change', () => onChange(select.value));
+  wrap.append(title, select); panel.appendChild(wrap); return select;
+}
+function renderActorControls(panel, o) {
+  const badge = document.createElement('div'); badge.className = 'rig-badge';
+  badge.textContent = o.rigMode === '3d' ? '3D avatar · 19 bones · weighted skin' : 'Legacy 2D character';
+  panel.appendChild(badge);
+  if (o.rigMode !== '3d') {
+    const upgrade = document.createElement('button'); upgrade.className = 'btn'; upgrade.textContent = 'Upgrade this actor to 3D';
+    upgrade.addEventListener('click', () => {
+      o.rigMode = '3d'; o.pos[1] = Math.max(0, o.pos[1] - 1.3);
+      o.motion = { clip: 'idle', speed: 1 }; syncSceneObjects(); evaluateAt(animTime);
+      markDirty(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
+    });
+    panel.appendChild(upgrade); return;
+  }
+  const motion = o.motion ||= { clip: 'none', speed: 1 };
+  labeledSelect(panel, 'Motion preset', MOTIONS.map(m => [m, m[0].toUpperCase() + m.slice(1)]), motion.clip, v => {
+    motion.clip = v; motion.speed = v === 'run' ? 2.3 : v === 'walk' ? 1.3 : 1;
+    markDirty(); evaluateAt(animTime); renderSceneProps(); renderAnimObjectSelect();
+  });
+  const motionNumber = (label, key, fallback, min, max, step) => {
+    const holder = { [key]: motion[key] ?? fallback };
+    panel.appendChild(mkNum(label, holder, key, v => { motion[key] = v; markDirty(); evaluateAt(animTime); }, min, max, step));
+  };
+  motionNumber('Motion speed', 'speed', 1, 0.1, 4, 0.05);
+  motionNumber('Motion strength', 'strength', 1, 0, 2, 0.05);
+  motionNumber('Motion phase', 'phase', 0, 0, 1, 0.05);
+  motionNumber('Motion start (s)', 'start', 0, 0, project.duration, 0.1);
+  motionNumber('Motion end (s)', 'end', project.duration, 0, project.duration, 0.1);
+  const details = document.createElement('details'); details.className = 'studio-details';
+  const summary = document.createElement('summary'); summary.textContent = 'Joint posing & keyframes';
+  const body = document.createElement('div'); body.className = 'joint-editor';
+  details.append(summary, body); panel.appendChild(details);
+  let joint = JOINTS[0];
+  const controlsPanel = document.createElement('div'); controlsPanel.className = 'joint-editor';
+  const drawJoint = () => {
+    controlsPanel.innerHTML = '';
+    for (const axis of ['x', 'y', 'z']) {
+      const key = joint + '.' + axis, values = o.joints ||= {};
+      controlsPanel.appendChild(mkNum('Joint ' + axis.toUpperCase(), { value: values[key] ?? 0 }, 'value', v => {
+        values[key] = v; markDirty(); evaluateAt(animTime);
+      }, -180, 180, 1));
+    }
+  };
+  labeledSelect(body, 'Joint', JOINTS.map(j => [j, j.replace(/([A-Z])/g, ' $1')]), joint, v => { joint = v; drawJoint(); });
+  body.appendChild(controlsPanel); drawJoint();
+  const keyBtn = document.createElement('button'); keyBtn.className = 'btn'; keyBtn.textContent = 'Key this joint at playhead';
+  keyBtn.addEventListener('click', () => {
+    const kf = project.keyframes[o.id] ||= {}, bone = objectGroups.get(o.id)?.children[0]?.userData.bones?.[joint];
+    for (const axis of ['x', 'y', 'z']) {
+      const ch = 'joint.' + joint + '.' + axis, key = joint + '.' + axis;
+      const value = o.joints?.[key] ?? (bone ? THREE.MathUtils.radToDeg(bone.rotation[axis]) : 0);
+      const track = kf[ch] ||= [];
+      const existing = track.find(k => Math.abs(k.t - animTime) < 0.02);
+      if (existing) existing.v = value;
+      else track.push({ t: round2(animTime), v: value, ease: 'ease' });
+      sortKeys(o.id, ch);
+    }
+    markDirty(); renderTimeline(); toast('Joint keyed at ' + animTime.toFixed(2) + 's');
+  });
+  body.appendChild(keyBtn);
+  const reset = document.createElement('button'); reset.className = 'btn'; reset.textContent = 'Clear static joint overrides';
+  reset.addEventListener('click', () => { o.joints = {}; markDirty(); evaluateAt(animTime); drawJoint(); });
+  body.appendChild(reset);
+}
+
+document.getElementById('shot-lighting').addEventListener('change', e => {
+  activeShot().lighting = e.target.value; applyLighting(e.target.value); markDirty();
+});
+document.getElementById('export-aspect').addEventListener('change', e => {
+  project.exportAspect = e.target.value; markDirty();
+});
+document.getElementById('btn-camera-lens').addEventListener('click', () => {
+  const mm = +document.getElementById('camera-lens').value;
+  const fov = THREE.MathUtils.radToDeg(2 * Math.atan(24 / (2 * mm)));
+  camera.fov = fov; camera.updateProjectionMatrix();
+  const s = activeShot(); s.camera ||= cameraBaseSnapshot(); s.camera.fov = fov;
+  const kf = s.keyframes[CAMERA_ID];
+  if (kf?.['cam.fov']) kf['cam.fov'].forEach(k => { k.v = fov; });
+  markDirty(); renderTimeline(); toast(mm + 'mm lens set');
+});
+document.getElementById('btn-camera-preset').addEventListener('click', () => {
+  if (moviePlaying || recMode) { toast('Stop playback or export before changing the camera'); return; }
+  const mode = document.getElementById('camera-preset').value, s = activeShot();
+  if (Object.keys(s.keyframes[CAMERA_ID] || {}).length && !confirm('Replace this shot’s camera keyframes?')) return;
+  const from = [...camera.position.toArray(), ...controls.target.toArray(), camera.fov];
+  let to = [...from];
+  const delta = camera.position.clone().sub(controls.target);
+  if (mode === 'dolly' || mode === 'pullback') {
+    const p = controls.target.clone().addScaledVector(delta, mode === 'dolly' ? 0.5 : 1.6);
+    to.splice(0, 3, ...p.toArray());
+  } else if (mode === 'crane') { to[1] += 6; to[2] += 2; }
+  else if (mode === 'tracking') {
+    const o = selObj();
+    if (!o || o.type === 'camera') { toast('Select an actor or object to track first'); return; }
+    const tracks = s.keyframes[o.id] || {};
+    const begin = ['x', 'y', 'z'].map((a, i) => tracks['pos.' + a]?.length ? sampleTrack(tracks['pos.' + a], 0) : o.pos[i]);
+    const end = ['x', 'y', 'z'].map((a, i) => tracks['pos.' + a]?.length ? sampleTrack(tracks['pos.' + a], s.duration) : o.pos[i]);
+    begin.forEach((v, i) => { from[i + 3] = v + (i === 1 ? 1.2 : 0); to[i + 3] = end[i] + (i === 1 ? 1.2 : 0); to[i] = from[i] + end[i] - v; });
+  }
+  s.camera = { pos: from.slice(0, 3), tgt: from.slice(3, 6), fov: from[6] };
+  s.keyframes[CAMERA_ID] = cameraTracks(from, to, s.duration);
+  if (mode === 'orbit') {
+    const frames = 12;
+    for (const ch of ['cam.px', 'cam.pz']) s.keyframes[CAMERA_ID][ch] = [];
+    for (let i = 0; i <= frames; i++) {
+      const angle = i / frames * Math.PI * 1.5, c = Math.cos(angle), sn = Math.sin(angle);
+      s.keyframes[CAMERA_ID]['cam.px'].push({ t: s.duration * i / frames, v: from[3] + delta.x * c + delta.z * sn, ease: 'linear' });
+      s.keyframes[CAMERA_ID]['cam.pz'].push({ t: s.duration * i / frames, v: from[5] + delta.z * c - delta.x * sn, ease: 'linear' });
+    }
+  }
+  animTime = 0; evaluateAt(0); markDirty(); renderTimeline(); renderAnimObjectSelect();
+  toast('Camera move added — select Shot camera to edit its keys');
+});
+
+function loadRaceMovie() {
+  if (recMode || exportPreparing || exportFinalizing) { toast('Finish exporting first'); return; }
+  const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length;
+  if (hasWork && !confirm('Replace the current movie with the 3D race movie? Save your project first to keep it.')) return;
+  if (moviePlaying) stopMovie(); setPlaying(false);
+  project = defaultProject(); project.name = 'The Final Straight'; project.exportAspect = '2.39:1';
+  const colors = ['#e05d5d', '#efb855', '#4fb3a4', '#648fe1'];
+  project.characters = ['Blaze', 'Dash', 'Nova', 'Jet'].map((name, i) => {
+    const rig = defaultRig(name); rig.torsoColor = colors[i]; rig.feetColor = colors[i];
+    rig.headColor = SKIN[(i * 2) % SKIN.length]; rig.armColor = rig.headColor; rig.handColor = rig.headColor;
+    rig.hairStyle = ['spiky', 'side', 'flat', 'bald'][i]; return rig;
+  });
+  const defs = [
+    ['The contenders', 4, -9, -9, 'idle', [0, 12, 17, -2, 0.8, 0, 46], [-4, 6, 13, -8, 1, 0, 42]],
+    ['Off the line', 5, -9, -3, 'run', [-6, 2.8, 10, -9, 1.1, 0, 42], [0, 2.6, 10, -3, 1.1, 0, 42]],
+    ['The chase', 7, -3, 5, 'run', [-2, 2.8, 10, -3, 1.2, 0, 38], [6, 2.6, 10, 5, 1.2, 0, 38]],
+    ['Photo finish', 5, 5, 10, 'run', [12, 2.8, 9, 7, 1.2, 0, 46], [14, 2.3, 8, 10, 1.2, 0, 46]],
+    ['Nova takes the win', 5, 10, 10, 'celebrate', [13, 3.6, 9, 9, 1.3, 0, 42], [11.5, 2.8, 6, 9, 1.4, 0, 38]],
+  ];
+  const primitive = (s, name, type, color, pos, scale, rot = [0, 0, 0]) => {
+    const castShadow = !/Track surface|Lane marking|Start line|Finish line|Stadium seat|Floodlight panel/.test(name);
+    const o = { id: uid('obj'), name, type, color, pos, scale, rot, opacity: 1, castShadow }; s.sceneObjects.push(o); return o;
+  };
+  let phaseTime = 0;
+  project.shots = defs.map(([name, duration, start, end, clip, from, to], shotIndex) => {
+    const s = newShot(name, duration); s.lighting = shotIndex === 4 ? 'sunset' : 'daylight';
+    s.camera = { pos: from.slice(0, 3), tgt: from.slice(3, 6), fov: from[6] };
+    s.keyframes[CAMERA_ID] = cameraTracks(from, to, duration, 'linear');
+    primitive(s, 'Track surface', 'box', '#ac5f46', [0, -0.08, 0], [28, 0.2, 8]);
+    for (let i = 0; i < 5; i++) primitive(s, 'Lane marking ' + (i + 1), 'box', '#f5e9d1', [0, 0.035, -3.2 + i * 1.6], [28, 0.015, 0.04]);
+    for (const x of [-9, 8]) primitive(s, x < 0 ? 'Start line' : 'Finish line', 'box', '#fff7e5', [x, 0.04, 0], [0.14, 0.02, 6.4]);
+    for (const z of [-7, 7]) {
+      for (let row = 0; row < 3; row++) {
+        primitive(s, 'Stadium terrace', 'box', '#546577', [0, 0.2 + row * 0.45, z + Math.sign(z) * row * 0.8], [28, 0.4 + row * 0.4, 0.7]);
+        for (let seat = 0; seat < 9; seat++) primitive(s, 'Stadium seat', 'box', colors[(seat + row) % 4], [-12 + seat * 3, 0.5 + row * 0.65, z + Math.sign(z) * row * 0.8], [0.7, 0.25, 0.45]);
+      }
+    }
+    for (const x of [-12, 12]) for (const z of [-5, 5]) {
+      primitive(s, 'Floodlight mast', 'cylinder', '#a6b0b8', [x, 3.5, z], [0.14, 7, 0.14]);
+      primitive(s, 'Floodlight panel', 'box', '#fff1c2', [x, 7, z], [1.4, 0.5, 0.3]);
+    }
+    project.characters.forEach((rig, i) => {
+      const gap = [0.55, 0.9, 0, 1.3][i];
+      const prevGap = shotIndex < 2 ? 0 : shotIndex === 2 ? gap * 0.4 : gap;
+      const nextGap = shotIndex === 0 ? 0 : shotIndex === 1 ? gap * 0.4 : gap;
+      const isWinShot = shotIndex === 4;
+      const o = primitive(s, rig.name, 'character', '#fff', [start - prevGap, 0, -2.4 + i * 1.6], [1, 1, 1], [0, isWinShot ? 0 : 90, 0]);
+      o.assetId = rig.id; o.rigMode = '3d';
+      o.motion = { clip: isWinShot && i !== 2 ? 'idle' : clip, speed: clip === 'run' ? 2.25 + i * 0.035 : 1, phase: phaseTime * (clip === 'run' ? 2.25 + i * 0.035 : 1) + i * 0.2 };
+      if (!isWinShot) s.keyframes[o.id] = { 'pos.x': [{ t: 0, v: start - prevGap, ease: 'linear' }, { t: duration, v: end - nextGap, ease: 'linear' }] };
+      else o.pos[0] = 9 - gap;
+    });
+    if (shotIndex === 0 || shotIndex === 4) {
+      const title = primitive(s, 'Movie title', 'text', '#fff3d4', [shotIndex === 0 ? -7 : 9, 4, -3.8], [2, 2, 2]);
+      title.text = shotIndex === 0 ? 'THE FINAL STRAIGHT' : 'NOVA TAKES THE WIN';
+    }
+    phaseTime += duration; return s;
+  });
+  project.activeShotId = project.shots[0].id;
+  project.sceneObjects = project.shots[0].sceneObjects; project.keyframes = project.shots[0].keyframes; project.duration = project.shots[0].duration;
+  animTime = 0; selectedId = null; currentCharId = project.characters[0].id;
+  document.getElementById('project-tag').textContent = project.name;
+  applyShot(project.activeShotId); setWorkspace('anim'); evaluateAt(0);
+  markDirty(); renderCharList(); drawCharPreview(); renderCharProps(); renderAssetList(); renderAudioList();
+  toast('3D race movie ready: 4 rigged actors, 5 shots, 26 seconds. Press Play movie.');
+}
+document.getElementById('btn-race').addEventListener('click', loadRaceMovie);
+
+/* ============================================================
    Boot
    ============================================================ */
 loadSaved();
@@ -2476,6 +2887,7 @@ markDirty();
 
 // test/QA hook (harmless in production)
 window.__vc = {
+  get objectGroups() { return objectGroups; },
   get project() { return project; },
   get camera() { return camera; },
   evaluateAt,
