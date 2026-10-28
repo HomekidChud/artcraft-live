@@ -134,6 +134,7 @@ function markDirty(msg) {
     autosaveTimer = setTimeout(() => {
       try {
         storage.setItem(SAVE_KEY, JSON.stringify(serializeProject()));
+        try { storage.removeItem('videocraft_project_v1'); } catch {} // upgraded: v1 key no longer needed
         dirty = false;
         if (el) el.textContent = 'Saved automatically';
       } catch {
@@ -154,7 +155,7 @@ function loadSaved() {
   if (!storage) return;
   try {
     let raw = storage.getItem(SAVE_KEY);
-    if (!raw) { // upgrade path from v1 autosaves (v1 key removed only after v2 save succeeds)
+    if (!raw) { // upgrade path from v1 autosaves (v1 key removed once a v2 save succeeds)
       raw = storage.getItem('videocraft_project_v1');
       if (raw) { loadProjectData(JSON.parse(raw)); markDirty(); }
       return;
@@ -1611,11 +1612,13 @@ function renderTimeline() {
       tlTrackList.appendChild(row);
     });
   }
-  // canvas sizing — canvas spans the full (possibly scrolled) wrap width (capped for very long shots)
-  const wrapW = Math.min(16000, Math.round(project.duration * pxPerSec) + 30);
+  // canvas sizing — the wrap spans the FULL duration (fully scrollable);
+  // only the canvas backing store is capped, by lowering its resolution when huge.
+  const wrapW = Math.round(project.duration * pxPerSec) + 30;
   const wrapH = tlKeys.parentElement.clientHeight || 160;
-  tlCanvas.width = wrapW * devicePixelRatio;
-  tlCanvas.height = wrapH * devicePixelRatio;
+  const canvasRatio = Math.min(devicePixelRatio, 16000 / wrapW);
+  tlCanvas.width = Math.max(1, Math.round(wrapW * canvasRatio));
+  tlCanvas.height = Math.max(1, Math.round(wrapH * canvasRatio));
   tlCanvas.style.width = wrapW + 'px';
   tlCanvas.style.height = wrapH + 'px';
   document.getElementById('tl-canvas-wrap').style.width = wrapW + 'px';
@@ -1624,7 +1627,7 @@ function renderTimeline() {
   updatePlayhead();
 }
 function drawTimelineCanvas() {
-  const dpr = devicePixelRatio;
+  const dpr = tlCanvas.width / (parseFloat(tlCanvas.style.width) || 1); // actual backing-store ratio (may be < devicePixelRatio)
   const W = tlCanvas.width / dpr, H = tlCanvas.height / dpr;
   tlCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   tlCtx.clearRect(0, 0, W, H);
@@ -2053,6 +2056,7 @@ let mediaRecorder = null, recordedChunks = [];
 let recStart = 0, recHiddenTotal = 0, recHiddenSince = 0;
 
 async function exportMovie() {
+  if (exportFinalizing) { toast('Still saving the previous export…'); return; }
   if (recMode) { // acts as Stop while exporting — saves what was recorded
     recStatus.textContent = 'Stopping — saving partial movie…';
     finishExport(exportRestore.shotId, exportRestore.cam);
@@ -2070,6 +2074,21 @@ async function exportMovie() {
   const W = parseInt(resSel ? resSel.value : '1280', 10) || 1280;
   const H = Math.round(W * 9 / 16);
   const kbps = { high: 8000, medium: 4000, low: 2500 }[qualSel ? qualSel.value : 'high'] || 8000;
+
+  const ext = mime.includes('webm') ? 'webm' : 'mp4';
+  const fileName = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + '.' + ext;
+
+  // ask for the save file FIRST (inside the click gesture) so no movie time is lost to the dialog;
+  // if the browser can't / the user cancels, we fall back to an in-memory recording + download.
+  let fileHandle = null;
+  if (window.showSaveFilePicker) {
+    try {
+      fileHandle = await showSaveFilePicker({
+        suggestedName: fileName,
+        types: [{ description: 'Video', accept: { 'video/webm': ['.webm'] } }],
+      });
+    } catch { /* cancelled or not allowed — in-memory fallback */ }
+  }
 
   // fixed export frame — restored afterwards
   exportRestore = {
@@ -2091,20 +2110,28 @@ async function exportMovie() {
   if (exportDest) tracks.push(exportDest.stream.getAudioTracks()[0]);
   const stream = new MediaStream(tracks);
 
-  const ext = mime.includes('webm') ? 'webm' : 'mp4';
-  const fileName = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + '.' + ext;
   recordedChunks = [];
-  let fsWritable = null, draining = false;
-  const drain = async () => { // serialize disk writes, keep memory flat
-    if (draining || !fsWritable || !recordedChunks.length) return;
-    draining = true;
-    try { while (recordedChunks.length) await fsWritable.write(recordedChunks.shift()); }
-    catch { fsWritable = null; }
-    draining = false;
+  let fsWritable = null, diskError = null, writeIdx = 0, drainPromise = null;
+  if (fileHandle) {
+    try { fsWritable = await fileHandle.createWritable(); } catch { fsWritable = null; } // in-memory fallback
+  }
+  // serialize disk writes; the running loop keeps picking up newly queued chunks
+  const drain = () => {
+    if (!drainPromise) drainPromise = (async () => {
+      try {
+        while (fsWritable && writeIdx < recordedChunks.length) {
+          await fsWritable.write(recordedChunks[writeIdx]);
+          writeIdx++;
+        }
+      } catch (err) { diskError = err; fsWritable = null; }
+    })().finally(() => { drainPromise = null; });
+    return drainPromise;
   };
   const saveRecording = async () => {
     try {
       if (fsWritable) {
+        await drain(); // every queued chunk is submitted before closing
+        if (diskError) throw diskError;
         await fsWritable.close();
         toast('Movie saved to the file you chose (' + W + '×' + H + ')');
       } else {
@@ -2114,8 +2141,9 @@ async function exportMovie() {
       }
     } catch (err) {
       console.error('save failed', err);
-      toast('Could not save the recording — sorry. Try a shorter movie.');
+      toast('Could not save the recording — the write failed. Try again or use a shorter movie.');
     }
+    exportFinalizing = false;
     recStatus.textContent = '';
     const rBtn = document.getElementById('btn-record');
     rBtn.disabled = false; rBtn.textContent = 'Export movie';
@@ -2141,14 +2169,6 @@ async function exportMovie() {
   rBtn.disabled = false; rBtn.textContent = 'Stop export';
   document.getElementById('btn-download-video').disabled = true;
 
-  // optional: stream straight to a file on disk (Chrome/Edge) — avoids holding the whole movie in memory
-  if (window.showSaveFilePicker) {
-    try {
-      const fh = await showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'Video', accept: { [mime]: ['.' + ext] } }] });
-      if (recMode) { fsWritable = await fh.createWritable(); drain(); } // ignore if export already ended
-    } catch { /* user cancelled or unsupported — fall back to in-memory + download */ }
-  }
-
   const step = () => {
     if (!recMode) return;
     const elapsed = (performance.now() - recStart - recHiddenTotal) / 1000;
@@ -2169,11 +2189,15 @@ async function exportMovie() {
   requestAnimationFrame(step);
 }
 let exportRestore = null;
+let exportFinalizing = false; // true from recorder stop until the file is saved
 function finishExport(prevShotId, prevCam) {
   recMode = false;
+  exportFinalizing = true; // blocks a new export until saving finishes
   stopAudio();
   try { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); } catch {}
-  // restore editor state
+  // restore editor state WITHOUT capturing a camera base (a capture here would
+  // overwrite the last exported shot's framing with the restored editor camera)
+  applyShotPlayback(prevShotId);
   camera.position.copy(prevCam.pos);
   controls.target.copy(prevCam.tgt);
   camera.fov = prevCam.fov;
@@ -2183,7 +2207,7 @@ function finishExport(prevShotId, prevCam) {
   const rBtn = document.getElementById('btn-record');
   if (rBtn.textContent === 'Stop export') rBtn.textContent = 'Export movie';
   document.getElementById('btn-download-video').disabled = false;
-  applyShot(prevShotId);
+  renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline(); renderShotsUI();
   resize3D(); // recomputes aspect + canvas size from the host element
 }
 // pause while the tab is hidden (rAF stops; recording would desync)
@@ -2370,6 +2394,8 @@ window.__vc = {
   get project() { return project; },
   get camera() { return camera; },
   evaluateAt,
+  get recorder() { return mediaRecorder; },
+  get chunkCount() { return recordedChunks.length; },
   playingAudioCount: () => [...audioNodes.values()].filter(n => !n.el.paused).length,
   clipInfo: () => project.audioClips.map(c => ({ start: c.start, vol: c.volume, asset: (project.audioAssets.find(a => a.id === c.assetId) || {}).name })),
   audioDebug: () => ({
