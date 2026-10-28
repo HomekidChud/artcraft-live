@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VideoCraft — Scene Builder & Animation Studio</title>
-<meta name="description" content="VideoCraft: draw, build 3D scenes, create characters and animate them — a free browser studio from the ArtCraft family.">
+<title>VideoCraft — Movie Studio</title>
+<meta name="description" content="VideoCraft: draw, build 3D scenes, create characters and turn them into full movies with shots, camera moves, audio and video export — a free browser studio from the ArtCraft family.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%23f2b25c'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e05d5d'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%234fb3a4'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%23c77b9e'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -234,6 +234,44 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
   font-size: var(--text-xs); color: var(--text-muted); overflow: hidden;
 }
 #tl-head .btn { padding: 3px 8px; }
+#shot-strip { flex: 1; display: flex; gap: 3px; height: 22px; min-width: 60px; position: relative; margin: 0 var(--space-2); }
+.shot-chip {
+  position: relative; min-width: 34px; border-radius: 4px; background: var(--panel-3);
+  border: 1px solid var(--line-soft); color: var(--text-muted); font-size: 10px;
+  display: flex; align-items: center; justify-content: center; white-space: nowrap; cursor: pointer;
+  overflow: hidden; transition: background var(--transition-interactive);
+}
+.shot-chip:hover { background: #383431; }
+.shot-chip.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; border-color: var(--accent); }
+.shot-chip .t { position: absolute; right: 3px; bottom: 1px; font-size: 9px; opacity: 0.75; }
+#shot-strip-playhead { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--accent-2); pointer-events: none; z-index: 2; }
+#shot-duration { width: 100%; background: var(--panel-3); border: 1px solid var(--line-soft); border-radius: var(--radius-sm); color: var(--text); padding: 5px 8px; }
+#shot-list { display: flex; flex-direction: column; gap: 4px; }
+.shot-row { display: flex; gap: 4px; align-items: stretch; }
+.shot-row .main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 6px 8px;
+  background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
+  font-size: var(--text-xs); text-align: left;
+}
+.shot-row .main:hover { background: var(--panel-3); }
+.shot-row.active .main { border-color: var(--accent); background: var(--panel-3); }
+.shot-row .idx { color: var(--text-faint); font-weight: 600; }
+.shot-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shot-row .dur { color: var(--text-faint); }
+.shot-row .mini, .audio-row .mini {
+  width: 26px; flex: none; background: var(--panel-3); border-radius: 4px; color: var(--text-muted);
+  font-size: var(--text-xs); display: grid; place-items: center;
+}
+.shot-row .mini:hover, .audio-row .mini:hover { color: var(--accent-2); }
+#audio-list { display: flex; flex-direction: column; gap: 6px; }
+.audio-row {
+  background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
+  padding: 6px; display: flex; flex-direction: column; gap: 5px;
+}
+.audio-row .an { font-size: var(--text-xs); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audio-row .ar { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-muted); }
+.audio-row .ar input[type=number] { width: 58px; background: var(--panel-3); border: 1px solid var(--line-soft); border-radius: 4px; color: var(--text); padding: 2px 4px; }
+.audio-row .ar input[type=range] { flex: 1; }
 #tl-body { display: flex; min-height: 0; }
 #tl-tracks { width: 158px; flex: none; border-right: 1px solid var(--line-soft); overflow: hidden; background: var(--panel); }
 #tl-track-labels { height: 26px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; padding: 0 var(--space-2); font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -321,7 +359,7 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
       <button class="btn ghost" id="btn-open">Open</button>
       <input type="file" id="file-open" accept=".videocraft,.json" class="sr-only">
       <button class="btn ghost" id="btn-save">Save project</button>
-      <button class="btn ghost" id="btn-download-video">Download video</button>
+      <button class="btn ghost" id="btn-download-video">Export movie</button>
     </header>
 
     <div id="content">
@@ -414,14 +452,26 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
             </button>
             <span class="time" id="time-label">0.00s / 0.00s</span>
           </div>
-          <div class="field-row"><label for="anim-duration">Duration (s)</label></div>
-          <input type="range" id="anim-duration" min="1" max="30" step="0.5" value="5" aria-label="Animation duration in seconds">
+          <button class="btn" id="btn-movie">Play movie</button>
+          <div class="field-row"><label for="shot-duration">Shot duration (s)</label><output id="shot-duration-out">5s</output></div>
+          <input type="number" id="shot-duration" min="0.5" step="0.5" value="5" aria-label="Shot duration in seconds">
           <div class="field-row"><label for="anim-fps">FPS</label><output id="anim-fps-out">30</output></div>
           <input type="range" id="anim-fps" min="10" max="60" step="5" value="30" aria-label="Frames per second">
+          <div class="side-title">Shots</div>
+          <div id="shot-list"></div>
+          <div class="row2">
+            <button class="btn" id="btn-shot-add">+ Shot</button>
+            <button class="btn" id="btn-shot-dup">Duplicate</button>
+          </div>
+          <div class="row2">
+            <button class="btn" id="btn-shot-up">Move up</button>
+            <button class="btn" id="btn-shot-down">Move down</button>
+          </div>
+          <button class="btn" id="btn-shot-del">Delete shot</button>
           <div class="side-title">Selected object</div>
           <select class="btn" id="anim-object" style="width:100%" aria-label="Animated object"></select>
           <div class="side-title">Selected channel</div>
-          <div id="anim-channel-info" class="empty-note">Click a track on the timeline, then drag keyframes. Space toggles playback.</div>
+          <div id="anim-channel-info" class="empty-note">Click a track on the timeline, then drag keyframes. Space plays the current shot; Play movie runs the whole film.</div>
           <div class="row2">
             <button class="btn" id="btn-key-add">Add key</button>
             <button class="btn" id="btn-key-del">Delete key</button>
@@ -432,16 +482,31 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
             <option value="ease" selected>Smooth (ease)</option>
             <option value="step">Step (hold)</option>
           </select>
-          <div class="side-title">Export</div>
-          <button class="btn primary" id="btn-record">Record video (webm)</button>
+          <div class="side-title">Audio</div>
+          <button class="btn" id="btn-audio-add">+ Add audio file</button>
+          <input type="file" id="file-audio" accept="audio/*" class="sr-only">
+          <div id="audio-list"></div>
+          <div class="side-title">Export movie</div>
+          <div class="field-row"><label for="export-res">Resolution</label></div>
+          <select class="btn" id="export-res" style="width:100%" aria-label="Export resolution">
+            <option value="1280">1280 × 720 (HD)</option>
+            <option value="1920">1920 × 1080 (Full HD)</option>
+          </select>
+          <div class="field-row"><label for="export-quality">Quality</label></div>
+          <select class="btn" id="export-quality" style="width:100%" aria-label="Export bitrate">
+            <option value="high">High (8 Mbps)</option>
+            <option value="medium">Medium (4 Mbps)</option>
+            <option value="low">Small file (2.5 Mbps)</option>
+          </select>
+          <button class="btn primary" id="btn-record">Export movie (webm)</button>
           <span id="rec-status"></span>
-          <div class="empty-note">Recording happens in real time while the animation plays. Frames are also saved into the project.</div>
+          <div class="empty-note">The movie exports in real time with sound — all shots, back to back. Keep the tab visible while it records.</div>
         </aside>
         <div id="anim-viewport"></div>
         <div id="timeline">
           <div id="tl-head">
-            <span>Tracks</span>
-            <span class="spacer" style="flex:1"></span>
+            <span>Movie</span>
+            <div id="shot-strip"><div id="shot-strip-playhead"></div></div>
             <button class="btn small" id="btn-zoom-fit">Fit</button>
           </div>
           <div id="tl-body">
@@ -463,6 +528,6 @@ input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); 
   }
 }
 </script>
-<script type="module" src="app.js"></script>
+<script type="module" src="app.js?v=0.2.5"></script>
 </body>
 </html>

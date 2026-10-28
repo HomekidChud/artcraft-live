@@ -1,22 +1,89 @@
-// VideoCraft — draw / build / animate in the browser. ArtCraft family tool.
+// VideoCraft — draw / build / animate / make movies in the browser. ArtCraft family tool.
+// v0.2 — movie studio: shots, per-shot camera, audio, fixed-res export.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 /* ============================================================
-   Shared project model
+   Shared project model — a movie is a sequence of shots
    ============================================================ */
 const uid = (p = 'id') => p + '_' + Math.random().toString(36).slice(2, 9);
 
-function defaultProject() {
+function newShot(name = 'Shot 1', duration = 5) {
   return {
-    name: 'Untitled project',
-    duration: 5,
-    fps: 30,
-    drawings: [],          // { id, name, dataURL }  raster assets
-    characters: [],        // character rigs (see below)
-    sceneObjects: [],      // see below
-    keyframes: {},         // [sceneObjectId][channel] -> [{t, v, ease}]
+    id: uid('shot'), name, duration,
+    sceneObjects: [],   // per-shot 3D objects (see below)
+    keyframes: {},      // [sceneObjectId][channel] -> [{t, v, ease}]
+    camera: null,        // reserved: per-shot camera base (currently keys live in keyframes.__camera__)
   };
+}
+function defaultProject() {
+  const shot = newShot('Shot 1', 5);
+  return {
+    version: 2,
+    name: 'Untitled movie',
+    fps: 30,
+    drawings: [],        // { id, name, dataURL } raster assets (movie-wide)
+    characters: [],      // character rigs (movie-wide)
+    shots: [shot],
+    activeShotId: shot.id,
+    audioAssets: [],     // { id, name, dataURL, duration } imported audio (movie-wide)
+    audioClips: [],      // { id, assetId, start, volume } placed on the global movie timeline
+    // live mirror of the ACTIVE shot (kept in sync by applyShot / setShotDuration):
+    sceneObjects: shot.sceneObjects,
+    keyframes: shot.keyframes,
+    duration: shot.duration,
+  };
+}
+function activeShot() { return project.shots.find(s => s.id === project.activeShotId) || project.shots[0]; }
+function totalDuration() { return project.shots.reduce((a, s) => a + Math.max(0.5, s.duration), 0); }
+function shotStart(idx) { let t = 0; for (let i = 0; i < idx; i++) t += Math.max(0.5, project.shots[i].duration); return t; }
+function globalTime() {
+  const i = Math.max(0, project.shots.indexOf(activeShot()));
+  return shotStart(i) + animTime;
+}
+// migrate any older project shape (v1 single-animation) into the shot-based model
+function migrateProject(data) {
+  if (!data || typeof data !== 'object') return defaultProject();
+  if (!Array.isArray(data.shots) || !data.shots.length) {
+    const shot = {
+      id: uid('shot'), name: 'Shot 1',
+      duration: data.duration || 5,
+      sceneObjects: Array.isArray(data.sceneObjects) ? data.sceneObjects : [],
+      keyframes: data.keyframes || {}, camera: null,
+    };
+    data.shots = [shot];
+  }
+  data.shots.forEach(s => {
+    if (!Array.isArray(s.sceneObjects)) s.sceneObjects = [];
+    if (!s.keyframes || typeof s.keyframes !== 'object') s.keyframes = {};
+    if (!s.duration || s.duration < 0.5) s.duration = 5;
+    if (!s.name) s.name = 'Shot';
+  });
+  data.version = 2;
+  data.name = data.name || 'Untitled movie';
+  data.fps = data.fps || 30;
+  data.drawings = Array.isArray(data.drawings) ? data.drawings : [];
+  data.characters = Array.isArray(data.characters) ? data.characters : [];
+  data.audioAssets = Array.isArray(data.audioAssets) ? data.audioAssets : [];
+  data.audioClips = Array.isArray(data.audioClips) ? data.audioClips : [];
+  if (!data.shots.some(s => s.id === data.activeShotId)) data.activeShotId = data.shots[0].id;
+  return data;
+}
+// canonical serialization — shots own their scene/keyframe data; no mirror duplication
+function serializeProject() {
+  return {
+    version: 2, name: project.name, fps: project.fps,
+    drawings: project.drawings, characters: project.characters,
+    shots: project.shots, activeShotId: project.activeShotId,
+    audioAssets: project.audioAssets, audioClips: project.audioClips,
+  };
+}
+function loadProjectData(data) {
+  project = migrateProject(data);
+  const s = activeShot();
+  project.sceneObjects = s.sceneObjects;
+  project.keyframes = s.keyframes;
+  project.duration = s.duration;
 }
 // sceneObject:
 // { id, name, type: 'box'|'sphere'|'cylinder'|'cone'|'torus'|'plane'|'engineKit'|'drawing'|'character',
@@ -53,7 +120,7 @@ const storage = (() => {
     return localStorage;
   } catch { return null; }
 })();
-const SAVE_KEY = 'videocraft_project_v1';
+const SAVE_KEY = 'videocraft_project_v2';
 let project = defaultProject();
 let dirty = false;
 let autosaveTimer = null;
@@ -66,16 +133,34 @@ function markDirty(msg) {
     clearTimeout(autosaveTimer);
     autosaveTimer = setTimeout(() => {
       try {
-        storage.setItem(SAVE_KEY, JSON.stringify(project));
+        storage.setItem(SAVE_KEY, JSON.stringify(serializeProject()));
         dirty = false;
         if (el) el.textContent = 'Saved automatically';
-      } catch { /* quota exceeded — user must save a file */ }
+      } catch {
+        // quota exceeded (usually large audio) — autosave without audio data
+        try {
+          const slim = serializeProject();
+          slim.audioAssets = slim.audioAssets.map(a => ({ ...a, dataURL: '' }));
+          storage.setItem(SAVE_KEY, JSON.stringify(slim));
+          if (el) el.textContent = 'Autosaved (audio too large — use Save project)';
+          project.audioAssets.forEach(a => { if (!a.dataURL) a.stripped = true; });
+          renderAudioList(); // show those assets as missing
+        } catch { /* user must save a file */ }
+      }
     }, 600);
   }
 }
 function loadSaved() {
   if (!storage) return;
-  try { const raw = storage.getItem(SAVE_KEY); if (raw) project = JSON.parse(raw); } catch { /* fresh start */ }
+  try {
+    let raw = storage.getItem(SAVE_KEY);
+    if (!raw) { // upgrade path from v1 autosaves (v1 key removed only after v2 save succeeds)
+      raw = storage.getItem('videocraft_project_v1');
+      if (raw) { loadProjectData(JSON.parse(raw)); markDirty(); }
+      return;
+    }
+    if (raw) loadProjectData(JSON.parse(raw));
+  } catch { /* fresh start */ }
 }
 
 function toast(msg) {
@@ -111,6 +196,183 @@ function setWorkspace(ws) {
 railBtns.forEach(b => b.addEventListener('click', () => setWorkspace(b.dataset.ws)));
 
 document.getElementById('project-tag').textContent = project.name;
+
+/* ============================================================
+   Shots — a movie is an ordered list of shots; the active shot's
+   data is mirrored into project.sceneObjects / keyframes / duration
+   ============================================================ */
+function applyShot(id) {
+  if (moviePlaying) stopMovie();
+  if (recMode) return;
+  captureCameraBase(); // remember the outgoing shot's framing
+  project.activeShotId = id;
+  const s = activeShot();
+  project.sceneObjects = s.sceneObjects;
+  project.keyframes = s.keyframes;
+  project.duration = s.duration;
+  selectedId = null; selectedTrack = null; selectedKey = null;
+  animTime = clamp(animTime, 0, s.duration);
+  applyCameraBase(s);
+  syncSceneObjects();
+  renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
+  renderShotsUI(); syncShotControls(); updatePlayhead();
+}
+// remember the current editor camera as the active shot's base framing
+function captureCameraBase() {
+  const s = activeShot(); if (!s) return;
+  s.camera = {
+    pos: [camera.position.x, camera.position.y, camera.position.z],
+    tgt: [controls.target.x, controls.target.y, controls.target.z],
+    fov: camera.fov,
+  };
+}
+// restore a shot's base framing (used when switching, playing back and exporting)
+function applyCameraBase(s) {
+  if (!s || !s.camera) return false;
+  camera.position.fromArray(s.camera.pos);
+  controls.target.fromArray(s.camera.tgt);
+  camera.fov = s.camera.fov;
+  camera.updateProjectionMatrix();
+  return true;
+}
+// lightweight variant used mid-playback / mid-export (no UI churn)
+function applyShotPlayback(id) {
+  project.activeShotId = id;
+  const s = activeShot();
+  project.sceneObjects = s.sceneObjects;
+  project.keyframes = s.keyframes;
+  project.duration = s.duration;
+  selectedId = null;
+  applyCameraBase(s);
+  syncSceneObjects();
+  // keep the sidebar + strip highlight on the shot that is playing
+  document.querySelectorAll('#shot-list .shot-row').forEach((row, i) => {
+    row.classList.toggle('active', project.shots[i] && project.shots[i].id === project.activeShotId);
+  });
+  document.querySelectorAll('#shot-strip .shot-chip').forEach((chip, i) => {
+    chip.classList.toggle('active', project.shots[i] && project.shots[i].id === project.activeShotId);
+  });
+}
+function syncShotControls() {
+  const inp = document.getElementById('shot-duration');
+  if (inp) inp.value = project.duration;
+  const out = document.getElementById('shot-duration-out');
+  if (out) out.textContent = project.duration + 's';
+  const fpsOut = document.getElementById('anim-fps-out');
+  if (fpsOut) fpsOut.textContent = project.fps;
+  const fpsIn = document.getElementById('anim-fps');
+  if (fpsIn) fpsIn.value = project.fps;
+}
+function fmtDur(d) {
+  d = Math.max(0, d);
+  if (d < 60) return (Math.round(d * 10) / 10) + 's';
+  const m = Math.floor(d / 60), s = Math.round(d % 60);
+  return m + 'm' + (s ? ' ' + s + 's' : '');
+}
+function renderShotsUI() {
+  const list = document.getElementById('shot-list');
+  if (list) {
+    list.innerHTML = '';
+    project.shots.forEach((s, i) => {
+      const row = document.createElement('div');
+      row.className = 'shot-row' + (s.id === project.activeShotId ? ' active' : '');
+      const b = document.createElement('button');
+      b.className = 'main';
+      b.title = 'Open this shot';
+      const idx = document.createElement('span'); idx.className = 'idx'; idx.textContent = i + 1;
+      const nm = document.createElement('span'); nm.className = 'name'; nm.textContent = s.name;
+      const du = document.createElement('span'); du.className = 'dur'; du.textContent = fmtDur(s.duration);
+      b.append(idx, nm, du);
+      b.addEventListener('click', () => { if (s.id !== project.activeShotId) applyShot(s.id); });
+      row.appendChild(b);
+      const ren = document.createElement('button'); ren.className = 'mini'; ren.textContent = '✎'; ren.title = 'Rename shot';
+      ren.addEventListener('click', () => {
+        const n = prompt('Shot name:', s.name);
+        if (n !== null && n.trim()) { s.name = n.trim(); markDirty(); renderShotsUI(); }
+      });
+      row.appendChild(ren);
+      list.appendChild(row);
+    });
+  }
+  renderShotStrip();
+}
+function renderShotStrip() {
+  const strip = document.getElementById('shot-strip');
+  if (!strip) return;
+  strip.querySelectorAll('.shot-chip').forEach(c => c.remove());
+  project.shots.forEach(s => {
+    const chip = document.createElement('div');
+    chip.className = 'shot-chip' + (s.id === project.activeShotId ? ' active' : '');
+    chip.style.flex = Math.max(0.5, s.duration);
+    const nm = document.createElement('span'); nm.textContent = s.name;
+    const du = document.createElement('span'); du.className = 't'; du.textContent = fmtDur(s.duration);
+    chip.append(nm, du);
+    chip.title = s.name + ' — ' + fmtDur(s.duration) + ' (click to open)';
+    chip.addEventListener('click', () => { if (s.id !== project.activeShotId) applyShot(s.id); });
+    strip.appendChild(chip);
+  });
+  updatePlayhead();
+}
+function addShot() {
+  const s = newShot('Shot ' + (project.shots.length + 1), 5);
+  project.shots.push(s);
+  applyShot(s.id);
+  markDirty();
+  toast('Shot added — build its scene, then set its duration');
+}
+function duplicateShot() {
+  const src = activeShot();
+  const copy = newShot(src.name + ' copy', src.duration);
+  if (src.camera) copy.camera = JSON.parse(JSON.stringify(src.camera));
+  // regenerate object ids so the copy is fully independent
+  const idMap = {};
+  copy.sceneObjects = src.sceneObjects.map(o => {
+    const c = JSON.parse(JSON.stringify(o));
+    idMap[o.id] = c.id = uid('obj');
+    return c;
+  });
+  copy.keyframes = {};
+  Object.entries(src.keyframes).forEach(([objId, chans]) => {
+    const nid = objId === CAMERA_ID ? objId : idMap[objId];
+    if (!nid) return;
+    copy.keyframes[nid] = JSON.parse(JSON.stringify(chans));
+  });
+  const idx = project.shots.indexOf(src);
+  project.shots.splice(idx + 1, 0, copy);
+  applyShot(copy.id);
+  markDirty();
+  toast('Shot duplicated');
+}
+function moveShot(dir) {
+  const i = project.shots.indexOf(activeShot());
+  const j = i + dir;
+  if (j < 0 || j >= project.shots.length) return;
+  [project.shots[i], project.shots[j]] = [project.shots[j], project.shots[i]];
+  markDirty(); renderShotsUI();
+}
+function deleteShot() {
+  if (project.shots.length < 2) { toast('A movie needs at least one shot'); return; }
+  const s = activeShot();
+  if (!confirm('Delete "' + s.name + '"?')) return;
+  const idx = project.shots.indexOf(s);
+  project.shots.splice(idx, 1);
+  applyShot(project.shots[Math.min(idx, project.shots.length - 1)].id);
+  markDirty();
+  toast('Shot deleted');
+}
+document.getElementById('btn-shot-add')?.addEventListener('click', addShot);
+document.getElementById('btn-shot-dup')?.addEventListener('click', duplicateShot);
+document.getElementById('btn-shot-up')?.addEventListener('click', () => moveShot(-1));
+document.getElementById('btn-shot-down')?.addEventListener('click', () => moveShot(1));
+document.getElementById('btn-shot-del')?.addEventListener('click', deleteShot);
+document.getElementById('shot-duration')?.addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (!isFinite(v) || v < 0.5) return;
+  const s = activeShot();
+  s.duration = v; project.duration = v;
+  animTime = clamp(animTime, 0, v);
+  markDirty(); renderTimeline(); updatePlayhead(); renderShotsUI();
+});
 
 /* ============================================================
    DRAW workspace
@@ -278,9 +540,8 @@ function renderAssetList() {
     const del = document.createElement('button'); del.textContent = 'Delete'; del.setAttribute('aria-label', 'Delete ' + a.name);
     del.addEventListener('click', () => {
       project.drawings = project.drawings.filter(d => d.id !== a.id);
-      project.sceneObjects = project.sceneObjects.filter(o => o.assetId !== a.id);
-      deleteKeyframesByAsset(a.id);
-      markDirty(); renderAssetList(); renderSceneList(); renderAnimObjectSelect();
+      removeSceneObjectsWhere(o => o.assetId === a.id);
+      markDirty(); renderAssetList(); renderSceneList(); renderSceneProps(); renderAnimObjectSelect();
     });
     div.appendChild(del);
     list.appendChild(div);
@@ -607,10 +868,9 @@ document.getElementById('btn-char-delete').addEventListener('click', () => {
   const rig = currentRig(); if (!rig) return;
   if (!confirm('Delete ' + rig.name + '?')) return;
   project.characters = project.characters.filter(c => c.id !== rig.id);
-  project.sceneObjects = project.sceneObjects.filter(o => o.assetId !== rig.id);
-  deleteKeyframesByAsset(rig.id);
+  removeSceneObjectsWhere(o => o.assetId === rig.id);
   currentCharId = project.characters[0]?.id || null;
-  markDirty(); renderCharList(); drawCharPreview(); renderCharProps(); renderSceneList(); renderAnimObjectSelect();
+  markDirty(); renderCharList(); drawCharPreview(); renderCharProps(); renderSceneList(); renderSceneProps(); renderAnimObjectSelect();
 });
 document.getElementById('char-name').addEventListener('input', e => {
   const rig = currentRig(); if (!rig) return;
@@ -681,6 +941,7 @@ selRing.visible = false;
 three.add(selRing);
 
 function resize3D() {
+  if (recMode) return; // never clobber the fixed export frame
   const host = activeWs === 'anim' ? animViewport : sceneViewport;
   if (!host.clientWidth) return;
   if (renderer.domElement.parentElement !== host) host.appendChild(renderer.domElement);
@@ -751,6 +1012,10 @@ function build3DObject(o) {
       group.add(plane);
       group.userData.redraw = () => { plane.material.map = drawingTexture(d); plane.material.needsUpdate = true; };
     }
+  } else if (o.type === 'text') {
+    const plane = makeMesh(new THREE.PlaneGeometry(3.8, 0.95), new THREE.MeshStandardMaterial({ map: textTexture(o.text, o.color), transparent: true, side: THREE.DoubleSide, roughness: 0.9 }));
+    group.add(plane);
+    group.userData.redraw = () => { plane.material.map = textTexture(o.text, o.color); plane.material.needsUpdate = true; };
   } else if (o.type === 'character') {
     const rig = project.characters.find(c => c.id === o.assetId);
     if (rig) {
@@ -772,6 +1037,25 @@ function build3DObject(o) {
 function imgAspect(d) {
   const img = drawingImageCache[d.id];
   return img && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1;
+}
+
+// text card → canvas texture (drawn into the 3D scene, so it exports with the video)
+function textTexture(text, color) {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 256;
+  const x = c.getContext('2d');
+  const str = String(text || ' '); // never empty (fillText with '' throws on some paths)
+  let size = 110;
+  x.font = '700 ' + size + 'px Outfit, sans-serif';
+  const w = x.measureText(str).width;
+  if (w > 950) { size = Math.max(26, Math.floor(size * 950 / w)); x.font = '700 ' + size + 'px Outfit, sans-serif'; }
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineWidth = Math.max(8, size * 0.13); x.strokeStyle = 'rgba(15,13,11,0.65)'; x.lineJoin = 'round';
+  x.strokeText(str, 512, 132);
+  x.fillStyle = color || '#ece7dd';
+  x.fillText(str, 512, 132);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 /* ---------- engine kit ---------- */
@@ -817,16 +1101,16 @@ const objectGroups = new Map(); // id -> THREE.Group
 function syncSceneObjects() {
   // remove stale
   for (const [id, g] of objectGroups) {
-    if (!project.sceneObjects.find(o => o.id === id)) { three.remove(g); objectGroups.delete(id); }
+    if (!project.sceneObjects.find(o => o.id === id)) { three.remove(g); disposeGroup(g); objectGroups.delete(id); }
   }
   // add new / refresh
   project.sceneObjects.forEach(o => {
     let g = objectGroups.get(o.id);
-    const needsRebuild = !g || g.userData.builtFrom !== JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity]);
+    const needsRebuild = !g || g.userData.builtFrom !== JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text]);
     if (needsRebuild) {
-      if (g) three.remove(g);
+      if (g) { three.remove(g); disposeGroup(g); }
       g = build3DObject(o);
-      g.userData.builtFrom = JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity]);
+      g.userData.builtFrom = JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text]);
       objectGroups.set(o.id, g);
       three.add(g);
     }
@@ -845,13 +1129,33 @@ function syncSceneObjects() {
   });
   updateSelectionVisuals();
 }
+// free GPU memory held by a removed group (geometries, materials, textures)
+function disposeGroup(g) {
+  g.traverse(m => {
+    m.geometry?.dispose?.();
+    if (m.material) {
+      const mats = Array.isArray(m.material) ? m.material : [m.material];
+      mats.forEach(mm => {
+        mm.map?.dispose?.();
+        mm.dispose?.();
+      });
+    }
+  });
+}
 const rigRevisions = {};
 function rigRevision(id) { return rigRevisions[id] || 0; }
 function bumpRigRevision(id) { rigRevisions[id] = (rigRevisions[id] || 0) + 1; }
-function deleteKeyframesByAsset(assetId) {
-  const ids = project.sceneObjects.filter(o => o.assetId === assetId).map(o => o.id);
-  project.sceneObjects = project.sceneObjects.filter(o => o.assetId !== assetId);
-  ids.forEach(id => delete project.keyframes[id]);
+// removes matching scene objects (and their keyframes) from every shot;
+// the active shot's arrays are the live mirror, so they mutate in place.
+function removeSceneObjectsWhere(pred) {
+  project.shots.forEach(s => {
+    for (let i = s.sceneObjects.length - 1; i >= 0; i--) {
+      if (pred(s.sceneObjects[i])) {
+        delete s.keyframes[s.sceneObjects[i].id];
+        s.sceneObjects.splice(i, 1);
+      }
+    }
+  });
 }
 
 /* ---------- selection & gizmo ---------- */
@@ -879,7 +1183,10 @@ function updateSelectionVisuals() {
   selRing.position.set(c.x, 0.02, c.z);
   selRing.visible = true;
 }
-function selObj() { return project.sceneObjects.find(o => o.id === selectedId) || null; }
+function selObj() {
+  if (selectedId === CAMERA_ID) return { id: CAMERA_ID, name: 'Shot camera', type: 'camera', pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 };
+  return project.sceneObjects.find(o => o.id === selectedId) || null;
+}
 
 renderer.domElement.addEventListener('pointerdown', e => {
   if (gizmoMode === 'none') {
@@ -1006,6 +1313,7 @@ function renderSceneList() {
   ['block', 'piston', 'crankshaft', 'flywheel', 'propeller'].forEach(p => {
     addRow('+ ' + p, () => addEnginePart(p));
   });
+  addRow('+ text card', addTextCard);
   project.drawings.forEach(d => {
     addRow('+ drawing: ' + d.name, () => addDrawingPlane(d));
   });
@@ -1061,12 +1369,22 @@ function addCharacterObject(c) {
   syncSceneObjects();
   selectObject(o.id); markDirty();
 }
+function addTextCard() {
+  const o = {
+    id: uid('obj'), name: 'Title card', type: 'text', text: 'Your title', color: '#ece7dd',
+    pos: [0, 2.5, -4], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1,
+  };
+  project.sceneObjects.push(o);
+  syncSceneObjects();
+  selectObject(o.id); markDirty();
+}
 document.getElementById('btn-clear-scene').addEventListener('click', () => {
-  if (!confirm('Remove all objects from the scene?')) return;
-  project.sceneObjects = [];
-  project.keyframes = {};
+  if (!confirm('Remove all objects from this shot?')) return;
+  // mutate in place — this array belongs to the active shot
+  project.sceneObjects.length = 0;
+  for (const k in project.keyframes) delete project.keyframes[k];
   selectedId = null;
-  markDirty(); renderSceneList(); renderSceneProps(); renderAnimObjectSelect();
+  markDirty(); renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); updateSelectionVisuals();
 });
 
 /* ---------- scene props panel ---------- */
@@ -1075,6 +1393,23 @@ function renderSceneProps() {
   panel.innerHTML = '';
   const o = selObj();
   if (!o) { panel.innerHTML = '<div class="empty-state"><b>Nothing selected</b>Click an object in the 3D view or the list.</div>'; return; }
+  if (o.type === 'camera') {
+    panel.innerHTML = '<div class="empty-state"><b>Shot camera</b>Orbit the 3D view to frame the shot. Then in the Animate workspace pick "Shot camera" and keyframe position, target and FOV to move it.</div>';
+    return;
+  }
+  if (o.type === 'text') {
+    const tt = document.createElement('div'); tt.className = 'side-title'; tt.textContent = 'Text';
+    panel.appendChild(tt);
+    const ti = document.createElement('input'); ti.className = 'btn'; ti.style.width = '100%'; ti.style.textAlign = 'left';
+    ti.value = o.text; ti.setAttribute('aria-label', 'Card text');
+    ti.addEventListener('input', () => { o.text = ti.value; syncSceneObjects(); markDirty(); });
+    panel.appendChild(ti);
+    const ct = document.createElement('div'); ct.className = 'side-title'; ct.textContent = 'Text color';
+    panel.appendChild(ct);
+    const ci = document.createElement('input'); ci.type = 'color'; ci.value = o.color;
+    ci.addEventListener('input', () => { o.color = ci.value; syncSceneObjects(); markDirty(); });
+    panel.appendChild(ci);
+  }
   const t = document.createElement('div'); t.className = 'side-title'; t.textContent = 'Name';
   panel.appendChild(t);
   const nameIn = document.createElement('input'); nameIn.className = 'btn'; nameIn.style.width = '100%'; nameIn.style.textAlign = 'left';
@@ -1104,8 +1439,7 @@ function renderSceneProps() {
   panel.appendChild(dup);
   const del = document.createElement('button'); del.className = 'btn'; del.textContent = 'Delete';
   del.addEventListener('click', () => {
-    project.sceneObjects = project.sceneObjects.filter(x => x.id !== o.id);
-    delete project.keyframes[o.id];
+    removeSceneObjectsWhere(x => x.id === o.id);
     selectedId = null;
     markDirty(); renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); updateSelectionVisuals();
   });
@@ -1135,6 +1469,7 @@ const tlPlayhead = document.getElementById('tl-playhead');
 const tlTrackList = document.getElementById('tl-track-list');
 let pxPerSec = 110;
 let animTime = 0, playing = false, recMode = false;
+let moviePlaying = false, movieTime = 0;
 let selectedTrack = null; // sceneObject id + channel {id, ch}
 let selectedKey = null; // {id, ch, index}
 
@@ -1145,6 +1480,13 @@ const CHANNELS = [
   { ch: 'opacity', label: 'Opacity' },
   { ch: 'pose', label: 'Character pose' },
 ];
+const CAMERA_ID = '__camera__';
+const CAM_CHANNELS = [
+  { ch: 'cam.px', label: 'Cam pos X' }, { ch: 'cam.py', label: 'Cam pos Y' }, { ch: 'cam.pz', label: 'Cam pos Z' },
+  { ch: 'cam.tx', label: 'Target X' }, { ch: 'cam.ty', label: 'Target Y' }, { ch: 'cam.tz', label: 'Target Z' },
+  { ch: 'cam.fov', label: 'FOV' },
+];
+function channelsFor(o) { return o && o.type === 'camera' ? CAM_CHANNELS : CHANNELS; }
 function objChannelValue(o, ch, t) {
   const kfs = (project.keyframes[o.id] || {})[ch] || [];
   if (!kfs.length) return null;
@@ -1199,6 +1541,21 @@ function evaluateAt(t) {
       }
     }
   });
+  // ---- shot camera ----
+  const ckf = project.keyframes[CAMERA_ID] || {};
+  if (Object.keys(ckf).some(ch => ckf[ch] && ckf[ch].length)) {
+    // unkeyed components fall back to this shot's base framing (deterministic per shot)
+    const base = activeShot().camera;
+    const px = ckf['cam.px'] ? sampleTrack(ckf['cam.px'], T) : (base ? base.pos[0] : camera.position.x);
+    const py = ckf['cam.py'] ? sampleTrack(ckf['cam.py'], T) : (base ? base.pos[1] : camera.position.y);
+    const pz = ckf['cam.pz'] ? sampleTrack(ckf['cam.pz'], T) : (base ? base.pos[2] : camera.position.z);
+    camera.position.set(px, py, pz);
+    const tx = ckf['cam.tx'] ? sampleTrack(ckf['cam.tx'], T) : (base ? base.tgt[0] : controls.target.x);
+    const ty = ckf['cam.ty'] ? sampleTrack(ckf['cam.ty'], T) : (base ? base.tgt[1] : controls.target.y);
+    const tz = ckf['cam.tz'] ? sampleTrack(ckf['cam.tz'], T) : (base ? base.tgt[2] : controls.target.z);
+    controls.target.set(tx, ty, tz);
+    if (ckf['cam.fov']) { camera.fov = sampleTrack(ckf['cam.fov'], T); camera.updateProjectionMatrix(); }
+  }
 }
 
 // pose u in [0,1]: 0 = base, blends to swing extremes (a walk cycle)
@@ -1213,14 +1570,19 @@ function applyPose(rig, u) {
 function renderAnimObjectSelect() {
   const sel = document.getElementById('anim-object');
   sel.innerHTML = '';
+  const camOp = document.createElement('option');
+  camOp.value = CAMERA_ID;
+  const camKeys = project.keyframes[CAMERA_ID] || {};
+  camOp.textContent = 'Shot camera' + (Object.keys(camKeys).some(ch => (camKeys[ch] || []).length) ? ' •' : '');
+  sel.appendChild(camOp);
   project.sceneObjects.forEach(o => {
     const op = document.createElement('option');
     op.value = o.id; op.textContent = o.name + (Object.keys(project.keyframes[o.id] || {}).some(ch => (project.keyframes[o.id][ch] || []).length) ? ' •' : '');
     sel.appendChild(op);
   });
-  if (!project.sceneObjects.length) { const op = document.createElement('option'); op.textContent = 'No objects yet'; sel.appendChild(op); }
+  if (!project.sceneObjects.length) { /* camera option always present */ }
   // keep the dropdown in sync with the current selection after rebuild
-  if (selectedId && project.sceneObjects.some(o => o.id === selectedId)) sel.value = selectedId;
+  if (selectedId && (selectedId === CAMERA_ID || project.sceneObjects.some(o => o.id === selectedId))) sel.value = selectedId;
 }
 document.getElementById('anim-object').addEventListener('change', e => {
   selectObject(e.target.value);
@@ -1234,7 +1596,7 @@ function renderTimeline() {
   const o = selObj();
   if (!o) { tlTrackList.innerHTML = '<div class="empty-note" style="padding:8px">Select an object to see its channels.</div>'; }
   else {
-    CHANNELS.forEach(c => {
+    channelsFor(o).forEach(c => {
       const kfs = (project.keyframes[o.id] || {})[c.ch] || [];
       const row = document.createElement('div');
       row.className = 'tl-track-label' + (kfs.length ? ' has-keys' : '') + (selectedTrack?.ch === c.ch && selectedTrack?.id === o.id ? ' active' : '');
@@ -1249,8 +1611,8 @@ function renderTimeline() {
       tlTrackList.appendChild(row);
     });
   }
-  // canvas sizing — canvas spans the full (possibly scrolled) wrap width
-  const wrapW = Math.round(project.duration * pxPerSec) + 30;
+  // canvas sizing — canvas spans the full (possibly scrolled) wrap width (capped for very long shots)
+  const wrapW = Math.min(16000, Math.round(project.duration * pxPerSec) + 30);
   const wrapH = tlKeys.parentElement.clientHeight || 160;
   tlCanvas.width = wrapW * devicePixelRatio;
   tlCanvas.height = wrapH * devicePixelRatio;
@@ -1266,8 +1628,8 @@ function drawTimelineCanvas() {
   const W = tlCanvas.width / dpr, H = tlCanvas.height / dpr;
   tlCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
   tlCtx.clearRect(0, 0, W, H);
-  // seconds grid
-  const step = pxPerSec > 70 ? 0.5 : 1;
+  // seconds grid — step widens automatically so labels never collide
+  const step = pxPerSec >= 200 ? 0.25 : pxPerSec >= 70 ? 0.5 : pxPerSec >= 35 ? 1 : pxPerSec >= 15 ? 2 : pxPerSec >= 7 ? 5 : 10;
   tlCtx.strokeStyle = '#332e27'; tlCtx.fillStyle = '#6e675c';
   tlCtx.font = '10px Outfit, sans-serif';
   for (let s = 0; s <= project.duration + 0.01; s += step) {
@@ -1278,7 +1640,7 @@ function drawTimelineCanvas() {
   // channel rows
   const o = selObj();
   if (!o) return;
-  CHANNELS.forEach((c, i) => {
+  channelsFor(o).forEach((c, i) => {
     const y = 26 + i * 26;
     const kfs = (project.keyframes[o.id] || {})[c.ch] || [];
     // row bg
@@ -1309,7 +1671,7 @@ function renderKeys() {
   tlKeys.innerHTML = '';
   const o = selObj();
   if (!o) return;
-  CHANNELS.forEach((c, ci) => {
+  channelsFor(o).forEach((c, ci) => {
     const kfs = (project.keyframes[o.id] || {})[c.ch] || [];
     kfs.forEach((k, i) => {
       const el = document.createElement('div');
@@ -1317,6 +1679,7 @@ function renderKeys() {
       el.style.left = (k.t * pxPerSec) + 'px';
       el.style.top = (26 + ci * 26 + 13) + 'px';
       el.setAttribute('aria-label', 'Keyframe at ' + k.t.toFixed(2) + 's');
+      el.innerHTML = '<div class="diamond"></div>';
       el.addEventListener('pointerdown', e => {
         e.preventDefault();
         selectedKey = { id: o.id, ch: c.ch, index: i };
@@ -1351,11 +1714,20 @@ function sortKeys(id, ch) {
 function updatePlayhead() {
   const x = animTime * pxPerSec;
   tlPlayhead.style.left = x + 'px';
-  document.getElementById('time-label').textContent = animTime.toFixed(2) + 's / ' + project.duration.toFixed(1) + 's';
+  const shotIdx = Math.max(0, project.shots.indexOf(activeShot()));
+  document.getElementById('time-label').textContent =
+    'S' + (shotIdx + 1) + ' ' + animTime.toFixed(2) + 's/' + project.duration.toFixed(1) + 's · movie ' +
+    globalTime().toFixed(1) + 's/' + totalDuration().toFixed(1) + 's';
+  const strip = document.getElementById('shot-strip');
+  if (strip) {
+    const ph = document.getElementById('shot-strip-playhead');
+    if (ph) ph.style.left = (clamp(globalTime() / Math.max(0.1, totalDuration()), 0, 1) * 100) + '%';
+  }
 }
 
 // scrub
 tlScroll.addEventListener('pointerdown', e => {
+  if (recMode) return; // no scrubbing while exporting
   if (e.target.closest('.tl-key')) return;
   const rect = tlScroll.getBoundingClientRect();
   const setFromEvent = ev => {
@@ -1386,13 +1758,14 @@ document.getElementById('tl-scroll').addEventListener('wheel', e => {
 /* play / pause */
 const btnPlay = document.getElementById('btn-play');
 function setPlaying(p) {
+  if (recMode && p) return; // no manual playback while exporting
   playing = p;
   document.getElementById('icon-play').style.display = p ? 'none' : '';
   document.getElementById('icon-pause').style.display = p ? '' : 'none';
 }
 btnPlay.addEventListener('click', () => setPlaying(!playing));
 window.addEventListener('keydown', e => {
-  if (e.code === 'Space' && activeWs === 'anim' && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+  if (e.code === 'Space' && activeWs === 'anim' && !recMode && !['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
     e.preventDefault(); setPlaying(!playing);
   }
 });
@@ -1426,6 +1799,13 @@ function currentChannelValue(o, ch) {
     case 'scale': return 1;
     case 'opacity': return o.opacity ?? 1;
     case 'pose': return 0;
+    case 'cam.px': return camera.position.x;
+    case 'cam.py': return camera.position.y;
+    case 'cam.pz': return camera.position.z;
+    case 'cam.tx': return controls.target.x;
+    case 'cam.ty': return controls.target.y;
+    case 'cam.tz': return controls.target.z;
+    case 'cam.fov': return camera.fov;
   }
 }
 document.getElementById('btn-key-del').addEventListener('click', () => {
@@ -1445,13 +1825,8 @@ window.addEventListener('keydown', e => {
   }
 });
 document.getElementById('btn-zoom-fit').addEventListener('click', () => {
-  pxPerSec = Math.max(40, (tlScroll.clientWidth - 60) / project.duration);
+  pxPerSec = clamp((tlScroll.clientWidth - 60) / project.duration, 0.5, 400);
   renderTimeline();
-});
-document.getElementById('anim-duration').addEventListener('input', e => {
-  project.duration = +e.target.value;
-  animTime = clamp(animTime, 0, project.duration);
-  markDirty(); renderTimeline(); updatePlaybar();
 });
 document.getElementById('anim-fps').addEventListener('input', e => {
   project.fps = +e.target.value;
@@ -1464,11 +1839,32 @@ function updatePlaybar() { updatePlayhead(); }
    Render loop
    ============================================================ */
 let lastFrameTs = performance.now();
+let moviePlayStart = 0, moviePlayOffset = 0; // wall-clock anchor: no drift vs audio
 function tick(now) {
   requestAnimationFrame(tick);
   const dt = Math.min((now - lastFrameTs) / 1000, 0.1);
   lastFrameTs = now;
-  if (playing) {
+  if (moviePlaying) {
+    movieTime = moviePlayOffset + (performance.now() - moviePlayStart) / 1000;
+    const total = totalDuration();
+    if (movieTime >= total) {
+      movieTime = total;
+      stopMovie();
+    } else {
+      // find the shot that covers movieTime
+      let acc = 0, idx = project.shots.length - 1;
+      for (let i = 0; i < project.shots.length; i++) {
+        if (movieTime < acc + Math.max(0.5, project.shots[i].duration)) { idx = i; break; }
+        acc += Math.max(0.5, project.shots[i].duration);
+      }
+      const s = project.shots[idx];
+      if (s.id !== project.activeShotId) applyShotPlayback(s.id);
+      animTime = clamp(movieTime - shotStart(idx), 0, s.duration);
+      evaluateAt(animTime);
+      syncAudio(movieTime);
+      updatePlayhead();
+    }
+  } else if (playing) {
     animTime += dt;
     if (animTime > project.duration) animTime = 0;
     evaluateAt(animTime);
@@ -1505,55 +1901,308 @@ function drawAxisBadge() {
 }
 
 /* ============================================================
-   Video export (MediaRecorder)
+   Audio — clips placed on the global movie timeline
+   ============================================================ */
+let audioCtx = null, masterGain = null, exportDest = null;
+const audioNodes = new Map(); // assetId -> { el, gain }
+function getAudioCtx() {
+  if (!audioCtx) {
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.connect(audioCtx.destination);
+      exportDest = audioCtx.createMediaStreamDestination(); // feeds the export stream
+      masterGain.connect(exportDest);
+    } catch { return null; }
+  }
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+function audioNodeFor(assetId) {
+  let n = audioNodes.get(assetId);
+  if (!n) {
+    const asset = project.audioAssets.find(a => a.id === assetId);
+    if (!asset || !asset.dataURL) return null;
+    const ctx = getAudioCtx();
+    if (!ctx) return null;
+    const el = new Audio();
+    el.preload = 'auto';
+    el.src = asset.dataURL;
+    try {
+      const src = ctx.createMediaElementSource(el);
+      const gain = ctx.createGain();
+      src.connect(gain);
+      gain.connect(masterGain);
+      n = { el, gain };
+      audioNodes.set(assetId, n);
+    } catch { return null; }
+  }
+  return n;
+}
+function syncAudio(t) {
+  getAudioCtx();
+  project.audioClips.forEach(clip => {
+    const n = audioNodeFor(clip.assetId); if (!n) return;
+    n.gain.gain.value = clip.volume ?? 1;
+    const dur = isFinite(n.el.duration) ? n.el.duration : 0;
+    const local = t - clip.start;
+    const should = local >= -0.05 && (dur === 0 || local < dur);
+    if (should) {
+      if (n.el.paused) {
+        try { n.el.currentTime = Math.max(0, local); } catch {}
+        n.el.play().catch(() => {});
+      } else if (Math.abs(n.el.currentTime - local) > 0.35) {
+        try { n.el.currentTime = Math.max(0, local); } catch {}
+      }
+    } else if (!n.el.paused) n.el.pause();
+  });
+}
+function stopAudio() { audioNodes.forEach(n => { try { n.el.pause(); } catch {} }); }
+
+/* ---------- audio UI ---------- */
+function renderAudioList() {
+  const list = document.getElementById('audio-list');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!project.audioClips.length) {
+    list.innerHTML = '<div class="empty-note">Add music or dialogue files — each clip sits on the global movie timeline (start = seconds from the beginning of the movie).</div>';
+    return;
+  }
+  project.audioClips.forEach(clip => {
+    const asset = project.audioAssets.find(a => a.id === clip.assetId);
+    const row = document.createElement('div'); row.className = 'audio-row';
+    const nm = document.createElement('div'); nm.className = 'an';
+    nm.textContent = (asset ? asset.name : 'missing audio') + (asset && asset.duration ? ' · ' + fmtDur(asset.duration) : '');
+    if (asset && !asset.dataURL) nm.textContent += ' · file missing (re-add this audio)';
+    row.appendChild(nm);
+    const r1 = document.createElement('div'); r1.className = 'ar';
+    const l1 = document.createElement('label'); l1.textContent = 'Start (s)';
+    const sIn = document.createElement('input'); sIn.type = 'number'; sIn.step = '0.1'; sIn.min = '0'; sIn.value = clip.start;
+    sIn.setAttribute('aria-label', 'Clip start on movie timeline');
+    sIn.addEventListener('change', () => { clip.start = Math.max(0, parseFloat(sIn.value) || 0); markDirty(); });
+    r1.append(l1, sIn);
+    const r2 = document.createElement('div'); r2.className = 'ar';
+    const l2 = document.createElement('label'); l2.textContent = 'Volume';
+    const vIn = document.createElement('input'); vIn.type = 'range'; vIn.min = '0'; vIn.max = '100'; vIn.value = Math.round((clip.volume ?? 1) * 100);
+    vIn.setAttribute('aria-label', 'Clip volume');
+    vIn.addEventListener('input', () => { clip.volume = vIn.value / 100; markDirty(); });
+    r2.append(l2, vIn);
+    const del = document.createElement('button'); del.className = 'mini'; del.textContent = '×'; del.title = 'Remove clip';
+    del.addEventListener('click', () => {
+      project.audioClips = project.audioClips.filter(c => c !== clip);
+      markDirty(); renderAudioList();
+    });
+    row.append(r1, r2, del);
+    list.appendChild(row);
+  });
+}
+document.getElementById('btn-audio-add')?.addEventListener('click', () => document.getElementById('file-audio')?.click());
+document.getElementById('file-audio')?.addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataURL = reader.result;
+    const probe = new Audio(); probe.preload = 'metadata'; probe.src = dataURL;
+    const asset = { id: uid('aud'), name: f.name, dataURL, duration: 0 };
+    probe.addEventListener('loadedmetadata', () => { asset.duration = probe.duration || 0; renderAudioList(); }, { once: true });
+    project.audioAssets.push(asset);
+    project.audioClips.push({ id: uid('clip'), assetId: asset.id, start: Math.round(globalTime() * 10) / 10, volume: 1 });
+    markDirty(); renderAudioList();
+    toast('Audio added at ' + fmtDur(globalTime()) + ' on the movie timeline');
+  };
+  reader.readAsDataURL(f);
+  e.target.value = '';
+});
+
+/* ============================================================
+   Play movie — preview the whole film, shot by shot, with sound
+   ============================================================ */
+function playMovie() {
+  if (recMode) return;
+  if (activeWs !== 'anim') setWorkspace('anim');
+  setPlaying(false);
+  moviePlaying = true;
+  moviePlayOffset = globalTime();
+  moviePlayStart = performance.now();
+  movieTime = moviePlayOffset;
+  applyShotPlayback(activeShot().id); // apply this shot's base framing right away
+  getAudioCtx(); // unlock audio with the user gesture
+  const btn = document.getElementById('btn-movie');
+  if (btn) { btn.textContent = 'Stop movie'; btn.classList.add('primary'); }
+  syncAudio(movieTime);
+}
+function stopMovie() {
+  moviePlaying = false;
+  stopAudio();
+  const btn = document.getElementById('btn-movie');
+  if (btn) { btn.textContent = 'Play movie'; btn.classList.remove('primary'); }
+  renderShotsUI(); syncShotControls(); updatePlayhead();
+}
+document.getElementById('btn-movie')?.addEventListener('click', () => { moviePlaying ? stopMovie() : playMovie(); });
+
+// don't lose a recording to an accidental tab close
+window.addEventListener('beforeunload', e => {
+  if (recMode) { e.preventDefault(); e.returnValue = ''; }
+});
+
+/* ============================================================
+   Movie export (MediaRecorder, fixed resolution, with audio)
    ============================================================ */
 const recStatus = document.getElementById('rec-status');
 let mediaRecorder = null, recordedChunks = [];
-let recordedFrames = []; // frame blobs for the project
+let recStart = 0, recHiddenTotal = 0, recHiddenSince = 0;
 
-document.getElementById('btn-record').addEventListener('click', async () => {
-  if (!project.sceneObjects.length) { toast('Scene is empty — nothing to record'); return; }
+async function exportMovie() {
+  if (recMode) { // acts as Stop while exporting — saves what was recorded
+    recStatus.textContent = 'Stopping — saving partial movie…';
+    finishExport(exportRestore.shotId, exportRestore.cam);
+    return;
+  }
+  if (!project.shots.length) { toast('Add a shot first'); return; }
   if (!window.MediaRecorder) { toast('This browser cannot record video'); return; }
-  const mimes = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  const mimes = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
   const mime = mimes.find(m => MediaRecorder.isTypeSupported(m));
   if (!mime) { toast('No supported video format'); return; }
-  // stop playback, go to 0
+  if (moviePlaying) stopMovie();
   setPlaying(false);
-  animTime = 0;
-  evaluateAt(0);
-  renderTimeline();
-  recordedChunks = [];
-  const stream = renderer.domElement.captureStream(project.fps);
-  mediaRecorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
-  mediaRecorder.ondataavailable = e => { if (e.data.size) recordedChunks.push(e.data); };
-  mediaRecorder.onstop = () => {
-    const blob = new Blob(recordedChunks, { type: mime });
-    const ext = mime.includes('webm') ? 'webm' : 'mp4';
-    downloadBlob(blob, (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + '.' + ext);
-    recStatus.textContent = '';
-    toast('Video saved (' + ext.toUpperCase() + ') — check your downloads');
-    document.getElementById('btn-record').disabled = false;
+  const resSel = document.getElementById('export-res');
+  const qualSel = document.getElementById('export-quality');
+  const W = parseInt(resSel ? resSel.value : '1280', 10) || 1280;
+  const H = Math.round(W * 9 / 16);
+  const kbps = { high: 8000, medium: 4000, low: 2500 }[qualSel ? qualSel.value : 'high'] || 8000;
+
+  // fixed export frame — restored afterwards
+  exportRestore = {
+    shotId: project.activeShotId,
+    cam: { pos: camera.position.clone(), tgt: controls.target.clone(), fov: camera.fov },
+    pixelRatio: renderer.getPixelRatio(),
   };
-  mediaRecorder.start(100);
-  recMode = true;
-  recStatus.textContent = 'Recording… plays once in real time (' + project.duration + 's)';
-  document.getElementById('btn-record').disabled = true;
-  // play from 0 to duration in real time
-  const startTs = performance.now();
-  const step = () => {
-    const elapsed = (performance.now() - startTs) / 1000;
-    animTime = clamp(elapsed, 0, project.duration);
-    evaluateAt(animTime);
-    updatePlayhead();
-    if (elapsed >= project.duration + 0.15) {
-      mediaRecorder.stop();
-      recMode = false;
-      return;
+  renderer.setPixelRatio(1); // square pixels: no DPR double-sampling in the video
+  renderer.setSize(W, H, false);
+  renderer.domElement.style.width = '100%';
+  renderer.domElement.style.height = '100%';
+  camera.aspect = W / H;
+  camera.updateProjectionMatrix();
+  controls.enabled = false;
+
+  // one video track + one mixed audio track
+  const tracks = [renderer.domElement.captureStream(project.fps).getVideoTracks()[0]];
+  getAudioCtx();
+  if (exportDest) tracks.push(exportDest.stream.getAudioTracks()[0]);
+  const stream = new MediaStream(tracks);
+
+  const ext = mime.includes('webm') ? 'webm' : 'mp4';
+  const fileName = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + '.' + ext;
+  recordedChunks = [];
+  let fsWritable = null, draining = false;
+  const drain = async () => { // serialize disk writes, keep memory flat
+    if (draining || !fsWritable || !recordedChunks.length) return;
+    draining = true;
+    try { while (recordedChunks.length) await fsWritable.write(recordedChunks.shift()); }
+    catch { fsWritable = null; }
+    draining = false;
+  };
+  const saveRecording = async () => {
+    try {
+      if (fsWritable) {
+        await fsWritable.close();
+        toast('Movie saved to the file you chose (' + W + '×' + H + ')');
+      } else {
+        const blob = new Blob(recordedChunks, { type: mime });
+        downloadBlob(blob, fileName);
+        toast('Movie exported (' + ext.toUpperCase() + ', ' + W + '×' + H + ') — check your downloads');
+      }
+    } catch (err) {
+      console.error('save failed', err);
+      toast('Could not save the recording — sorry. Try a shorter movie.');
     }
+    recStatus.textContent = '';
+    const rBtn = document.getElementById('btn-record');
+    rBtn.disabled = false; rBtn.textContent = 'Export movie';
+    document.getElementById('btn-download-video').disabled = false;
+  };
+  mediaRecorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: kbps * 1000, audioBitsPerSecond: 128000 });
+  mediaRecorder.ondataavailable = e => { if (e.data.size) { recordedChunks.push(e.data); drain(); } };
+  mediaRecorder.onerror = e => { console.error('MediaRecorder error', e.error); toast('Recorder error: ' + (e.error?.message || 'unknown')); finishExport(exportRestore.shotId, exportRestore.cam); };
+  mediaRecorder.onstop = saveRecording;
+
+  const total = totalDuration();
+
+  // pre-roll: show shot 1 at t=0 so the recording starts on a real frame
+  applyShotPlayback(project.shots[0].id);
+  evaluateAt(0);
+  renderer.render(three, camera);
+
+  mediaRecorder.start(1000);
+  recMode = true;
+  recStart = performance.now(); recHiddenTotal = 0; recHiddenSince = 0;
+  recStatus.textContent = 'Recording ' + W + '×' + H + ' — the movie plays once in real time (' + fmtDur(total) + '). Keep this tab visible.';
+  const rBtn = document.getElementById('btn-record');
+  rBtn.disabled = false; rBtn.textContent = 'Stop export';
+  document.getElementById('btn-download-video').disabled = true;
+
+  // optional: stream straight to a file on disk (Chrome/Edge) — avoids holding the whole movie in memory
+  if (window.showSaveFilePicker) {
+    try {
+      const fh = await showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'Video', accept: { [mime]: ['.' + ext] } }] });
+      if (recMode) { fsWritable = await fh.createWritable(); drain(); } // ignore if export already ended
+    } catch { /* user cancelled or unsupported — fall back to in-memory + download */ }
+  }
+
+  const step = () => {
+    if (!recMode) return;
+    const elapsed = (performance.now() - recStart - recHiddenTotal) / 1000;
+    let acc = 0, idx = project.shots.length - 1;
+    for (let i = 0; i < project.shots.length; i++) {
+      if (elapsed < acc + Math.max(0.5, project.shots[i].duration)) { idx = i; break; }
+      acc += Math.max(0.5, project.shots[i].duration);
+    }
+    const s = project.shots[idx];
+    if (s.id !== project.activeShotId) applyShotPlayback(s.id);
+    animTime = clamp(elapsed - shotStart(idx), 0, s.duration);
+    evaluateAt(animTime);
+    syncAudio(Math.min(elapsed, total));
+    updatePlayhead();
+    if (elapsed >= total + 0.2) { finishExport(exportRestore.shotId, exportRestore.cam); return; }
     requestAnimationFrame(step);
   };
   requestAnimationFrame(step);
+}
+let exportRestore = null;
+function finishExport(prevShotId, prevCam) {
+  recMode = false;
+  stopAudio();
+  try { if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop(); } catch {}
+  // restore editor state
+  camera.position.copy(prevCam.pos);
+  controls.target.copy(prevCam.tgt);
+  camera.fov = prevCam.fov;
+  camera.updateProjectionMatrix();
+  controls.enabled = true;
+  if (exportRestore) renderer.setPixelRatio(exportRestore.pixelRatio);
+  const rBtn = document.getElementById('btn-record');
+  if (rBtn.textContent === 'Stop export') rBtn.textContent = 'Export movie';
+  document.getElementById('btn-download-video').disabled = false;
+  applyShot(prevShotId);
+  resize3D(); // recomputes aspect + canvas size from the host element
+}
+// pause while the tab is hidden (rAF stops; recording would desync)
+document.addEventListener('visibilitychange', () => {
+  if (!recMode || !mediaRecorder) return;
+  if (document.hidden) {
+    recHiddenSince = performance.now();
+    try { mediaRecorder.pause(); } catch {}
+    stopAudio();
+    recStatus.textContent = 'Paused — this tab was hidden. Switch back to continue recording.';
+  } else if (recHiddenSince) {
+    recHiddenTotal += performance.now() - recHiddenSince;
+    recHiddenSince = 0;
+    try { mediaRecorder.resume(); } catch {}
+    recStatus.textContent = 'Recording…';
+  }
 });
+document.getElementById('btn-record').addEventListener('click', exportMovie);
+document.getElementById('btn-download-video').addEventListener('click', exportMovie);
 
 function downloadBlob(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -1562,20 +2211,17 @@ function downloadBlob(blob, name) {
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
-document.getElementById('btn-download-video').addEventListener('click', () => {
-  if (activeWs !== 'anim') setWorkspace('anim');
-  document.getElementById('btn-record').click();
-});
+
 
 /* ============================================================
    Project save / open / new
    ============================================================ */
 document.getElementById('btn-save').addEventListener('click', () => {
-  const data = JSON.stringify(project, null, 1);
+  const data = JSON.stringify(serializeProject(), null, 1);
   downloadBlob(new Blob([data], { type: 'application/json' }), (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + '.videocraft.json');
   dirty = false;
   document.getElementById('save-state').textContent = '';
-  toast('Project file saved to downloads');
+  toast('Project file saved to downloads — includes all shots and audio');
 });
 document.getElementById('btn-open').addEventListener('click', () => document.getElementById('file-open').click());
 document.getElementById('file-open').addEventListener('change', e => {
@@ -1584,16 +2230,15 @@ document.getElementById('file-open').addEventListener('change', e => {
   reader.onload = () => {
     try {
       const data = JSON.parse(reader.result);
-      if (!data.sceneObjects || !data.characters) throw new Error('bad file');
-      project = data;
-      project.name = project.name || 'Untitled project';
+      if (!data.shots && !data.sceneObjects) throw new Error('bad file');
+      loadProjectData(data);
       selectedId = null; currentCharId = project.characters[0]?.id || null;
       document.getElementById('project-tag').textContent = project.name;
+      applyShot(project.activeShotId);
       markDirty();
-      syncSceneObjects(); renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
-      renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
-      document.getElementById('anim-duration').value = project.duration;
-      toast('Project loaded: ' + project.name);
+      renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
+      renderAudioList();
+      toast('Project loaded: ' + project.name + ' (' + project.shots.length + ' shot' + (project.shots.length > 1 ? 's' : '') + ')');
     } catch { toast('That file is not a VideoCraft project'); }
     e.target.value = '';
   };
@@ -1601,24 +2246,27 @@ document.getElementById('file-open').addEventListener('change', e => {
 });
 document.getElementById('btn-starter').addEventListener('click', loadStarterScene);
 document.getElementById('btn-new').addEventListener('click', () => {
-  if (project.sceneObjects.length && !confirm('Start a new project? Unsaved work will be lost.')) return;
+  const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length;
+  if (hasWork && !confirm('Start a new movie? Unsaved work will be lost.')) return;
   project = defaultProject();
   currentCharId = null; selectedId = null;
   document.getElementById('project-tag').textContent = project.name;
   markDirty();
   clearDraw();
-  syncSceneObjects(); renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
-  renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
-  toast('New project');
+  applyShot(project.shots[0].id);
+  renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
+  renderAudioList();
+  toast('New movie');
 });
 
 /* ============================================================
-   Starter demo — draws an asset, builds an engine + hero, keys it
+   Starter demo — a two-shot mini movie: engine room + hero close-up
    ============================================================ */
 function loadStarterScene() {
-  if ((project.sceneObjects.length || project.drawings.length) && !confirm('Replace the current project with the starter scene?')) return;
+  const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length;
+  if (hasWork && !confirm('Replace the current movie with the starter scene?')) return;
   project = defaultProject();
-  project.name = 'Starter — spinning engine';
+  project.name = 'Starter — mini movie';
   selectedId = null; currentCharId = null;
 
   // 1) draw an asset programmatically (a sunny poster)
@@ -1629,7 +2277,7 @@ function loadStarterScene() {
   x.fillStyle = '#5b4632'; x.font = '700 44px Outfit, sans-serif'; x.textAlign = 'center';
   x.fillText('VideoCraft', 200, 70);
   x.font = '400 22px Outfit, sans-serif'; x.fillStyle = '#7a5b3a';
-  x.fillText('draw → build → animate', 200, 110);
+  x.fillText('draw, build, animate', 200, 110);
   project.drawings.push({ id: uid('draw'), name: 'Sun poster', dataURL: c.toDataURL('image/png') });
 
   // 2) a hero character
@@ -1637,23 +2285,43 @@ function loadStarterScene() {
   project.characters.push(hero);
   currentCharId = hero.id;
 
-  // 3) scene objects: engine assembly + poster + hero
-  const mk = (o) => { project.sceneObjects.push(o); return o; };
-  const block = mk({ id: uid('obj'), name: 'Engine block', type: 'engineKit', enginePart: 'block', color: '#8a8f96', pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  // ---------- SHOT 1: the engine room ----------
+  const s1 = project.shots[0];
+  s1.name = 'Engine room';
+  s1.duration = 6;
+  const mk = (o) => { s1.sceneObjects.push(o); return o; };
+  mk({ id: uid('obj'), name: 'Engine block', type: 'engineKit', enginePart: 'block', color: '#8a8f96', pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
   const fly = mk({ id: uid('obj'), name: 'Flywheel', type: 'engineKit', enginePart: 'flywheel', color: '#8a8f96', pos: [2.4, 1.15, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
   const crank = mk({ id: uid('obj'), name: 'Crankshaft', type: 'engineKit', enginePart: 'crankshaft', color: '#8a8f96', pos: [0, 0.35, 1.7], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
-  const poster = mk({ id: uid('obj'), name: 'Sun poster', type: 'drawing', assetId: project.drawings[0].id, color: '#fff', pos: [-4.5, 1.7, -2], rot: [0, 24, 0], scale: [1, 1, 1], opacity: 1 });
-  const heroObj = mk({ id: uid('obj'), name: 'Hero', type: 'character', assetId: hero.id, color: '#fff', pos: [-5, 1.3, 2.5], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
-
-  // 4) keyframes: flywheel + crank spin, hero walks past, wave at the end
-  project.duration = 6;
-  const kf = project.keyframes;
-  kf[fly.id] = { 'rot.y': [{ t: 0, v: 0, ease: 'linear' }, { t: 6, v: 720, ease: 'linear' }] };
-  kf[crank.id] = { 'rot.y': [{ t: 0, v: 0, ease: 'linear' }, { t: 6, v: 720, ease: 'linear' }] };
-  kf[heroObj.id] = {
+  mk({ id: uid('obj'), name: 'Sun poster', type: 'drawing', assetId: project.drawings[0].id, color: '#fff', pos: [-4.5, 1.7, -2], rot: [0, 24, 0], scale: [1, 1, 1], opacity: 1 });
+  mk({ id: uid('obj'), name: 'Title', type: 'text', text: 'THE ENGINE ROOM', color: '#f2b25c', pos: [0, 3.1, -3.5], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  const heroObj1 = mk({ id: uid('obj'), name: 'Hero', type: 'character', assetId: hero.id, color: '#fff', pos: [-5, 1.3, 2.5], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  const kf1 = s1.keyframes;
+  kf1[fly.id] = { 'rot.y': [{ t: 0, v: 0, ease: 'linear' }, { t: 6, v: 720, ease: 'linear' }] };
+  kf1[crank.id] = { 'rot.y': [{ t: 0, v: 0, ease: 'linear' }, { t: 6, v: 720, ease: 'linear' }] };
+  kf1[heroObj1.id] = {
     'pos.x': [{ t: 0, v: -5, ease: 'ease' }, { t: 4, v: 3.5, ease: 'ease' }],
     'pos.z': [{ t: 0, v: 2.5, ease: 'ease' }, { t: 4, v: 2.5, ease: 'ease' }],
     'pose': [{ t: 0, v: 0, ease: 'linear' }, { t: 3.5, v: 7, ease: 'linear' }, { t: 4, v: 0, ease: 'linear' }],
+  };
+
+  // ---------- SHOT 2: hero close-up, with a camera move ----------
+  const s2 = newShot('Hero close-up', 4);
+  project.shots.push(s2);
+  const mk2 = (o) => { s2.sceneObjects.push(o); return o; };
+  const heroObj2 = mk2({ id: uid('obj'), name: 'Hero', type: 'character', assetId: hero.id, color: '#fff', pos: [0, 1.3, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  mk2({ id: uid('obj'), name: 'The end', type: 'text', text: 'THE END', color: '#ece7dd', pos: [0, 2.8, -2], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  const kf2 = s2.keyframes;
+  kf2[heroObj2.id] = {
+    'pose': [{ t: 0, v: 0, ease: 'linear' }, { t: 2, v: 6, ease: 'linear' }, { t: 4, v: 0, ease: 'linear' }],
+  };
+  kf2[CAMERA_ID] = {
+    'cam.px': [{ t: 0, v: 7, ease: 'ease' }, { t: 4, v: 2.4, ease: 'ease' }],
+    'cam.py': [{ t: 0, v: 5.5, ease: 'ease' }, { t: 4, v: 1.9, ease: 'ease' }],
+    'cam.pz': [{ t: 0, v: 9, ease: 'ease' }, { t: 4, v: 3.4, ease: 'ease' }],
+    'cam.tx': [{ t: 0, v: 0, ease: 'ease' }, { t: 4, v: 0, ease: 'ease' }],
+    'cam.ty': [{ t: 0, v: 1.4, ease: 'ease' }, { t: 4, v: 1.4, ease: 'ease' }],
+    'cam.tz': [{ t: 0, v: 0, ease: 'ease' }, { t: 4, v: 0, ease: 'ease' }],
   };
   hero._base = { ...hero.pivots };
 
@@ -1663,13 +2331,16 @@ function loadStarterScene() {
   img.src = project.drawings[0].dataURL;
 
   document.getElementById('project-tag').textContent = project.name;
-  document.getElementById('anim-duration').value = project.duration;
-  selectedId = fly.id;
+  applyShot(s1.id);
+  // set deterministic base framings AFTER applyShot (which captures the old editor camera)
+  s1.camera = { pos: [8.5, 7, 11], tgt: [0, 1.2, 0], fov: 46 };
+  s2.camera = { pos: [7, 5.5, 9], tgt: [0, 1.4, 0], fov: 46 };
+  applyCameraBase(s1);
   markDirty();
-  syncSceneObjects(); renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
-  renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
+  renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
+  renderAudioList();
   setWorkspace('anim');
-  toast('Starter scene loaded — press Space to play');
+  toast('Starter movie loaded — 2 shots, 10s. Try Play movie.');
 }
 
 /* ============================================================
@@ -1677,7 +2348,7 @@ function loadStarterScene() {
    ============================================================ */
 loadSaved();
 document.getElementById('project-tag').textContent = project.name;
-if (!project.characters.length && !project.sceneObjects.length && !project.drawings.length) {
+if (!project.characters.length && !project.shots.some(s => s.sceneObjects.length) && !project.drawings.length) {
   // first visit: starter character so the app never feels empty
   const rig = defaultRig('Hero');
   project.characters.push(rig);
@@ -1685,10 +2356,25 @@ if (!project.characters.length && !project.sceneObjects.length && !project.drawi
 }
 document.getElementById('char-name').value = currentRig()?.name || '';
 renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
-syncSceneObjects();
+renderAudioList();
+applyShot(project.activeShotId);
 renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
 setWorkspace('draw');
 syncDrawSize();
 requestAnimationFrame(tick);
 window.addEventListener('resize', () => { syncDrawSize(); resize3D(); renderTimeline(); });
 markDirty();
+
+// test/QA hook (harmless in production)
+window.__vc = {
+  get project() { return project; },
+  get camera() { return camera; },
+  evaluateAt,
+  playingAudioCount: () => [...audioNodes.values()].filter(n => !n.el.paused).length,
+  clipInfo: () => project.audioClips.map(c => ({ start: c.start, vol: c.volume, asset: (project.audioAssets.find(a => a.id === c.assetId) || {}).name })),
+  audioDebug: () => ({
+    ctxState: audioCtx ? audioCtx.state : 'none',
+    nodes: [...audioNodes.entries()].map(([id, n]) => ({ id, paused: n.el.paused, ct: Math.round(n.el.currentTime * 100) / 100, ready: n.el.readyState })),
+    masterConnected: !!(masterGain && exportDest),
+  }),
+};
