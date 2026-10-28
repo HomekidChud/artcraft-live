@@ -5,7 +5,7 @@ video-only offline-export limitation in `QA-FILM-PRODUCTION.md`.
 
 ## Automated and browser checks
 
-- **Automated:** 56 VideoCraft tests and 77 assistant tests pass. New checks
+- **Automated:** 57 VideoCraft tests and 77 assistant tests pass. New checks
   cover grade/performance migration, deterministic blinking and speech,
   amplitude envelopes, camera framing, trim/fade/pan/peak limiting, repeated
   sources, section PCM equivalence, missing/corrupt/oversized sources,

@@ -14,10 +14,12 @@ export const LIGHT_RIGS = {
   golden: { key:'#ffb966', intensity:4, position:[-7,4,5], rim:'#cedaff', rimIntensity:1.7, rimPosition:[4,6,-5], ambient:0.5 },
 };
 export function gradeSettings(g = {}) {
+  g=g && typeof g==='object' ? g : {};
   return { contrast:clamp(g.contrast ?? 1,0.5,1.8), saturation:clamp(g.saturation ?? 1,0,1.8),
     temperature:clamp(g.temperature ?? 0,-1,1), vignette:clamp(g.vignette ?? 0,0,0.7), grain:clamp(g.grain ?? 0,0,0.08) };
 }
 export function performanceSettings(p = {}) {
+  p=p && typeof p==='object' ? p : {};
   const voice = p.voice && typeof p.voice.clipId === 'string' && Array.isArray(p.voice.values)
     ? { clipId:p.voice.clipId, step:clamp(p.voice.step ?? 0.02,0.01,0.1),
       values:p.voice.values.slice(0,60001).map(v=>clamp(v,0,1)) } : null;

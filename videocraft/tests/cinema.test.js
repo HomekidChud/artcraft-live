@@ -9,6 +9,13 @@ test('legacy films have neutral grades and no changed lighting rig',()=>{
   assert.deepEqual(shotFilm().grade,GRADES.neutral);assert.equal(shotFilm().lightRig,'legacy');
   assert.equal(shotFilm({lightRig:'not-a-rig'}).lightRig,'legacy');
 });
+test('empty or malformed optional cinematic settings keep safe defaults',()=>{
+  assert.deepEqual(gradeSettings(null),GRADES.neutral);
+  assert.deepEqual(gradeSettings('invalid'),GRADES.neutral);
+  assert.deepEqual(shotFilm(null),shotFilm());
+  assert.deepEqual(shotFilm({grade:null}).grade,GRADES.neutral);
+  assert.equal(performanceSettings(null).emotion,'neutral');
+});
 test('grades normalize finite values within render limits',()=>{
   assert.deepEqual(gradeSettings({contrast:100,saturation:-10,temperature:Infinity,vignette:2,grain:1}),
     {contrast:1.8,saturation:0,temperature:-1,vignette:0.7,grain:0.08});

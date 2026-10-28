@@ -51,6 +51,7 @@ export function renderRange(shots, activeId, settings = {}) {
   return { start, end, duration: end - start };
 }
 export function shotFilm(input = {}) {
+  input=input && typeof input==='object' ? input : {};
   const colour = (v, fallback) => /^#[0-9a-f]{6}$/i.test(v) ? v : fallback;
   return {
     grade:gradeSettings(input.grade), lightRig:Object.hasOwn(LIGHT_RIGS,input.lightRig) ? input.lightRig : 'legacy',
