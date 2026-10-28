@@ -11,6 +11,12 @@ Straight**, has four 3D runners, five camera shots, a stadium, a close finish an
 a winner's celebration over 26 seconds. Replacing an existing movie requires
 confirmation. Save your current project first if you want to retain it.
 
+For a dialogue example, click **Cinematic demo**. **The Last Signal** is a
+13-second, four-shot apartment scene with two rigged actors, a bundled
+AI-generated voice, audio-amplitude mouth movement, timed subtitles, lighting
+and grading. Its camera moves, performances and sound clip remain editable.
+This is an original stylised technical demo, not a production-quality film.
+
 ## Production workspaces
 
 The studio now has ten labelled tabs. The navigation rail scrolls on shorter
@@ -112,7 +118,40 @@ file backup rather than claiming the asset was saved automatically.
 Sound clips now have independent media elements, even for repeated instances
 of one source. Set source in-point, trimmed duration (zero means to source
 end), fade-in/out, volume and stereo pan. Real-time movie recording includes
-this mix; frame-accurate mode remains video-only.
+this mix; frame-accurate mode now renders a stereo PCM mix into Opus audio.
+
+## Faces, dialogue and cinematic looks
+
+In Scene or Animate, select a built-in 3D character and expand **Face, gaze &
+dialogue**. Choose neutral, happy, sad, angry, surprised or focused expressions;
+set horizontal/vertical gaze, blinking and manual mouth opening. Face controls
+are independent per instance and do not change the character's body animation.
+Timed dialogue gestures use shot-local times and synthetic mouth movement.
+
+For audio-driven mouth movement, import dialogue in Sound, select its placed
+clip in the actor's face panel, then click **Analyze dialogue for mouth
+movement**. A compact loudness envelope is saved in the project and sampled
+at absolute movie time, respecting that clip's start, source trim and gain.
+This is amplitude animation, not phoneme recognition or accurate lip sync.
+Changing the audio source requires analyzing it again; changing clip timing
+does not. Analysis is limited to ten-minute sources.
+
+Imported GLBs can opt into **Imported face overrides**. Recognized named
+jaw/mouth, blink and emotion morphs are overlaid on their authored animation.
+Overrides are off by default. Switching them off restores the authored morph
+values; unsupported morph naming and rigs without morph targets are unchanged.
+
+**Actor camera composition** supplies Close-up, Medium and Wide framing from
+the actor's current position, rotation and bounds. Applying it asks before
+replacing existing shot camera keys. It authors a base camera, not a moving
+tracking constraint.
+
+In Scene, expand **Cinematic lighting & grade** for portrait, moonlight, neon
+and golden key/fill/rim arrangements. Colour presets and editable contrast,
+saturation, warmth, vignette and grain use GPU postprocessing shared by preview
+and export. Grain is deterministic by movie frame. Neutral grading bypasses
+the postprocessor, and legacy files keep their original lighting by default.
+Captions are composited after grading so their colours stay readable.
 
 ## 3D characters and animation
 
@@ -188,9 +227,15 @@ demanding; use a smaller width on limited hardware.
 
 **Frame-accurate** mode evaluates each movie frame at its exact time and encodes
 it with WebCodecs and a vendored WebM muxer. A slow GPU takes longer rather than
-skipping animation frames. This mode is **video-only**: if a movie has audio
-clips, the editor asks you to use real-time recording rather than silently
-discarding sound. WebCodecs needs a supported secure browser/encoder.
+skipping animation frames. The offline mixer decodes each used audio source
+once, mixes independent clips in small stereo blocks at 48 kHz, and encodes
+128 kbps Opus alongside VP8 video. Trims, fades, volume, repeated sources,
+stereo pan and section offsets are supported. A hard peak limiter prevents
+sample overflow; this is not a mastering loudness normalizer. Decoded audio is
+capped at 256 MB, so split very long sound sources into shorter files.
+WebCodecs needs a supported secure browser and video/audio encoders.
+Missing sources or unsupported audio encoders fail visibly rather than
+silently discarding sound. Use real-time mode as a compatibility fallback.
 
 **Real-time recording** uses MediaRecorder and includes the existing audio mix.
 Frame delivery depends on the machine; a slow browser may record choppy
@@ -213,9 +258,9 @@ binary shot lookup in the precision seeker; keyframe sampling uses binary
 search, and the timeline only mounts visible keyframe diamonds. Frame-accurate
 export still evaluates every frame, which can take substantial time.
 
-MP4/ProRes, offline audio mixing, path tracing, depth of field, physically accurate motion blur,
+Native MP4/ProRes, path tracing, depth of field, physically accurate motion blur,
 colour grading nodes, multilayer compositing, dissolves, FBX import, external mocap,
-dialogue/lip-sync and distributed/render-farm processing are not implemented here.
+phoneme-accurate lip sync and distributed/render-farm processing are not implemented here.
 You can make multi-shot stylised movies, but these are future work for a
 professional feature-film pipeline. A one-hour data timeline and short
 sections can be tested without certifying a complete hour-long render on

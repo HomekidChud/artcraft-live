@@ -19,7 +19,7 @@
   /* warm graphite studio + ember accents (no purple, no gradients) */
   --bg: #191714; --panel: #211f1b; --panel-2: #272421; --panel-3: #2e2a26;
   --line: #383329; --line-soft: #322e28;
-  --text: #ece7dd; --text-muted: #a89e8f; --text-faint: #6e675c;
+  --text: #ece7dd; --text-muted: #a89e8f; --text-faint: #a79b89;
   --accent: #f2b25c; --accent-strong: #e0a043; --accent-ink: #241a0a;
   --accent-2: #e05d5d; --accent-3: #4fb3a4; --accent-4: #c77b9e;
   --focus: #f2b25c;
@@ -381,6 +381,7 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
       <span id="save-state"></span>
       <button class="btn ghost" id="btn-starter">Starter scene</button>
       <button class="btn primary" id="btn-race">3D race movie</button>
+      <button class="btn primary" id="btn-cinema">Cinematic demo</button>
       <button class="btn ghost" id="btn-new">New</button>
       <button class="btn ghost" id="btn-open">Open</button>
       <input type="file" id="file-open" accept=".videocraft,.json" class="sr-only">
@@ -582,7 +583,7 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
           <div class="empty-note" id="export-range-summary"></div>
           <label class="side-title" for="export-mode">Render mode</label>
           <select class="btn studio-select" id="export-mode">
-            <option value="offline" selected>Frame-accurate (video only)</option>
+            <option value="offline" selected>Frame-accurate (video + audio)</option>
             <option value="realtime">Real-time recording (with audio)</option>
           </select>
           <div class="field-row"><label for="export-res">Resolution</label></div>
@@ -604,7 +605,7 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
           </select>
           <button class="btn primary" id="btn-record">Export movie (webm)</button>
           <span id="rec-status"></span>
-            <div class="empty-note">Frame-accurate mode renders every frame, but is video-only. Choose real-time for sound and keep the tab visible. Memory exports in either mode are limited to five-minute sections; direct-to-disk needs a browser with a save-file picker.</div>
+            <div class="empty-note">Frame-accurate mode renders every frame and mixes stereo audio with WebCodecs. Real-time is a compatibility fallback; keep the tab visible. Memory exports in either mode are limited to five-minute sections. Audio decoding is capped at 256 MB.</div>
           </div></div>
         </aside>
         <div id="anim-viewport"></div>
@@ -633,6 +634,6 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
   }
 }
 </script>
-<script type="module" src="app.js?v=0.6.0"></script>
+<script type="module" src="app.js?v=0.7.0"></script>
 </body>
 </html>

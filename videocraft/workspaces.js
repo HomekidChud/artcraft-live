@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildModel, disposeModel } from './models.js';
-import { PRODUCTION_TABS, PART_TYPES, newPart, validateModel, modelTemplate, modelInstance, makeId } from './production.js';
-import { renderShotFinishing, subtitleTools } from './film-ui.js';
+import { buildModel, disposeModel } from './models.js?v=0.7.0';
+import { PRODUCTION_TABS, PART_TYPES, newPart, validateModel, modelTemplate, modelInstance, makeId } from './production.js?v=0.7.0';
+import { renderShotFinishing, subtitleTools } from './film-ui.js?v=0.7.0';
 
 const names = { plan: 'Planning', design: 'Design', assets: 'Assets', board: 'Storyboard', sound: 'Sound', delivery: 'Delivery' };
 const icons = {
@@ -367,7 +367,7 @@ export function createStudioWorkspaces(api) {
   }
   function sound() {
     const el = root('sound');
-    heading(el, 'SOUND DEPARTMENT', 'Give your movie a voice.', 'Layer dialogue, music and effects with independent clips, source trims, fades and stereo pan. Start times are global movie seconds; real-time export includes sound.');
+    heading(el, 'SOUND DEPARTMENT', 'Give your movie a voice.', 'Layer dialogue, music and effects with independent clips, source trims, fades and stereo pan. Start times are global movie seconds; both export modes include sound.');
     const grid = node('div', 'studio-grid'); el.append(grid);
     const audio = panel(grid, 'Audio clips'), host = node('div', 'studio-stack'); host.id = 'sound-controls'; audio.append(host);
     const notes = panel(grid, 'Sound direction');
@@ -392,7 +392,7 @@ export function createStudioWorkspaces(api) {
     check.append(node('p', 'studio-muted', `${p().shots.length} shots · ${p().shots.reduce((sum, shot) => sum + shot.duration, 0).toFixed(1)}s · ${p().fps} fps · ${p().audioClips.length} audio clips`));
     check.append(button('Review storyboard', () => open('board')), button('Save project backup', api.saveProject));
     const output = panel(grid, 'Export settings'), host = node('div', 'studio-stack'); host.id = 'delivery-controls'; output.append(host);
-    output.append(node('p', 'studio-muted', 'Render a whole film, the current shot or a custom interval. Frame-accurate mode is silent; direct-to-disk bounds output memory in compatible browsers. Memory exports are limited to five-minute sections. A feature-length timeline is not a guarantee that your device can render a finished feature.'));
+    output.append(node('p', 'studio-muted', 'Render a film, shot or interval with frame-accurate video and mixed stereo audio. Direct-to-disk bounds compressed output memory; decoded audio has a 256 MB cap. Memory exports are limited to five-minute sections. A feature-length timeline is not a guarantee of a finished feature.'));
   }
   const renderers = { plan: planning, design, assets, board: storyboard, sound, delivery };
   return {

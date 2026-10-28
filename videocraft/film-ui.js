@@ -1,6 +1,6 @@
-import { createSet, SETS } from './sets.js';
-import { makeId } from './production.js';
-import { parseSRT, movieSRT, movieIndex, shotFilm } from './film.js';
+import { createSet, SETS } from './sets.js?v=0.7.0';
+import { makeId } from './production.js?v=0.7.0';
+import { parseSRT, movieSRT, movieIndex, shotFilm } from './film.js?v=0.7.0';
 
 const el = (tag, text, cls) => {
   const n = document.createElement(tag); if (text !== undefined) n.textContent = text;

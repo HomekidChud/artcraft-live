@@ -1,4 +1,5 @@
 // Pure film-production utilities: shared by the editor, renderer and tests.
+import { gradeSettings, LIGHT_RIGS } from './cinema.js?v=0.7.0';
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const number = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 export function easing(u, kind = 'ease') {
@@ -52,6 +53,7 @@ export function renderRange(shots, activeId, settings = {}) {
 export function shotFilm(input = {}) {
   const colour = (v, fallback) => /^#[0-9a-f]{6}$/i.test(v) ? v : fallback;
   return {
+    grade:gradeSettings(input.grade), lightRig:Object.hasOwn(LIGHT_RIGS,input.lightRig) ? input.lightRig : 'legacy',
     background: colour(input.background, ''), ground: colour(input.ground, '#2b2620'),
     exposure: input.exposure == null ? null : clamp(number(input.exposure, 1.1), 0.2, 3),
     fog: input.fog == null ? null : clamp(number(input.fog, 0), 0, 0.12),

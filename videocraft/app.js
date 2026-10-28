@@ -2,14 +2,19 @@
 // v0.2 — movie studio: shots, per-shot camera, audio, fixed-res export.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildAvatar } from './avatar3d.js';
-import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js';
-import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js';
-import { buildModel } from './models.js';
-import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
-import { sampleKeys, movieIndex, locateTime, renderRange, shotFilm, fadeAmount, inspectGLB } from './film.js';
-import { importedInstance, loadImported } from './imported.js';
-import { renderWorld } from './film-ui.js';
+import { buildAvatar } from './avatar3d.js?v=0.7.0';
+import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js?v=0.7.0';
+import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js?v=0.7.0';
+import { buildModel } from './models.js?v=0.7.0';
+import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js?v=0.7.0';
+import { sampleKeys, movieIndex, locateTime, renderRange, shotFilm, fadeAmount, inspectGLB } from './film.js?v=0.7.0';
+import { importedInstance, loadImported } from './imported.js?v=0.7.0';
+import { renderWorld } from './film-ui.js?v=0.7.0';
+import { LIGHT_RIGS, performanceSettings, samplePerformance, audioEnvelope, composeCamera } from './cinema.js?v=0.7.0';
+import { renderCinemaLook, renderPerformance } from './cinema-ui.js?v=0.7.0';
+import { createCinemaRenderer } from './cinema-renderer.js?v=0.7.0';
+import { decodeSources, mixStereo } from './sound-render.js?v=0.7.0';
+import { buildCinemaDemo, loadDemoVoice } from './cinema-demo.js?v=0.7.0';
 
 installWorkspaceShell();
 let studioWorkspaces = null;
@@ -73,6 +78,7 @@ function migrateProject(data) {
     if (!s.duration || s.duration < 0.5) s.duration = 5;
     if (!s.name) s.name = 'Shot';
     if (s.film) s.film = shotFilm(s.film);
+    s.sceneObjects.forEach(o=>{if(o.performance)o.performance=performanceSettings(o.performance);});
     // pin legacy/null camera bases so every shot has deterministic framing
     if (!s.camera) s.camera = cameraBaseSnapshot();
   });
@@ -957,6 +963,7 @@ three.fog = new THREE.Fog('#211d18', 26, 60);
 const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 200);
 camera.position.set(8.5, 7, 11);
 const controls = new OrbitControls(camera, renderer.domElement);
+const cinemaRenderer = createCinemaRenderer(renderer,three,camera);
 controls.enableDamping = true; controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI / 2 - 0.02;
 controls.target.set(0, 1.2, 0);
@@ -965,7 +972,8 @@ controls.addEventListener('end', () => {
 });
 
 // lights
-three.add(new THREE.HemisphereLight('#fff4e0', '#3a3226', 1.15));
+const ambientLight = new THREE.HemisphereLight('#fff4e0', '#3a3226', 1.15);
+three.add(ambientLight);
 const sun = new THREE.DirectionalLight('#ffe3b0', 1.9);
 sun.position.set(6, 10, 4);
 sun.castShadow = true;
@@ -991,6 +999,10 @@ function applyLighting(preset) {
   rimLight.color.set(rim); rimLight.intensity = rimIntensity;
   renderer.toneMappingExposure = exposure;
   const film = activeShot().film;
+  const rig=LIGHT_RIGS[film?.lightRig];
+  ambientLight.intensity=rig?.ambient ?? 1.15;
+  sun.position.fromArray(rig?.position || [6,10,4]);rimLight.position.fromArray(rig?.rimPosition || [-6,5,-8]);
+  if(rig){sun.color.set(rig.key);sun.intensity=rig.intensity;rimLight.color.set(rig.rim);rimLight.intensity=rig.rimIntensity;}
   if (film?.background) three.background.set(film.background);
   three.fog = film?.fog > 0 ? new THREE.FogExp2(three.background, film.fog) : new THREE.Fog(three.background, 26, 60);
   if (film?.fog === 0) three.fog = null;
@@ -1539,6 +1551,7 @@ function renderSceneProps() {
   }
   if (o.type === 'character') renderActorControls(panel, o);
   if (o.type === 'imported') renderImportedControls(panel, o);
+  if(['character','imported'].includes(o.type))renderPerformanceTools(panel,o);
   const frame = document.createElement('button'); frame.className = 'btn'; frame.textContent = 'Frame selected object';
   frame.addEventListener('click', () => {
     const group = objectGroups.get(o.id); if (!group) return;
@@ -1683,6 +1696,10 @@ function evaluateAt(t) {
       Object.keys(kf).filter(ch => ch.startsWith('joint.') && kf[ch]?.length).forEach(ch => { joints[ch.slice(6)] = sampleTrack(kf[ch], T); });
       g.children[0]?.userData.animate?.(o.motion, T, project.duration, joints, kf.pose ? sampleTrack(kf.pose, T) : null);
     }
+    if(o.rigMode==='3d' || o.type==='imported'){
+      const seed=[...o.id].reduce((n,c)=>n+c.charCodeAt(0),0);
+      g.children[0]?.userData.face?.(samplePerformance(o.performance,T,globalTime(),project.audioClips,seed),o.performance?.enabled);
+    }
     // Legacy billboard pose: clone the asset, never mutate a shared rig.
     if (kf['pose']?.length && g.userData.redraw) {
       const rig = project.characters.find(c => c.id === o.assetId);
@@ -1727,6 +1744,7 @@ function renderAnimObjectSelect() {
   if (actor?.type === 'imported') renderImportedControls(actorPanel, actor);
   else if (actor) renderActorControls(actorPanel, actor);
   else actorPanel.innerHTML = '<div class="empty-note">Select a character to direct its performance.</div>';
+  if(actor)renderPerformanceTools(actorPanel,actor);
   const sel = document.getElementById('anim-object');
   sel.innerHTML = '';
   const camOp = document.createElement('option');
@@ -2580,7 +2598,8 @@ function shotAtGlobal(time) {
 }
 async function exportOfflineMovie() {
   if (!window.VideoEncoder || !window.VideoFrame) { toast('Frame-accurate export needs WebCodecs. Choose real-time recording in this browser.'); return; }
-  if (project.audioClips.length) { toast('Frame-accurate mode is video-only. Choose real-time recording to include your audio.'); return; }
+  const hasSound = project.audioClips.length > 0;
+  if(hasSound && (!window.AudioEncoder || !window.AudioData)){toast('Frame-accurate audio needs WebCodecs AudioEncoder. Choose real-time in this browser.');return;}
   let range;
   try { range = chosenRenderRange(); } catch (e) { toast(e.message); return; }
   const disk = project.studio.delivery.disk;
@@ -2597,7 +2616,8 @@ async function exportOfflineMovie() {
     pos: camera.position.clone(), target: controls.target.clone(), fov: camera.fov };
   const sectionName = project.studio.delivery.mode === 'all' ? '' : `_${range.start.toFixed(2)}-${range.end.toFixed(2)}s`;
   const filename = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + sectionName;
-  let encoder, encoderError, framesWritten = 0, writable = null, writes = Promise.resolve(), writeError = null;
+  let encoder, audioEncoder, encoderError, framesWritten = 0, audioPosition = 0, audioBuffers,
+    writable = null, writes = Promise.resolve(), writeError = null;
   const started = performance.now();
   exportPreparing = true; lockExportControls(true);
   try {
@@ -2608,6 +2628,12 @@ async function exportOfflineMovie() {
     }
     const support = await VideoEncoder.isConfigSupported(config);
     if (!support.supported) throw new Error('This frame size is not supported by the video encoder. Try a smaller frame or real-time mode.');
+    const audioConfig={codec:'opus',sampleRate:48000,numberOfChannels:2,bitrate:128000};
+    if(hasSound){
+      if(!(await AudioEncoder.isConfigSupported(audioConfig)).supported)throw new Error('Opus audio encoding is unavailable. Choose real-time export.');
+      recStatus.textContent='Decoding audio sources…';
+      audioBuffers=await decodeSources(project.audioAssets,project.audioClips,range);
+    }
     const { Muxer, ArrayBufferTarget, StreamTarget } = await import('./vendor/webm-muxer.mjs');
     const target = writable ? new StreamTarget({
       chunked: true, chunkSize: 1024 * 1024,
@@ -2618,7 +2644,17 @@ async function exportOfflineMovie() {
         writes = writes.then(() => writable.write({ type: 'write', data: chunk, position })).catch(e => { writeError = e; });
       },
     }) : new ArrayBufferTarget();
-    const muxer = new Muxer({ target, video: { codec: 'V_VP8', width, height, frameRate: fps }, firstTimestampBehavior: 'strict' });
+    const muxer = new Muxer({ target, video: { codec: 'V_VP8', width, height, frameRate: fps },
+      ...(hasSound ? {audio:{codec:'A_OPUS',sampleRate:48000,numberOfChannels:2}} : {}), firstTimestampBehavior: 'strict' });
+    if(hasSound){
+      audioEncoder=new AudioEncoder({
+        output:(chunk,metadata)=>{
+          // Drop Opus flush padding packets starting beyond the supplied PCM.
+          if(chunk.timestamp>=Math.round(audioPosition/48000*1e6))return;
+          try{muxer.addAudioChunk(chunk,metadata);}catch(e){encoderError=e;}
+        },error:e=>{encoderError=e;},
+      });audioEncoder.configure(audioConfig);
+    }
     encoder = new VideoEncoder({
       output: (chunk, metadata) => { try { muxer.addVideoChunk(chunk, metadata); } catch (e) { encoderError = e; } },
       error: e => { encoderError = e; },
@@ -2641,6 +2677,15 @@ async function exportOfflineMovie() {
       const videoFrame = new VideoFrame(filmOutput, { timestamp: Math.round(frame * 1e6 / fps), duration: Math.round(1e6 / fps) });
       try { encoder.encode(videoFrame, { keyFrame: frame % (fps * 2) === 0 }); } finally { videoFrame.close(); }
       framesWritten++;
+      if(audioEncoder){
+        const end=Math.round(framesWritten/fps*48000), count=end-audioPosition;
+        const [left,right]=mixStereo(project.audioClips,audioBuffers,range.start+audioPosition/48000,count);
+        const data=new Float32Array(count*2);data.set(left);data.set(right,count);
+        const frame=new AudioData({format:'f32-planar',sampleRate:48000,numberOfFrames:count,numberOfChannels:2,timestamp:Math.round(audioPosition/48000*1e6),data});
+        audioPosition=end;
+        try{audioEncoder.encode(frame);}finally{frame.close();}
+        if(audioEncoder.encodeQueueSize>8)await new Promise(resolve=>audioEncoder.addEventListener('dequeue',resolve,{once:true}));
+      }
       const rate = framesWritten / Math.max(0.01, (performance.now() - started) / 1000), remaining = (frameCount - framesWritten) / rate;
       recStatus.textContent = `Rendering ${Math.round(framesWritten / frameCount * 100)}% · ${framesWritten}/${frameCount} frames · ${rate.toFixed(1)} fps · about ${fmtDur(remaining)} left${writable ? ' · streaming to disk' : ''}`;
       if (encoder.encodeQueueSize > 4) await encoder.flush();
@@ -2648,6 +2693,7 @@ async function exportOfflineMovie() {
       await new Promise(resolve => setTimeout(resolve, 0)); // allow stop/progress, without advancing the movie clock
     }
     await encoder.flush();
+    if(audioEncoder)await audioEncoder.flush();
     if (encoderError) throw encoderError;
     if (framesWritten) {
       muxer.finalize();
@@ -2658,7 +2704,7 @@ async function exportOfflineMovie() {
         const blob = new Blob([target.buffer], { type: 'video/webm' }); size = (blob.size / 1e6).toFixed(1) + ' MB';
         downloadBlob(blob, filename + (offlineCancel ? '_partial' : '') + '.webm');
       }
-      recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps · ${size}`;
+      recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps${hasSound ? ' · stereo audio' : ''} · ${size}`;
       toast('Frame-accurate movie saved');
     } else recStatus.textContent = 'Export cancelled.';
   } catch (e) {
@@ -2667,6 +2713,8 @@ async function exportOfflineMovie() {
   } finally {
     if (writable) { await writes; try { await writable.abort(); } catch {} }
     try { encoder?.close(); } catch {}
+    try { audioEncoder?.close(); } catch {}
+    audioBuffers?.clear();
     offlineRendering = false; recMode = false; exportPreparing = false;
     applyShotPlayback(restore.shotId); animTime = restore.time; evaluateAt(animTime);
     camera.position.copy(restore.pos); controls.target.copy(restore.target); camera.fov = restore.fov;
@@ -2736,6 +2784,27 @@ function renderFilmWorld() {
     refresh: () => {
       applyCameraBase(activeShot()); syncSceneObjects(); evaluateAt(animTime);
       renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline(); renderFilmWorld();
+    },
+  });
+  renderCinemaLook(host,activeShot(),{dirty:markDirty,look:()=>applyLighting(activeShot().lighting)});
+}
+function renderPerformanceTools(panel,object){
+  renderPerformance(panel,object,{
+    project:()=>project,time:()=>animTime,duration:()=>project.duration,dirty:markDirty,evaluate:()=>evaluateAt(animTime),
+    analyze:async(object,clipId)=>{
+      const clip=project.audioClips.find(c=>c.id===clipId);if(!clip)throw new Error('Import dialogue in Sound and choose its clip first.');
+      const buffers=await decodeSources(project.audioAssets,[clip],{start:-Infinity,end:Infinity});
+      object.performance.voice={clipId,...audioEnvelope(buffers.get(clip.assetId))};buffers.clear();
+    },
+    compose:(object,kind)=>{
+      const group=objectGroups.get(object.id);if(!group)return;
+      const keys=project.keyframes[CAMERA_ID] || {};
+      if(Object.keys(keys).length && !confirm('Replace this shot’s camera animation with the actor composition?'))return;
+      delete project.keyframes[CAMERA_ID];
+      group.updateMatrixWorld(true);group.traverse(o=>{if(o.isSkinnedMesh)o.computeBoundingBox();});
+      const bounds=new THREE.Box3().setFromObject(group),height=Math.max(0.3,bounds.max.y-bounds.min.y);
+      activeShot().camera=composeCamera(group.position.toArray(),height,THREE.MathUtils.radToDeg(group.rotation.y),kind);
+      applyCameraBase(activeShot());markDirty();renderTimeline();
     },
   });
 }
@@ -2827,7 +2896,7 @@ function drawFilmOverlay(ctx, width, height) {
   ctx.restore();
 }
 function renderFilmFrame() {
-  renderer.render(three, camera);
+  cinemaRenderer.render(activeShot().film?.grade,globalTime(),project.fps);
   const width = renderer.domElement.width, height = renderer.domElement.height;
   if (filmOverlay.width !== width || filmOverlay.height !== height) { filmOverlay.width = width; filmOverlay.height = height; }
   overlayCtx.clearRect(0, 0, width, height);
@@ -3217,6 +3286,25 @@ function loadRaceMovie() {
   toast('3D race movie ready: 4 rigged actors, 5 shots, 26 seconds. Press Play movie.');
 }
 document.getElementById('btn-race').addEventListener('click', loadRaceMovie);
+document.getElementById('btn-cinema').addEventListener('click', async e => {
+  if(recMode || exportPreparing || exportFinalizing)return;
+  const button=e.currentTarget;button.disabled=true;
+  try {
+    const voice=await loadDemoVoice();
+    if(recMode || exportPreparing || exportFinalizing)return;
+    const hasWork=project.shots.some(s=>s.sceneObjects.length) || project.drawings.length || project.audioAssets.length ||
+      project.name!=='Untitled movie' || hasProductionWork(project.studio);
+    if(hasWork && !confirm('Replace the current movie with The Last Signal? Save your project first to keep it.'))return;
+    if(moviePlaying)stopMovie();setPlaying(false);
+    project=buildCinemaDemo({newProject:defaultProject,newShot,newRig:defaultRig,uid},voice);
+    animTime=0;selectedId=null;currentCharId=project.characters[0].id;
+    document.getElementById('project-tag').textContent=project.name;
+    applyShot(project.activeShotId);setWorkspace('anim');evaluateAt(0);
+    markDirty();renderCharList();drawCharPreview();renderCharProps();renderAssetList();renderAudioList();
+    toast('The Last Signal: 4 shots, 13 seconds, generated voice and editable facial performances. Press Play movie.');
+  } catch(error){toast('Could not load cinematic demo: '+error.message);}
+  finally{button.disabled=false;}
+});
 
 /* ============================================================
    Boot

@@ -1,5 +1,8 @@
 # Film-production upgrade verification
 
+Historical v0.6 baseline. See `QA-CINEMATIC.md` for the v0.7 cinematic pass,
+which adds offline audio and supersedes the video-only limitation below.
+
 Local verification: 28 October 2026, headless Chromium at 1440 × 1000 and
 375 × 812. This is a tested browser-editor upgrade, not a claim of
 Hollywood-quality output or a certified feature-length rendering pipeline.

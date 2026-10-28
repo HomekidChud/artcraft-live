@@ -1,4 +1,4 @@
-import { newPart, makeId } from './production.js';
+import { newPart, makeId } from './production.js?v=0.7.0';
 export const SETS = [['forest', 'Forest clearing'], ['street', 'City street'], ['interior', 'Studio apartment']];
 export function createSet(kind) {
   const parts = [];
@@ -35,7 +35,7 @@ export function createSet(kind) {
   } else if (kind === 'interior') {
     lighting = 'studio'; film = { ground: '#b59372', background: '#494743', fog: 0, exposure: 1.15 };
     camera = { pos: [9, 6.5, 11], tgt: [0, 1.2, -1], fov: 43 };
-    add('box', 'Wood floor', [0, -0.08, 0], [14, 0.16, 12], '#aa8563');
+    add('box', 'Wood floor', [0, -0.05, 0], [14, 0.16, 12], '#aa8563');
     add('box', 'Back wall', [0, 2.5, -6], [14, 5, 0.2], '#c6ba9f');
     add('box', 'Side wall', [-7, 2.5, 0], [0.2, 5, 12], '#9ca79d');
     add('box', 'Window frame', [-6.85, 2.8, -2], [0.15, 2.4, 3.6], '#e8d7ae');

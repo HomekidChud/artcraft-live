@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
-import { inspectGLB } from './film.js';
+import { inspectGLB } from './film.js?v=0.7.0';
 
 const cache = new WeakMap();
 export async function loadImported(asset) {
@@ -42,7 +42,27 @@ export async function importedInstance(asset) {
   const mixer = new THREE.AnimationMixer(root);
   const clips = gltf.animations, actions = clips.map(c => mixer.clipAction(c));
   let current = -1;
+  const morphs=[],authored=new Map();let faceEnabled=false;
+  root.traverse(o=>{if(o.morphTargetDictionary && o.morphTargetInfluences){morphs.push(o);authored.set(o,o.morphTargetInfluences.slice());}});
+  const restoreMorphs=()=>{for(const mesh of morphs)mesh.morphTargetInfluences.splice(0,mesh.morphTargetInfluences.length,...authored.get(mesh));};
+  wrapper.userData.face = (state, enabled) => {
+    if(!enabled){
+      if(faceEnabled)restoreMorphs();
+      faceEnabled=false;return;
+    }
+    faceEnabled=true;
+    for(const mesh of morphs)for(const [name,index] of Object.entries(mesh.morphTargetDictionary)){
+      const key=name.toLowerCase().replace(/[^a-z]/g,'');
+      if(['jawopen','mouthopen','visemeaa'].includes(key))mesh.morphTargetInfluences[index]=state.mouth;
+      else if(['blink','eyeblinkleft','eyeblinkright'].includes(key))mesh.morphTargetInfluences[index]=state.blink;
+      else if(['happy','sad','angry','surprised'].includes(key))mesh.morphTargetInfluences[index]=state.emotion===key ? 1 : 0;
+    }
+    wrapper.userData.facialState={...state};
+  };
   wrapper.userData.animate = (motion = {}, time) => {
+    // Undo our last face overlay before the mixer evaluates. Its property cache
+    // may skip unchanged authored values, so a second update(0) is insufficient.
+    if(faceEnabled)restoreMorphs();
     const index = Number.isInteger(Number(motion.clipIndex)) ? Number(motion.clipIndex) : -1;
     if (index !== current) { mixer.stopAllAction(); current = index; actions[index]?.reset().play(); }
     const action = actions[index], clip = clips[index];
@@ -53,6 +73,7 @@ export async function importedInstance(asset) {
     action.time = motion.loop === false ? Math.min(local, clip.duration) : local % Math.max(0.0001, clip.duration);
     // update(0) applies an explicit absolute action time, including backwards seeks.
     mixer.update(0);
+    for(const mesh of morphs)authored.set(mesh,mesh.morphTargetInfluences.slice());
   };
   wrapper.userData.disposeAnimation = () => { mixer.stopAllAction(); mixer.uncacheRoot(root); };
   return wrapper;
