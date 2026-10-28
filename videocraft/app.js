@@ -1219,6 +1219,8 @@ function renderAnimObjectSelect() {
     sel.appendChild(op);
   });
   if (!project.sceneObjects.length) { const op = document.createElement('option'); op.textContent = 'No objects yet'; sel.appendChild(op); }
+  // keep the dropdown in sync with the current selection after rebuild
+  if (selectedId && project.sceneObjects.some(o => o.id === selectedId)) sel.value = selectedId;
 }
 document.getElementById('anim-object').addEventListener('change', e => {
   selectObject(e.target.value);
@@ -1316,10 +1318,11 @@ function renderKeys() {
       el.style.top = (26 + ci * 26 + 13) + 'px';
       el.setAttribute('aria-label', 'Keyframe at ' + k.t.toFixed(2) + 's');
       el.addEventListener('pointerdown', e => {
-        e.target.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
         selectedKey = { id: o.id, ch: c.ch, index: i };
         selectedTrack = { id: o.id, ch: c.ch };
         const startX = e.clientX, startT = k.t;
+        // listeners live on window so the gesture survives renderTimeline() rebuilding the keys
         const move = ev => {
           const dx = ev.clientX - startX;
           let nt = clamp(startT + dx / pxPerSec, 0, project.duration);
@@ -1329,12 +1332,12 @@ function renderKeys() {
           renderTimeline();
         };
         const up = () => {
-          el.removeEventListener('pointermove', move);
-          el.removeEventListener('pointerup', up);
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
           markDirty(); renderTimeline();
         };
-        el.addEventListener('pointermove', move);
-        el.addEventListener('pointerup', up);
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
         renderTimeline();
       });
       tlKeys.appendChild(el);
