@@ -1,4 +1,4 @@
-import { clipWindow, clipGain } from './cinema.js?v=0.7.0';
+import { clipWindow, clipGain } from './cinema.js?v=0.7.1';
 
 // Mix small, absolute-time PCM blocks. Independent clips share decoded source
 // buffers but never playback state. Peak protection is an explicit hard limiter.

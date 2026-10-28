@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { JOINTS, motionPose } from './motion.js?v=0.7.0';
+import { JOINTS, motionPose } from './motion.js?v=0.7.1';
 
 // A real 19-bone Skeleton + weighted SkinnedMesh, with stylised rigid segments.
 // Every avatar instance owns its skeleton, pose and geometry.

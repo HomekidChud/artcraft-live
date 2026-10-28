@@ -30,6 +30,11 @@ video-only offline-export limitation in `QA-FILM-PRODUCTION.md`.
   desktop layout. Secondary status text was made more readable.
 - **Cache safety:** Relative application module imports carry the release
   version so returning users do not mix old and new module graphs.
+- **Sandbox compatibility:** Native browser confirmation/naming dialogs were
+  found blocked in the hosted preview. They were replaced by queued in-app
+  HTML dialogs with explicit buttons, keyboard submission, Escape cancellation,
+  focus management and mobile-safe sizing. Storyboard deletion awaits its
+  asynchronous confirmation before refreshing.
 
 ## Actual exported movie and sound
 

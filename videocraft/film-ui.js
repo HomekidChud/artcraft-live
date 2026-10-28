@@ -1,6 +1,7 @@
-import { createSet, SETS } from './sets.js?v=0.7.0';
-import { makeId } from './production.js?v=0.7.0';
-import { parseSRT, movieSRT, movieIndex, shotFilm } from './film.js?v=0.7.0';
+import { createSet, SETS } from './sets.js?v=0.7.1';
+import { makeId } from './production.js?v=0.7.1';
+import { parseSRT, movieSRT, movieIndex, shotFilm } from './film.js?v=0.7.1';
+import { askConfirm } from './dialogs.js?v=0.7.1';
 
 const el = (tag, text, cls) => {
   const n = document.createElement(tag); if (text !== undefined) n.textContent = text;
@@ -32,11 +33,11 @@ export function renderWorld(parent, shot, api) {
   parent.replaceChildren();
   const sets = details(parent, 'Sets & atmosphere'), film = shot.film ||= shotFilm();
   const choice = select(sets, 'Ready-made set', 'forest', SETS, () => {});
-  button(sets, 'Add set to shot', () => {
+  button(sets, 'Add set to shot', async () => {
     const set = createSet(choice.value); shot.sceneObjects.push(set.object);
     Object.assign(film, set.film); shot.camera = set.camera; shot.lighting = set.lighting;
     // Authored moves would override the new framing; remove only with explicit approval.
-    if (Object.keys(shot.keyframes.__camera__ || {}).length && confirm('Use the set camera instead of the current camera animation?')) delete shot.keyframes.__camera__;
+    if (Object.keys(shot.keyframes.__camera__ || {}).length && await askConfirm('Use the set camera instead of the current camera animation?')) delete shot.keyframes.__camera__;
     api.refresh(); api.dirty(); api.toast('Set added. Existing objects were kept. Unlock the set to move it.');
   });
   sets.append(el('p', 'Sets are compound objects. Select one and copy its parts to Design to make an edited version. Existing actors and props are kept.', 'empty-note'));

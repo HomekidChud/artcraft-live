@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildModel, disposeModel } from './models.js?v=0.7.0';
-import { PRODUCTION_TABS, PART_TYPES, newPart, validateModel, modelTemplate, modelInstance, makeId } from './production.js?v=0.7.0';
-import { renderShotFinishing, subtitleTools } from './film-ui.js?v=0.7.0';
+import { buildModel, disposeModel } from './models.js?v=0.7.1';
+import { PRODUCTION_TABS, PART_TYPES, newPart, validateModel, modelTemplate, modelInstance, makeId } from './production.js?v=0.7.1';
+import { renderShotFinishing, subtitleTools } from './film-ui.js?v=0.7.1';
+import { askConfirm } from './dialogs.js?v=0.7.1';
 
 const names = { plan: 'Planning', design: 'Design', assets: 'Assets', board: 'Storyboard', sound: 'Sound', delivery: 'Delivery' };
 const icons = {
@@ -181,9 +182,9 @@ export function createStudioWorkspaces(api) {
     layout.append(center); layout.append(right);
     const draft = s().draft;
     field(left, 'Model name', draft.name, v => { draft.name = v; change(); });
-    select(left, 'Start from a template', '', [['', 'Choose a template…'], ['trophy', 'Champion trophy'], ['podium', 'Winners podium'], ['tree', 'Studio tree'], ['blank', 'Empty model']], kind => {
+    select(left, 'Start from a template', '', [['', 'Choose a template…'], ['trophy', 'Champion trophy'], ['podium', 'Winners podium'], ['tree', 'Studio tree'], ['blank', 'Empty model']], async kind => {
       if (!kind) return;
-      if (draft.parts.length && !confirm('Replace the current design draft? Save it to your library first to keep it.')) return;
+      if (draft.parts.length && !await askConfirm('Replace the current design draft? Save it to your library first to keep it.')) return;
       s().draft = modelTemplate(kind); selectedPart = null; change(); design();
     });
     const addRow = node('div', 'studio-toolbar');
@@ -295,24 +296,24 @@ export function createStudioWorkspaces(api) {
         if (kind === 'model') {
           card.append(node('p', 'studio-muted', asset.parts.length + ' editable parts'),
             button('Add to current shot', () => addModel(asset), true),
-            button('Edit model design', () => {
+            button('Edit model design', async () => {
               const draft = s().draft, source = s().models.find(model => model.id === draft.assetId);
               const value = model => JSON.stringify({ name: model.name, parts: model.parts.map(({ id, ...part }) => part) });
-              if (draft.parts.length && (!source || value(draft) !== value(source)) && !confirm('Replace the unsaved design draft? Save it to Assets first to keep it.')) return;
+              if (draft.parts.length && (!source || value(draft) !== value(source)) && !await askConfirm('Replace the unsaved design draft? Save it to Assets first to keep it.')) return;
               s().draft = { name: asset.name, assetId: asset.id, parts: structuredClone(asset.parts) };
               selectedPart = null; change(); open('design');
             }),
             button('Export model JSON', () => downloadJSON({ format: 'videocraft.model.v1', model: asset }, asset.name.replace(/[^a-z0-9-_]/gi, '_') + '.model.json')),
-            button('Remove library model', () => {
-              if (!confirm('Remove this library model? Existing shot instances will be kept.')) return;
+            button('Remove library model', async () => {
+              if (!await askConfirm('Remove this library model? Existing shot instances will be kept.')) return;
               s().models = s().models.filter(m => m.id !== asset.id); if (s().draft.assetId === asset.id) s().draft.assetId = ''; change(); renderCards();
             }));
         } else if (kind === 'imported') {
           card.append(node('p', 'studio-muted', asset.animations.length + ' animation clips · embedded source'),
             button('Place imported model', () => api.placeImported(asset), true),
-            button('Remove imported asset', () => {
+            button('Remove imported asset', async () => {
               if (p().shots.some(shot => shot.sceneObjects.some(o => o.type === 'imported' && o.assetId === asset.id))) return api.toast('Remove this model’s instances from every shot before deleting its source.');
-              if (!confirm('Remove this imported model from the project?')) return;
+              if (!await askConfirm('Remove this imported model from the project?')) return;
               s().imports = s().imports.filter(a => a !== asset); change(); renderCards();
             }));
         } else if (kind === 'character') card.append(button('Add actor to current shot', () => { api.placeCharacter(asset); open('scene'); }, true), button('Open Cast', () => open('char')));
@@ -361,7 +362,7 @@ export function createStudioWorkspaces(api) {
       const down = button('Later', () => { api.moveShot(shot.id, 1); storyboard(); }); down.disabled = index === p().shots.length - 1;
       actions.append(up, down, button('Duplicate shot', () => {
         const id = api.duplicateShot(shot.id); s().shotNotes[id] = s().shotNotes[shot.id] || ''; change(); storyboard();
-      }), button('Delete shot', () => { api.deleteShot(shot.id); storyboard(); }));
+      }), button('Delete shot', async () => { await api.deleteShot(shot.id); storyboard(); }));
       card.append(actions);
     });
   }

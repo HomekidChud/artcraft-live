@@ -1,5 +1,5 @@
 // Pure film-production utilities: shared by the editor, renderer and tests.
-import { gradeSettings, LIGHT_RIGS } from './cinema.js?v=0.7.0';
+import { gradeSettings, LIGHT_RIGS } from './cinema.js?v=0.7.1';
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 const number = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 export function easing(u, kind = 'ease') {

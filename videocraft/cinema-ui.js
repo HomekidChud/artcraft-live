@@ -1,5 +1,5 @@
-import { EXPRESSIONS, GRADES, LIGHT_RIGS, gradeSettings, performanceSettings } from './cinema.js?v=0.7.0';
-import { filmField } from './film-ui.js?v=0.7.0';
+import { EXPRESSIONS, GRADES, LIGHT_RIGS, gradeSettings, performanceSettings } from './cinema.js?v=0.7.1';
+import { filmField } from './film-ui.js?v=0.7.1';
 const make = (tag,text,cls) => {const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;};
 function group(parent,title) {const d=make('details',undefined,'studio-details film-details'),body=make('div',undefined,'studio-stack');d.append(make('summary',title),body);parent.append(d);return body;}
 function choose(parent,label,value,items,change) {

@@ -1,4 +1,4 @@
-import { newPart, makeId } from './production.js?v=0.7.0';
+import { newPart, makeId } from './production.js?v=0.7.1';
 export const SETS = [['forest', 'Forest clearing'], ['street', 'City street'], ['interior', 'Studio apartment']];
 export function createSet(kind) {
   const parts = [];

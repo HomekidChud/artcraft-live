@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
-import { inspectGLB } from './film.js?v=0.7.0';
+import { inspectGLB } from './film.js?v=0.7.1';
 
 const cache = new WeakMap();
 export async function loadImported(asset) {

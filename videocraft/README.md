@@ -17,6 +17,10 @@ AI-generated voice, audio-amplitude mouth movement, timed subtitles, lighting
 and grading. Its camera moves, performances and sound clip remain editable.
 This is an original stylised technical demo, not a production-quality film.
 
+Replacement, deletion and naming use keyboard-accessible in-app dialogs,
+including in the sandboxed review preview. Cancel or Escape keeps the existing
+work; naming dialogs accept Enter. No blocked native browser prompt is needed.
+
 ## Production workspaces
 
 The studio now has ten labelled tabs. The navigation rail scrolls on shorter

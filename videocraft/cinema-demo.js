@@ -1,7 +1,7 @@
-import { createSet } from './sets.js?v=0.7.0';
-import { shotFilm } from './film.js?v=0.7.0';
-import { GRADES, performanceSettings, audioEnvelope, composeCamera } from './cinema.js?v=0.7.0';
-import { cameraTracks } from './motion.js?v=0.7.0';
+import { createSet } from './sets.js?v=0.7.1';
+import { shotFilm } from './film.js?v=0.7.1';
+import { GRADES, performanceSettings, audioEnvelope, composeCamera } from './cinema.js?v=0.7.1';
+import { cameraTracks } from './motion.js?v=0.7.1';
 
 export async function loadDemoVoice() {
   const response=await fetch(new URL('./assets/last-signal-voice.mp3',import.meta.url));

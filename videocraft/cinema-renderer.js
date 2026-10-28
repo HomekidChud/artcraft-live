@@ -3,7 +3,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { Vector2 } from 'three';
-import { gradeSettings } from './cinema.js?v=0.7.0';
+import { gradeSettings } from './cinema.js?v=0.7.1';
 
 export function createCinemaRenderer(renderer, scene, camera) {
   let composer, gradePass, size = '', vector = new Vector2();

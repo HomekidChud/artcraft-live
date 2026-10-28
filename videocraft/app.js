@@ -2,19 +2,20 @@
 // v0.2 — movie studio: shots, per-shot camera, audio, fixed-res export.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildAvatar } from './avatar3d.js?v=0.7.0';
-import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js?v=0.7.0';
-import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js?v=0.7.0';
-import { buildModel } from './models.js?v=0.7.0';
-import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js?v=0.7.0';
-import { sampleKeys, movieIndex, locateTime, renderRange, shotFilm, fadeAmount, inspectGLB } from './film.js?v=0.7.0';
-import { importedInstance, loadImported } from './imported.js?v=0.7.0';
-import { renderWorld } from './film-ui.js?v=0.7.0';
-import { LIGHT_RIGS, performanceSettings, samplePerformance, audioEnvelope, composeCamera } from './cinema.js?v=0.7.0';
-import { renderCinemaLook, renderPerformance } from './cinema-ui.js?v=0.7.0';
-import { createCinemaRenderer } from './cinema-renderer.js?v=0.7.0';
-import { decodeSources, mixStereo } from './sound-render.js?v=0.7.0';
-import { buildCinemaDemo, loadDemoVoice } from './cinema-demo.js?v=0.7.0';
+import { buildAvatar } from './avatar3d.js?v=0.7.1';
+import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js?v=0.7.1';
+import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js?v=0.7.1';
+import { buildModel } from './models.js?v=0.7.1';
+import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js?v=0.7.1';
+import { sampleKeys, movieIndex, locateTime, renderRange, shotFilm, fadeAmount, inspectGLB } from './film.js?v=0.7.1';
+import { importedInstance, loadImported } from './imported.js?v=0.7.1';
+import { renderWorld } from './film-ui.js?v=0.7.1';
+import { LIGHT_RIGS, performanceSettings, samplePerformance, audioEnvelope, composeCamera } from './cinema.js?v=0.7.1';
+import { renderCinemaLook, renderPerformance } from './cinema-ui.js?v=0.7.1';
+import { createCinemaRenderer } from './cinema-renderer.js?v=0.7.1';
+import { decodeSources, mixStereo } from './sound-render.js?v=0.7.1';
+import { buildCinemaDemo, loadDemoVoice } from './cinema-demo.js?v=0.7.1';
+import { askConfirm, askName } from './dialogs.js?v=0.7.1';
 
 installWorkspaceShell();
 let studioWorkspaces = null;
@@ -337,8 +338,8 @@ function renderShotsUI() {
       b.addEventListener('click', () => { if (s.id !== project.activeShotId) applyShot(s.id); });
       row.appendChild(b);
       const ren = document.createElement('button'); ren.className = 'mini'; ren.textContent = '✎'; ren.title = 'Rename shot';
-      ren.addEventListener('click', () => {
-        const n = prompt('Shot name:', s.name);
+      ren.addEventListener('click', async () => {
+        const n = await askName('Shot name:', s.name);
         if (n !== null && n.trim()) { s.name = n.trim(); markDirty(); renderShotsUI(); }
       });
       row.appendChild(ren);
@@ -405,10 +406,10 @@ function moveShot(dir) {
   [project.shots[i], project.shots[j]] = [project.shots[j], project.shots[i]];
   markDirty(); renderShotsUI();
 }
-function deleteShot() {
+async function deleteShot() {
   if (project.shots.length < 2) { toast('A movie needs at least one shot'); return; }
   const s = activeShot();
-  if (!confirm('Delete "' + s.name + '"?')) return;
+  if (!await askConfirm('Delete "' + s.name + '"?')) return;
   const idx = project.shots.indexOf(s);
   project.shots.splice(idx, 1);
   delete project.studio.shotNotes[s.id];
@@ -571,9 +572,9 @@ drawCanvas.addEventListener('pointermove', e => {
 });
 drawCanvas.addEventListener('pointerup', () => { drawStart = null; });
 
-function saveDrawingAsset() {
+async function saveDrawingAsset() {
   if (!hasDrawnFlag) { toast('Nothing painted yet'); return; }
-  const name = prompt('Asset name:', 'Drawing ' + (project.drawings.length + 1));
+  const name = await askName('Asset name:', 'Drawing ' + (project.drawings.length + 1));
   if (name === null) return;
   project.drawings.push({ id: uid('draw'), name: name || 'Drawing', dataURL: drawCanvas.toDataURL('image/png') });
   markDirty(); renderAssetList();
@@ -920,9 +921,9 @@ document.getElementById('btn-char-copy').addEventListener('click', () => {
   project.characters.push(copy); currentCharId = copy.id;
   markDirty(); renderCharList(); drawCharPreview(); renderCharProps();
 });
-document.getElementById('btn-char-delete').addEventListener('click', () => {
+document.getElementById('btn-char-delete').addEventListener('click', async () => {
   const rig = currentRig(); if (!rig) return;
-  if (!confirm('Delete ' + rig.name + '?')) return;
+  if (!await askConfirm('Delete ' + rig.name + '?')) return;
   project.characters = project.characters.filter(c => c.id !== rig.id);
   removeSceneObjectsWhere(o => o.assetId === rig.id);
   currentCharId = project.characters[0]?.id || null;
@@ -1517,8 +1518,8 @@ function addTextCard() {
   syncSceneObjects();
   selectObject(o.id); markDirty();
 }
-document.getElementById('btn-clear-scene').addEventListener('click', () => {
-  if (!confirm('Remove all objects from this shot?')) return;
+document.getElementById('btn-clear-scene').addEventListener('click', async () => {
+  if (!await askConfirm('Remove all objects from this shot?')) return;
   // mutate in place — this array belongs to the active shot
   project.sceneObjects.length = 0;
   for (const k in project.keyframes) delete project.keyframes[k];
@@ -1566,8 +1567,8 @@ function renderSceneProps() {
   }); panel.append(frame);
   if (o.type === 'model') {
     const edit = document.createElement('button'); edit.className = 'btn'; edit.textContent = 'Copy parts to Design';
-    edit.addEventListener('click', () => {
-      if (project.studio.draft.parts.length && !confirm('Replace the current design draft? Save it to Assets first to keep it.')) return;
+    edit.addEventListener('click', async () => {
+      if (project.studio.draft.parts.length && !await askConfirm('Replace the current design draft? Save it to Assets first to keep it.')) return;
       project.studio.draft = { name: o.name, parts: structuredClone(o.modelParts || []) };
       markDirty(); setWorkspace('design');
       toast('Parts copied. Save a reusable model to Assets; the original shot instance is unchanged.');
@@ -2796,10 +2797,10 @@ function renderPerformanceTools(panel,object){
       const buffers=await decodeSources(project.audioAssets,[clip],{start:-Infinity,end:Infinity});
       object.performance.voice={clipId,...audioEnvelope(buffers.get(clip.assetId))};buffers.clear();
     },
-    compose:(object,kind)=>{
+    compose:async(object,kind)=>{
       const group=objectGroups.get(object.id);if(!group)return;
       const keys=project.keyframes[CAMERA_ID] || {};
-      if(Object.keys(keys).length && !confirm('Replace this shot’s camera animation with the actor composition?'))return;
+      if(Object.keys(keys).length && !await askConfirm('Replace this shot’s camera animation with the actor composition?'))return;
       delete project.keyframes[CAMERA_ID];
       group.updateMatrixWorld(true);group.traverse(o=>{if(o.isSkinnedMesh)o.computeBoundingBox();});
       const bounds=new THREE.Box3().setFromObject(group),height=Math.max(0.3,bounds.max.y-bounds.min.y);
@@ -2846,16 +2847,16 @@ document.getElementById('film-copy-motion').addEventListener('click', () => {
   motionClipboard = { camera: object.type === 'camera', tracks: structuredClone(project.keyframes[object.id] || {}) };
   toast('Motion copied.');
 });
-document.getElementById('film-paste-motion').addEventListener('click', () => {
+document.getElementById('film-paste-motion').addEventListener('click', async () => {
   const object = selObj();
   if (!object || !motionClipboard) return toast('Copy motion and select a destination first.');
   if ((object.type === 'camera') !== motionClipboard.camera) return toast('Camera motion can only be pasted onto a camera.');
-  if (Object.keys(project.keyframes[object.id] || {}).length && !confirm('Replace this object’s existing keyframes?')) return;
+  if (Object.keys(project.keyframes[object.id] || {}).length && !await askConfirm('Replace this object’s existing keyframes?')) return;
   project.keyframes[object.id] = Object.fromEntries(Object.entries(structuredClone(motionClipboard.tracks)).map(([ch, keys]) => [ch, keys.filter(k => k.t <= project.duration)]).filter(([, keys]) => keys.length));
   selectedKey = null; markDirty(); evaluateAt(animTime); renderTimeline(); renderAnimObjectSelect(); toast('Motion pasted. Keys outside this shot were skipped.');
 });
-document.getElementById('film-clear-motion').addEventListener('click', () => {
-  const object = selObj(); if (!object || !confirm('Clear the selected object’s keyframes? Its base transform and motion preset will be kept.')) return;
+document.getElementById('film-clear-motion').addEventListener('click', async () => {
+  const object = selObj(); if (!object || !await askConfirm('Clear the selected object’s keyframes? Its base transform and motion preset will be kept.')) return;
   delete project.keyframes[object.id]; selectedKey = null; markDirty();
   if (object.type === 'camera') applyCameraBase(activeShot());
   evaluateAt(animTime); renderTimeline(); renderAnimObjectSelect();
@@ -2978,9 +2979,9 @@ document.getElementById('file-open').addEventListener('change', e => {
   reader.readAsText(f);
 });
 document.getElementById('btn-starter').addEventListener('click', loadStarterScene);
-document.getElementById('btn-new').addEventListener('click', () => {
+document.getElementById('btn-new').addEventListener('click', async () => {
   const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
-  if (hasWork && !confirm('Start a new movie? Unsaved work will be lost.')) return;
+  if (hasWork && !await askConfirm('Start a new movie? Unsaved work will be lost.')) return;
   if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject();
   currentCharId = null; selectedId = null;
@@ -2997,9 +2998,9 @@ document.getElementById('btn-new').addEventListener('click', () => {
 /* ============================================================
    Starter demo — a two-shot mini movie: engine room + hero close-up
    ============================================================ */
-function loadStarterScene() {
+async function loadStarterScene() {
   const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
-  if (hasWork && !confirm('Replace the current movie with the starter scene?')) return;
+  if (hasWork && !await askConfirm('Replace the current movie with the starter scene?')) return;
   if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject();
   project.name = 'Starter — mini movie';
@@ -3170,10 +3171,10 @@ document.getElementById('btn-camera-lens').addEventListener('click', () => {
   if (kf?.['cam.fov']) kf['cam.fov'].forEach(k => { k.v = fov; });
   markDirty(); renderTimeline(); toast(mm + 'mm lens set');
 });
-document.getElementById('btn-camera-preset').addEventListener('click', () => {
+document.getElementById('btn-camera-preset').addEventListener('click', async () => {
   if (moviePlaying || recMode) { toast('Stop playback or export before changing the camera'); return; }
   const mode = document.getElementById('camera-preset').value, s = activeShot();
-  if (Object.keys(s.keyframes[CAMERA_ID] || {}).length && !confirm('Replace this shot’s camera keyframes?')) return;
+  if (Object.keys(s.keyframes[CAMERA_ID] || {}).length && !await askConfirm('Replace this shot’s camera keyframes?')) return;
   const from = [...camera.position.toArray(), ...controls.target.toArray(), camera.fov];
   let to = [...from];
   const delta = camera.position.clone().sub(controls.target);
@@ -3204,10 +3205,10 @@ document.getElementById('btn-camera-preset').addEventListener('click', () => {
   toast('Camera move added — select Shot camera to edit its keys');
 });
 
-function loadRaceMovie() {
+async function loadRaceMovie() {
   if (recMode || exportPreparing || exportFinalizing) { toast('Finish exporting first'); return; }
   const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
-  if (hasWork && !confirm('Replace the current movie with the 3D race movie? Save your project first to keep it.')) return;
+  if (hasWork && !await askConfirm('Replace the current movie with the 3D race movie? Save your project first to keep it.')) return;
   if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject(); project.name = 'The Final Straight'; project.exportAspect = '2.39:1';
   project.studio.plan = { ...project.studio.plan, genre: 'Sports drama',
@@ -3294,7 +3295,7 @@ document.getElementById('btn-cinema').addEventListener('click', async e => {
     if(recMode || exportPreparing || exportFinalizing)return;
     const hasWork=project.shots.some(s=>s.sceneObjects.length) || project.drawings.length || project.audioAssets.length ||
       project.name!=='Untitled movie' || hasProductionWork(project.studio);
-    if(hasWork && !confirm('Replace the current movie with The Last Signal? Save your project first to keep it.'))return;
+    if(hasWork && !await askConfirm('Replace the current movie with The Last Signal? Save your project first to keep it.'))return;
     if(moviePlaying)stopMovie();setPlaying(false);
     project=buildCinemaDemo({newProject:defaultProject,newShot,newRig:defaultRig,uid},voice);
     animTime=0;selectedId=null;currentCharId=project.characters[0].id;
@@ -3325,7 +3326,7 @@ studioWorkspaces = createStudioWorkspaces({
     markDirty(); syncShotControls(); renderShotsUI(); renderTimeline();
   },
   duplicateShot: id => { applyShot(id); duplicateShot(); return project.activeShotId; },
-  deleteShot: id => { applyShot(id); const old = project.shots.length; deleteShot(); if (project.shots.length < old) delete project.studio.shotNotes[id]; },
+  deleteShot: async id => { applyShot(id); const old = project.shots.length; await deleteShot(); if (project.shots.length < old) delete project.studio.shotNotes[id]; },
   moveShot: (id, dir) => {
     const index = project.shots.findIndex(s => s.id === id), next = index + dir;
     if (index < 0 || next < 0 || next >= project.shots.length) return;
