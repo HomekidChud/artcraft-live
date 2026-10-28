@@ -2161,15 +2161,31 @@ async function exportMovie() {
             await fsWritable.write(chunk);
             recordedChunks.shift(); // memory released only after the write succeeds
           }
-        } catch (err) { diskError = err; fsWritable = null; }
+        } catch (err) {
+          diskError = err;
+          // release the file handle — the partial file is not a valid movie.
+          // a committed-stream failure cannot be recovered (earlier chunks are gone),
+          // so stop recording and report instead of accumulating the tail in memory.
+          try { await fsWritable.abort(); } catch {}
+          fsWritable = null;
+          if (recMode) {
+            toast('Saving to the file failed — stopping the export. Nothing was saved.');
+            finishExport(exportRestore.shotId, exportRestore.cam);
+          }
+        }
       })().finally(() => { drainPromise = null; });
       return drainPromise;
     };
     const saveRecording = async () => {
+      // a save is now pending/running regardless of who stopped the recorder:
+      // if the recorder went inactive on its own (error path), finishExport armed
+      // neither flag — arm here so a new export cannot replace the shared buffer mid-save
+      savePending = true;
+      exportFinalizing = true;
       try {
         if (diskMode) {
           await drain(); // every queued chunk is submitted before closing
-          if (diskError) throw diskError; // handled below with an explicit fallback
+          if (diskError) throw diskError; // reported below — a committed-stream failure is not recoverable
           await fsWritable.close();
           toast('Movie saved to the file you chose (' + W + '×' + H + ')');
         } else {
@@ -2179,20 +2195,10 @@ async function exportMovie() {
         }
       } catch (err) {
         console.error('save failed', err);
-        // disk save failed — the chunks are still in memory, so offer them as a download
-        // (explicitly labelled; never passed off as a complete save)
-        try {
-          const blob = new Blob(recordedChunks, { type: mime });
-          if (blob.size) {
-            downloadBlob(blob, fileName);
-            toast('Save to the file failed (' + ((err && err.name) || 'error') + ') — downloading what was recorded instead');
-          } else {
-            toast('Could not save the recording — the write failed. Try again or use a shorter movie.');
-          }
-        } catch {
-          toast('Could not save the recording — the write failed. Try again or use a shorter movie.');
-        }
+        if (diskError) toast('Could not save the recording — the write failed. Nothing was saved.');
+        else toast('Could not save the recording — try again or use a shorter movie.');
       }
+      savePending = false;
       exportFinalizing = false;
       recStatus.textContent = '';
       const rBtn = document.getElementById('btn-record');
@@ -2262,12 +2268,15 @@ async function exportMovie() {
 let exportRestore = null;
 let exportPreparing = false; // true while the picker / writable is being set up
 let exportFinalizing = false; // true from recorder stop until the file is saved
+let savePending = false; // a recorder stop has been issued and its save is still running
 function finishExport(prevShotId, prevCam) {
   recMode = false;
   stopAudio();
   let stopped = false;
-  try { if (mediaRecorder && mediaRecorder.state !== 'inactive') { mediaRecorder.stop(); stopped = true; } } catch {}
-  exportFinalizing = stopped; // blocks a new export until saving finishes (only if a save is coming)
+  try { if (mediaRecorder && mediaRecorder.state !== 'inactive') { mediaRecorder.stop(); stopped = true; savePending = true; } } catch {}
+  // finalizing stays armed while THIS recording's save is still pending (idempotent teardown:
+  // a late second call with an inactive recorder must not clear the flag under a running save)
+  exportFinalizing = stopped || savePending;
   // restore editor state WITHOUT capturing a camera base (a capture here would
   // overwrite the last exported shot's framing with the restored editor camera)
   applyShotPlayback(prevShotId);
@@ -2472,6 +2481,10 @@ window.__vc = {
   evaluateAt,
   get recorder() { return mediaRecorder; },
   get chunkCount() { return recordedChunks.length; },
+  get savePending() { return savePending; },
+  get exportPreparing() { return exportPreparing; },
+  get exportFinalizing() { return exportFinalizing; },
+  get recActive() { return recMode; },
   playingAudioCount: () => [...audioNodes.values()].filter(n => !n.el.paused).length,
   clipInfo: () => project.audioClips.map(c => ({ start: c.start, vol: c.volume, asset: (project.audioAssets.find(a => a.id === c.assetId) || {}).name })),
   audioDebug: () => ({
