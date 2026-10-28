@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildModel, disposeModel } from './models.js';
-import { PRODUCTION_TABS, PART_TYPES, newPart, validateModel, modelTemplate, modelInstance, makeId } from './production.js';
+import { buildModel, disposeModel } from './models.js?v=0.7.1';
+import { PRODUCTION_TABS, PART_TYPES, newPart, validateModel, modelTemplate, modelInstance, makeId } from './production.js?v=0.7.1';
+import { renderShotFinishing, subtitleTools } from './film-ui.js?v=0.7.1';
+import { askConfirm } from './dialogs.js?v=0.7.1';
 
 const names = { plan: 'Planning', design: 'Design', assets: 'Assets', board: 'Storyboard', sound: 'Sound', delivery: 'Delivery' };
 const icons = {
@@ -75,6 +77,7 @@ function downloadJSON(data, filename) {
 
 export function createStudioWorkspaces(api) {
   let current = '', selectedPart = null, designRenderer, designScene, designCamera, designControls, designGroup, designOutline;
+  let storyboardPage = 0, storyboardSearch = '';
   let designHost, designFrame = 0, designDirty = true, designResizeObserver, selectDesignPart = () => {};
   const p = () => api.project();
   const s = () => p().studio;
@@ -86,6 +89,9 @@ export function createStudioWorkspaces(api) {
   function planning() {
     const el = root('plan');
     heading(el, 'PRE-PRODUCTION', 'Every movie starts with a plan.', 'Develop the idea, write your script and track the work. Everything here travels with your project file.');
+    const next = node('div', 'studio-toolbar planning-actions');
+    next.append(button('Build a scene', () => open('scene'), true), button('Import 3D assets', () => open('assets')), button('Open movie timeline', () => open('anim')));
+    el.append(next);
     const grid = node('div', 'studio-grid'); el.append(grid);
     const brief = panel(grid, 'Creative brief');
     field(brief, 'Movie title', p().name, value => { p().name = value || 'Untitled movie'; document.getElementById('project-tag').textContent = p().name; change(); });
@@ -176,9 +182,9 @@ export function createStudioWorkspaces(api) {
     layout.append(center); layout.append(right);
     const draft = s().draft;
     field(left, 'Model name', draft.name, v => { draft.name = v; change(); });
-    select(left, 'Start from a template', '', [['', 'Choose a template…'], ['trophy', 'Champion trophy'], ['podium', 'Winners podium'], ['tree', 'Studio tree'], ['blank', 'Empty model']], kind => {
+    select(left, 'Start from a template', '', [['', 'Choose a template…'], ['trophy', 'Champion trophy'], ['podium', 'Winners podium'], ['tree', 'Studio tree'], ['blank', 'Empty model']], async kind => {
       if (!kind) return;
-      if (draft.parts.length && !confirm('Replace the current design draft? Save it to your library first to keep it.')) return;
+      if (draft.parts.length && !await askConfirm('Replace the current design draft? Save it to your library first to keep it.')) return;
       s().draft = modelTemplate(kind); selectedPart = null; change(); design();
     });
     const addRow = node('div', 'studio-toolbar');
@@ -250,7 +256,7 @@ export function createStudioWorkspaces(api) {
     heading(el, 'PROJECT LIBRARY', 'Your entire production, in one place.', 'Browse reusable 3D models, cast, drawings and audio. Model instances placed in shots are independent copies.');
     const toolbar = node('div', 'studio-toolbar'); el.append(toolbar);
     const search = node('input', 'studio-input'); search.placeholder = 'Search assets'; search.setAttribute('aria-label', 'Search assets'); toolbar.append(search);
-    const filter = select(toolbar, 'Asset type', 'all', [['all', 'All assets'], ['model', '3D models'], ['character', 'Characters'], ['drawing', 'Drawings'], ['audio', 'Audio']], () => renderCards());
+    const filter = select(toolbar, 'Asset type', 'all', [['all', 'All assets'], ['model', 'Designed models'], ['imported', 'Imported 3D / GLB'], ['character', 'Characters'], ['drawing', 'Drawings'], ['audio', 'Audio']], () => renderCards());
     const upload = node('input'); upload.type = 'file'; upload.accept = '.json'; upload.hidden = true; upload.setAttribute('aria-label', 'Import model JSON');
     upload.addEventListener('change', async () => {
       const file = upload.files[0]; if (!file) return;
@@ -262,33 +268,53 @@ export function createStudioWorkspaces(api) {
       upload.value = '';
     });
     toolbar.append(button('Import model JSON', () => upload.click()), button('Design a model', () => open('design'), true), upload);
+    const glb = node('input'); glb.type = 'file'; glb.accept = '.glb'; glb.hidden = true; glb.setAttribute('aria-label', 'Import 3D GLB file');
+    const importStatus = node('p', 'studio-muted'); importStatus.setAttribute('role', 'status');
+    const importButton = button('Import 3D GLB', () => glb.click());
+    glb.addEventListener('change', async () => {
+      const file = glb.files[0]; if (!file) return;
+      importButton.disabled = true; importStatus.textContent = 'Reading model, materials and animation…';
+      try { const asset = await api.importGLB(file); importStatus.textContent = asset.name + ' imported with ' + asset.animations.length + ' animation clips.'; renderCards(); }
+      catch (e) { importStatus.textContent = 'Import failed: ' + e.message; }
+      finally { importButton.disabled = false; glb.value = ''; }
+    });
+    toolbar.append(importButton, glb);
+    el.append(node('p', 'studio-muted', 'Import self-contained, uncompressed GLB files up to 25 MB, including embedded textures, skins and animation clips. Imported models are normalized to 2m high; scale them in Scene. Save a project backup to keep large assets.'), importStatus);
     const cards = node('div', 'asset-cards'); el.append(cards);
     function renderCards() {
       cards.replaceChildren();
-      const all = [...s().models.map(asset => ({ kind: 'model', asset })),
+      const all = [...s().models.map(asset => ({ kind: 'model', asset })), ...s().imports.map(asset => ({ kind: 'imported', asset })),
         ...p().characters.map(asset => ({ kind: 'character', asset })),
         ...p().drawings.map(asset => ({ kind: 'drawing', asset })),
         ...p().audioAssets.map(asset => ({ kind: 'audio', asset }))];
       const shown = all.filter(({ kind, asset }) => (filter.value === 'all' || kind === filter.value) && asset.name.toLowerCase().includes(search.value.toLowerCase()));
       if (!shown.length) cards.append(node('p', 'studio-muted', all.length ? 'No assets match that search.' : 'Your library is empty. Start in Design, Draw or Cast, or import audio in Sound.'));
       shown.forEach(({ kind, asset }) => {
-        const card = panel(cards), badge = node('div', 'asset-kind', { model: '3D MODEL', character: 'RIGGED CAST', drawing: 'DRAWING', audio: 'AUDIO' }[kind]);
+        const card = panel(cards), badge = node('div', 'asset-kind', { model: '3D MODEL', imported: 'IMPORTED 3D / GLB', character: 'RIGGED CAST', drawing: 'DRAWING', audio: 'AUDIO' }[kind]);
         card.append(badge, node('h3', '', asset.name));
         if (kind === 'drawing') { const image = node('img', 'asset-preview'); image.src = asset.dataURL; image.alt = asset.name; card.append(image); }
         if (kind === 'model') {
           card.append(node('p', 'studio-muted', asset.parts.length + ' editable parts'),
             button('Add to current shot', () => addModel(asset), true),
-            button('Edit model design', () => {
+            button('Edit model design', async () => {
               const draft = s().draft, source = s().models.find(model => model.id === draft.assetId);
               const value = model => JSON.stringify({ name: model.name, parts: model.parts.map(({ id, ...part }) => part) });
-              if (draft.parts.length && (!source || value(draft) !== value(source)) && !confirm('Replace the unsaved design draft? Save it to Assets first to keep it.')) return;
+              if (draft.parts.length && (!source || value(draft) !== value(source)) && !await askConfirm('Replace the unsaved design draft? Save it to Assets first to keep it.')) return;
               s().draft = { name: asset.name, assetId: asset.id, parts: structuredClone(asset.parts) };
               selectedPart = null; change(); open('design');
             }),
             button('Export model JSON', () => downloadJSON({ format: 'videocraft.model.v1', model: asset }, asset.name.replace(/[^a-z0-9-_]/gi, '_') + '.model.json')),
-            button('Remove library model', () => {
-              if (!confirm('Remove this library model? Existing shot instances will be kept.')) return;
+            button('Remove library model', async () => {
+              if (!await askConfirm('Remove this library model? Existing shot instances will be kept.')) return;
               s().models = s().models.filter(m => m.id !== asset.id); if (s().draft.assetId === asset.id) s().draft.assetId = ''; change(); renderCards();
+            }));
+        } else if (kind === 'imported') {
+          card.append(node('p', 'studio-muted', asset.animations.length + ' animation clips · embedded source'),
+            button('Place imported model', () => api.placeImported(asset), true),
+            button('Remove imported asset', async () => {
+              if (p().shots.some(shot => shot.sceneObjects.some(o => o.type === 'imported' && o.assetId === asset.id))) return api.toast('Remove this model’s instances from every shot before deleting its source.');
+              if (!await askConfirm('Remove this imported model from the project?')) return;
+              s().imports = s().imports.filter(a => a !== asset); change(); renderCards();
             }));
         } else if (kind === 'character') card.append(button('Add actor to current shot', () => { api.placeCharacter(asset); open('scene'); }, true), button('Open Cast', () => open('char')));
         else if (kind === 'drawing') card.append(button('Add drawing to current shot', () => { api.placeDrawing(asset); open('scene'); }, true));
@@ -302,8 +328,17 @@ export function createStudioWorkspaces(api) {
     const el = root('board'), total = p().shots.reduce((sum, shot) => sum + shot.duration, 0);
     heading(el, 'SHOT DEVELOPMENT', 'Shape the story, one shot at a time.', `${p().shots.length} shots · ${total.toFixed(1)} seconds. Write the action and camera intention, then take each shot into Animate.`);
     const toolbar = node('div', 'studio-toolbar'); toolbar.append(button('Add storyboard shot', () => { api.addShot(); storyboard(); }, true), button('Play movie in Animate', () => { open('anim'); api.playMovie(); })); el.append(toolbar);
+    subtitleTools(toolbar, { ...api, refresh: storyboard });
+    const navigation = node('div', 'studio-toolbar'); el.append(navigation);
+    field(navigation, 'Search shots', storyboardSearch, value => { storyboardSearch = value; }, { });
+    navigation.append(button('Search', () => { storyboardPage = 0; storyboard(); }));
+    const matching = p().shots.map((shot, index) => ({ shot, index })).filter(({ shot }) => (shot.name + ' ' + (s().shotNotes[shot.id] || '')).toLowerCase().includes(storyboardSearch.toLowerCase()));
+    const pages = Math.max(1, Math.ceil(matching.length / 12)); storyboardPage = Math.min(storyboardPage, pages - 1);
+    const previous = button('Previous shots', () => { storyboardPage--; storyboard(); }); previous.disabled = storyboardPage === 0;
+    const next = button('Next shots', () => { storyboardPage++; storyboard(); }); next.disabled = storyboardPage === pages - 1;
+    navigation.append(previous, node('span', 'studio-muted', `Page ${storyboardPage + 1} of ${pages} · ${matching.length} matching shots`), next);
     const grid = node('div', 'storyboard-grid'); el.append(grid);
-    p().shots.forEach((shot, index) => {
+    matching.slice(storyboardPage * 12, (storyboardPage + 1) * 12).forEach(({ shot, index }) => {
       const card = panel(grid);
       card.append(node('div', 'studio-kicker', 'SHOT ' + String(index + 1).padStart(2, '0')));
       const image = node('div', 'story-frame');
@@ -318,6 +353,7 @@ export function createStudioWorkspaces(api) {
         el.querySelector('.studio-heading p').textContent = `${p().shots.length} shots · ${p().shots.reduce((sum, shot) => sum + shot.duration, 0).toFixed(1)} seconds. Write the action and camera intention, then take each shot into Animate.`;
       }, { type: 'number', min: 0.5, max: 3600, step: 0.5 });
       field(card, 'Shot notes ' + (index + 1), s().shotNotes[shot.id], v => { s().shotNotes[shot.id] = v; change(); }, { multiline: true, rows: 4 });
+      renderShotFinishing(card, shot, 'Shot ' + (index + 1), api);
       if (p().drawings.length) select(card, 'Shot reference ' + (index + 1), shot.referenceDrawingId || '',
         [['', 'No reference'], ...p().drawings.map(d => [d.id, d.name])], v => { shot.referenceDrawingId = v; change(); storyboard(); });
       card.append(button('Open shot in Animate', () => { api.openShot(shot.id); open('anim'); }, true));
@@ -326,13 +362,13 @@ export function createStudioWorkspaces(api) {
       const down = button('Later', () => { api.moveShot(shot.id, 1); storyboard(); }); down.disabled = index === p().shots.length - 1;
       actions.append(up, down, button('Duplicate shot', () => {
         const id = api.duplicateShot(shot.id); s().shotNotes[id] = s().shotNotes[shot.id] || ''; change(); storyboard();
-      }), button('Delete shot', () => { api.deleteShot(shot.id); storyboard(); }));
+      }), button('Delete shot', async () => { await api.deleteShot(shot.id); storyboard(); }));
       card.append(actions);
     });
   }
   function sound() {
     const el = root('sound');
-    heading(el, 'SOUND DEPARTMENT', 'Give your movie a voice.', 'Import dialogue, music and sound effects. Clip start times are global movie seconds; use real-time export to include sound.');
+    heading(el, 'SOUND DEPARTMENT', 'Give your movie a voice.', 'Layer dialogue, music and effects with independent clips, source trims, fades and stereo pan. Start times are global movie seconds; both export modes include sound.');
     const grid = node('div', 'studio-grid'); el.append(grid);
     const audio = panel(grid, 'Audio clips'), host = node('div', 'studio-stack'); host.id = 'sound-controls'; audio.append(host);
     const notes = panel(grid, 'Sound direction');
@@ -357,7 +393,7 @@ export function createStudioWorkspaces(api) {
     check.append(node('p', 'studio-muted', `${p().shots.length} shots · ${p().shots.reduce((sum, shot) => sum + shot.duration, 0).toFixed(1)}s · ${p().fps} fps · ${p().audioClips.length} audio clips`));
     check.append(button('Review storyboard', () => open('board')), button('Save project backup', api.saveProject));
     const output = panel(grid, 'Export settings'), host = node('div', 'studio-stack'); host.id = 'delivery-controls'; output.append(host);
-    output.append(node('p', 'studio-muted', '4K availability is encoder-dependent. Frame-accurate export is currently silent and keeps compressed output in memory; long productions should be rendered in shorter sections.'));
+    output.append(node('p', 'studio-muted', 'Render a film, shot or interval with frame-accurate video and mixed stereo audio. Direct-to-disk bounds compressed output memory; decoded audio has a 256 MB cap. Memory exports are limited to five-minute sections. A feature-length timeline is not a guarantee of a finished feature.'));
   }
   const renderers = { plan: planning, design, assets, board: storyboard, sound, delivery };
   return {

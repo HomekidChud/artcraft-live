@@ -26,7 +26,8 @@ export function validateModel(input) {
 export function defaultStudio() {
   return {
     plan: { logline: '', synopsis: '', genre: 'Adventure', audience: '', stage: 'Development', script: '', tasks: [] },
-    models: [], draft: { name: 'Untitled model', parts: [] }, shotNotes: {}, soundNotes: '',
+    models: [], imports: [], delivery: { mode: 'all', start: 0, end: 5, disk: false },
+    draft: { name: 'Untitled model', parts: [] }, shotNotes: {}, soundNotes: '',
   };
 }
 export function normalizeStudio(input) {
@@ -50,11 +51,21 @@ export function normalizeStudio(input) {
     s.shotNotes = Object.fromEntries(Object.entries(input.shotNotes).filter(([key]) => !['__proto__', 'constructor', 'prototype'].includes(key)).map(([key, note]) => [key, text(note)]));
   }
   s.soundNotes = text(input.soundNotes);
+  s.imports = Array.isArray(input.imports) ? input.imports.slice(0, 100).filter(a =>
+    a && typeof a.id === 'string' && typeof a.dataURL === 'string' &&
+    a.dataURL.startsWith('data:model/gltf-binary;base64,') && a.dataURL.length < 34000000
+  ).map(a => ({ id: text(a.id), name: text(a.name, 'Imported model').slice(0, 120), dataURL: a.dataURL,
+    animations: Array.isArray(a.animations) ? a.animations.slice(0, 1000).map(n => text(n).slice(0, 120)) : [] })) : [];
+  if (input.delivery) s.delivery = {
+    mode: ['all', 'shot', 'range'].includes(input.delivery.mode) ? input.delivery.mode : 'all',
+    start: number(input.delivery.start, 0, 0, 604800), end: number(input.delivery.end, 5, 0, 604800),
+    disk: !!input.delivery.disk,
+  };
   return s;
 }
 export function hasProductionWork(studio) {
   if (!studio) return false;
-  return !!(studio.models?.length || studio.draft?.parts?.length || studio.soundNotes ||
+  return !!(studio.models?.length || studio.imports?.length || studio.draft?.parts?.length || studio.soundNotes ||
     studio.plan?.tasks?.length || ['logline', 'synopsis', 'audience', 'script'].some(k => studio.plan?.[k]) ||
     (studio.plan?.genre && studio.plan.genre !== 'Adventure') || (studio.plan?.stage && studio.plan.stage !== 'Development') ||
     Object.values(studio.shotNotes || {}).some(Boolean));

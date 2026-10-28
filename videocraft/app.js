@@ -2,11 +2,20 @@
 // v0.2 — movie studio: shots, per-shot camera, audio, fixed-res export.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { buildAvatar } from './avatar3d.js';
-import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js';
-import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js';
-import { buildModel } from './models.js';
-import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
+import { buildAvatar } from './avatar3d.js?v=0.7.1';
+import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js?v=0.7.1';
+import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js?v=0.7.1';
+import { buildModel } from './models.js?v=0.7.1';
+import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js?v=0.7.1';
+import { sampleKeys, movieIndex, locateTime, renderRange, shotFilm, fadeAmount, inspectGLB } from './film.js?v=0.7.1';
+import { importedInstance, loadImported } from './imported.js?v=0.7.1';
+import { renderWorld } from './film-ui.js?v=0.7.1';
+import { LIGHT_RIGS, performanceSettings, samplePerformance, audioEnvelope, composeCamera } from './cinema.js?v=0.7.1';
+import { renderCinemaLook, renderPerformance } from './cinema-ui.js?v=0.7.1';
+import { createCinemaRenderer } from './cinema-renderer.js?v=0.7.1';
+import { decodeSources, mixStereo } from './sound-render.js?v=0.7.1';
+import { buildCinemaDemo, loadDemoVoice } from './cinema-demo.js?v=0.7.1';
+import { askConfirm, askName } from './dialogs.js?v=0.7.1';
 
 installWorkspaceShell();
 let studioWorkspaces = null;
@@ -69,6 +78,8 @@ function migrateProject(data) {
     if (!s.keyframes || typeof s.keyframes !== 'object') s.keyframes = {};
     if (!s.duration || s.duration < 0.5) s.duration = 5;
     if (!s.name) s.name = 'Shot';
+    if (s.film) s.film = shotFilm(s.film);
+    s.sceneObjects.forEach(o=>{if(o.performance)o.performance=performanceSettings(o.performance);});
     // pin legacy/null camera bases so every shot has deterministic framing
     if (!s.camera) s.camera = cameraBaseSnapshot();
   });
@@ -162,7 +173,7 @@ function markDirty(msg) {
           if (el) el.textContent = 'Autosaved (audio too large — use Save project)';
           project.audioAssets.forEach(a => { if (!a.dataURL) a.stripped = true; });
           renderAudioList(); // show those assets as missing
-        } catch { /* user must save a file */ }
+        } catch { if (el) el.textContent = 'Autosave full · use Save project to keep large 3D/audio assets'; }
       }
     }, 600);
   }
@@ -212,11 +223,13 @@ function setWorkspace(ws) {
     syncSceneObjects();
     if (!selectedId && project.sceneObjects.length) selectedId = project.sceneObjects[0].id;
     renderSceneList(); renderSceneProps(); renderAnimObjectSelect();
+    renderFilmWorld();
     if (ws === 'anim') { document.getElementById('anim-object').value = selectedId || ''; renderTimeline(); }
   }
   if (ws === 'draw') syncDrawSize();
   if (ws === 'char') { renderCharList(); drawCharPreview(); }
   updatePlaybar();
+  syncFilmSettings();
 }
 railBtns.forEach(b => b.addEventListener('click', () => setWorkspace(b.dataset.ws)));
 
@@ -243,6 +256,7 @@ function applyShot(id) {
   evaluateAt(animTime);
   renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
   renderShotsUI(); syncShotControls(); updatePlayhead();
+  renderFilmWorld();
 }
 // snapshot the current editor camera as a shot's base framing
 function cameraBaseSnapshot() {
@@ -299,6 +313,7 @@ function syncShotControls() {
   if (fpsOut) fpsOut.textContent = project.fps;
   const fpsIn = document.getElementById('anim-fps');
   if (fpsIn) fpsIn.value = project.fps;
+  syncFilmSettings();
 }
 function fmtDur(d) {
   d = Math.max(0, d);
@@ -323,8 +338,8 @@ function renderShotsUI() {
       b.addEventListener('click', () => { if (s.id !== project.activeShotId) applyShot(s.id); });
       row.appendChild(b);
       const ren = document.createElement('button'); ren.className = 'mini'; ren.textContent = '✎'; ren.title = 'Rename shot';
-      ren.addEventListener('click', () => {
-        const n = prompt('Shot name:', s.name);
+      ren.addEventListener('click', async () => {
+        const n = await askName('Shot name:', s.name);
         if (n !== null && n.trim()) { s.name = n.trim(); markDirty(); renderShotsUI(); }
       });
       row.appendChild(ren);
@@ -362,6 +377,7 @@ function duplicateShot() {
   const copy = newShot(src.name + ' copy', src.duration);
   if (src.camera) copy.camera = JSON.parse(JSON.stringify(src.camera));
   copy.lighting = src.lighting || 'studio';
+  if (src.film) copy.film = structuredClone(src.film);
   copy.referenceDrawingId = src.referenceDrawingId || '';
   if (project.studio.shotNotes[src.id]) project.studio.shotNotes[copy.id] = project.studio.shotNotes[src.id];
   // regenerate object ids so the copy is fully independent
@@ -390,10 +406,10 @@ function moveShot(dir) {
   [project.shots[i], project.shots[j]] = [project.shots[j], project.shots[i]];
   markDirty(); renderShotsUI();
 }
-function deleteShot() {
+async function deleteShot() {
   if (project.shots.length < 2) { toast('A movie needs at least one shot'); return; }
   const s = activeShot();
-  if (!confirm('Delete "' + s.name + '"?')) return;
+  if (!await askConfirm('Delete "' + s.name + '"?')) return;
   const idx = project.shots.indexOf(s);
   project.shots.splice(idx, 1);
   delete project.studio.shotNotes[s.id];
@@ -556,9 +572,9 @@ drawCanvas.addEventListener('pointermove', e => {
 });
 drawCanvas.addEventListener('pointerup', () => { drawStart = null; });
 
-function saveDrawingAsset() {
+async function saveDrawingAsset() {
   if (!hasDrawnFlag) { toast('Nothing painted yet'); return; }
-  const name = prompt('Asset name:', 'Drawing ' + (project.drawings.length + 1));
+  const name = await askName('Asset name:', 'Drawing ' + (project.drawings.length + 1));
   if (name === null) return;
   project.drawings.push({ id: uid('draw'), name: name || 'Drawing', dataURL: drawCanvas.toDataURL('image/png') });
   markDirty(); renderAssetList();
@@ -905,9 +921,9 @@ document.getElementById('btn-char-copy').addEventListener('click', () => {
   project.characters.push(copy); currentCharId = copy.id;
   markDirty(); renderCharList(); drawCharPreview(); renderCharProps();
 });
-document.getElementById('btn-char-delete').addEventListener('click', () => {
+document.getElementById('btn-char-delete').addEventListener('click', async () => {
   const rig = currentRig(); if (!rig) return;
-  if (!confirm('Delete ' + rig.name + '?')) return;
+  if (!await askConfirm('Delete ' + rig.name + '?')) return;
   project.characters = project.characters.filter(c => c.id !== rig.id);
   removeSceneObjectsWhere(o => o.assetId === rig.id);
   currentCharId = project.characters[0]?.id || null;
@@ -948,6 +964,7 @@ three.fog = new THREE.Fog('#211d18', 26, 60);
 const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 200);
 camera.position.set(8.5, 7, 11);
 const controls = new OrbitControls(camera, renderer.domElement);
+const cinemaRenderer = createCinemaRenderer(renderer,three,camera);
 controls.enableDamping = true; controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI / 2 - 0.02;
 controls.target.set(0, 1.2, 0);
@@ -956,7 +973,8 @@ controls.addEventListener('end', () => {
 });
 
 // lights
-three.add(new THREE.HemisphereLight('#fff4e0', '#3a3226', 1.15));
+const ambientLight = new THREE.HemisphereLight('#fff4e0', '#3a3226', 1.15);
+three.add(ambientLight);
 const sun = new THREE.DirectionalLight('#ffe3b0', 1.9);
 sun.position.set(6, 10, 4);
 sun.castShadow = true;
@@ -977,10 +995,20 @@ function applyLighting(preset) {
     night: ['#101b2b', '#d3e8ff', 2.1, '#70a8ff', 3.0, 0.95],
   };
   const [bg, key, intensity, rim, rimIntensity, exposure] = looks[preset] || looks.studio;
-  three.background.set(bg); three.fog.color.set(bg);
+  three.background.set(bg);
   sun.color.set(key); sun.intensity = intensity;
   rimLight.color.set(rim); rimLight.intensity = rimIntensity;
   renderer.toneMappingExposure = exposure;
+  const film = activeShot().film;
+  const rig=LIGHT_RIGS[film?.lightRig];
+  ambientLight.intensity=rig?.ambient ?? 1.15;
+  sun.position.fromArray(rig?.position || [6,10,4]);rimLight.position.fromArray(rig?.rimPosition || [-6,5,-8]);
+  if(rig){sun.color.set(rig.key);sun.intensity=rig.intensity;rimLight.color.set(rig.rim);rimLight.intensity=rig.rimIntensity;}
+  if (film?.background) three.background.set(film.background);
+  three.fog = film?.fog > 0 ? new THREE.FogExp2(three.background, film.fog) : new THREE.Fog(three.background, 26, 60);
+  if (film?.fog === 0) three.fog = null;
+  if (film?.exposure != null) renderer.toneMappingExposure = film.exposure;
+  if (typeof groundMat !== 'undefined') groundMat.color.set(film?.ground || '#2b2620');
 }
 
 // ground
@@ -1007,8 +1035,15 @@ function resize3D() {
   const host = activeWs === 'anim' ? animViewport : sceneViewport;
   if (!host.clientWidth) return;
   if (renderer.domElement.parentElement !== host) host.appendChild(renderer.domElement);
-  renderer.setSize(host.clientWidth, host.clientHeight, false);
-  camera.aspect = host.clientWidth / host.clientHeight;
+  const [a, b] = (project.exportAspect || '16:9').split(':').map(Number);
+  const aspect = activeWs === 'anim' ? a / b : host.clientWidth / Math.max(1, host.clientHeight);
+  const width = Math.min(host.clientWidth, host.clientHeight * aspect), height = width / aspect;
+  const left = (host.clientWidth - width) / 2, top = (host.clientHeight - height) / 2;
+  renderer.setSize(width, height, false);
+  Object.assign(renderer.domElement.style, { position: 'absolute', width: width + 'px', height: height + 'px', left: left + 'px', top: top + 'px' });
+  // The preview is letterboxed to the delivery aspect, not stretched to the editor pane.
+  if (typeof filmOverlay !== 'undefined') Object.assign(filmOverlay.style, { inset: 'auto', width: width + 'px', height: height + 'px', left: left + 'px', top: top + 'px' });
+  camera.aspect = aspect;
   camera.updateProjectionMatrix();
 }
 new ResizeObserver(() => resize3D()).observe(sceneViewport);
@@ -1061,7 +1096,19 @@ function drawingTexture(d) {
 
 function build3DObject(o) {
   let group = new THREE.Group();
-  if (o.type === 'model') {
+  if (o.type === 'imported') {
+    const asset = project.studio.imports.find(a => a.id === o.assetId);
+    group.userData.ready = importedInstance(asset).then(model => {
+      // A shot switch may have disposed the placeholder before parsing finishes.
+      if (group.userData.disposed) { disposeGroup(model); return; }
+      group.add(model); group.userData.loading = false;
+      delete group.userData.appliedOpacity;
+      setGroupOpacity(group, o.opacity ?? 1);
+      model.userData.animate?.(o.importMotion, animTime);
+      updateSelectionVisuals();
+    }).catch(error => { group.userData.loadError = error; group.userData.loading = false; toast(o.name + ': ' + error.message); });
+    group.userData.loading = true;
+  } else if (o.type === 'model') {
     group.add(buildModel(o.modelParts || []));
   } else if (o.type === 'box' || o.type === 'sphere' || o.type === 'cylinder' || o.type === 'cone' || o.type === 'torus' || o.type === 'plane') {
     group.add(makeMesh(GEOMETRIES[o.type](), stdMat(o.color, o.opacity)));
@@ -1186,6 +1233,7 @@ function syncSceneObjects() {
     g.position.fromArray(o.pos);
     g.rotation.set(...o.rot.map(r => r * Math.PI / 180));
     g.scale.fromArray(o.scale);
+    g.visible = o.visible !== false;
     g.traverse(m => { if (m.isMesh && o.castShadow === false) m.castShadow = false; });
     setGroupOpacity(g, o.opacity ?? 1);
     if (o.type === 'character' && g.userData.redraw && g.userData.lastRigRev !== rigRevision(o.assetId)) {
@@ -1202,20 +1250,25 @@ function setGroupOpacity(group, value) {
   group.traverse(m => {
     if (!m.material) return;
     for (const material of Array.isArray(m.material) ? m.material : [m.material]) {
-      const transparent = value < 1 || !!material.map;
+      material.userData.originalOpacity ??= 1;
+      material.userData.originalTransparent ??= material.transparent;
+      const transparent = value * material.userData.originalOpacity < 1 || material.userData.originalTransparent;
       if (material.transparent !== transparent) { material.transparent = transparent; material.needsUpdate = true; }
-      material.opacity = value;
+      material.opacity = material.userData.originalOpacity * value;
     }
   });
 }
 function disposeGroup(g) {
+  g.userData.disposed = true;
   g.traverse(m => {
+    m.userData.disposeAnimation?.();
+    m.skeleton?.dispose?.();
     m.userData.skeleton?.dispose();
     m.geometry?.dispose?.();
     if (m.material) {
       const mats = Array.isArray(m.material) ? m.material : [m.material];
       mats.forEach(mm => {
-        mm.map?.dispose?.();
+        for (const value of Object.values(mm)) if (value?.isTexture) value.dispose();
         mm.dispose?.();
       });
     }
@@ -1251,7 +1304,7 @@ function updateSelectionVisuals() {
   const o = selObj();
   if (!o) { gizmo.visible = false; selRing.visible = false; return; }
   const g = objectGroups.get(o.id);
-  if (!g) { gizmo.visible = false; selRing.visible = false; return; }
+  if (!g || !g.visible) { gizmo.visible = false; selRing.visible = false; return; }
   const box = new THREE.Box3().setFromObject(g);
   if (box.isEmpty()) { gizmo.visible = false; selRing.visible = false; return; }
   gizmo.box.copy(box);
@@ -1276,7 +1329,7 @@ renderer.domElement.addEventListener('pointerdown', e => {
   }
   // dragging on empty space = orbit (default). dragging on selected object = move it.
   const hit = pickObject(e);
-  if (hit === selectedId) {
+  if (hit === selectedId && !selObj()?.locked && selObj()?.visible !== false) {
     controls.enabled = false;
     dragState = { obj: selObj(), start: pickGround(e), mode: gizmoMode, startVals: null };
     e.target.setPointerCapture(e.pointerId);
@@ -1323,7 +1376,7 @@ function pickObject(e) {
   for (const h of hits) {
     let g = h.object;
     while (g && !g.userData.objId) g = g.parent;
-    if (g) return g.userData.objId;
+    if (g && g.visible) return g.userData.objId;
   }
   return null;
 }
@@ -1405,6 +1458,7 @@ function renderSceneList() {
       object.pos = [x, 0, z]; project.sceneObjects.push(object); syncSceneObjects(); selectObject(object.id); markDirty();
     });
   });
+  project.studio.imports.forEach(asset => addRow('+ imported: ' + asset.name, () => placeImported(asset)));
 }
 function freeSpot() {
   const cands = [[3.2, 2.4], [-3.2, 2.4], [3.2, -2.4], [-3.2, -2.4], [0, 3.6], [0, -3.6], [5, 0], [-5, 0]];
@@ -1464,8 +1518,8 @@ function addTextCard() {
   syncSceneObjects();
   selectObject(o.id); markDirty();
 }
-document.getElementById('btn-clear-scene').addEventListener('click', () => {
-  if (!confirm('Remove all objects from this shot?')) return;
+document.getElementById('btn-clear-scene').addEventListener('click', async () => {
+  if (!await askConfirm('Remove all objects from this shot?')) return;
   // mutate in place — this array belongs to the active shot
   project.sceneObjects.length = 0;
   for (const k in project.keyframes) delete project.keyframes[k];
@@ -1497,12 +1551,43 @@ function renderSceneProps() {
     panel.appendChild(ci);
   }
   if (o.type === 'character') renderActorControls(panel, o);
+  if (o.type === 'imported') renderImportedControls(panel, o);
+  if(['character','imported'].includes(o.type))renderPerformanceTools(panel,o);
+  const frame = document.createElement('button'); frame.className = 'btn'; frame.textContent = 'Frame selected object';
+  frame.addEventListener('click', () => {
+    const group = objectGroups.get(o.id); if (!group) return;
+    const box = new THREE.Box3().setFromObject(group); if (box.isEmpty()) return toast('The model is still loading.');
+    const center = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+    const half = Math.max(size.y, size.x / camera.aspect, size.z) / 2;
+    const distance = Math.max(1, half / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * 1.4);
+    const direction = camera.position.clone().sub(controls.target).normalize();
+    camera.position.copy(center).addScaledVector(direction, distance); controls.target.copy(center); controls.update();
+    captureCameraBase(); markDirty();
+    if (Object.keys(project.keyframes[CAMERA_ID] || {}).length) toast('Object framed for editing. Existing camera animation is unchanged.');
+  }); panel.append(frame);
+  if (o.type === 'model') {
+    const edit = document.createElement('button'); edit.className = 'btn'; edit.textContent = 'Copy parts to Design';
+    edit.addEventListener('click', async () => {
+      if (project.studio.draft.parts.length && !await askConfirm('Replace the current design draft? Save it to Assets first to keep it.')) return;
+      project.studio.draft = { name: o.name, parts: structuredClone(o.modelParts || []) };
+      markDirty(); setWorkspace('design');
+      toast('Parts copied. Save a reusable model to Assets; the original shot instance is unchanged.');
+    }); panel.append(edit);
+  }
   const t = document.createElement('div'); t.className = 'side-title'; t.textContent = 'Name';
   panel.appendChild(t);
   const nameIn = document.createElement('input'); nameIn.className = 'btn'; nameIn.style.width = '100%'; nameIn.style.textAlign = 'left';
   nameIn.value = o.name;
+  nameIn.setAttribute('aria-label', 'Object name');
   nameIn.addEventListener('input', () => { o.name = nameIn.value; renderSceneList(); renderAnimObjectSelect(); markDirty(); });
   panel.appendChild(nameIn);
+  for (const [key, label, fallback] of [['visible', 'Visible in movie', true], ['locked', 'Lock viewport transforms', false]]) {
+    const wrap = document.createElement('label'); wrap.className = 'film-check';
+    const check = document.createElement('input'); check.type = 'checkbox'; check.checked = o[key] ?? fallback;
+    check.setAttribute('aria-label', label);
+    check.addEventListener('change', () => { o[key] = check.checked; syncSceneObjects(); evaluateAt(animTime); markDirty(); });
+    wrap.append(check, document.createTextNode(label)); panel.append(wrap);
+  }
 
   ['x', 'y', 'z'].forEach((axis, i) => {
     panel.appendChild(mkNum('Position ' + axis, o.pos, i, v => { o.pos[i] = v; syncSceneObjects(); markDirty(); }, -20, 20, 0.1));
@@ -1521,7 +1606,8 @@ function renderSceneProps() {
   dup.addEventListener('click', () => {
     const copy = JSON.parse(JSON.stringify(o)); copy.id = uid('obj');
     copy.pos = [copy.pos[0] + 1, copy.pos[1], copy.pos[2] + 1];
-    project.sceneObjects.push(copy); selectObject(copy.id); markDirty();
+    if (project.keyframes[o.id]) project.keyframes[copy.id] = structuredClone(project.keyframes[o.id]);
+    project.sceneObjects.push(copy); syncSceneObjects(); selectObject(copy.id); markDirty();
   });
   panel.appendChild(dup);
   const del = document.createElement('button'); del.className = 'btn'; del.textContent = 'Delete';
@@ -1563,8 +1649,9 @@ let selectedKey = null; // {id, ch, index}
 
 const CHANNELS = [
   { ch: 'pos.x', label: 'Pos X' }, { ch: 'pos.y', label: 'Pos Y' }, { ch: 'pos.z', label: 'Pos Z' },
-  { ch: 'rot.y', label: 'Rotate Y' },
+  { ch: 'rot.x', label: 'Rotate X' }, { ch: 'rot.y', label: 'Rotate Y' }, { ch: 'rot.z', label: 'Rotate Z' },
   { ch: 'scale', label: 'Scale' },
+  { ch: 'scale.x', label: 'Scale X' }, { ch: 'scale.y', label: 'Scale Y' }, { ch: 'scale.z', label: 'Scale Z' },
   { ch: 'opacity', label: 'Opacity' },
   { ch: 'pose', label: 'Character pose' },
 ];
@@ -1584,21 +1671,7 @@ function objChannelValue(o, ch, t) {
   if (!kfs.length) return null;
   return sampleTrack(kfs, t);
 }
-function sampleTrack(kfs, t) {
-  if (!kfs.length) return null;
-  if (t <= kfs[0].t) return kfs[0].v;
-  if (t >= kfs[kfs.length - 1].t) return kfs[kfs.length - 1].v;
-  for (let i = 0; i < kfs.length - 1; i++) {
-    if (t >= kfs[i].t && t <= kfs[i + 1].t) {
-      const a = kfs[i], b = kfs[i + 1];
-      const u = (t - a.t) / (b.t - a.t || 1);
-      const eu = a.ease === 'step' ? 0 : a.ease === 'linear' ? u : smoothstep(u);
-      return a.v + (b.v - a.v) * eu;
-    }
-  }
-  return kfs[kfs.length - 1].v;
-}
-function smoothstep(u) { return u * u * (3 - 2 * u); }
+const sampleTrack = sampleKeys;
 
 // evaluateAt: the single source of truth for scrub, playback, and recording
 function evaluateAt(t) {
@@ -1608,25 +1681,28 @@ function evaluateAt(t) {
     const g = objectGroups.get(o.id);
     if (!g) return;
     // position
-    const px = kf['pos.x'] ? sampleTrack(kf['pos.x'], T) : o.pos[0];
-    const py = kf['pos.y'] ? sampleTrack(kf['pos.y'], T) : o.pos[1];
-    const pz = kf['pos.z'] ? sampleTrack(kf['pos.z'], T) : o.pos[2];
+    const px = kf['pos.x']?.length ? sampleTrack(kf['pos.x'], T) : o.pos[0];
+    const py = kf['pos.y']?.length ? sampleTrack(kf['pos.y'], T) : o.pos[1];
+    const pz = kf['pos.z']?.length ? sampleTrack(kf['pos.z'], T) : o.pos[2];
     g.position.set(px, py, pz);
-    // rotation (base + animated rot.y)
-    const ry = kf['rot.y'] ? sampleTrack(kf['rot.y'], T) : o.rot[1];
-    g.rotation.set(o.rot[0] * Math.PI / 180, ry * Math.PI / 180, o.rot[2] * Math.PI / 180);
-    // scale
-    if (kf['scale']) { const s = sampleTrack(kf['scale'], T); g.scale.set(o.scale[0] * s, o.scale[1] * s, o.scale[2] * s); }
-    else g.scale.fromArray(o.scale);
+    g.rotation.set(...['x', 'y', 'z'].map((a, i) => THREE.MathUtils.degToRad(kf['rot.' + a]?.length ? sampleTrack(kf['rot.' + a], T) : o.rot[i])));
+    const uniform = kf.scale?.length ? sampleTrack(kf.scale, T) : 1;
+    g.scale.set(...['x', 'y', 'z'].map((a, i) => (kf['scale.' + a]?.length ? sampleTrack(kf['scale.' + a], T) : o.scale[i]) * uniform));
+    g.visible = o.visible !== false;
     // opacity
-    setGroupOpacity(g, kf.opacity ? sampleTrack(kf.opacity, T) : o.opacity ?? 1);
+    setGroupOpacity(g, kf.opacity?.length ? sampleTrack(kf.opacity, T) : o.opacity ?? 1);
+    if (o.type === 'imported') g.children[0]?.userData.animate?.(o.importMotion, T);
     if (o.rigMode === '3d') {
       const joints = { ...(o.joints || {}) };
-      Object.keys(kf).filter(ch => ch.startsWith('joint.')).forEach(ch => { joints[ch.slice(6)] = sampleTrack(kf[ch], T); });
+      Object.keys(kf).filter(ch => ch.startsWith('joint.') && kf[ch]?.length).forEach(ch => { joints[ch.slice(6)] = sampleTrack(kf[ch], T); });
       g.children[0]?.userData.animate?.(o.motion, T, project.duration, joints, kf.pose ? sampleTrack(kf.pose, T) : null);
     }
+    if(o.rigMode==='3d' || o.type==='imported'){
+      const seed=[...o.id].reduce((n,c)=>n+c.charCodeAt(0),0);
+      g.children[0]?.userData.face?.(samplePerformance(o.performance,T,globalTime(),project.audioClips,seed),o.performance?.enabled);
+    }
     // Legacy billboard pose: clone the asset, never mutate a shared rig.
-    if (kf['pose'] && g.userData.redraw) {
+    if (kf['pose']?.length && g.userData.redraw) {
       const rig = project.characters.find(c => c.id === o.assetId);
       if (rig) {
         const u = sampleTrack(kf['pose'], T);
@@ -1665,9 +1741,11 @@ function applyPose(rig, u) {
 function renderAnimObjectSelect() {
   const actorPanel = document.getElementById('actor-tools');
   actorPanel.innerHTML = '';
-  const actor = project.sceneObjects.find(o => o.id === selectedId && o.type === 'character');
-  if (actor) renderActorControls(actorPanel, actor);
+  const actor = project.sceneObjects.find(o => o.id === selectedId && ['character', 'imported'].includes(o.type));
+  if (actor?.type === 'imported') renderImportedControls(actorPanel, actor);
+  else if (actor) renderActorControls(actorPanel, actor);
   else actorPanel.innerHTML = '<div class="empty-note">Select a character to direct its performance.</div>';
+  if(actor)renderPerformanceTools(actorPanel,actor);
   const sel = document.getElementById('anim-object');
   sel.innerHTML = '';
   const camOp = document.createElement('option');
@@ -1811,7 +1889,7 @@ function renderKeys() {
         const move = ev => {
           const dx = ev.clientX - startX;
           let nt = clamp(startT + dx / pxPerSec, 0, project.duration);
-          k.t = round2(nt);
+          k.t = snapTime(nt);
           sortKeys(o.id, c.ch);
           selectedKey.index = kfs.indexOf(k);
           renderTimeline();
@@ -1825,7 +1903,7 @@ function renderKeys() {
         window.addEventListener('pointerup', up);
         renderTimeline();
       });
-      tlKeys.appendChild(el);
+      if (k.t * pxPerSec >= tlScroll.scrollLeft - 24 && k.t * pxPerSec <= tlScroll.scrollLeft + tlScroll.clientWidth + 24) tlKeys.appendChild(el);
     });
   });
 }
@@ -1845,6 +1923,9 @@ function updatePlayhead() {
     const ph = document.getElementById('shot-strip-playhead');
     if (ph) ph.style.left = (clamp(globalTime() / Math.max(0.1, totalDuration()), 0, 1) * 100) + '%';
   }
+  const seek = document.getElementById('film-local-time'), globalSeek = document.getElementById('film-global-time');
+  if (seek && document.activeElement !== seek) seek.value = animTime.toFixed(3);
+  if (globalSeek && document.activeElement !== globalSeek) globalSeek.value = globalTime().toFixed(3);
 }
 
 // move + redraw the windowed timeline canvas as the user scrolls
@@ -1853,7 +1934,7 @@ tlScroll.addEventListener('scroll', () => {
   tlCanvas.style.left = tlScroll.scrollLeft + 'px';
   tlCanvas.style.top = tlScroll.scrollTop + 'px';
   if (Math.abs(tlTrackList.scrollTop - tlScroll.scrollTop) > 1) tlTrackList.scrollTop = tlScroll.scrollTop;
-  if (!tlScrollRaf) tlScrollRaf = requestAnimationFrame(() => { tlScrollRaf = 0; drawTimelineCanvas(); });
+  if (!tlScrollRaf) tlScrollRaf = requestAnimationFrame(() => { tlScrollRaf = 0; drawTimelineCanvas(); renderKeys(); });
 }, { passive: true });
 tlTrackList.addEventListener('scroll', () => {
   if (Math.abs(tlScroll.scrollTop - tlTrackList.scrollTop) > 1) tlScroll.scrollTop = tlTrackList.scrollTop;
@@ -1871,7 +1952,7 @@ tlScroll.addEventListener('pointerdown', e => {
   const rect = tlScroll.getBoundingClientRect();
   const setFromEvent = ev => {
     const x = ev.clientX - rect.left + tlScroll.scrollLeft;
-    animTime = clamp(x / pxPerSec, 0, project.duration);
+    animTime = snapTime(clamp(x / pxPerSec, 0, project.duration));
     evaluateAt(animTime);
     updatePlayhead();
     renderKeys(); // to refresh played state
@@ -1924,7 +2005,7 @@ document.getElementById('btn-key-add').addEventListener('click', () => {
   const existing = kf[ch].find(k => Math.abs(k.t - animTime) < 0.02);
   const ease = document.getElementById('key-ease').value;
   if (existing) { existing.v = v; existing.ease = ease; }
-  else kf[ch].push({ t: round2(animTime), v, ease });
+  else kf[ch].push({ t: snapTime(animTime), v, ease });
   sortKeys(o.id, ch);
   markDirty(); renderTimeline(); renderAnimObjectSelect();
   toast('Keyframe added at ' + animTime.toFixed(2) + 's');
@@ -1936,7 +2017,12 @@ function currentChannelValue(o, ch) {
     case 'pos.y': return o.pos[1];
     case 'pos.z': return o.pos[2];
     case 'rot.y': return o.rot[1];
+    case 'rot.x': return o.rot[0];
+    case 'rot.z': return o.rot[2];
     case 'scale': return 1;
+    case 'scale.x': return o.scale[0];
+    case 'scale.y': return o.scale[1];
+    case 'scale.z': return o.scale[2];
     case 'opacity': return o.opacity ?? 1;
     case 'pose': return 0;
     case 'cam.px': return camera.position.x;
@@ -1994,7 +2080,7 @@ let lastFrameTs = performance.now();
 let moviePlayStart = 0, moviePlayOffset = 0; // wall-clock anchor: no drift vs audio
 function tick(now) {
   requestAnimationFrame(tick);
-  if (offlineRendering) return; // the offline renderer owns the scene and frame clock
+  if (offlineRendering || exportPreparing || recMode) return; // export owns its scene and frame clock
   if (!['scene', 'anim'].includes(activeWs) && !recMode && !moviePlaying && !playing) return;
   const dt = Math.min((now - lastFrameTs) / 1000, 0.1);
   lastFrameTs = now;
@@ -2034,7 +2120,7 @@ function tick(now) {
   grid.visible = !moviePlaying && !recMode;
   if (moviePlaying || recMode) { gizmo.visible = false; selRing.visible = false; }
   drawAxisBadge();
-  renderer.render(three, camera);
+  renderFilmFrame();
 }
 const axisCanvas = document.getElementById('axis-badge');
 const axisCtx = axisCanvas.getContext('2d');
@@ -2065,7 +2151,7 @@ function drawAxisBadge() {
    Audio — clips placed on the global movie timeline
    ============================================================ */
 let audioCtx = null, masterGain = null, exportDest = null;
-const audioNodes = new Map(); // assetId -> { el, gain }
+const audioNodes = new Map(); // clipId -> independent media element/gain/panner
 function getAudioCtx() {
   if (!audioCtx) {
     try {
@@ -2079,10 +2165,11 @@ function getAudioCtx() {
   if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
   return audioCtx;
 }
-function audioNodeFor(assetId) {
-  let n = audioNodes.get(assetId);
+function audioNodeFor(assetId, clipId) {
+  const asset = project.audioAssets.find(a => a.id === assetId);
+  let n = audioNodes.get(clipId);
+  if (n && n.source !== asset?.dataURL) { n.el.pause(); n.gain.disconnect(); n.pan?.disconnect(); audioNodes.delete(clipId); n = null; }
   if (!n) {
-    const asset = project.audioAssets.find(a => a.id === assetId);
     if (!asset || !asset.dataURL) return null;
     const ctx = getAudioCtx();
     if (!ctx) return null;
@@ -2093,21 +2180,27 @@ function audioNodeFor(assetId) {
       const src = ctx.createMediaElementSource(el);
       const gain = ctx.createGain();
       src.connect(gain);
-      gain.connect(masterGain);
-      n = { el, gain };
-      audioNodes.set(assetId, n);
+      const pan = ctx.createStereoPanner?.();
+      if (pan) { gain.connect(pan); pan.connect(masterGain); } else gain.connect(masterGain);
+      n = { el, gain, pan, source: asset.dataURL };
+      audioNodes.set(clipId, n);
     } catch { return null; }
   }
   return n;
 }
 function syncAudio(t) {
   getAudioCtx();
+  for (const [id, n] of audioNodes) if (!project.audioClips.some(c => c.id === id)) { n.el.pause(); n.gain.disconnect(); n.pan?.disconnect(); audioNodes.delete(id); }
   project.audioClips.forEach(clip => {
-    const n = audioNodeFor(clip.assetId); if (!n) return;
-    n.gain.gain.value = clip.volume ?? 1;
+    const n = audioNodeFor(clip.assetId, clip.id); if (!n) return;
     const dur = isFinite(n.el.duration) ? n.el.duration : 0;
-    const local = t - clip.start;
-    const should = local >= -0.05 && (dur === 0 || local < dur);
+    const trim = Math.max(0, Number(clip.trimIn) || 0), elapsed = t - clip.start;
+    const length = Math.max(0, Math.min(clip.trimDuration > 0 ? clip.trimDuration : Infinity, dur > 0 ? dur - trim : Infinity));
+    const fade = (seconds, position) => seconds > 0 ? clamp(position / seconds, 0, 1) : 1;
+    n.gain.gain.value = (clip.volume ?? 1) * Math.min(fade(clip.fadeIn, elapsed), fade(clip.fadeOut, length - elapsed));
+    if (n.pan) n.pan.pan.value = clamp(Number(clip.pan) || 0, -1, 1);
+    const local = trim + Math.max(0, elapsed);
+    const should = elapsed >= 0 && elapsed < length;
     if (should) {
       if (n.el.paused) {
         try { n.el.currentTime = Math.max(0, local); } catch {}
@@ -2150,10 +2243,18 @@ function renderAudioList() {
     r2.append(l2, vIn);
     const del = document.createElement('button'); del.className = 'mini'; del.textContent = '×'; del.title = 'Remove clip';
     del.addEventListener('click', () => {
+      audioNodes.get(clip.id)?.el.pause();
       project.audioClips = project.audioClips.filter(c => c !== clip);
       markDirty(); renderAudioList();
     });
     row.append(r1, r2, del);
+    for (const [key, label, max] of [['trimIn', 'Source in-point (s)', 86400], ['trimDuration', 'Trim duration (0 = to end)', 86400], ['fadeIn', 'Audio fade in (s)', 30], ['fadeOut', 'Audio fade out (s)', 30], ['pan', 'Stereo pan (-1 left, 1 right)', 1]]) {
+      const wrap = document.createElement('label'); wrap.className = 'field-row'; wrap.textContent = label;
+      const input = document.createElement('input'); input.type = 'number'; input.step = '0.1'; input.min = key === 'pan' ? -1 : 0; input.max = max;
+      input.value = clip[key] || 0; input.setAttribute('aria-label', label);
+      input.addEventListener('change', () => { clip[key] = clamp(Number(input.value) || 0, Number(input.min), max); markDirty(); });
+      wrap.append(input); row.append(wrap);
+    }
     list.appendChild(row);
   });
 }
@@ -2208,7 +2309,7 @@ document.getElementById('btn-movie')?.addEventListener('click', () => { moviePla
 
 // don't lose a recording to an accidental tab close
 window.addEventListener('beforeunload', e => {
-  if (recMode) { e.preventDefault(); e.returnValue = ''; }
+  if (recMode || dirty) { e.preventDefault(); e.returnValue = ''; }
 });
 
 /* ============================================================
@@ -2242,6 +2343,8 @@ async function exportMovie() {
   if (exportPreparing) { toast('Preparing the export…'); return; }
   if (exportFinalizing) { toast('Still saving the previous export…'); return; }
   if (!project.shots.length) { toast('Add a shot first'); return; }
+  let range;
+  try { range = chosenRenderRange(); } catch (e) { toast(e.message); return; }
   if (document.getElementById('export-mode').value === 'offline') return exportOfflineMovie();
   if (!window.MediaRecorder) { toast('This browser cannot record video'); return; }
   const mimes = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
@@ -2261,7 +2364,8 @@ async function exportMovie() {
   const kbps = { high: 8000, medium: 4000, low: 2500 }[qualSel ? qualSel.value : 'high'] || 8000;
 
   const ext = mime.includes('webm') ? 'webm' : 'mp4';
-  const fileName = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + '.' + ext;
+  const sectionName = project.studio.delivery.mode === 'all' ? '' : `_${range.start.toFixed(2)}-${range.end.toFixed(2)}s`;
+  const fileName = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + sectionName + '.' + ext;
 
   // fixed export frame — restored afterwards
   exportRestore = {
@@ -2274,9 +2378,10 @@ async function exportMovie() {
 
   exportPreparing = true; // no second export while the picker/writable is being set up
   lockExportControls(true);
+  let setupStream = null, setupWritable = null;
   try {
     // ask for the save file FIRST (inside the click gesture) so no movie time is lost to the dialog;
-    // if the browser can't / the user cancels, we fall back to an in-memory recording + download.
+    // unavailable pickers can use bounded memory; explicit cancellation cancels.
     let fileHandle = null;
     if (window.showSaveFilePicker) {
       try {
@@ -2284,28 +2389,35 @@ async function exportMovie() {
           suggestedName: fileName,
           types: [{ description: 'Video', accept: { 'video/webm': ['.webm'] } }],
         });
-      } catch { /* cancelled or not allowed — in-memory fallback */ }
+      } catch (err) { if (err?.name === 'AbortError') throw err; }
     }
+    if (!fileHandle && range.duration > 300) throw new Error('Memory exports are limited to five-minute sections. Choose a shorter range or a browser with direct-to-disk support.');
 
     renderer.setPixelRatio(1); // square pixels: no DPR double-sampling in the video
     renderer.setSize(W, H, false);
-    renderer.domElement.style.width = '100%';
-    renderer.domElement.style.height = '100%';
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
     controls.enabled = false;
     grid.visible = false; gizmo.visible = false; selRing.visible = false;
+    await document.fonts.ready;
+    await Promise.all(project.studio.imports.map(loadImported));
+    const first = shotAtGlobal(range.start);
+    applyShotPlayback(first.shot.id); animTime = first.local;
+    await ensureShotResources(); evaluateAt(animTime); renderFilmFrame();
 
     // one video track + one mixed audio track
-    const tracks = [renderer.domElement.captureStream(project.fps).getVideoTracks()[0]];
+    const tracks = [filmOutput.captureStream(project.fps).getVideoTracks()[0]];
+    recordingVideoTrack = tracks[0];
     const hasAudio = project.audioClips.some(clip => project.audioAssets.some(asset => asset.id === clip.assetId));
     if (exportDest && hasAudio) tracks.push(exportDest.stream.getAudioTracks()[0]);
     const stream = new MediaStream(tracks);
+    setupStream = stream;
 
     recordedChunks = [];
     let fsWritable = null, diskError = null, drainPromise = null;
     if (fileHandle) {
-      try { fsWritable = await fileHandle.createWritable(); } catch { fsWritable = null; } // in-memory fallback
+      try { fsWritable = await fileHandle.createWritable(); setupWritable = fsWritable; }
+      catch (err) { if (range.duration > 300) throw err; }
     }
     const diskMode = !!fsWritable; // disk mode releases each chunk after its write succeeds
     // serialize disk writes; the running loop keeps picking up newly queued chunks
@@ -2358,6 +2470,7 @@ async function exportMovie() {
       exportFinalizing = false;
       lockExportControls(false);
       stream.getVideoTracks().forEach(track => track.stop());
+      recordingVideoTrack = null;
       recStatus.textContent = '';
       const rBtn = document.getElementById('btn-record');
       rBtn.disabled = false; rBtn.textContent = 'Export movie';
@@ -2368,45 +2481,52 @@ async function exportMovie() {
     mediaRecorder.onerror = e => { console.error('MediaRecorder error', e.error); toast('Recorder error: ' + (e.error?.message || 'unknown')); finishExport(exportRestore.shotId, exportRestore.cam); };
     mediaRecorder.onstop = saveRecording;
 
-    const total = totalDuration();
+    const total = range.end;
 
     // pre-roll: show shot 1 at t=0 so the recording starts on a real frame
-    applyShotPlayback(project.shots[0].id);
-    evaluateAt(0);
-    renderer.render(three, camera);
+    evaluateAt(first.local);
+    renderFilmFrame();
 
     mediaRecorder.start(1000);
+    recordingVideoTrack?.requestFrame?.();
     recMode = true;
     exportPreparing = false;
     recStart = performance.now(); recHiddenTotal = 0; recHiddenSince = 0;
-    recStatus.textContent = 'Recording ' + W + '×' + H + ' — the movie plays once in real time (' + fmtDur(total) + '). Keep this tab visible.';
+    recStatus.textContent = 'Recording ' + W + '×' + H + ' — section plays in real time (' + fmtDur(range.duration) + '). Keep this tab visible.';
     const rBtn = document.getElementById('btn-record');
     rBtn.disabled = false; rBtn.textContent = 'Stop export';
     document.getElementById('btn-download-video').disabled = true;
 
-    const step = () => {
+    const step = async () => {
       if (!recMode) return;
-      const elapsed = (performance.now() - recStart - recHiddenTotal) / 1000;
-      let acc = 0, idx = project.shots.length - 1;
-      for (let i = 0; i < project.shots.length; i++) {
-        if (elapsed < acc + Math.max(0.5, project.shots[i].duration)) { idx = i; break; }
-        acc += Math.max(0.5, project.shots[i].duration);
+      const elapsed = range.start + (performance.now() - recStart - recHiddenTotal) / 1000;
+      if (elapsed >= total) { finishExport(exportRestore.shotId, exportRestore.cam); return; }
+      const hit = shotAtGlobal(elapsed), s = hit.shot;
+      if (s.id !== project.activeShotId) {
+        applyShotPlayback(s.id);
+        try { await ensureShotResources(); }
+        catch (err) {
+          toast('Could not load the next shot: ' + (err?.message || err));
+          finishExport(exportRestore.shotId, exportRestore.cam); return;
+        }
+        if (!recMode) return;
       }
-      const s = project.shots[idx];
-      if (s.id !== project.activeShotId) applyShotPlayback(s.id);
-      animTime = clamp(elapsed - shotStart(idx), 0, s.duration);
+      animTime = hit.local;
       evaluateAt(animTime);
+      camera.lookAt(controls.target); renderFilmFrame();
       syncAudio(Math.min(elapsed, total));
       updatePlayhead();
-      if (elapsed >= total + 0.2) { finishExport(exportRestore.shotId, exportRestore.cam); return; }
       requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
   } catch (err) {
     // setup failed — restore the editor and let the user try again
-    console.error('export setup failed', err);
+    if (err?.name !== 'AbortError') console.error('export setup failed', err);
+    setupStream?.getVideoTracks().forEach(track => track.stop());
+    recordingVideoTrack = null;
+    if (setupWritable) { try { await setupWritable.abort(); } catch {} }
     exportPreparing = false;
-    toast('Could not start the export: ' + (err?.message || err));
+    toast(err?.name === 'AbortError' ? 'Export cancelled.' : 'Could not start the export: ' + (err?.message || err));
     if (recMode) {
       finishExport(exportRestore.shotId, exportRestore.cam); // recording had started — normal teardown
     } else {
@@ -2475,36 +2595,67 @@ document.getElementById('btn-record').addEventListener('click', exportMovie);
 
 let offlineRendering = false, offlineCancel = false;
 function shotAtGlobal(time) {
-  let offset = 0;
-  for (const shot of project.shots) {
-    const duration = Math.max(0.5, shot.duration);
-    if (time < offset + duration) return { shot, local: Math.max(0, time - offset) };
-    offset += duration;
-  }
-  const shot = project.shots[project.shots.length - 1];
-  return { shot, local: shot.duration };
+  return locateTime(movieIndex(project.shots), time);
 }
 async function exportOfflineMovie() {
   if (!window.VideoEncoder || !window.VideoFrame) { toast('Frame-accurate export needs WebCodecs. Choose real-time recording in this browser.'); return; }
-  if (project.audioClips.length) { toast('Frame-accurate mode is video-only. Choose real-time recording to include your audio.'); return; }
-  if (totalDuration() > 300 && !confirm('Frame-accurate export currently keeps the compressed video in memory. For long movies, export shorter sections. Continue?')) return;
+  const hasSound = project.audioClips.length > 0;
+  if(hasSound && (!window.AudioEncoder || !window.AudioData)){toast('Frame-accurate audio needs WebCodecs AudioEncoder. Choose real-time in this browser.');return;}
+  let range;
+  try { range = chosenRenderRange(); } catch (e) { toast(e.message); return; }
+  const disk = project.studio.delivery.disk;
+  if (disk && !window.showSaveFilePicker) { toast('Direct-to-disk needs a browser with a save-file picker. Uncheck it and render a section of five minutes or less.'); return; }
+  if (!disk && range.duration > 300) { toast('Memory exports are limited to five-minute sections. Choose a shorter range or enable direct-to-disk.'); return; }
   if (moviePlaying) stopMovie(); setPlaying(false); setWorkspace('anim');
   const width = +document.getElementById('export-res').value;
   const [, height] = exportSize(width, project.exportAspect);
   const fps = Math.max(1, Math.min(60, Number(project.fps) || 30));
-  const frameCount = Math.ceil(totalDuration() * fps);
+  const frameCount = Math.ceil(range.duration * fps);
   const bitrate = { high: 8000000, medium: 4000000, low: 2500000 }[document.getElementById('export-quality').value] || 8000000;
   const config = { codec: 'vp8', width, height, bitrate, framerate: fps, latencyMode: 'quality' };
   const restore = { shotId: project.activeShotId, time: animTime, pixelRatio: renderer.getPixelRatio(),
     pos: camera.position.clone(), target: controls.target.clone(), fov: camera.fov };
-  let encoder, encoderError, framesWritten = 0;
+  const sectionName = project.studio.delivery.mode === 'all' ? '' : `_${range.start.toFixed(2)}-${range.end.toFixed(2)}s`;
+  const filename = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + sectionName;
+  let encoder, audioEncoder, encoderError, framesWritten = 0, audioPosition = 0, audioBuffers,
+    writable = null, writes = Promise.resolve(), writeError = null;
+  const started = performance.now();
   exportPreparing = true; lockExportControls(true);
   try {
+    // A cancelled file picker cancels the export; never silently buffer a long movie.
+    if (disk) {
+      const handle = await window.showSaveFilePicker({ suggestedName: filename + '.webm', types: [{ description: 'WebM movie', accept: { 'video/webm': ['.webm'] } }] });
+      writable = await handle.createWritable();
+    }
     const support = await VideoEncoder.isConfigSupported(config);
     if (!support.supported) throw new Error('This frame size is not supported by the video encoder. Try a smaller frame or real-time mode.');
-    const { Muxer, ArrayBufferTarget } = await import('./vendor/webm-muxer.mjs');
-    const target = new ArrayBufferTarget();
-    const muxer = new Muxer({ target, video: { codec: 'V_VP8', width, height, frameRate: fps }, firstTimestampBehavior: 'strict' });
+    const audioConfig={codec:'opus',sampleRate:48000,numberOfChannels:2,bitrate:128000};
+    if(hasSound){
+      if(!(await AudioEncoder.isConfigSupported(audioConfig)).supported)throw new Error('Opus audio encoding is unavailable. Choose real-time export.');
+      recStatus.textContent='Decoding audio sources…';
+      audioBuffers=await decodeSources(project.audioAssets,project.audioClips,range);
+    }
+    const { Muxer, ArrayBufferTarget, StreamTarget } = await import('./vendor/webm-muxer.mjs');
+    const target = writable ? new StreamTarget({
+      chunked: true, chunkSize: 1024 * 1024,
+      onData(data, position) {
+        // Copy ownership before the muxer reuses a chunk, serialize writes, and
+        // await this queue during rendering to bound pending compressed bytes.
+        const chunk = data.slice();
+        writes = writes.then(() => writable.write({ type: 'write', data: chunk, position })).catch(e => { writeError = e; });
+      },
+    }) : new ArrayBufferTarget();
+    const muxer = new Muxer({ target, video: { codec: 'V_VP8', width, height, frameRate: fps },
+      ...(hasSound ? {audio:{codec:'A_OPUS',sampleRate:48000,numberOfChannels:2}} : {}), firstTimestampBehavior: 'strict' });
+    if(hasSound){
+      audioEncoder=new AudioEncoder({
+        output:(chunk,metadata)=>{
+          // Drop Opus flush padding packets starting beyond the supplied PCM.
+          if(chunk.timestamp>=Math.round(audioPosition/48000*1e6))return;
+          try{muxer.addAudioChunk(chunk,metadata);}catch(e){encoderError=e;}
+        },error:e=>{encoderError=e;},
+      });audioEncoder.configure(audioConfig);
+    }
     encoder = new VideoEncoder({
       output: (chunk, metadata) => { try { muxer.addVideoChunk(chunk, metadata); } catch (e) { encoderError = e; } },
       error: e => { encoderError = e; },
@@ -2515,35 +2666,56 @@ async function exportOfflineMovie() {
     renderer.setPixelRatio(1); renderer.setSize(width, height, false);
     camera.aspect = width / height; camera.updateProjectionMatrix(); controls.enabled = false;
     grid.visible = false; gizmo.visible = false; selRing.visible = false;
+    await document.fonts.ready;
     for (let frame = 0; frame < frameCount && !offlineCancel; frame++) {
-      if (encoderError) throw encoderError;
-      const time = frame / fps;
+      if (encoderError || writeError) throw encoderError || writeError;
+      const time = range.start + frame / fps;
       const hit = shotAtGlobal(time);
       if (project.activeShotId !== hit.shot.id) applyShotPlayback(hit.shot.id);
+      await ensureShotResources();
       animTime = hit.local; movieTime = time; evaluateAt(animTime);
-      camera.lookAt(controls.target); renderer.render(three, camera);
-      const videoFrame = new VideoFrame(renderer.domElement, { timestamp: Math.round(frame * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      camera.lookAt(controls.target); renderFilmFrame();
+      const videoFrame = new VideoFrame(filmOutput, { timestamp: Math.round(frame * 1e6 / fps), duration: Math.round(1e6 / fps) });
       try { encoder.encode(videoFrame, { keyFrame: frame % (fps * 2) === 0 }); } finally { videoFrame.close(); }
       framesWritten++;
-      recStatus.textContent = `Rendering ${Math.round(framesWritten / frameCount * 100)}% · frame ${framesWritten}/${frameCount}. Slower than real time is normal.`;
+      if(audioEncoder){
+        const end=Math.round(framesWritten/fps*48000), count=end-audioPosition;
+        const [left,right]=mixStereo(project.audioClips,audioBuffers,range.start+audioPosition/48000,count);
+        const data=new Float32Array(count*2);data.set(left);data.set(right,count);
+        const frame=new AudioData({format:'f32-planar',sampleRate:48000,numberOfFrames:count,numberOfChannels:2,timestamp:Math.round(audioPosition/48000*1e6),data});
+        audioPosition=end;
+        try{audioEncoder.encode(frame);}finally{frame.close();}
+        if(audioEncoder.encodeQueueSize>8)await new Promise(resolve=>audioEncoder.addEventListener('dequeue',resolve,{once:true}));
+      }
+      const rate = framesWritten / Math.max(0.01, (performance.now() - started) / 1000), remaining = (frameCount - framesWritten) / rate;
+      recStatus.textContent = `Rendering ${Math.round(framesWritten / frameCount * 100)}% · ${framesWritten}/${frameCount} frames · ${rate.toFixed(1)} fps · about ${fmtDur(remaining)} left${writable ? ' · streaming to disk' : ''}`;
       if (encoder.encodeQueueSize > 4) await encoder.flush();
+      await writes; // Disk backpressure: do not accumulate the whole film in memory.
       await new Promise(resolve => setTimeout(resolve, 0)); // allow stop/progress, without advancing the movie clock
     }
     await encoder.flush();
+    if(audioEncoder)await audioEncoder.flush();
     if (encoderError) throw encoderError;
     if (framesWritten) {
       muxer.finalize();
-      const blob = new Blob([target.buffer], { type: 'video/webm' });
-      const fileName = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + (offlineCancel ? '_partial' : '') + '.webm';
-      downloadBlob(blob, fileName);
-      recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps · ${(blob.size / 1e6).toFixed(1)} MB`;
+      await writes; if (writeError) throw writeError;
+      let size = 'saved to disk';
+      if (writable) { await writable.close(); writable = null; }
+      else {
+        const blob = new Blob([target.buffer], { type: 'video/webm' }); size = (blob.size / 1e6).toFixed(1) + ' MB';
+        downloadBlob(blob, filename + (offlineCancel ? '_partial' : '') + '.webm');
+      }
+      recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps${hasSound ? ' · stereo audio' : ''} · ${size}`;
       toast('Frame-accurate movie saved');
     } else recStatus.textContent = 'Export cancelled.';
   } catch (e) {
-    recStatus.textContent = 'Export failed: ' + e.message;
-    toast('Frame-accurate export failed. Try a smaller frame or real-time mode.');
+    recStatus.textContent = e.name === 'AbortError' ? 'Export cancelled.' : 'Export failed: ' + e.message;
+    if (e.name !== 'AbortError') toast('Frame-accurate export failed: ' + e.message);
   } finally {
+    if (writable) { await writes; try { await writable.abort(); } catch {} }
     try { encoder?.close(); } catch {}
+    try { audioEncoder?.close(); } catch {}
+    audioBuffers?.clear();
     offlineRendering = false; recMode = false; exportPreparing = false;
     applyShotPlayback(restore.shotId); animTime = restore.time; evaluateAt(animTime);
     camera.position.copy(restore.pos); controls.target.copy(restore.target); camera.fov = restore.fov;
@@ -2564,6 +2736,211 @@ function downloadBlob(blob, name) {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+/* ============================================================
+   Film production: imported assets, precision editing, composition
+   ============================================================ */
+async function importGLB(file) {
+  if (project.studio.imports.length >= 100) throw new Error('This project already has 100 imported models.');
+  const buffer = await file.arrayBuffer(), metadata = inspectGLB(buffer);
+  const dataURL = await new Promise((resolve, reject) => {
+    const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = reject;
+    reader.readAsDataURL(new Blob([buffer], { type: 'model/gltf-binary' }));
+  });
+  const asset = { id: uid('glb'), name: file.name.replace(/\.glb$/i, ''), dataURL, animations: metadata.animations };
+  await loadImported(asset); // Fail at import, not later during movie rendering.
+  project.studio.imports.push(asset); markDirty(); return asset;
+}
+function placeImported(asset) {
+  const object = { id: uid('obj'), name: asset.name, type: 'imported', assetId: asset.id,
+    importMotion: { clipIndex: asset.animations.length ? 0 : -1, speed: 1, start: 0, offset: 0, loop: true },
+    color: '#ffffff', pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 };
+  project.sceneObjects.push(object); selectedId = object.id; markDirty(); setWorkspace('scene'); selectObject(object.id);
+}
+function renderImportedControls(panel, object) {
+  const asset = project.studio.imports.find(a => a.id === object.assetId);
+  const badge = document.createElement('div'); badge.className = 'rig-badge';
+  badge.textContent = 'Imported 3D · embedded materials & rig · normalized to 2m'; panel.append(badge);
+  const motion = object.importMotion ||= { clipIndex: -1, speed: 1, start: 0, offset: 0, loop: true };
+  labeledSelect(panel, 'Imported animation', [['-1', 'Static / bind pose'], ...(asset?.animations || []).map((name, i) => [String(i), name])], String(motion.clipIndex), v => {
+    motion.clipIndex = Number(v); evaluateAt(animTime); markDirty();
+  });
+  labeledSelect(panel, 'Clip playback', [['loop', 'Loop'], ['hold', 'Play once & hold']], motion.loop === false ? 'hold' : 'loop', v => {
+    motion.loop = v === 'loop'; evaluateAt(animTime); markDirty();
+  });
+  for (const [key, label, base, min, max] of [['speed', 'Imported clip speed', 1, 0.05, 4], ['start', 'Imported clip starts at (s)', 0, 0, project.duration], ['offset', 'Imported source offset (s)', 0, 0, 120]]) {
+    panel.append(mkNum(label, { value: motion[key] ?? base }, 'value', v => { motion[key] = v; evaluateAt(animTime); markDirty(); }, min, max, 0.05));
+  }
+}
+async function ensureShotResources() {
+  await Promise.all([...objectGroups.values()].map(g => g.userData.ready));
+  const failed = [...objectGroups.values()].find(g => g.userData.loadError);
+  if (failed) throw failed.userData.loadError;
+}
+function renderFilmWorld() {
+  const host = document.getElementById('film-world-tools');
+  if (!host || !project?.studio) return;
+  renderWorld(host, activeShot(), {
+    dirty: markDirty, toast,
+    look: () => applyLighting(activeShot().lighting),
+    refresh: () => {
+      applyCameraBase(activeShot()); syncSceneObjects(); evaluateAt(animTime);
+      renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline(); renderFilmWorld();
+    },
+  });
+  renderCinemaLook(host,activeShot(),{dirty:markDirty,look:()=>applyLighting(activeShot().lighting)});
+}
+function renderPerformanceTools(panel,object){
+  renderPerformance(panel,object,{
+    project:()=>project,time:()=>animTime,duration:()=>project.duration,dirty:markDirty,evaluate:()=>evaluateAt(animTime),
+    analyze:async(object,clipId)=>{
+      const clip=project.audioClips.find(c=>c.id===clipId);if(!clip)throw new Error('Import dialogue in Sound and choose its clip first.');
+      const buffers=await decodeSources(project.audioAssets,[clip],{start:-Infinity,end:Infinity});
+      object.performance.voice={clipId,...audioEnvelope(buffers.get(clip.assetId))};buffers.clear();
+    },
+    compose:async(object,kind)=>{
+      const group=objectGroups.get(object.id);if(!group)return;
+      const keys=project.keyframes[CAMERA_ID] || {};
+      if(Object.keys(keys).length && !await askConfirm('Replace this shot’s camera animation with the actor composition?'))return;
+      delete project.keyframes[CAMERA_ID];
+      group.updateMatrixWorld(true);group.traverse(o=>{if(o.isSkinnedMesh)o.computeBoundingBox();});
+      const bounds=new THREE.Box3().setFromObject(group),height=Math.max(0.3,bounds.max.y-bounds.min.y);
+      activeShot().camera=composeCamera(group.position.toArray(),height,THREE.MathUtils.radToDeg(group.rotation.y),kind);
+      applyCameraBase(activeShot());markDirty();renderTimeline();
+    },
+  });
+}
+function snapTime(time) {
+  const t = document.getElementById('film-snap').checked ? Math.round(time * project.fps) / project.fps : time;
+  return clamp(t, 0, project.duration);
+}
+function seekLocal(time) {
+  if (recMode) return;
+  if (moviePlaying) stopMovie(); setPlaying(false);
+  animTime = snapTime(Number(time) || 0); evaluateAt(animTime); updatePlayhead();
+}
+document.getElementById('film-local-time').addEventListener('change', e => seekLocal(e.target.value));
+document.getElementById('film-global-time').addEventListener('change', e => {
+  if (recMode) return;
+  if (moviePlaying) stopMovie(); setPlaying(false);
+  const hit = locateTime(movieIndex(project.shots), Number(e.target.value) || 0);
+  if (hit.shot.id !== project.activeShotId) applyShot(hit.shot.id);
+  seekLocal(hit.local);
+});
+document.getElementById('film-prev-frame').addEventListener('click', () => seekLocal(animTime - 1 / project.fps));
+document.getElementById('film-next-frame').addEventListener('click', () => seekLocal(animTime + 1 / project.fps));
+document.getElementById('film-key-transform').addEventListener('click', () => {
+  const object = selObj(); if (!object) return toast('Select an object first.');
+  const channels = object.type === 'camera' ? CAM_CHANNELS.map(c => c.ch) : ['pos.x', 'pos.y', 'pos.z', 'rot.x', 'rot.y', 'rot.z', 'scale.x', 'scale.y', 'scale.z', 'opacity'];
+  const tracks = project.keyframes[object.id] ||= {};
+  const time = snapTime(animTime);
+  for (const ch of channels) {
+    const track = tracks[ch] ||= [], existing = track.find(k => Math.abs(k.t - time) < 0.0001);
+    const key = { t: time, v: currentChannelValue(object, ch), ease: document.getElementById('key-ease').value };
+    if (existing) Object.assign(existing, key); else track.push(key);
+    track.sort((a, b) => a.t - b.t);
+  }
+  markDirty(); renderTimeline(); renderAnimObjectSelect(); toast('Base transform keyed at ' + time.toFixed(3) + 's.');
+});
+let motionClipboard = null;
+document.getElementById('film-copy-motion').addEventListener('click', () => {
+  const object = selObj(); if (!object) return toast('Select an object first.');
+  motionClipboard = { camera: object.type === 'camera', tracks: structuredClone(project.keyframes[object.id] || {}) };
+  toast('Motion copied.');
+});
+document.getElementById('film-paste-motion').addEventListener('click', async () => {
+  const object = selObj();
+  if (!object || !motionClipboard) return toast('Copy motion and select a destination first.');
+  if ((object.type === 'camera') !== motionClipboard.camera) return toast('Camera motion can only be pasted onto a camera.');
+  if (Object.keys(project.keyframes[object.id] || {}).length && !await askConfirm('Replace this object’s existing keyframes?')) return;
+  project.keyframes[object.id] = Object.fromEntries(Object.entries(structuredClone(motionClipboard.tracks)).map(([ch, keys]) => [ch, keys.filter(k => k.t <= project.duration)]).filter(([, keys]) => keys.length));
+  selectedKey = null; markDirty(); evaluateAt(animTime); renderTimeline(); renderAnimObjectSelect(); toast('Motion pasted. Keys outside this shot were skipped.');
+});
+document.getElementById('film-clear-motion').addEventListener('click', async () => {
+  const object = selObj(); if (!object || !await askConfirm('Clear the selected object’s keyframes? Its base transform and motion preset will be kept.')) return;
+  delete project.keyframes[object.id]; selectedKey = null; markDirty();
+  if (object.type === 'camera') applyCameraBase(activeShot());
+  evaluateAt(animTime); renderTimeline(); renderAnimObjectSelect();
+});
+
+let recordingVideoTrack = null;
+const filmOverlay = document.createElement('canvas'), filmOutput = document.createElement('canvas');
+filmOverlay.className = 'film-overlay'; filmOverlay.setAttribute('aria-label', 'Movie titles and subtitles');
+document.getElementById('anim-viewport').append(filmOverlay);
+const overlayCtx = filmOverlay.getContext('2d'), filmOutputCtx = filmOutput.getContext('2d');
+function drawFilmOverlay(ctx, width, height) {
+  const shot = activeShot(), film = shot.film;
+  ctx.save();
+  const cues = (film?.captions || []).filter(c => animTime >= c.start && animTime < c.end);
+  let bottom = height * 0.91;
+  for (const cue of cues) {
+    const font = Math.max(1, height * cue.size / 100);
+    ctx.font = `600 ${font}px Outfit, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const lines = [];
+    for (const paragraph of cue.text.split('\n')) {
+      let line = '';
+      for (const word of paragraph.split(/\s+/)) {
+        const next = line ? line + ' ' + word : word;
+        if (line && ctx.measureText(next).width > width * 0.84) { lines.push(line); line = word; } else line = next;
+      }
+      lines.push(line);
+    }
+    const lineHeight = font * 1.3, y = cue.position === 'center' ? height / 2 - (lines.length - 1) * lineHeight / 2 : bottom - (lines.length - 1) * lineHeight;
+    if (cue.position !== 'center') bottom -= lines.length * lineHeight + font * 0.35;
+    lines.forEach((line, i) => {
+      const w = Math.min(width * 0.94, ctx.measureText(line).width + font);
+      ctx.fillStyle = 'rgba(12,15,19,.78)'; ctx.fillRect(width / 2 - w / 2, y + i * lineHeight - lineHeight / 2, w, lineHeight);
+      ctx.fillStyle = cue.color; ctx.fillText(line, width / 2, y + i * lineHeight, width * 0.88);
+    });
+  }
+  const fade = fadeAmount(film, animTime, shot.duration);
+  if (fade > 0) { ctx.fillStyle = `rgba(0,0,0,${fade})`; ctx.fillRect(0, 0, width, height); }
+  ctx.restore();
+}
+function renderFilmFrame() {
+  cinemaRenderer.render(activeShot().film?.grade,globalTime(),project.fps);
+  const width = renderer.domElement.width, height = renderer.domElement.height;
+  if (filmOverlay.width !== width || filmOverlay.height !== height) { filmOverlay.width = width; filmOverlay.height = height; }
+  overlayCtx.clearRect(0, 0, width, height);
+  if (activeWs === 'anim') {
+    drawFilmOverlay(overlayCtx, width, height);
+    if (!recMode && document.getElementById('film-guides').checked) {
+      overlayCtx.strokeStyle = 'rgba(255,255,255,.4)'; overlayCtx.lineWidth = 1;
+      for (const n of [1, 2]) {
+        overlayCtx.beginPath(); overlayCtx.moveTo(width * n / 3, 0); overlayCtx.lineTo(width * n / 3, height);
+        overlayCtx.moveTo(0, height * n / 3); overlayCtx.lineTo(width, height * n / 3); overlayCtx.stroke();
+      }
+    }
+  }
+  if (recMode || exportPreparing) {
+    if (filmOutput.width !== width || filmOutput.height !== height) { filmOutput.width = width; filmOutput.height = height; }
+    filmOutputCtx.drawImage(renderer.domElement, 0, 0); drawFilmOverlay(filmOutputCtx, width, height);
+    // Explicitly submit the composed frame: detached 2D canvases are not
+    // consistently auto-captured by all MediaRecorder implementations.
+    recordingVideoTrack?.requestFrame?.();
+  }
+}
+function chosenRenderRange() {
+  return renderRange(project.shots, project.activeShotId, project.studio.delivery);
+}
+function syncFilmSettings() {
+  const settings = project.studio.delivery;
+  document.getElementById('export-scope').value = settings.mode;
+  document.getElementById('export-start').value = settings.start;
+  document.getElementById('export-end').value = settings.end;
+  document.getElementById('export-disk').checked = settings.disk;
+  document.getElementById('export-range-fields').hidden = settings.mode !== 'range';
+  const summary = document.getElementById('export-range-summary');
+  try {
+    const range = chosenRenderRange();
+    summary.textContent = `${fmtDur(range.duration)} · ${Math.ceil(range.duration * project.fps).toLocaleString()} frames · movie ${range.start.toFixed(2)}–${range.end.toFixed(2)}s`;
+  } catch (e) { summary.textContent = e.message; }
+}
+for (const id of ['export-scope', 'export-start', 'export-end', 'export-disk']) {
+  document.getElementById(id).addEventListener('change', () => {
+    project.studio.delivery = { mode: document.getElementById('export-scope').value, start: Number(document.getElementById('export-start').value), end: Number(document.getElementById('export-end').value), disk: document.getElementById('export-disk').checked };
+    markDirty(); syncFilmSettings();
+  });
+}
 
 /* ============================================================
    Project save / open / new
@@ -2602,9 +2979,9 @@ document.getElementById('file-open').addEventListener('change', e => {
   reader.readAsText(f);
 });
 document.getElementById('btn-starter').addEventListener('click', loadStarterScene);
-document.getElementById('btn-new').addEventListener('click', () => {
+document.getElementById('btn-new').addEventListener('click', async () => {
   const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
-  if (hasWork && !confirm('Start a new movie? Unsaved work will be lost.')) return;
+  if (hasWork && !await askConfirm('Start a new movie? Unsaved work will be lost.')) return;
   if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject();
   currentCharId = null; selectedId = null;
@@ -2621,9 +2998,9 @@ document.getElementById('btn-new').addEventListener('click', () => {
 /* ============================================================
    Starter demo — a two-shot mini movie: engine room + hero close-up
    ============================================================ */
-function loadStarterScene() {
+async function loadStarterScene() {
   const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
-  if (hasWork && !confirm('Replace the current movie with the starter scene?')) return;
+  if (hasWork && !await askConfirm('Replace the current movie with the starter scene?')) return;
   if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject();
   project.name = 'Starter — mini movie';
@@ -2768,7 +3145,7 @@ function renderActorControls(panel, o) {
       const track = kf[ch] ||= [];
       const existing = track.find(k => Math.abs(k.t - animTime) < 0.02);
       if (existing) existing.v = value;
-      else track.push({ t: round2(animTime), v: value, ease: 'ease' });
+      else track.push({ t: snapTime(animTime), v: value, ease: 'ease' });
       sortKeys(o.id, ch);
     }
     markDirty(); renderTimeline(); toast('Joint keyed at ' + animTime.toFixed(2) + 's');
@@ -2783,7 +3160,7 @@ document.getElementById('shot-lighting').addEventListener('change', e => {
   activeShot().lighting = e.target.value; applyLighting(e.target.value); markDirty();
 });
 document.getElementById('export-aspect').addEventListener('change', e => {
-  project.exportAspect = e.target.value; markDirty();
+  project.exportAspect = e.target.value; markDirty(); resize3D();
 });
 document.getElementById('btn-camera-lens').addEventListener('click', () => {
   const mm = +document.getElementById('camera-lens').value;
@@ -2794,10 +3171,10 @@ document.getElementById('btn-camera-lens').addEventListener('click', () => {
   if (kf?.['cam.fov']) kf['cam.fov'].forEach(k => { k.v = fov; });
   markDirty(); renderTimeline(); toast(mm + 'mm lens set');
 });
-document.getElementById('btn-camera-preset').addEventListener('click', () => {
+document.getElementById('btn-camera-preset').addEventListener('click', async () => {
   if (moviePlaying || recMode) { toast('Stop playback or export before changing the camera'); return; }
   const mode = document.getElementById('camera-preset').value, s = activeShot();
-  if (Object.keys(s.keyframes[CAMERA_ID] || {}).length && !confirm('Replace this shot’s camera keyframes?')) return;
+  if (Object.keys(s.keyframes[CAMERA_ID] || {}).length && !await askConfirm('Replace this shot’s camera keyframes?')) return;
   const from = [...camera.position.toArray(), ...controls.target.toArray(), camera.fov];
   let to = [...from];
   const delta = camera.position.clone().sub(controls.target);
@@ -2828,12 +3205,17 @@ document.getElementById('btn-camera-preset').addEventListener('click', () => {
   toast('Camera move added — select Shot camera to edit its keys');
 });
 
-function loadRaceMovie() {
+async function loadRaceMovie() {
   if (recMode || exportPreparing || exportFinalizing) { toast('Finish exporting first'); return; }
   const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
-  if (hasWork && !confirm('Replace the current movie with the 3D race movie? Save your project first to keep it.')) return;
+  if (hasWork && !await askConfirm('Replace the current movie with the 3D race movie? Save your project first to keep it.')) return;
   if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject(); project.name = 'The Final Straight'; project.exportAspect = '2.39:1';
+  project.studio.plan = { ...project.studio.plan, genre: 'Sports drama',
+    logline: 'Four runners enter the final straight. Nova finds one last burst of speed.',
+    synopsis: 'Establish the contenders, follow the race, build tension at the line, and finish with Nova’s celebration.',
+    script: 'EXT. STADIUM - LATE AFTERNOON\n\nFour runners wait at the start.\n\nThe race begins. Blaze leads; Nova stays close.\n\nOn the final straight, Nova surges. The finish is decided by a stride.\n\nNova raises both arms. The others catch their breath.',
+  };
   const colors = ['#e05d5d', '#efb855', '#4fb3a4', '#648fe1'];
   project.characters = ['Blaze', 'Dash', 'Nova', 'Jet'].map((name, i) => {
     const rig = defaultRig(name); rig.torsoColor = colors[i]; rig.feetColor = colors[i];
@@ -2854,6 +3236,20 @@ function loadRaceMovie() {
   let phaseTime = 0;
   project.shots = defs.map(([name, duration, start, end, clip, from, to], shotIndex) => {
     const s = newShot(name, duration); s.lighting = shotIndex === 4 ? 'sunset' : 'daylight';
+    s.film = shotFilm({
+      fadeIn: shotIndex === 0 ? 0.6 : 0, fadeOut: shotIndex === 4 ? 0.8 : 0,
+      captions: shotIndex === 0 || shotIndex === 4 ? [{
+        id: uid('cue'), start: 0.7, end: Math.min(3.5, duration - 0.4), position: 'center',
+        text: shotIndex === 0 ? 'THE FINAL STRAIGHT' : 'NOVA TAKES THE WIN', size: 6, color: '#fff3d4',
+      }] : [],
+    });
+    project.studio.shotNotes[s.id] = [
+      'Wide establishing move. Introduce the field and the film title.',
+      'Low lateral track. Keep the runners’ feet and lane lines visible.',
+      'Follow the pack; hold the camera speed steady while Nova closes the gap.',
+      'Three-quarter finish angle. Leave room ahead of the runners.',
+      'Push into the winner’s celebration. End with a fade through black.',
+    ][shotIndex];
     s.camera = { pos: from.slice(0, 3), tgt: from.slice(3, 6), fov: from[6] };
     s.keyframes[CAMERA_ID] = cameraTracks(from, to, duration, 'linear');
     primitive(s, 'Track surface', 'box', '#ac5f46', [0, -0.08, 0], [28, 0.2, 8]);
@@ -2880,10 +3276,6 @@ function loadRaceMovie() {
       if (!isWinShot) s.keyframes[o.id] = { 'pos.x': [{ t: 0, v: start - prevGap, ease: 'linear' }, { t: duration, v: end - nextGap, ease: 'linear' }] };
       else o.pos[0] = 9 - gap;
     });
-    if (shotIndex === 0 || shotIndex === 4) {
-      const title = primitive(s, 'Movie title', 'text', '#fff3d4', [shotIndex === 0 ? -7 : 9, 4, -3.8], [2, 2, 2]);
-      title.text = shotIndex === 0 ? 'THE FINAL STRAIGHT' : 'NOVA TAKES THE WIN';
-    }
     phaseTime += duration; return s;
   });
   project.activeShotId = project.shots[0].id;
@@ -2895,6 +3287,25 @@ function loadRaceMovie() {
   toast('3D race movie ready: 4 rigged actors, 5 shots, 26 seconds. Press Play movie.');
 }
 document.getElementById('btn-race').addEventListener('click', loadRaceMovie);
+document.getElementById('btn-cinema').addEventListener('click', async e => {
+  if(recMode || exportPreparing || exportFinalizing)return;
+  const button=e.currentTarget;button.disabled=true;
+  try {
+    const voice=await loadDemoVoice();
+    if(recMode || exportPreparing || exportFinalizing)return;
+    const hasWork=project.shots.some(s=>s.sceneObjects.length) || project.drawings.length || project.audioAssets.length ||
+      project.name!=='Untitled movie' || hasProductionWork(project.studio);
+    if(hasWork && !await askConfirm('Replace the current movie with The Last Signal? Save your project first to keep it.'))return;
+    if(moviePlaying)stopMovie();setPlaying(false);
+    project=buildCinemaDemo({newProject:defaultProject,newShot,newRig:defaultRig,uid},voice);
+    animTime=0;selectedId=null;currentCharId=project.characters[0].id;
+    document.getElementById('project-tag').textContent=project.name;
+    applyShot(project.activeShotId);setWorkspace('anim');evaluateAt(0);
+    markDirty();renderCharList();drawCharPreview();renderCharProps();renderAssetList();renderAudioList();
+    toast('The Last Signal: 4 shots, 13 seconds, generated voice and editable facial performances. Press Play movie.');
+  } catch(error){toast('Could not load cinematic demo: '+error.message);}
+  finally{button.disabled=false;}
+});
 
 /* ============================================================
    Boot
@@ -2902,6 +3313,7 @@ document.getElementById('btn-race').addEventListener('click', loadRaceMovie);
 loadSaved();
 studioWorkspaces = createStudioWorkspaces({
   project: () => project, dirty: markDirty, toast, workspace: setWorkspace,
+  importGLB, placeImported, download: downloadBlob,
   placeObject: o => { project.sceneObjects.push(o); selectedId = o.id; markDirty(); setWorkspace('scene'); selectObject(o.id); },
   placeCharacter: addCharacterObject, placeDrawing: addDrawingPlane,
   renderAudio: renderAudioList, saveProject: () => document.getElementById('btn-save').click(),
@@ -2914,7 +3326,7 @@ studioWorkspaces = createStudioWorkspaces({
     markDirty(); syncShotControls(); renderShotsUI(); renderTimeline();
   },
   duplicateShot: id => { applyShot(id); duplicateShot(); return project.activeShotId; },
-  deleteShot: id => { applyShot(id); const old = project.shots.length; deleteShot(); if (project.shots.length < old) delete project.studio.shotNotes[id]; },
+  deleteShot: async id => { applyShot(id); const old = project.shots.length; await deleteShot(); if (project.shots.length < old) delete project.studio.shotNotes[id]; },
   moveShot: (id, dir) => {
     const index = project.shots.findIndex(s => s.id === id), next = index + dir;
     if (index < 0 || next < 0 || next >= project.shots.length) return;

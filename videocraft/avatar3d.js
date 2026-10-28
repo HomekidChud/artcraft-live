@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { JOINTS, motionPose } from './motion.js';
+import { JOINTS, motionPose } from './motion.js?v=0.7.1';
 
 // A real 19-bone Skeleton + weighted SkinnedMesh, with stylised rigid segments.
 // Every avatar instance owns its skeleton, pose and geometry.
@@ -52,12 +52,33 @@ export function buildAvatar(rig) {
   const radius = rig.headR / 52 * 0.245;
   add('head', ball(), rig.headColor, [0, 0, 0], [radius, radius * 1.1, radius * 0.95]);
   if (rig.hairStyle !== 'bald') add('head', ball(), rig.hairColor, [rig.hairStyle === 'side' ? -0.025 : 0, radius * 0.7, -0.025], [radius * 1.02, radius * (rig.hairStyle === 'spiky' ? 0.8 : 0.5), radius * 0.94]);
-  for (const sign of [-1, 1]) {
-    add('head', ball(), rig.eyeColor || '#fff', [sign * radius * 0.4, radius * 0.12, radius * 0.86], [0.044, rig.eyes === 'happy' ? 0.018 : 0.05, 0.024]);
-    add('head', ball(), rig.pupilColor || '#221a12', [sign * radius * 0.4, radius * 0.12, radius * 0.95], [0.019, 0.026, 0.012]);
-  }
+  // Facial meshes live on the head bone rather than in the static batch.
   if (rig.nose) add('head', ball(), rig.headColor, [0, -radius * 0.13, radius * 0.95], [0.037, 0.043, 0.06]);
-  add('head', ball(), '#713f37', [0, -radius * 0.48, radius * 0.83], [0.062, rig.mouth === 'open' ? 0.04 : 0.014, 0.015]);
+  const face = new THREE.Group();bones.head.add(face);
+  const faceMesh=(color,pos,scale)=>{
+    const m=new THREE.Mesh(ball(),new THREE.MeshStandardMaterial({color,roughness:0.65}));
+    m.position.fromArray(pos);m.scale.fromArray(scale);face.add(m);return m;
+  };
+  const eyes=[],pupils=[],brows=[];
+  for(const sign of [-1,1]){
+    eyes.push(faceMesh(rig.eyeColor || '#fff',[sign*radius*0.4,radius*0.12,radius*0.86],[0.044,0.05,0.024]));
+    pupils.push(faceMesh(rig.pupilColor || '#221a12',[sign*radius*0.4,radius*0.12,radius*0.95],[0.019,0.026,0.012]));
+    brows.push(faceMesh(rig.hairColor || '#38251d',[sign*radius*0.4,radius*0.4,radius*0.86],[0.055,0.009,0.015]));
+  }
+  const mouth=faceMesh('#582933',[0,-radius*0.48,radius*0.83],[0.062,0.014,0.018]);
+  actor.userData.face = state => {
+    const happy=state.emotion==='happy',sad=state.emotion==='sad',angry=state.emotion==='angry',surprise=state.emotion==='surprised',focused=state.emotion==='focused';
+    eyes.forEach((eye,i)=>{
+      const open=Math.max(0.03,1-state.blink)*(happy ? 0.75 : surprise ? 1.25 : focused ? 0.78 : 1);
+      eye.scale.y=0.05*open;pupils[i].scale.y=0.026*open;
+      pupils[i].position.x=eye.position.x+state.gazeX*0.017;pupils[i].position.y=eye.position.y+state.gazeY*0.015;
+      brows[i].rotation.z=(i===0 ? -1 : 1)*(angry ? 0.4 : sad ? -0.35 : happy ? -0.1 : focused ? 0.14 : 0);
+      brows[i].position.y=radius*(surprise ? 0.55 : 0.4);
+    });
+    mouth.scale.set(surprise ? 0.045 : happy ? 0.08 : 0.062,0.012+state.mouth*0.085+(surprise?0.035:0),0.018);
+    mouth.rotation.z=sad?0.08:0;
+    actor.userData.facialState={...state};
+  };
   for (const side of ['left', 'right']) {
     add(side + 'UpperArm', ball(), rig.torsoColor, [0, -arm * 0.12, 0], [0.115, arm * 0.24, 0.115]);
     add(side + 'UpperArm', ball(), rig.armColor, [0, -arm * 0.32, 0], [0.085, arm * 0.25, 0.085]);
