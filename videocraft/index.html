@@ -451,6 +451,7 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
       <!-- SCENE -->
       <section class="ws" id="ws-scene" aria-label="3D scene">
         <aside id="scene-side">
+          <div id="film-world-tools"></div>
           <div class="side-title">Objects</div>
           <div id="scene-list"></div>
           <button class="btn" id="btn-clear-scene">Clear scene</button>
@@ -479,6 +480,22 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
             <span class="time" id="time-label">0.00s / 0.00s</span>
           </div>
           <button class="btn" id="btn-movie">Play movie</button>
+          <details class="studio-details" open>
+            <summary>Precision editing</summary>
+            <div class="joint-editor">
+              <label class="side-title" for="film-local-time">Shot playhead (seconds)</label>
+              <input class="btn studio-select" type="number" id="film-local-time" value="0" min="0" step="0.001">
+              <div class="row2"><button class="btn" id="film-prev-frame">Previous frame</button><button class="btn" id="film-next-frame">Next frame</button></div>
+              <label class="side-title" for="film-global-time">Movie playhead (seconds)</label>
+              <input class="btn studio-select" type="number" id="film-global-time" value="0" min="0" step="0.001">
+              <label class="film-check"><input type="checkbox" id="film-snap" checked>Snap edits to frames</label>
+              <label class="film-check"><input type="checkbox" id="film-guides">Composition guides</label>
+              <button class="btn" id="film-key-transform">Key entire base transform</button>
+              <div class="row2"><button class="btn" id="film-copy-motion">Copy motion</button><button class="btn" id="film-paste-motion">Paste motion</button></div>
+              <button class="btn" id="film-clear-motion">Clear selected motion</button>
+              <div class="empty-note">Transform keys capture the base pose set in Scene. Paste replaces the selected object's tracks. Save a project backup before major edits.</div>
+            </div>
+          </details>
           <div class="field-row"><label for="shot-duration">Shot duration (s)</label><output id="shot-duration-out">5s</output></div>
           <input type="number" id="shot-duration" min="0.5" step="0.5" value="5" aria-label="Shot duration in seconds">
           <div class="field-row"><label for="anim-fps">FPS</label><output id="anim-fps-out">30</output></div>
@@ -512,6 +529,9 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
           <select class="btn" id="key-ease" style="width:100%" aria-label="Key easing">
             <option value="linear">Linear</option>
             <option value="ease" selected>Smooth (ease)</option>
+            <option value="in">Ease in (cubic)</option>
+            <option value="out">Ease out (cubic)</option>
+            <option value="inout">Ease in/out (cubic)</option>
             <option value="step">Step (hold)</option>
           </select>
           <div class="side-title">Actor performance</div>
@@ -548,6 +568,18 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
           </div></div>
           <div id="anim-export-home"><div id="movie-export-tools" class="studio-stack">
           <div class="side-title">Export movie</div>
+          <label class="side-title" for="export-scope">Render section</label>
+          <select class="btn studio-select" id="export-scope">
+            <option value="all">Entire movie</option><option value="shot">Current shot</option><option value="range">Custom movie interval</option>
+          </select>
+          <div id="export-range-fields" class="studio-stack" hidden>
+            <label class="side-title" for="export-start">Start (movie seconds)</label>
+            <input class="btn studio-select" type="number" id="export-start" value="0" min="0" step="0.01">
+            <label class="side-title" for="export-end">End (movie seconds)</label>
+            <input class="btn studio-select" type="number" id="export-end" value="5" min="0" step="0.01">
+          </div>
+          <label class="film-check"><input type="checkbox" id="export-disk">Frame-accurate: stream directly to disk</label>
+          <div class="empty-note" id="export-range-summary"></div>
           <label class="side-title" for="export-mode">Render mode</label>
           <select class="btn studio-select" id="export-mode">
             <option value="offline" selected>Frame-accurate (video only)</option>
@@ -572,7 +604,7 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
           </select>
           <button class="btn primary" id="btn-record">Export movie (webm)</button>
           <span id="rec-status"></span>
-          <div class="empty-note">Frame-accurate mode renders every frame, even on slow devices, but does not include audio yet. Choose real-time recording for sound and keep the tab visible. Both modes export all shots back to back.</div>
+            <div class="empty-note">Frame-accurate mode renders every frame, but is video-only. Choose real-time for sound and keep the tab visible. Memory exports in either mode are limited to five-minute sections; direct-to-disk needs a browser with a save-file picker.</div>
           </div></div>
         </aside>
         <div id="anim-viewport"></div>
@@ -601,6 +633,6 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
   }
 }
 </script>
-<script type="module" src="app.js?v=0.5.0"></script>
+<script type="module" src="app.js?v=0.6.0"></script>
 </body>
 </html>

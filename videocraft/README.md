@@ -48,10 +48,71 @@ independent snapshot of its parts, so editing/removing a library model does not
 silently change existing scenes. Models support up to 100 primitive parts.
 
 Model JSON imports validate primitive types, colours, dimensions and material
-limits and reject empty/oversized models. This workshop builds compound
-primitive props and scenery, not arbitrary mesh sculpting or a GLTF/FBX
-importer. Model assets are local to the project; model JSON files can transfer
-them between projects.
+limits and reject empty/oversized models. Design builds compound primitive
+props rather than arbitrary mesh sculpting. Assets now also imports real GLB
+meshes, skins, materials and animation clips, as described below. FBX and
+multi-file `.gltf` packages are not supported.
+
+## Imported 3D models and animation
+
+In **Assets**, choose **Import 3D GLB**, then **Place imported model**.
+Use a self-contained, uncompressed glTF 2.0 `.glb` up to 25 MB. Textures and
+buffers must be embedded; external resource URLs are rejected. Required
+Draco/Meshopt/KTX2 compression is not supported. Projects allow up to 100
+imported assets; high polygon/texture counts remain limited by your device.
+
+The source is embedded once in the saved project. Each placed instance gets
+its own skeleton, geometry, materials and animation mixer. Instances are
+normalized to two metres high with a ground-level origin; Scene scale controls
+change their size. Select **Imported animation** in Scene or Animate to choose
+a clip, set speed/start/source offset, and loop or play once and hold. Absolute
+clip-time evaluation supports forward and reverse scrubbing. Imported clips
+are played as authored: this is not motion-capture retargeting or a bone editor
+for arbitrary imported rigs. Static/bind-pose playback is also available.
+
+Exports wait for imported resources to finish loading and report failures.
+Removing an imported library source is blocked while any shot uses it.
+Large GLBs can exceed browser-autosave quota; the status asks for a project
+file backup rather than claiming the asset was saved automatically.
+
+## Sets, precision editing and finishing
+
+- **Sets & atmosphere** in Scene adds a forest clearing, city street or studio
+  apartment without deleting existing objects. A set is a locked compound
+  object. Unlock viewport transforms in its inspector or **Copy parts to
+  Design** to make a new editable design. Saving the new design does not
+  mutate the original set instance. Set framing asks before replacing
+  existing camera animation.
+- Background, ground colour, exposure and fog are saved per shot. Resetting
+  the atmosphere preserves that shot's captions and fades.
+- Scene objects have movie visibility and viewport-transform locks.
+  Duplicating an object also copies its animation tracks independently.
+- Animate supports rotation X/Y/Z and scale X/Y/Z in addition to the legacy
+  uniform-scale multiplier. Axis scales are absolute local scales, then
+  multiplied by a uniform-scale track if present. Cubic ease-in/out curves
+  supplement linear, smooth and hold interpolation.
+- **Precision editing** provides shot/movie playhead input, previous/next
+  frame, frame snapping, composition guides, full base-transform keying and
+  object-motion copy/paste. Copy/paste replaces destination tracks with
+  confirmation, skips keys outside the destination shot, and keeps cameras
+  separate from object animation. Clear motion preserves the base pose.
+- Storyboard uses 12-shot pages and shot/name-note search. **Titles, captions
+  & fades** gives each shot timed text, centered titles or bottom subtitles,
+  size/colour and fades through black. Fades do not change shot durations;
+  each is capped at half the shot. These are not overlapping dissolves.
+- Import SRT in Storyboard using global movie timestamps. Cues crossing a
+  cut are split across shots. Existing cues are kept. SRT export combines
+  shot-relative subtitle cues into movie timestamps and excludes centered
+  title cards. Use valid end-after-start timings; out-of-shot cues are not shown.
+- Playback and video export share the same caption/fade drawing functions.
+  Guides, grid and selection helpers are omitted from exported frames.
+  Animate letterboxes the preview to the delivery aspect so its camera framing
+  matches the output rather than stretching to the editor pane.
+
+Sound clips now have independent media elements, even for repeated instances
+of one source. Set source in-point, trimmed duration (zero means to source
+end), fade-in/out, volume and stereo pan. Real-time movie recording includes
+this mix; frame-accurate mode remains video-only.
 
 ## 3D characters and animation
 
@@ -110,7 +171,9 @@ Opening a project stops existing playback and releases the old scene's GPU
 resources. Browser autosave is best-effort; file saves are the portable backup,
 especially for projects containing large audio files.
 
-Both export modes render all shots back-to-back to **WebM**. Choose a frame
+Both export modes render to **WebM**. Choose entire movie, current shot, or a
+custom interval in movie seconds. Section timestamps start at zero in the
+output file, even when rendering a later part of the movie. Choose a frame
 width (1280, 1920 or 3840 pixels), then a shape:
 
 - 16:9 widescreen
@@ -137,18 +200,31 @@ do not create an unnecessary audio track.
 4K needs suitable GPU/encoder support and was not performance-certified on
 every device. Stop export saves a partial movie in either mode. Mutating
 controls are locked during export, and the editor's frame size, camera and
-controls are restored afterward. Offline output currently keeps compressed
-video in memory and warns for movies longer than five minutes; use shorter
-sections for large productions rather than assuming feature-length output
-will fit in browser memory.
+controls are restored afterward. Memory-based output in either mode is limited
+to five-minute sections. **Frame-accurate: stream directly to disk** uses a
+save-file picker and positional, serialized chunk writes with backpressure,
+instead of holding the entire compressed film in memory. Cancelling that
+picker cancels rendering. Failed writes abort the file and restore the editor.
+Browsers without a save-file picker must use the memory/section path.
+
+Progress includes frame counts, observed rendering rate and an estimated
+remaining time, not a promised render speed. Long timeline navigation uses
+binary shot lookup in the precision seeker; keyframe sampling uses binary
+search, and the timeline only mounts visible keyframe diamonds. Frame-accurate
+export still evaluates every frame, which can take substantial time.
 
 MP4/ProRes, offline audio mixing, path tracing, depth of field, physically accurate motion blur,
-colour grading nodes, compositing, transitions, GLTF/FBX import, external mocap,
+colour grading nodes, multilayer compositing, dissolves, FBX import, external mocap,
 dialogue/lip-sync and distributed/render-farm processing are not implemented here.
 You can make multi-shot stylised movies, but these are future work for a
-professional feature-film pipeline.
+professional feature-film pipeline. A one-hour data timeline and short
+sections can be tested without certifying a complete hour-long render on
+every browser, or claiming the artistic quality of a finished feature.
 
 ## Development and checks
+
+See [film-production QA](QA-FILM-PRODUCTION.md) for the new upgrade's tested
+flows, observed export behavior and explicit limits.
 
 From the repository root:
 
@@ -166,5 +242,7 @@ Browser regression checks should also cover legacy load/upgrade, project
 round-trip, joint key editing, shot playback, export teardown, and 375px layout.
 
 The vendored `webm-muxer` 5.1.4 module is MIT-licensed; its license is alongside
-the module in `vendor/`. Avatar geometry is batched by material so one body
+the module in `vendor/`. A documented VideoCraft patch includes the final
+video frame's display interval in the segment duration; memory and seekable
+streaming tests cover this. Avatar geometry is batched by material so one body
 part does not require a separate draw call in every rendering pass.

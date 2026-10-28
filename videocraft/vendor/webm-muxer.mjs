@@ -1250,7 +1250,14 @@ writeBlock_fn = function(chunk, canCreateNewCluster) {
     ] };
     __privateGet(this, _writer).writeEBML(blockGroup);
   }
-  __privateSet(this, _duration, Math.max(__privateGet(this, _duration), msTimestamp));
+  // VideoCraft patch: include the final frame's display interval in the
+  // segment duration. The upstream muxer used only its presentation timestamp,
+  // shortening every constant-frame-rate section by one frame.
+  const frameRate = __privateGet(this, _options).video?.frameRate;
+  const chunkEnd = chunk.trackNumber === VIDEO_TRACK_NUMBER && frameRate
+    ? chunk.timestamp / 1e3 + 1e3 / frameRate
+    : msTimestamp + (chunk.duration ? chunk.duration / 1e3 : 0);
+  __privateSet(this, _duration, Math.max(__privateGet(this, _duration), chunkEnd));
 };
 _createCodecPrivateElement = new WeakSet();
 createCodecPrivateElement_fn = function(data) {
