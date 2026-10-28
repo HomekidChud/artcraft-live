@@ -2177,6 +2177,11 @@ async function exportMovie() {
       return drainPromise;
     };
     const saveRecording = async () => {
+      // a save is now pending/running regardless of who stopped the recorder:
+      // if the recorder went inactive on its own (error path), finishExport armed
+      // neither flag — arm here so a new export cannot replace the shared buffer mid-save
+      savePending = true;
+      exportFinalizing = true;
       try {
         if (diskMode) {
           await drain(); // every queued chunk is submitted before closing
