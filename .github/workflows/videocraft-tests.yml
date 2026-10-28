@@ -21,6 +21,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node --check videocraft/app.js && node --check videocraft/avatar3d.js
+      - run: node --check videocraft/app.js && node --check videocraft/avatar3d.js && node --check videocraft/workspaces.js && node --check videocraft/production.js && node --check videocraft/models.js
       - run: npm run test:videocraft
       - run: npm test

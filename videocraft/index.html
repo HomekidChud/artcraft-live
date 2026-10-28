@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VideoCraft — 3D Movie Studio</title>
-<meta name="description" content="VideoCraft: draw, build 3D scenes, create characters and turn them into full movies with shots, camera moves, audio and video export — a free browser studio from the ArtCraft family.">
+<meta name="description" content="VideoCraft: plan films, design reusable 3D models, organise assets, storyboard, build scenes, animate rigged characters, mix sound and export movies in a ten-workspace browser studio.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%23f2b25c'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e05d5d'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%234fb3a4'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%23c77b9e'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -361,6 +361,7 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
 </style>
+<link rel="stylesheet" href="studio.css?v=0.5.0">
 </head>
 <body>
 <div id="app">
@@ -539,10 +540,13 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
               <div class="empty-note">Camera moves become editable timeline keys. Lighting is saved independently for each shot.</div>
             </div>
           </details>
+          <div id="anim-audio-home"><div id="movie-audio-tools" class="studio-stack">
           <div class="side-title">Audio</div>
           <button class="btn" id="btn-audio-add">+ Add audio file</button>
           <input type="file" id="file-audio" accept="audio/*" class="sr-only">
           <div id="audio-list"></div>
+          </div></div>
+          <div id="anim-export-home"><div id="movie-export-tools" class="studio-stack">
           <div class="side-title">Export movie</div>
           <label class="side-title" for="export-mode">Render mode</label>
           <select class="btn studio-select" id="export-mode">
@@ -569,6 +573,7 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
           <button class="btn primary" id="btn-record">Export movie (webm)</button>
           <span id="rec-status"></span>
           <div class="empty-note">Frame-accurate mode renders every frame, even on slow devices, but does not include audio yet. Choose real-time recording for sound and keep the tab visible. Both modes export all shots back to back.</div>
+          </div></div>
         </aside>
         <div id="anim-viewport"></div>
         <div id="timeline">
@@ -596,6 +601,6 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
   }
 }
 </script>
-<script type="module" src="app.js?v=0.4.0"></script>
+<script type="module" src="app.js?v=0.5.0"></script>
 </body>
 </html>
