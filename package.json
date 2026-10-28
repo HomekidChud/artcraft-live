@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test assistant/tests/*.test.js",
+    "test:videocraft": "node --test videocraft/tests/*.test.js",
     "train": "python assistant/training/train.py",
     "serve": "python -m http.server 8000 --bind 127.0.0.1"
   }
