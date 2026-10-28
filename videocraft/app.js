@@ -4,6 +4,12 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildAvatar } from './avatar3d.js';
 import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js';
+import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js';
+import { buildModel } from './models.js';
+import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
+
+installWorkspaceShell();
+let studioWorkspaces = null;
 
 /* ============================================================
    Shared project model — a movie is a sequence of shots
@@ -26,6 +32,7 @@ function defaultProject() {
     name: 'Untitled movie',
     fps: 30,
     exportAspect: '16:9',
+    studio: defaultStudio(),
     drawings: [],        // { id, name, dataURL } raster assets (movie-wide)
     characters: [],      // character rigs (movie-wide)
     shots: [shot],
@@ -73,6 +80,7 @@ function migrateProject(data) {
   data.characters = Array.isArray(data.characters) ? data.characters : [];
   data.audioAssets = Array.isArray(data.audioAssets) ? data.audioAssets : [];
   data.audioClips = Array.isArray(data.audioClips) ? data.audioClips : [];
+  data.studio = normalizeStudio(data.studio);
   if (!data.shots.some(s => s.id === data.activeShotId)) data.activeShotId = data.shots[0].id;
   return data;
 }
@@ -83,6 +91,7 @@ function serializeProject() {
     drawings: project.drawings, characters: project.characters,
     shots: project.shots, activeShotId: project.activeShotId,
     audioAssets: project.audioAssets, audioClips: project.audioClips,
+    studio: project.studio,
   };
 }
 function loadProjectData(data) {
@@ -183,13 +192,21 @@ function toast(msg) {
    Workspace switching
    ============================================================ */
 const railBtns = [...document.querySelectorAll('.rail-btn')];
-const workspaces = ['draw', 'char', 'scene', 'anim'];
+const workspaces = ['draw', 'char', 'scene', 'anim', ...PRODUCTION_TABS];
 let activeWs = 'draw';
 
 function setWorkspace(ws) {
+  if (!workspaces.includes(ws)) return;
+  if (recMode || exportPreparing || exportFinalizing) return;
+  if (ws !== activeWs && moviePlaying) stopMovie();
+  if (ws !== activeWs) setPlaying(false);
   activeWs = ws;
-  railBtns.forEach(b => b.classList.toggle('active', b.dataset.ws === ws));
+  railBtns.forEach(b => {
+    b.classList.toggle('active', b.dataset.ws === ws);
+    if (b.dataset.ws === ws) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
   workspaces.forEach(w => document.getElementById('ws-' + w).classList.toggle('active', w === ws));
+  studioWorkspaces?.render(ws);
   if (ws === 'scene' || ws === 'anim') {
     resize3D();
     syncSceneObjects();
@@ -345,6 +362,8 @@ function duplicateShot() {
   const copy = newShot(src.name + ' copy', src.duration);
   if (src.camera) copy.camera = JSON.parse(JSON.stringify(src.camera));
   copy.lighting = src.lighting || 'studio';
+  copy.referenceDrawingId = src.referenceDrawingId || '';
+  if (project.studio.shotNotes[src.id]) project.studio.shotNotes[copy.id] = project.studio.shotNotes[src.id];
   // regenerate object ids so the copy is fully independent
   const idMap = {};
   copy.sceneObjects = src.sceneObjects.map(o => {
@@ -377,6 +396,7 @@ function deleteShot() {
   if (!confirm('Delete "' + s.name + '"?')) return;
   const idx = project.shots.indexOf(s);
   project.shots.splice(idx, 1);
+  delete project.studio.shotNotes[s.id];
   applyShot(project.shots[Math.min(idx, project.shots.length - 1)].id);
   markDirty();
   toast('Shot deleted');
@@ -1041,7 +1061,9 @@ function drawingTexture(d) {
 
 function build3DObject(o) {
   let group = new THREE.Group();
-  if (o.type === 'box' || o.type === 'sphere' || o.type === 'cylinder' || o.type === 'cone' || o.type === 'torus' || o.type === 'plane') {
+  if (o.type === 'model') {
+    group.add(buildModel(o.modelParts || []));
+  } else if (o.type === 'box' || o.type === 'sphere' || o.type === 'cylinder' || o.type === 'cone' || o.type === 'torus' || o.type === 'plane') {
     group.add(makeMesh(GEOMETRIES[o.type](), stdMat(o.color, o.opacity)));
   } else if (o.type === 'engineKit') {
     buildEngineKit(group, o);
@@ -1150,7 +1172,7 @@ function syncSceneObjects() {
   // add new / refresh
   project.sceneObjects.forEach(o => {
     let g = objectGroups.get(o.id);
-    const signature = JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text, o.rigMode,
+    const signature = JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text, o.rigMode, o.modelParts,
       o.rigMode === '3d' ? project.characters.find(c => c.id === o.assetId) : null]);
     const needsRebuild = !g || g.userData.builtFrom !== signature;
     if (needsRebuild) {
@@ -1376,6 +1398,12 @@ function renderSceneList() {
   });
   project.characters.forEach(c => {
     addRow('+ ' + c.name, () => addCharacterObject(c));
+  });
+  project.studio.models.forEach(model => {
+    addRow('+ model: ' + model.name, () => {
+      const object = modelInstance(model), [x, z] = freeSpot();
+      object.pos = [x, 0, z]; project.sceneObjects.push(object); syncSceneObjects(); selectObject(object.id); markDirty();
+    });
   });
 }
 function freeSpot() {
@@ -1967,6 +1995,7 @@ let moviePlayStart = 0, moviePlayOffset = 0; // wall-clock anchor: no drift vs a
 function tick(now) {
   requestAnimationFrame(tick);
   if (offlineRendering) return; // the offline renderer owns the scene and frame clock
+  if (!['scene', 'anim'].includes(activeWs) && !recMode && !moviePlaying && !playing) return;
   const dt = Math.min((now - lastFrameTs) / 1000, 0.1);
   lastFrameTs = now;
   if (moviePlaying) {
@@ -2565,6 +2594,7 @@ document.getElementById('file-open').addEventListener('change', e => {
       markDirty();
       renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
       renderAudioList();
+      setWorkspace(activeWs);
       toast('Project loaded: ' + project.name + ' (' + project.shots.length + ' shot' + (project.shots.length > 1 ? 's' : '') + ')');
     } catch { toast('That file is not a VideoCraft project'); }
     e.target.value = '';
@@ -2573,8 +2603,9 @@ document.getElementById('file-open').addEventListener('change', e => {
 });
 document.getElementById('btn-starter').addEventListener('click', loadStarterScene);
 document.getElementById('btn-new').addEventListener('click', () => {
-  const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length;
+  const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
   if (hasWork && !confirm('Start a new movie? Unsaved work will be lost.')) return;
+  if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject();
   currentCharId = null; selectedId = null;
   document.getElementById('project-tag').textContent = project.name;
@@ -2583,6 +2614,7 @@ document.getElementById('btn-new').addEventListener('click', () => {
   applyShot(project.shots[0].id);
   renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
   renderAudioList();
+  setWorkspace(activeWs);
   toast('New movie');
 });
 
@@ -2590,8 +2622,9 @@ document.getElementById('btn-new').addEventListener('click', () => {
    Starter demo — a two-shot mini movie: engine room + hero close-up
    ============================================================ */
 function loadStarterScene() {
-  const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length;
+  const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
   if (hasWork && !confirm('Replace the current movie with the starter scene?')) return;
+  if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject();
   project.name = 'Starter — mini movie';
   selectedId = null; currentCharId = null;
@@ -2797,7 +2830,7 @@ document.getElementById('btn-camera-preset').addEventListener('click', () => {
 
 function loadRaceMovie() {
   if (recMode || exportPreparing || exportFinalizing) { toast('Finish exporting first'); return; }
-  const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length;
+  const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
   if (hasWork && !confirm('Replace the current movie with the 3D race movie? Save your project first to keep it.')) return;
   if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject(); project.name = 'The Final Straight'; project.exportAspect = '2.39:1';
@@ -2867,6 +2900,28 @@ document.getElementById('btn-race').addEventListener('click', loadRaceMovie);
    Boot
    ============================================================ */
 loadSaved();
+studioWorkspaces = createStudioWorkspaces({
+  project: () => project, dirty: markDirty, toast, workspace: setWorkspace,
+  placeObject: o => { project.sceneObjects.push(o); selectedId = o.id; markDirty(); setWorkspace('scene'); selectObject(o.id); },
+  placeCharacter: addCharacterObject, placeDrawing: addDrawingPlane,
+  renderAudio: renderAudioList, saveProject: () => document.getElementById('btn-save').click(),
+  openShot: applyShot, playMovie, syncShots: renderShotsUI,
+  addShot,
+  duration: (id, duration) => {
+    const shot = project.shots.find(s => s.id === id); if (!shot) return;
+    shot.duration = duration;
+    if (shot.id === project.activeShotId) { project.duration = duration; animTime = Math.min(animTime, duration); }
+    markDirty(); syncShotControls(); renderShotsUI(); renderTimeline();
+  },
+  duplicateShot: id => { applyShot(id); duplicateShot(); return project.activeShotId; },
+  deleteShot: id => { applyShot(id); const old = project.shots.length; deleteShot(); if (project.shots.length < old) delete project.studio.shotNotes[id]; },
+  moveShot: (id, dir) => {
+    const index = project.shots.findIndex(s => s.id === id), next = index + dir;
+    if (index < 0 || next < 0 || next >= project.shots.length) return;
+    [project.shots[index], project.shots[next]] = [project.shots[next], project.shots[index]];
+    markDirty(); renderShotsUI();
+  },
+});
 document.getElementById('project-tag').textContent = project.name;
 if (!project.characters.length && !project.shots.some(s => s.sceneObjects.length) && !project.drawings.length) {
   // first visit: starter character so the app never feels empty
@@ -2879,7 +2934,7 @@ renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
 renderAudioList();
 applyShot(project.activeShotId);
 renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
-setWorkspace('draw');
+setWorkspace('plan');
 syncDrawSize();
 requestAnimationFrame(tick);
 window.addEventListener('resize', () => { syncDrawSize(); resize3D(); renderTimeline(); });

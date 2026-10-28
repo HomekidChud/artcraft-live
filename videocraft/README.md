@@ -11,6 +11,48 @@ Straight**, has four 3D runners, five camera shots, a stadium, a close finish an
 a winner's celebration over 26 seconds. Replacing an existing movie requires
 confirmation. Save your current project first if you want to retain it.
 
+## Production workspaces
+
+The studio now has ten labelled tabs. The navigation rail scrolls on shorter
+screens, and the production pages stack for phones.
+
+- **Planning**: movie title, production stage, genre, audience, logline,
+  synopsis, script and a checklist with completion tracking.
+- **Design**: an orbitable 3D workshop for combining boxes, spheres, cylinders,
+  cones and toruses into models. Add/select/duplicate/remove parts; change
+  transforms, colours, roughness and metalness; click a visible part in the
+  preview or select it in the list. Frame the model with the dedicated button.
+  Trophy, podium and tree templates remain fully editable.
+- **Draw**: the existing drawing studio and drawing asset workflow.
+- **Cast**: the existing Character workspace for designing the cast.
+- **Assets**: search/filter models, characters, drawings and audio. Add an asset
+  to the current shot, edit saved model designs, and import/export model JSON.
+- **Scene**: the existing 3D scene and transform tools, now also supporting
+  compound model instances. Saved library models appear in its add menu.
+- **Storyboard**: shot names, durations, action/camera notes and optional
+  drawing references. Create, duplicate, reorder or delete shots and open
+  individual shots in Animate. The reference image is chosen explicitly;
+  blank cards are labelled shot cards, not fake scene renders.
+- **Animate**: the existing movie timeline, actor rigs and camera animation.
+- **Sound**: dedicated access to the actual audio clip importer, global start
+  and volume controls, plus sound-direction/dialogue-cue notes.
+- **Delivery**: a non-blocking production checklist, project backup and the
+  actual movie export controls. Starting export opens Animate. Sound and
+  export controls are moved, not cloned, so their settings and handlers remain
+  consistent with Animate.
+
+Planning, models, the design draft, shot notes and sound notes are stored in an
+additive `studio` field in the project JSON. Existing version-1 and version-2
+files receive empty defaults. A designed model placed in a shot stores an
+independent snapshot of its parts, so editing/removing a library model does not
+silently change existing scenes. Models support up to 100 primitive parts.
+
+Model JSON imports validate primitive types, colours, dimensions and material
+limits and reject empty/oversized models. This workshop builds compound
+primitive props and scenery, not arbitrary mesh sculpting or a GLTF/FBX
+importer. Model assets are local to the project; model JSON files can transfer
+them between projects.
+
 ## 3D characters and animation
 
 - Newly placed characters are volumetric, weighted `THREE.SkinnedMesh` avatars
