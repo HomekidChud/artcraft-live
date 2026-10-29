@@ -613,7 +613,7 @@ body.any-sheet-open #sheet-backdrop { display: block; }
           <div class="side-title">Export movie</div>
           <label class="side-title" for="export-mode">Render mode</label>
           <select class="btn studio-select" id="export-mode">
-            <option value="offline" selected>Frame-accurate (video only)</option>
+            <option value="offline" selected>Frame-accurate (reliable)</option>
             <option value="realtime">Real-time recording (with audio)</option>
           </select>
           <div class="field-row"><label for="export-res">Resolution</label></div>
@@ -637,10 +637,10 @@ body.any-sheet-open #sheet-backdrop { display: block; }
           <input type="number" id="export-start" min="0" step="0.1" value="0" style="width:100%" aria-label="Export range start in seconds">
           <div class="field-row"><label for="export-end">Range end (s)</label></div>
           <input type="number" id="export-end" min="0" step="0.1" placeholder="end of movie" style="width:100%" aria-label="Export range end in seconds">
-          <div class="empty-note" id="export-range-hint">Export a section (frame-accurate mode): leave both blank for the whole movie, or set a start/end in seconds — great for long movies, exported in stitchable chunks. Sections start at timestamp zero; join parts with a remux tool (e.g. ffmpeg concat) and mix audio separately.</div>
+          <div class="empty-note" id="export-range-hint">Export a section (frame-accurate mode): leave both blank for the whole movie, or set a start/end in seconds — useful for long movies, exported in stitchable chunks with audio included. Sections start at timestamp zero; join parts with a remux tool (e.g. ffmpeg concat).</div>
           <button class="btn primary" id="btn-record">Export movie (webm)</button>
           <span id="rec-status"></span>
-          <div class="empty-note">Frame-accurate mode renders every frame, even on slow devices, but does not include audio yet. Choose real-time recording for sound and keep the tab visible. Both modes export all shots back to back.</div>
+          <div class="empty-note">Frame-accurate mode renders every frame, even on slow devices, and includes your audio clips as a mixed-in Opus track. In browsers with the File System Access API it streams the movie straight to a file you pick, so full-length films export in one pass; elsewhere it keeps the video in memory (short movies only). Real-time recording also has sound — keep that tab visible. Both modes export all shots back to back.</div>
           </div></div>
         </aside>
         <div id="anim-viewport"></div>
@@ -724,6 +724,6 @@ body.any-sheet-open #sheet-backdrop { display: block; }
   }
 }
 </script>
-<script type="module" src="app.js?v=0.6.6"></script>
+<script type="module" src="app.js?v=0.10.2"></script>
 </body>
 </html>
