@@ -81,8 +81,9 @@ Machine-readable guide for AI agents driving [VideoCraft](./index.html), a brows
 - Frame-accurate export **includes audio** (offline Opus mix) since v0.10. Audio
   files decode into memory for the mix — keep them to a few minutes each.
 - Where `window.showSaveFilePicker` exists (Chromium browsers), frame-accurate
-  export **streams to disk** — memory is bounded, full-length movies export in
-  one pass. Headless runs: stub `window.showSaveFilePicker = undefined` to use
+  export **streams to disk** — video memory stays bounded, full-length movies
+  export in one pass (decoded audio is the exception: see the note above).
+  Headless runs: stub `window.showSaveFilePicker = undefined` to use
   the in-RAM fallback, or provide a fake handle whose `createWritable()` returns
   an object with `write()`/`close()` collecting chunks.
 - Without the File System Access API (Safari, Firefox): whole-movie export

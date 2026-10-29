@@ -1,7 +1,9 @@
 // VideoCraft — draw / build / animate / make movies in the browser. ArtCraft family tool.
 // v0.10 — full-length exports: frame-accurate export streams to disk (File
 //         System Access API) and muxes an offline Opus mix of the audio clips,
-//         so long movies render in one pass with sound, memory bounded.
+//         so long movies render in one pass with sound. Video memory is bounded
+//         at any length; decoded audio scales with the soundtrack (sources are
+//         released as soon as no later window needs them).
 // v0.8 — cinematic FX engine (deterministic GPU particles: fire, smoke, sparks,
 //        explosions, fountains) + GLB model import for detailed assets.
 // v0.7 — character forge + cutscenes (titles, subtitles, fades, shake).
@@ -2912,9 +2914,11 @@ function shotAtGlobal(time) {
    Frame-accurate export (WebCodecs + webm-muxer)
    v0.10: asks for a save location up front and STREAMS the
    movie to disk (File System Access API + FileSystemWritableFileStream
-   target) — memory stays bounded, so full-length movies export in
-   one pass. It also renders an offline Opus mix of the movie's
-   audio clips and muxes it in, so exports are no longer video-only.
+   target) — video memory stays bounded, so full-length movies export in
+   one pass (decoded audio scales with the soundtrack; sources are released
+   once no later window needs them). It also renders an offline Opus mix of
+   the movie's audio clips and muxes it in, so exports are no longer
+   video-only.
    Browsers without those APIs fall back to the old in-RAM path
    (with its length warning) or video-only audio.
    ============================================================ */
@@ -2944,8 +2948,9 @@ async function exportOfflineMovie() {
   const part = isSection ? `_part_${(startFrame / fps).toFixed(1).replace('.', '-')}-${(endFrame / fps).toFixed(1).replace('.', '-')}s` : '';
   const fileName = base + part + '.webm';
   // Ask for the save location FIRST, while the click's user activation is
-  // fresh. Streaming straight to a real file keeps memory bounded, so
-  // full-length movies can export in a single pass instead of crashing the tab.
+  // fresh. Streaming straight to a real file keeps video memory bounded, so
+  // full-length movies can export in a single pass instead of crashing the tab
+  // (decoded audio is the exception — it scales with the soundtrack).
   let saveStream = null;
   if (typeof window.showSaveFilePicker === 'function') {
     try {

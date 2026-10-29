@@ -281,10 +281,12 @@ demanding; use a smaller width on limited hardware.
 **Frame-accurate** mode evaluates each movie frame at its exact time and encodes
 it with WebCodecs and a vendored WebM muxer. A slow GPU takes longer rather than
 skipping animation frames. Audio clips are mixed offline in 30-second blocks
-(bounded memory at any movie length) and muxed in as an Opus track — exports are
-no longer video-only. Keep individual audio files to a few minutes (they decode
-into memory for the mix); add a feature-length continuous soundtrack with ffmpeg
-afterwards if needed. WebCodecs needs a supported secure browser/encoder.
+(the mix buffer stays small at any movie length) and muxed in as an Opus track
+— exports are no longer video-only. Keep individual audio files to a few
+minutes (each decoded track is held in memory while windows still need it, so
+a single long soundtrack still scales with its length); add a feature-length
+continuous soundtrack with ffmpeg afterwards if needed. WebCodecs needs a
+supported secure browser/encoder.
 
 **Real-time recording** uses MediaRecorder and includes the existing audio mix.
 Frame delivery depends on the machine; a slow browser may record choppy
@@ -296,8 +298,9 @@ every device. Stop export saves a partial movie in either mode. Mutating
 controls are locked during export, and the editor's frame size, camera and
 controls are restored afterward. In browsers with the File System Access API
 (Chrome, Edge, Opera, Chromium-based mobile), frame-accurate export asks where
-to save and **streams the movie to that file as it renders** — memory stays
-bounded, so full-length films export in one pass. Browsers without it keep the
+to save and **streams the movie to that file as it renders** — video memory
+stays bounded, so full-length films export in one pass (decoded audio is the
+exception; see the audio note above). Browsers without it keep the
 compressed video in memory and warn for movies longer than five minutes; use
 shorter sections there rather than assuming feature-length output will fit.
 
