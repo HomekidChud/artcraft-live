@@ -1,9 +1,12 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { buildModel, disposeModel } from './models.js';
 import { PRODUCTION_TABS, PART_TYPES, newPart, validateModel, modelTemplate, modelInstance, makeId } from './production.js';
+import { FORGE_PART_TYPES, newBone, newPart as newForgePart, humanoidTemplate, blankCharacter, validateCharacter } from './charcraft.js';
+import { buildCharacterGroup } from './charbuild.js';
 
-const names = { plan: 'Planning', design: 'Design', assets: 'Assets', board: 'Storyboard', sound: 'Sound', delivery: 'Delivery' };
+const names = { plan: 'Planning', design: 'Design', assets: 'Assets', board: 'Storyboard', sound: 'Sound', delivery: 'Delivery', forge: 'Forge' };
 const icons = {
   plan: '<path d="M8 4H5v17h14V4h-3M9 2h6v5H9zM8 12h8M8 16h5"/>',
   design: '<path d="m12 2 9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10"/>',
@@ -11,6 +14,7 @@ const icons = {
   board: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 4v16M2 12h20"/>',
   sound: '<path d="M9 18V5l11-2v13M9 8l11-2"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
   delivery: '<path d="M12 3v13m-5-5 5 5 5-5M4 16v5h16v-5"/>',
+  forge: '<circle cx="12" cy="5" r="2.4"/><path d="M12 8v5M7 21c0-4 2.2-6.5 5-6.5s5 2.5 5 6.5M8.5 11.5 6 13M15.5 11.5 18 13"/>',
 };
 export function installWorkspaceShell() {
   const rail = document.getElementById('rail');
@@ -25,7 +29,7 @@ export function installWorkspaceShell() {
     document.getElementById('content').append(section);
   }
   const labels = { ...names, draw: 'Draw', char: 'Cast', scene: 'Scene', anim: 'Animate' };
-  for (const key of ['plan', 'design', 'draw', 'char', 'assets', 'scene', 'board', 'anim', 'sound', 'delivery']) {
+  for (const key of ['plan', 'design', 'draw', 'char', 'forge', 'assets', 'scene', 'board', 'anim', 'sound', 'delivery']) {
     const button = rail.querySelector(`[data-ws="${key}"]`);
     const label = document.createElement('span'); label.className = 'rail-label'; label.textContent = labels[key];
     button.append(label); rail.append(button);
@@ -290,7 +294,14 @@ export function createStudioWorkspaces(api) {
               if (!confirm('Remove this library model? Existing shot instances will be kept.')) return;
               s().models = s().models.filter(m => m.id !== asset.id); if (s().draft.assetId === asset.id) s().draft.assetId = ''; change(); renderCards();
             }));
-        } else if (kind === 'character') card.append(button('Add actor to current shot', () => { api.placeCharacter(asset); open('scene'); }, true), button('Open Cast', () => open('char')));
+        } else if (kind === 'character') {
+          card.append(button('Add actor to current shot', () => { api.placeCharacter(asset); open('scene'); }, true));
+          if (asset.kind === 'forge') card.append(button('Edit in Forge', () => {
+            open('forge');
+            window.__loadForgeCharacter?.(asset);
+          }));
+          card.append(button('Open Cast', () => open('char')));
+        }
         else if (kind === 'drawing') card.append(button('Add drawing to current shot', () => { api.placeDrawing(asset); open('scene'); }, true));
         else card.append(button('Add audio clip', () => { p().audioClips.push({ id: makeId('clip'), assetId: asset.id, start: 0, volume: 1 }); change(); open('sound'); }, true));
       });
@@ -359,11 +370,344 @@ export function createStudioWorkspaces(api) {
     const output = panel(grid, 'Export settings'), host = node('div', 'studio-stack'); host.id = 'delivery-controls'; output.append(host);
     output.append(node('p', 'studio-muted', '4K availability is encoder-dependent. Frame-accurate export is currently silent and keeps compressed output in memory; long productions should be rendered in shorter sections.'));
   }
-  const renderers = { plan: planning, design, assets, board: storyboard, sound, delivery };
+  /* ---------------- Character Forge ---------------- */
+  let forgeRenderer, forgeScene, forgeCamera, forgeControls, forgeGroup = null;
+  let forgeHost, forgeFrame = 0, forgeResizeObserver, forgeTcontrols = null;
+  let forgeSel = { kind: '', id: '' }; // 'part' | 'bone'
+  let forgePose = {}; // bone id -> [x,y,z] degrees — preview only, never saved
+  const boneNodes = () => (forgeGroup?.userData.bones || new Map());
+
+  function forgeEnsureDraft() {
+    if (!s().forgeDraft) s().forgeDraft = humanoidTemplate();
+    return s().forgeDraft;
+  }
+  function forgeResize() {
+    if (!forgeRenderer || !forgeHost) return;
+    const r = forgeHost.getBoundingClientRect(); if (!r.width || !r.height) return;
+    forgeRenderer.setSize(r.width, r.height);
+    forgeCamera.aspect = r.width / r.height; forgeCamera.updateProjectionMatrix();
+  }
+  function forgeDescendantIds(boneId, draft) {
+    const out = new Set([boneId]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const b of draft.bones) if (b.parent != null && out.has(b.parent) && !out.has(b.id)) { out.add(b.id); grew = true; }
+    }
+    return out;
+  }
+  function forgeRefresh() {
+    if (!forgeScene) return;
+    if (forgeGroup) {
+      forgeScene.remove(forgeGroup);
+      forgeGroup.userData.dispose?.();
+    }
+    const draft = forgeEnsureDraft();
+    forgeGroup = buildCharacterGroup(draft);
+    forgeScene.add(forgeGroup);
+    // bone pickers + axes
+    const nodes = boneNodes();
+    for (const [id, node] of nodes) {
+      const axis = new THREE.AxesHelper(0.13);
+      axis.material.depthTest = false; axis.renderOrder = 10;
+      node.add(axis);
+      const picker = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.001, depthWrite: false }));
+      picker.userData.boneId = id;
+      node.add(picker);
+    }
+    // preview pose
+    for (const [id, node] of nodes) {
+      const p = forgePose[id] || [0, 0, 0];
+      node.rotation.set(p[0] * Math.PI / 180, p[1] * Math.PI / 180, p[2] * Math.PI / 180);
+    }
+    forgeSelect(forgeSel.kind, forgeSel.id); // re-attach gizmo if still valid
+  }
+  function forgeSelect(kind, id) {
+    const draft = forgeEnsureDraft();
+    if (kind === 'part' && !draft.parts.some(p => p.id === id)) { kind = ''; id = ''; }
+    if (kind === 'bone' && !draft.bones.some(b => b.id === id)) { kind = ''; id = ''; }
+    forgeSel = { kind, id };
+    if (!forgeTcontrols) return;
+    forgeTcontrols.detach();
+    if (kind === 'part') {
+      let mesh = null;
+      forgeGroup.traverse(m => { if (m.name === 'fpart:' + id) mesh = m; });
+      if (mesh) { forgeTcontrols.attach(mesh); forgeTcontrols.setMode('translate'); forgeTcontrols.enabled = true; return; }
+    } else if (kind === 'bone') {
+      const node = boneNodes().get(id);
+      if (node) { forgeTcontrols.attach(node); forgeTcontrols.setMode('rotate'); forgeTcontrols.enabled = true; return; }
+    }
+    forgeTcontrols.enabled = false;
+  }
+  function forgeLoop() {
+    forgeFrame = 0;
+    if (current !== 'forge') return;
+    forgeControls.update();
+    forgeRenderer.render(forgeScene, forgeCamera); // small scene; render every frame for live gizmos
+    forgeFrame = requestAnimationFrame(forgeLoop);
+  }
+  function bootForge(host) {
+    forgeHost = host;
+    if (!forgeRenderer) {
+      forgeRenderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      forgeRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+      forgeRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+      forgeRenderer.toneMappingExposure = 1.15;
+      forgeScene = new THREE.Scene(); forgeScene.background = new THREE.Color('#25262b');
+      forgeCamera = new THREE.PerspectiveCamera(43, 1, 0.05, 300); forgeCamera.position.set(2.6, 2, 3.2);
+      forgeControls = new OrbitControls(forgeCamera, forgeRenderer.domElement);
+      forgeControls.target.set(0, 1, 0); forgeControls.enableDamping = true;
+      forgeScene.add(new THREE.HemisphereLight('#fff4dc', '#536079', 2.2));
+      const key = new THREE.DirectionalLight('#ffe5c2', 2.6); key.position.set(4, 7, 5); forgeScene.add(key);
+      const rim = new THREE.DirectionalLight('#86aeff', 1.6); rim.position.set(-5, 3, -4); forgeScene.add(rim);
+      forgeScene.add(new THREE.GridHelper(10, 10, '#666b76', '#363b45'));
+      forgeRenderer.domElement.setAttribute('aria-label', 'Character Forge 3D preview');
+      forgeTcontrols = new TransformControls(forgeCamera, forgeRenderer.domElement);
+      forgeTcontrols.enabled = false;
+      forgeTcontrols.addEventListener('dragging-changed', e => { forgeControls.enabled = !e.value; if (!e.value) forgeSyncGizmo(); });
+      forgeTcontrols.addEventListener('objectChange', () => forgeSyncGizmo(true));
+      forgeScene.add(forgeTcontrols);
+      let pointerStart = null;
+      forgeRenderer.domElement.addEventListener('pointerdown', e => { pointerStart = [e.clientX, e.clientY]; });
+      forgeRenderer.domElement.addEventListener('pointerup', e => {
+        if (!pointerStart || Math.hypot(e.clientX - pointerStart[0], e.clientY - pointerStart[1]) > 6 || !forgeGroup) return;
+        if (forgeTcontrols.axis) return; // grabbed a gizmo handle, not the scene
+        const rect = forgeRenderer.domElement.getBoundingClientRect();
+        const ray = new THREE.Raycaster();
+        ray.setFromCamera(new THREE.Vector2((e.clientX - rect.left) / rect.width * 2 - 1, -(e.clientY - rect.top) / rect.height * 2 + 1), forgeCamera);
+        const hits = ray.intersectObjects(forgeGroup.children, true);
+        const hit = hits.find(h => h.object.userData.boneId || h.object.name?.startsWith('fpart:'));
+        if (!hit) return;
+        if (hit.object.userData.boneId) { forgeSelect('bone', hit.object.userData.boneId); renderForgeInspector(); renderForgeLists(); }
+        else { forgeSelect('part', hit.object.name.slice(6)); renderForgeInspector(); renderForgeLists(); }
+      });
+    }
+    forgeResizeObserver ||= new ResizeObserver(forgeResize);
+    forgeResizeObserver.disconnect(); forgeResizeObserver.observe(host);
+    host.append(forgeRenderer.domElement); forgeResize(); forgeRefresh();
+    if (!forgeFrame) forgeLoop();
+  }
+  // write gizmo drags back into the draft (parts: definition; bones: preview pose)
+  function forgeSyncGizmo(live = false) {
+    if (forgeSel.kind === 'part') {
+      const part = forgeEnsureDraft().parts.find(p => p.id === forgeSel.id);
+      let mesh = null;
+      forgeGroup?.traverse(m => { if (m.name === 'fpart:' + forgeSel.id) mesh = m; });
+      if (part && mesh) {
+        part.pos = mesh.position.toArray().map(v => Math.round(v * 1000) / 1000);
+        if (!live) change();
+      }
+    } else if (forgeSel.kind === 'bone') {
+      const node = boneNodes().get(forgeSel.id);
+      if (node) {
+        const d = r => Math.round(THREE.MathUtils.radToDeg(r) * 10) / 10;
+        forgePose[forgeSel.id] = [d(node.rotation.x), d(node.rotation.y), d(node.rotation.z)];
+        if (!live) { change(); renderForgeInspector(); } // keep sliders in sync after a drag
+      }
+    }
+  }
+  function forge() {
+    const el = root('forge');
+    heading(el, 'CHARACTER FORGE', 'Build custom characters, bone by bone.', 'Add bones and attach parts to them, pose the rig, then save the character to your Cast and place it in any shot. The humanoid template works with the motion presets.');
+    const layout = node('div', 'design-layout'); el.append(layout);
+    const left = panel(layout, 'Character & rig'), center = node('div', 'design-preview'), right = panel(layout, 'Inspector');
+    layout.append(center); layout.append(right);
+    const draft = forgeEnsureDraft();
+    field(left, 'Character name', draft.name, v => { draft.name = v; change(); });
+    select(left, 'Start from', '', [['', 'Choose…'], ['humanoid', 'Humanoid template (preset-ready)'], ['blank', 'Blank character']], kind => {
+      if (!kind) return;
+      if ((draft.bones.length > 1 || draft.parts.length > 1) && !confirm('Replace the current forge draft? Save it to your Cast first to keep it.')) return;
+      const fresh = kind === 'humanoid' ? humanoidTemplate() : blankCharacter();
+      s().forgeDraft = { ...fresh, name: draft.name, assetId: '' };
+      forgePose = {}; forgeSel = { kind: '', id: '' };
+      change(); forge();
+    });
+    const addRow = node('div', 'studio-toolbar');
+    const typeSel = select(left, 'Part type', 'box', FORGE_PART_TYPES.map(t => [t, t[0].toUpperCase() + t.slice(1)]), () => {});
+    addRow.append(button('Add part', () => {
+      const d = forgeEnsureDraft();
+      if (d.parts.length >= 200) { api.toast('A character supports up to 200 parts'); return; }
+      const part = newForgePart(typeSel.value, forgeSel.kind === 'bone' ? forgeSel.id : (d.bones[0]?.id ?? null));
+      part.name = part.type[0].toUpperCase() + part.type.slice(1) + ' ' + (d.parts.length + 1);
+      d.parts.push(part);
+      change(); forgeRefresh(); renderForgeLists(); forgeSelect('part', part.id); renderForgeInspector();
+    }, true));
+    left.append(addRow);
+    left.append(button('Add bone (child of selection)', () => {
+      const d = forgeEnsureDraft();
+      if (d.bones.length >= 64) { api.toast('A character supports up to 64 bones'); return; }
+      const bone = newBone('Bone ' + (d.bones.length + 1), forgeSel.kind === 'bone' ? forgeSel.id : (d.bones[0]?.id ?? null));
+      d.bones.push(bone);
+      change(); forgeRefresh(); renderForgeLists(); forgeSelect('bone', bone.id); renderForgeInspector();
+    }));
+    const boneList = node('div', 'model-parts'); left.append(boneList);
+    const partList = node('div', 'model-parts'); left.append(partList);
+    left.append(button('Frame character', () => {
+      if (!forgeGroup) return;
+      const box = new THREE.Box3().setFromObject(forgeGroup);
+      if (box.isEmpty()) return;
+      const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+      const dist = Math.max(size.x, size.y, size.z, 1) * 2.2;
+      forgeControls.target.copy(c);
+      forgeCamera.position.copy(c).add(new THREE.Vector3(dist, dist * 0.6, dist));
+      forgeControls.update();
+    }));
+    const saveForge = (copy = false) => {
+      try {
+        const clean = validateCharacter(draft);
+        const id = copy ? '' : (draft.assetId || '');
+        const char = { ...clean, id: id || makeId('char') };
+        const existing = p().characters.findIndex(c => c.id === char.id);
+        if (existing >= 0) p().characters[existing] = char; else p().characters.push(char);
+        if (copy) { draft.assetId = ''; api.toast('Copy saved to Cast'); }
+        else { draft.assetId = char.id; api.toast('Character saved to Cast — place it from Scene or Assets'); }
+        change();
+      } catch (e) { api.toast(e.message); }
+    };
+    left.append(button('Save to Cast', () => saveForge(false), true));
+    left.append(button('Save a separate copy', () => saveForge(true)));
+    left.append(button('Place in current shot', () => {
+      try {
+        const clean = validateCharacter(draft);
+        const id = draft.assetId || '';
+        let char = p().characters.find(c => c.id === id && c.kind === 'forge');
+        if (!char) { char = { ...clean, id: id || makeId('char') }; p().characters.push(char); draft.assetId = char.id; }
+        else Object.assign(char, clean);
+        change(); api.placeCharacter(char); api.toast('Character placed in the current shot');
+      } catch (e) { api.toast(e.message); }
+    }));
+    const exportBtn = button('Export character JSON', () => {
+      try { downloadJSON({ format: 'videocraft.character.v1', character: validateCharacter(draft) }, draft.name.replace(/[^a-z0-9-_]/gi, '_') + '.character.json'); }
+      catch (e) { api.toast(e.message); }
+    });
+    const importInput = node('input'); importInput.type = 'file'; importInput.accept = '.json'; importInput.hidden = true;
+    importInput.setAttribute('aria-label', 'Import character JSON');
+    importInput.addEventListener('change', async () => {
+      const file = importInput.files[0]; if (!file) return;
+      try {
+        if (file.size > 2000000) throw new Error('Character JSON must be smaller than 2 MB');
+        const data = JSON.parse(await file.text());
+        const clean = validateCharacter(data.character || data);
+        if ((draft.bones.length > 1 || draft.parts.length > 1) && !confirm('Replace the current forge draft?')) return;
+        s().forgeDraft = { ...clean, assetId: '' };
+        forgePose = {}; forgeSel = { kind: '', id: '' };
+        change(); forge();
+      } catch (e) { api.toast('Import failed: ' + e.message); }
+      importInput.value = '';
+    });
+    left.append(button('Import character JSON', () => importInput.click()), exportBtn, importInput);
+    left.append(button('Browse asset library', () => open('assets')));
+
+    function renderForgeLists() {
+      const d = forgeEnsureDraft();
+      boneList.replaceChildren(node('div', 'studio-kicker', 'BONES'));
+      d.bones.forEach(bone => {
+        const b = button(bone.name + (forgePose[bone.id]?.some(v => Math.abs(v) > 0.5) ? ' ·posed' : ''), () => {
+          forgeSelect('bone', bone.id); renderForgeLists(); renderForgeInspector();
+        });
+        b.classList.toggle('selected-part', forgeSel.kind === 'bone' && forgeSel.id === bone.id);
+        boneList.append(b);
+      });
+      partList.replaceChildren(node('div', 'studio-kicker', 'PARTS'));
+      d.parts.forEach(part => {
+        const b = button(part.name, () => { forgeSelect('part', part.id); renderForgeLists(); renderForgeInspector(); });
+        b.classList.toggle('selected-part', forgeSel.kind === 'part' && forgeSel.id === part.id);
+        partList.append(b);
+      });
+    }
+    function renderForgeInspector() {
+      const d = forgeEnsureDraft();
+      right.replaceChildren(node('h3', '', 'Inspector'));
+      if (forgeSel.kind === 'part') {
+        const part = d.parts.find(p => p.id === forgeSel.id);
+        if (!part) { right.append(node('p', 'studio-muted', 'Select a part or bone in the preview or lists.')); return; }
+        const changed = () => { change(); forgeRefresh(); };
+        field(right, 'Part name', part.name, v => { part.name = v; change(); renderForgeLists(); });
+        select(right, 'Attached bone', part.bone ?? '', [['', 'None (root)'], ...d.bones.map(b => [b.id, b.name])], v => { part.bone = v || null; changed(); });
+        for (const [key, label, min, max] of [['pos', 'Offset', -50, 50], ['rot', 'Rotation', -360, 360], ['scale', 'Size', 0.02, 50]]) {
+          const row = node('div', 'design-axes'); right.append(row);
+          ['X', 'Y', 'Z'].forEach((axis, i) => field(row, label + ' ' + axis, part[key][i], v => {
+            const n = Number(v); if (!Number.isFinite(n)) return;
+            part[key][i] = Math.max(min, Math.min(max, n)); changed();
+          }, { type: 'number', min, max, step: key === 'rot' ? 1 : 0.05 }));
+        }
+        field(right, 'Colour', part.color, v => { part.color = v; changed(); }, { type: 'color' });
+        for (const key of ['roughness', 'metalness']) field(right, key === 'roughness' ? 'Roughness' : 'Metalness', part[key], v => {
+          part[key] = Math.max(0, Math.min(1, Number(v) || 0)); changed();
+        }, { type: 'number', min: 0, max: 1, step: 0.05 });
+        right.append(node('p', 'studio-muted', 'Drag the arrows in the preview to move this part.'));
+        right.append(button('Duplicate part', () => {
+          if (d.parts.length >= 200) return;
+          const copy = structuredClone(part); copy.id = makeId('fpart'); copy.name += ' copy'; copy.pos[0] += 0.25;
+          d.parts.push(copy); change(); forgeRefresh(); renderForgeLists(); forgeSelect('part', copy.id); renderForgeInspector();
+        }), button('Remove part', () => {
+          d.parts = d.parts.filter(p => p.id !== part.id);
+          forgeSel = { kind: '', id: '' };
+          change(); forgeRefresh(); renderForgeLists(); renderForgeInspector();
+        }));
+      } else if (forgeSel.kind === 'bone') {
+        const bone = d.bones.find(b => b.id === forgeSel.id);
+        if (!bone) { right.append(node('p', 'studio-muted', 'Select a part or bone.')); return; }
+        const changed = () => { change(); forgeRefresh(); };
+        field(right, 'Bone name', bone.name, v => { bone.name = v; change(); renderForgeLists(); });
+        const banned = forgeDescendantIds(bone.id, d); // reparenting into your own subtree would create a cycle
+        select(right, 'Parent bone', bone.parent ?? '', [['', 'None (root)'], ...d.bones.filter(b => !banned.has(b.id)).map(b => [b.id, b.name])], v => {
+          if (v === bone.id) return;
+          bone.parent = v || null; changed();
+        });
+        const row = node('div', 'design-axes'); right.append(row);
+        ['X', 'Y', 'Z'].forEach((axis, i) => field(row, 'Rest offset ' + axis, bone.pos[i], v => {
+          const n = Number(v); if (!Number.isFinite(n)) return;
+          bone.pos[i] = Math.max(-50, Math.min(50, n)); changed();
+        }, { type: 'number', min: -50, max: 50, step: 0.05 }));
+        right.append(node('div', 'studio-kicker', 'PREVIEW POSE (not saved)'));
+        const pose = forgePose[bone.id] ||= [0, 0, 0];
+        ['X', 'Y', 'Z'].forEach((axis, i) => field(right, 'Rotate ' + axis, pose[i], v => {
+          const n = Number(v); if (!Number.isFinite(n)) return;
+          pose[i] = Math.max(-180, Math.min(180, n));
+          const node = boneNodes().get(bone.id);
+          if (node) node.rotation.set(pose[0] * Math.PI / 180, pose[1] * Math.PI / 180, pose[2] * Math.PI / 180);
+        }, { type: 'number', min: -180, max: 180, step: 1 }));
+        right.append(node('p', 'studio-muted', 'Drag the rings in the preview to pose this bone. Poses are preview only — keyframe bones in Animate.'));
+        right.append(button('Reset bone pose', () => {
+          delete forgePose[bone.id];
+          const node = boneNodes().get(bone.id);
+          if (node) node.rotation.set(0, 0, 0);
+          renderForgeInspector(); renderForgeLists();
+        }), button('Remove bone', () => {
+          if (d.bones.length <= 1) { api.toast('A character needs at least one bone'); return; }
+          const orphanParent = bone.parent;
+          d.bones = d.bones.filter(b => b.id !== bone.id);
+          d.parts.forEach(part => { if (part.bone === bone.id) part.bone = orphanParent ?? d.bones[0].id; });
+          // children of the removed bone move to its parent
+          d.bones.forEach(b => { if (b.parent === bone.id) b.parent = orphanParent ?? null; });
+          forgeSel = { kind: '', id: '' };
+          change(); forgeRefresh(); renderForgeLists(); renderForgeInspector();
+        }));
+      } else {
+        right.append(node('p', 'studio-muted', 'Select a part or bone in the 3D preview or in the lists. Parts: drag arrows to move. Bones: drag rings to pose.'));
+        right.append(button('Reset all pose', () => {
+          forgePose = {};
+          for (const [, node] of boneNodes()) node.rotation.set(0, 0, 0);
+          renderForgeLists();
+        }));
+      }
+    }
+    // lets other workspaces (Cast, Assets) push a saved character into the forge draft
+    window.__loadForgeCharacter = char => {
+      s().forgeDraft = { name: char.name, assetId: char.id, bones: structuredClone(char.bones), parts: structuredClone(char.parts) };
+      forgePose = {}; forgeSel = { kind: '', id: '' };
+      change(); forge(); // full re-render so every handler captures the new draft
+    };
+    renderForgeLists(); renderForgeInspector(); bootForge(center);
+  }
+
+  const renderers = { plan: planning, design, assets, board: storyboard, sound, delivery, forge };
   return {
     render(ws) {
       current = ws;
       if (ws !== 'design' && designFrame) { cancelAnimationFrame(designFrame); designFrame = 0; }
+      if (ws !== 'forge' && forgeFrame) { cancelAnimationFrame(forgeFrame); forgeFrame = 0; forgeTcontrols?.detach(); }
       const audio = document.getElementById('movie-audio-tools'), output = document.getElementById('movie-export-tools');
       // Move the SAME controls, preserving event handlers and user selections.
       document.getElementById('anim-audio-home').append(audio);
@@ -372,5 +716,6 @@ export function createStudioWorkspaces(api) {
       if (ws === 'sound') document.getElementById('sound-controls').append(audio);
       if (ws === 'delivery') document.getElementById('delivery-controls').append(output);
     },
+    open: tab => api.workspace(tab),
   };
 }

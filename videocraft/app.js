@@ -9,6 +9,10 @@ import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, mod
 import { buildModel } from './models.js';
 import { defaultLook, GRADES, createLookEngine } from './effects.js';
 import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
+import { boneJoints, isPresetCompatible } from './charcraft.js';
+import { buildCharacterGroup, sketchCharacter } from './charbuild.js';
+import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './cutscene.js';
+import { createCutsceneOverlay } from './overlay.js';
 
 installWorkspaceShell();
 let studioWorkspaces = null;
@@ -74,6 +78,10 @@ function migrateProject(data) {
     if (!s.name) s.name = 'Shot';
     // pin legacy/null camera bases so every shot has deterministic framing
     if (!s.camera) s.camera = cameraBaseSnapshot();
+    // cutscene events & transitions (additive v2.1)
+    if (!Array.isArray(s.events)) s.events = [];
+    if (!s.transition || !TRANSITIONS.some(([v]) => v === s.transition)) s.transition = 'cut';
+    if (!Number.isFinite(Number(s.transitionDur)) || s.transitionDur < 0.05) s.transitionDur = 0.5;
   });
   data.version = 2;
   data.name = data.name || 'Untitled movie';
@@ -306,6 +314,68 @@ function syncShotControls() {
   if (fpsOut) fpsOut.textContent = project.fps;
   const fpsIn = document.getElementById('anim-fps');
   if (fpsIn) fpsIn.value = project.fps;
+  renderEventsPanel();
+}
+/* ---- cutscene events & shot transitions ---- */
+function renderEventsPanel() {
+  const panel = document.getElementById('events-panel');
+  if (!panel) return;
+  const shot = activeShot();
+  panel.innerHTML = '';
+  if (!shot) { panel.innerHTML = '<div class="empty-note">No shot selected.</div>'; return; }
+  shot.events = Array.isArray(shot.events) ? shot.events : [];
+  const refresh = () => { markDirty(); renderEventsPanel(); evaluateAt(animTime); };
+  labeledSelect(panel, 'Transition', TRANSITIONS, shot.transition || 'cut', v => { shot.transition = v; refresh(); });
+  const durHolder = { transitionDur: shot.transitionDur ?? 0.5 };
+  panel.appendChild(mkNum('Fade length (s)', durHolder, 'transitionDur', v => {
+    shot.transitionDur = Math.max(0.05, v); markDirty(); evaluateAt(animTime);
+  }, 0.05, 5, 0.05));
+  if (shot.transition === 'fade') panel.appendChild(Object.assign(document.createElement('div'), { className: 'empty-note', textContent: 'Shot fades in from black over the fade length. For a fade-through-black between shots, add a Fade out at the end of the previous shot.' }));
+  const addBar = document.createElement('div'); addBar.className = 'studio-toolbar'; addBar.style.flexWrap = 'wrap';
+  EVENT_TYPES.forEach(type => {
+    const b = document.createElement('button'); b.className = 'btn'; b.textContent = '+ ' + (EVENT_LABELS[type] || type);
+    b.addEventListener('click', () => {
+      const e = newEvent(type, Math.max(0, Math.min(animTime, Math.max(0, shot.duration - 0.2))), type === 'fadein' || type === 'fadeout' ? 1 : 2);
+      shot.events.push(e); refresh();
+    });
+    addBar.appendChild(b);
+  });
+  panel.appendChild(addBar);
+  if (!shot.events.length) { panel.appendChild(Object.assign(document.createElement('div'), { className: 'empty-note', textContent: 'No events yet. Titles, subtitles, fades, cinema bars and camera shake are evaluated from the shot timeline — they render in exports too.' })); return; }
+  shot.events.forEach((ev, idx) => {
+    const card = document.createElement('div'); card.className = 'studio-stack'; card.style.gap = '4px';
+    const head = document.createElement('div'); head.className = 'field-row';
+    const name = document.createElement('strong'); name.textContent = EVENT_LABELS[ev.type] || ev.type;
+    const rm = document.createElement('button'); rm.className = 'mini'; rm.textContent = '✕'; rm.title = 'Remove event';
+    rm.addEventListener('click', () => { shot.events.splice(idx, 1); refresh(); });
+    head.append(name, rm); card.appendChild(head);
+    const tHolder = { start: ev.start, duration: ev.duration };
+    card.appendChild(mkNum('Start (s)', tHolder, 'start', v => { ev.start = Math.max(0, v); markDirty(); evaluateAt(animTime); }, 0, shot.duration, 0.1));
+    card.appendChild(mkNum('Length (s)', tHolder, 'duration', v => { ev.duration = Math.max(0.1, v); markDirty(); evaluateAt(animTime); }, 0.1, shot.duration, 0.1));
+    if (ev.type === 'title' || ev.type === 'subtitle') {
+      const mkText = (label, key, max) => {
+        const row = document.createElement('div'); row.className = 'field-row';
+        const l = document.createElement('label'); l.textContent = label;
+        const input = document.createElement('input'); input.type = 'text'; input.maxLength = max; input.value = ev[key] || '';
+        input.addEventListener('input', () => { ev[key] = input.value; markDirty(); evaluateAt(animTime); });
+        row.append(l, input); card.appendChild(row);
+      };
+      mkText('Text', 'text', 300);
+      mkText('Speaker', 'speaker', 60);
+    }
+    if (ev.type === 'fadein' || ev.type === 'fadeout') {
+      const row = document.createElement('div'); row.className = 'field-row';
+      const l = document.createElement('label'); l.textContent = 'Color';
+      const color = document.createElement('input'); color.type = 'color'; color.value = ev.color || '#000000';
+      color.addEventListener('input', () => { ev.color = color.value; markDirty(); evaluateAt(animTime); });
+      row.append(l, color); card.appendChild(row);
+    }
+    if (ev.type === 'shake') {
+      const sHolder = { strength: ev.strength };
+      card.appendChild(mkNum('Strength', sHolder, 'strength', v => { ev.strength = Math.max(0, Math.min(1, v)); markDirty(); evaluateAt(animTime); }, 0, 1, 0.05));
+    }
+    panel.appendChild(card);
+  });
 }
 function fmtDur(d) {
   d = Math.max(0, d);
@@ -781,6 +851,7 @@ function drawCharPreview() {
     charCtx.fillText('Create a character to start', CHAR_W / 2, CHAR_H / 2);
     return;
   }
+  if (rig.kind === 'forge') { sketchCharacter(charCtx, rig, CHAR_W / 2, CHAR_H - 40, 1); return; }
   // figure top at y=60; total height ~ head(0..~52*2)+torso 120+legs 96+feet ≈ 380
   renderRig(charCtx, rig, CHAR_W / 2, 60, 1);
   drawPivotHandles(rig);
@@ -808,7 +879,7 @@ function pivotPos(rig, key) {
 // drag near a pivot rotates that part
 let charDrag = null;
 charCanvas.addEventListener('pointerdown', e => {
-  const rig = currentRig(); if (!rig) return;
+  const rig = currentRig(); if (!rig || rig.kind === 'forge') return;
   const r = charCanvas.getBoundingClientRect();
   const mx = (e.clientX - r.left) * (CHAR_W / r.width), my = (e.clientY - r.top) * (CHAR_H / r.height);
   let best = null, bd = 46;
@@ -845,11 +916,13 @@ function renderCharList() {
     b.className = 'char-card' + (c.id === currentCharId ? ' active' : '');
     const img = document.createElement('canvas'); img.width = 44; img.height = 44;
     const ic = img.getContext('2d');
-    ic.save(); ic.translate(22, 4); ic.scale(0.09, 0.09);
-    renderRig(ic, c, 0, 0, 1); ic.restore();
+    ic.save();
+    if (c.kind === 'forge') sketchCharacter(ic, c, 22, 40, 0.5);
+    else { ic.translate(22, 4); ic.scale(0.09, 0.09); renderRig(ic, c, 0, 0, 1); }
+    ic.restore();
     b.appendChild(img);
     const meta = document.createElement('div'); meta.className = 'meta';
-    meta.innerHTML = `<div class="name">${esc(c.name)}</div><div class="sub">${Object.values(c.pivots).some(v => Math.abs(v) > 15) ? 'posed' : 'idle rig'}</div>`;
+    meta.innerHTML = `<div class="name">${esc(c.name)}</div><div class="sub">${c.kind === 'forge' ? 'forge rig · ' + c.bones.length + ' bones' : Object.values(c.pivots).some(v => Math.abs(v) > 15) ? 'posed' : 'idle rig'}</div>`;
     b.appendChild(meta);
     b.addEventListener('click', () => { currentCharId = c.id; renderCharList(); drawCharPreview(); renderCharProps(); });
     list.appendChild(b);
@@ -873,6 +946,21 @@ function renderCharProps() {
   const rig = currentRig();
   charPropsPanel.innerHTML = '';
   if (!rig) { charPropsPanel.innerHTML = '<div class="empty-note">No character selected.</div>'; return; }
+  if (rig.kind === 'forge') {
+    const note = document.createElement('div'); note.className = 'empty-note';
+    note.textContent = 'Forge character — ' + rig.bones.length + ' bones, ' + rig.parts.length + ' parts. Edit its rig in the Forge workspace.';
+    charPropsPanel.appendChild(note);
+    const editBtn = document.createElement('button'); editBtn.className = 'btn'; editBtn.textContent = 'Edit in Forge';
+    editBtn.addEventListener('click', () => {
+      studioWorkspaces.open('forge');
+      if (typeof window.__loadForgeCharacter === 'function') window.__loadForgeCharacter(rig);
+    });
+    charPropsPanel.appendChild(editBtn);
+    const placeBtn = document.createElement('button'); placeBtn.className = 'btn'; placeBtn.textContent = 'Add actor to current shot';
+    placeBtn.addEventListener('click', () => { addCharacterObject(rig); toast('Actor added to current shot'); });
+    charPropsPanel.appendChild(placeBtn);
+    return;
+  }
   if (charTab === 'body') {
     addSlider('Head size', 30, 70, rig.headR, v => { rig.headR = v; });
     addSlider('Torso width', 60, 130, rig.torsoW, v => { rig.torsoW = v; });
@@ -1197,7 +1285,9 @@ function build3DObject(o) {
     group.userData.redraw = () => { plane.material.map = textTexture(o.text, o.color); plane.material.needsUpdate = true; };
   } else if (o.type === 'character') {
     const rig = project.characters.find(c => c.id === o.assetId);
-    if (rig && o.rigMode === '3d') {
+    if (rig && rig.kind === 'forge') {
+      group.add(buildCharacterGroup(rig)); // custom forge rig (rigid parts on a bone hierarchy)
+    } else if (rig && o.rigMode === '3d') {
       group.add(buildAvatar(rig));
     } else if (rig) {
       const plane = makeMesh(new THREE.PlaneGeometry(2.6, 2.6), new THREE.MeshStandardMaterial({ map: rigTexture(rig), transparent: true, side: THREE.DoubleSide, roughness: 0.85, alphaTest: 0.02 }));
@@ -1484,7 +1574,7 @@ function renderSceneList() {
     const chip = document.createElement('span'); chip.className = 'chip';
     if (o.type === 'character') {
       const rig = project.characters.find(c => c.id === o.assetId);
-      if (rig) { const c = document.createElement('canvas'); c.width = c.height = 22; const ic = c.getContext('2d'); ic.save(); ic.translate(11, 0); ic.scale(0.045, 0.045); renderRig(ic, rig, 0, 0, 1); ic.restore(); chip.appendChild(c); }
+      if (rig) { const c = document.createElement('canvas'); c.width = c.height = 22; const ic = c.getContext('2d'); ic.save(); if (rig.kind === 'forge') { sketchCharacter(ic, rig, 11, 20, 7); } else { ic.translate(11, 0); ic.scale(0.045, 0.045); renderRig(ic, rig, 0, 0, 1); } ic.restore(); chip.appendChild(c); }
     } else if (o.type === 'drawing') {
       const d = project.drawings.find(x => x.id === o.assetId);
       if (d) { const i = new Image(); i.src = d.dataURL; i.style.objectFit = 'contain'; chip.appendChild(i); }
@@ -1698,7 +1788,12 @@ const CAM_CHANNELS = [
 ];
 function channelsFor(o) {
   if (o?.type === 'camera') return CAM_CHANNELS;
-  if (o?.rigMode === '3d') return [...CHANNELS, ...JOINTS.flatMap(j => ['x', 'y', 'z'].map(a => ({ ch: 'joint.' + j + '.' + a, label: j + ' ' + a.toUpperCase() })))];
+  if (o?.rigMode === '3d' || o?.type === 'character') {
+    // forge characters expose their own bones as joint channels
+    const char = o.assetId ? project.characters.find(c => c.id === o.assetId) : null;
+    const joints = char?.kind === 'forge' ? boneJoints(char) : JOINTS.map(j => ({ id: j, label: j.replace(/([A-Z])/g, ' $1') }));
+    return [...CHANNELS, ...joints.flatMap(j => ['x', 'y', 'z'].map(a => ({ ch: 'joint.' + j.id + '.' + a, label: j.label + ' ' + a.toUpperCase() })))];
+  }
   return CHANNELS;
 }
 function objChannelValue(o, ch, t) {
@@ -2160,7 +2255,27 @@ function tick(now) {
     lightHelpers.forEach(h => h.visible = false);
   }
   drawAxisBadge();
+  renderFinalFrame(true);
+}
+/* ---- cutscene overlay: deterministic titles/fades/bars, drawn over the final frame ---- */
+const cutsceneOverlay = createCutsceneOverlay();
+function renderFinalFrame(shakeEnabled, t = animTime) {
+  const shot = activeShot();
+  const state = evalShotOverlay(shot, t);
+  const showOverlay = activeWs === 'anim' || moviePlaying || recMode || playing;
+  let off = null;
+  if (shakeEnabled && state.shake > 0.001 && (moviePlaying || recMode)) off = shakeOffset(state.shake, t);
+  if (off) {
+    // shake: apply the offset, render, then restore the full camera transform
+    const pos = camera.position.clone(), quat = camera.quaternion.clone();
+    camera.position.set(pos.x + off[0], pos.y + off[1], pos.z + off[2]);
+    camera.lookAt(controls.target);
+    try { lookEngine.render(); if (showOverlay) cutsceneOverlay.render(renderer, state); }
+    finally { camera.position.copy(pos); camera.quaternion.copy(quat); camera.updateMatrixWorld(); }
+    return;
+  }
   lookEngine.render();
+  if (showOverlay) cutsceneOverlay.render(renderer, state);
 }
 const axisCanvas = document.getElementById('axis-badge');
 const axisCtx = axisCanvas.getContext('2d');
@@ -2502,8 +2617,9 @@ async function exportMovie() {
 
     // pre-roll: show shot 1 at t=0 so the recording starts on a real frame
     applyShotPlayback(project.shots[0].id);
+    animTime = 0;
     evaluateAt(0);
-    lookEngine.render();
+    renderFinalFrame(true, 0);
 
     mediaRecorder.start(1000);
     recMode = true;
@@ -2655,7 +2771,7 @@ async function exportOfflineMovie() {
       const hit = shotAtGlobal(time);
       if (project.activeShotId !== hit.shot.id) applyShotPlayback(hit.shot.id);
       animTime = hit.local; movieTime = time; evaluateAt(animTime);
-      camera.lookAt(controls.target); lookEngine.render();
+      camera.lookAt(controls.target); renderFinalFrame(true, hit.local);
       const videoFrame = new VideoFrame(renderer.domElement, { timestamp: Math.round(frame * 1e6 / fps), duration: Math.round(1e6 / fps) });
       try { encoder.encode(videoFrame, { keyFrame: frame % (fps * 2) === 0 }); } finally { videoFrame.close(); }
       framesWritten++;
@@ -2851,10 +2967,17 @@ function labeledSelect(panel, label, options, value, onChange) {
   wrap.append(title, select); panel.appendChild(wrap); return select;
 }
 function renderActorControls(panel, o) {
+  const forgeChar = o.assetId ? project.characters.find(c => c.id === o.assetId && c.kind === 'forge') : null;
   const badge = document.createElement('div'); badge.className = 'rig-badge';
-  badge.textContent = o.rigMode === '3d' ? '3D avatar · 19 bones · weighted skin' : 'Legacy 2D character';
+  if (forgeChar) badge.textContent = 'Forge character · custom rig · ' + forgeChar.bones.length + ' bones · ' + forgeChar.parts.length + ' parts';
+  else badge.textContent = o.rigMode === '3d' ? '3D avatar · 19 bones · weighted skin' : 'Legacy 2D character';
   panel.appendChild(badge);
-  if (o.rigMode !== '3d') {
+  if (forgeChar && !isPresetCompatible(forgeChar)) {
+    const note = document.createElement('p'); note.className = 'studio-muted';
+    note.textContent = 'Custom bone names — motion presets are off for this rig. Keyframe its bones in Animate instead.';
+    panel.appendChild(note);
+  }
+  if (!forgeChar && o.rigMode !== '3d') {
     const upgrade = document.createElement('button'); upgrade.className = 'btn'; upgrade.textContent = 'Upgrade this actor to 3D';
     upgrade.addEventListener('click', () => {
       o.rigMode = '3d'; o.pos[1] = Math.max(0, o.pos[1] - 1.3);
@@ -2864,6 +2987,7 @@ function renderActorControls(panel, o) {
     panel.appendChild(upgrade); return;
   }
   const motion = o.motion ||= { clip: 'none', speed: 1 };
+  if (!forgeChar || isPresetCompatible(forgeChar))
   labeledSelect(panel, 'Motion preset', MOTIONS.map(m => [m, m[0].toUpperCase() + m.slice(1)]), motion.clip, v => {
     motion.clip = v; motion.speed = v === 'run' ? 2.3 : v === 'walk' ? 1.3 : 1;
     markDirty(); evaluateAt(animTime); renderSceneProps(); renderAnimObjectSelect();
@@ -2881,7 +3005,8 @@ function renderActorControls(panel, o) {
   const summary = document.createElement('summary'); summary.textContent = 'Joint posing & keyframes';
   const body = document.createElement('div'); body.className = 'joint-editor';
   details.append(summary, body); panel.appendChild(details);
-  let joint = JOINTS[0];
+  const jointDefs = forgeChar ? boneJoints(forgeChar) : JOINTS.map(j => ({ id: j, label: j.replace(/([A-Z])/g, ' $1') }));
+  let joint = jointDefs[0].id;
   const controlsPanel = document.createElement('div'); controlsPanel.className = 'joint-editor';
   const drawJoint = () => {
     controlsPanel.innerHTML = '';
@@ -2892,11 +3017,13 @@ function renderActorControls(panel, o) {
       }, -180, 180, 1));
     }
   };
-  labeledSelect(body, 'Joint', JOINTS.map(j => [j, j.replace(/([A-Z])/g, ' $1')]), joint, v => { joint = v; drawJoint(); });
+  labeledSelect(body, 'Joint', jointDefs.map(j => [j.id, j.label]), joint, v => { joint = v; drawJoint(); });
   body.appendChild(controlsPanel); drawJoint();
   const keyBtn = document.createElement('button'); keyBtn.className = 'btn'; keyBtn.textContent = 'Key this joint at playhead';
   keyBtn.addEventListener('click', () => {
-    const kf = project.keyframes[o.id] ||= {}, bone = objectGroups.get(o.id)?.children[0]?.userData.bones?.[joint];
+    const bones = objectGroups.get(o.id)?.children[0]?.userData.bones;
+    const bone = bones instanceof Map ? bones.get(joint) : bones?.[joint];
+    const kf = project.keyframes[o.id] ||= {};
     for (const axis of ['x', 'y', 'z']) {
       const ch = 'joint.' + joint + '.' + axis, key = joint + '.' + axis;
       const value = o.joints?.[key] ?? (bone ? THREE.MathUtils.radToDeg(bone.rotation[axis]) : 0);

@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { defaultStudio, normalizeStudio, validateModel, newPart, modelTemplate, modelInstance, hasProductionWork, PRODUCTION_TABS } from '../production.js';
 
-test('six distinct production workspaces extend the original four', () => {
-  assert.equal(PRODUCTION_TABS.length, 6); assert.equal(new Set(PRODUCTION_TABS).size, 6);
+test('seven distinct production workspaces extend the original four', () => {
+  assert.equal(PRODUCTION_TABS.length, 7); assert.equal(new Set(PRODUCTION_TABS).size, 7);
+  assert.ok(PRODUCTION_TABS.includes('forge'));
 });
 test('old projects get independent empty production data', () => {
   const a = normalizeStudio(undefined), b = normalizeStudio(null);

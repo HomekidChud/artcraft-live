@@ -1,6 +1,7 @@
 // Renderer-independent, additive production workspace data.
+import { validateCharacter } from './charcraft.js';
 export const PART_TYPES = ['box', 'sphere', 'cylinder', 'cone', 'torus'];
-export const PRODUCTION_TABS = ['plan', 'design', 'assets', 'board', 'sound', 'delivery'];
+export const PRODUCTION_TABS = ['plan', 'design', 'assets', 'board', 'sound', 'delivery', 'forge'];
 const text = (v, fallback = '') => typeof v === 'string' ? v.slice(0, 1000000) : fallback;
 const number = (v, fallback, min, max) => Number.isFinite(Number(v)) ? Math.max(min, Math.min(max, Number(v))) : fallback;
 const vector = (value, fallback, min, max) => fallback.map((v, i) => number(value?.[i], v, min, max));
@@ -27,6 +28,7 @@ export function defaultStudio() {
   return {
     plan: { logline: '', synopsis: '', genre: 'Adventure', audience: '', stage: 'Development', script: '', tasks: [] },
     models: [], draft: { name: 'Untitled model', parts: [] }, shotNotes: {}, soundNotes: '',
+    forgeDraft: null, // Character Forge draft: { name, assetId, bones, parts }
   };
 }
 export function normalizeStudio(input) {
@@ -50,11 +52,18 @@ export function normalizeStudio(input) {
     s.shotNotes = Object.fromEntries(Object.entries(input.shotNotes).filter(([key]) => !['__proto__', 'constructor', 'prototype'].includes(key)).map(([key, note]) => [key, text(note)]));
   }
   s.soundNotes = text(input.soundNotes);
+  // forge draft (Character Forge): validated on load; invalid drafts are dropped
+  if (input.forgeDraft && typeof input.forgeDraft === 'object' && Array.isArray(input.forgeDraft.bones)) {
+    try {
+      const clean = validateCharacter(input.forgeDraft);
+      s.forgeDraft = { name: clean.name, assetId: text(input.forgeDraft.assetId), bones: clean.bones, parts: clean.parts };
+    } catch { s.forgeDraft = null; }
+  }
   return s;
 }
 export function hasProductionWork(studio) {
   if (!studio) return false;
-  return !!(studio.models?.length || studio.draft?.parts?.length || studio.soundNotes ||
+  return !!(studio.models?.length || studio.draft?.parts?.length || studio.forgeDraft?.parts?.length || studio.soundNotes ||
     studio.plan?.tasks?.length || ['logline', 'synopsis', 'audience', 'script'].some(k => studio.plan?.[k]) ||
     (studio.plan?.genre && studio.plan.genre !== 'Adventure') || (studio.plan?.stage && studio.plan.stage !== 'Development') ||
     Object.values(studio.shotNotes || {}).some(Boolean));

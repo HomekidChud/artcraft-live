@@ -4,9 +4,12 @@ VideoCraft is a static, browser-based scene and movie editor. This upgrade is a
 practical foundation for stylised 3D filmmaking, not a claim of feature parity
 with a Hollywood production pipeline.
 
-Version 0.6 adds a cinematic look/effects pipeline, transform gizmos and a
-majorly more detailed character body (see below). Existing projects keep
-loading; all new fields are additive.
+Version 0.7 adds the **Character Forge** (build custom characters with your own
+bone rigs, not just preset avatars) and a **cutscene system** (title cards,
+subtitles, fades, cinema bars, camera shake and shot transitions), all baked
+into exported movies. Version 0.6 added the cinematic look/effects pipeline,
+transform gizmos and a majorly more detailed character body. Existing projects
+keep loading; all new fields are additive.
 
 ## Start with a complete movie
 
@@ -17,7 +20,7 @@ confirmation. Save your current project first if you want to retain it.
 
 ## Production workspaces
 
-The studio now has ten labelled tabs. The navigation rail scrolls on shorter
+The studio now has eleven labelled tabs. The navigation rail scrolls on shorter
 screens, and the production pages stack for phones.
 
 - **Planning**: movie title, production stage, genre, audience, logline,
@@ -28,7 +31,10 @@ screens, and the production pages stack for phones.
   preview or select it in the list. Frame the model with the dedicated button.
   Trophy, podium and tree templates remain fully editable.
 - **Draw**: the existing drawing studio and drawing asset workflow.
-- **Cast**: the existing Character workspace for designing the cast.
+- **Cast**: the existing Character workspace for designing the cast. Characters
+  saved from the Forge appear here with a sketch preview and an **Edit in
+  Forge** button.
+- **Forge**: the Character Forge (see below).
 - **Assets**: search/filter models, characters, drawings and audio. Add an asset
   to the current shot, edit saved model designs, and import/export model JSON.
 - **Scene**: the existing 3D scene and transform tools, now also supporting
@@ -92,6 +98,48 @@ capture retargeting or realistic anatomy. The Character workspace remains a
 2D design/colour preview; inspect and pose the actual 3D character in Scene or
 Animate.
 
+## Character Forge
+
+The **Forge** workspace builds fully custom characters instead of choosing a
+preset avatar:
+
+- Start from a blank rig or a 19-bone humanoid template, then **add bones**
+  with any parent (including none/root) and **add parts** — boxes, spheres,
+  capsules, cylinders and cones with per-part colour, dimensions and offsets.
+- Bones form an editable hierarchy (up to 64 bones, 200 parts, 24 direct
+  children per bone). Parent cycles and orphaned bones are prevented or
+  repaired on load.
+- Selecting a bone shows a rotate gizmo preview; selecting a part shows a
+  translate gizmo. Bone picker spheres and axis helpers make the rig visible.
+- **Save to Cast** stores the character in the movie like any other; place it
+  from Cast or Assets. Its bones appear as joint channels in **Animate** and
+  can be keyed exactly like preset character joints.
+- Characters whose bones use the standard joint IDs keep motion presets
+  (idle/walk/run/wave/celebrate); custom bone names are posed by keys only.
+- **Export/Import character JSON** moves custom characters between projects,
+  and the Assets tab has an **Edit in Forge** button for round-trip editing.
+
+The Forge uses rigid-part rigging: each bone rotates the parts attached to it.
+It does not skin-weight arbitrary meshes, sculpt, import GLTF/FBX or retarget
+mocap. The result is stylised and game-like, not photoreal.
+
+## Cutscenes and transitions
+
+Expand **Cutscene & transitions** in Animate. Every shot owns a list of events
+plus a transition into it. Event state is a pure function of shot-local time,
+so scrubbing, replaying backwards and frame-accurate export all agree:
+
+- **Title card** and **subtitle/dialogue** with text, speaker name and colour.
+- **Fade in** and **fade out** with configurable colour and length.
+- **Cinema bars** (letterbox) for anamorphic framing.
+- **Camera shake** with strength, eased in and out; it only runs during movie
+  playback and recording, never while editing or scrubbing.
+- **Transitions**: hard cut or fade from black, with an editable fade length.
+
+Titles, subtitles, fades and bars render in a screen-space overlay on the same
+canvas the exporter captures, so they are baked into exported movies in both
+export modes.
+
 ## Cinematic look and effects
 
 Expand **Look & effects** in Animate. The render pipeline is an
@@ -141,7 +189,9 @@ Expand **Cinematography** in Animate:
 ## Projects and export
 
 The existing version-2 project schema is retained. New fields (`rigMode`,
-`motion`, `joints`, shot `lighting`, project `exportAspect`) are additive.
+`motion`, `joints`, shot `lighting`, project `exportAspect`, forge characters
+with `kind: 'forge'` in `characters`, and shot `events`/`transition`/
+`transitionDur`) are additive.
 Version-1 single-shot projects and existing version-2 movies still load.
 Existing audio clips, drawing assets and shot sequencing are retained.
 
@@ -183,7 +233,8 @@ sections for large productions rather than assuming feature-length output
 will fit in browser memory.
 
 MP4/ProRes, offline audio mixing, path tracing, physically accurate motion blur,
-compositing, transitions, GLTF/FBX import, external mocap, dialogue/lip-sync and
+compositing, transition libraries beyond the included cut/fade, GLTF/FBX
+import, external mocap, dialogue/lip-sync and
 distributed/render-farm processing are not implemented here. Depth of field and
 colour grading exist (see above) but are stylised real-time effects, not a
 physically based render pipeline. You can make multi-shot stylised movies, but
@@ -200,11 +251,15 @@ npm run test:videocraft
 npm test
 ```
 
-`tests/motion.test.js` uses Node's built-in test runner and has no dependencies.
-It checks skeleton names, finite motion, deterministic scrubbing, independent
-instances, clip bounds, strengths, speed/phase, camera tracks and frame sizes.
+`tests/motion.test.js`, `tests/charcraft.test.js` and `tests/cutscene.test.js`
+use Node's built-in test runner and have no dependencies. They check skeleton
+names, finite motion, deterministic scrubbing, independent instances, clip
+bounds, strengths, speed/phase, camera tracks and frame sizes; character
+validation (limits, cycles, parents, colours) and the forge data model; and
+cutscene event evaluation (fades, titles, bars, shake, transitions).
 Browser regression checks should also cover legacy load/upgrade, project
-round-trip, joint key editing, shot playback, export teardown, and 375px layout.
+round-trip, joint key editing, shot playback, export teardown, forge
+round-trip (save/place/key joints) and 375px layout.
 
 The vendored `webm-muxer` 5.1.4 module is MIT-licensed; its license is alongside
 the module in `vendor/`. Avatar geometry is batched by material so one body
