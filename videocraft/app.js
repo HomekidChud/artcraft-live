@@ -363,10 +363,13 @@ function renderEventsPanel() {
       mkText('Text', 'text', 300);
       mkText('Speaker', 'speaker', 60);
     }
-    if (ev.type === 'fadein' || ev.type === 'fadeout') {
+    if (ev.type === 'fadein' || ev.type === 'fadeout' || ev.type === 'title' || ev.type === 'subtitle') {
       const row = document.createElement('div'); row.className = 'field-row';
       const l = document.createElement('label'); l.textContent = 'Color';
-      const color = document.createElement('input'); color.type = 'color'; color.value = ev.color || '#000000';
+      const color = document.createElement('input'); color.type = 'color';
+      // titles/subtitles default to the standard light tone; fades to black
+      const isText = ev.type === 'title' || ev.type === 'subtitle';
+      color.value = (isText && (!ev.color || ev.color === '#000000')) ? '#ece7dd' : (ev.color || '#000000');
       color.addEventListener('input', () => { ev.color = color.value; markDirty(); evaluateAt(animTime); });
       row.append(l, color); card.appendChild(row);
     }
