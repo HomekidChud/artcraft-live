@@ -14,6 +14,21 @@ transitions), all baked into exported movies. Version 0.6 added the cinematic
 look/effects pipeline, transform gizmos and a majorly more detailed character
 body. Existing projects keep loading; all new fields are additive.
 
+## Documentation
+
+- **[docs.html](videocraft/docs.html)** — the full guide: quick start, every
+  workspace, FX and GLB models, phone controls, shortcuts, export modes,
+  section stitching with ffmpeg, and the honest limits of the tool.
+- **[GUIDE.md](videocraft/GUIDE.md)** — a machine-readable guide for AI agents:
+  stable UI selectors, the project JSON schema, key flows, and limits.
+
+Version 0.9 adds a **phone UI** (slide-in panel sheets with a floating dock,
+bottom-sheet timeline, touch-sized targets — desktop layouts unchanged),
+**section export** (export long movies frame-accurately in stitchable chunks
+via range start/end), a smoother frame-accurate export pipeline (backpressure
+waits instead of mid-stream encoder flushes, which could stall exports on
+slower machines), and the documentation pages above.
+
 ## Start with a complete movie
 
 Click **3D race movie**, then **Play movie**. The editable example, **The Final

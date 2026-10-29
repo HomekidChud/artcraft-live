@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VideoCraft — Guide & Docs</title>
+<meta name="description" content="VideoCraft documentation: quick start, workspaces, FX and GLB models, phone controls, export modes and section stitching, honest limits, and automation notes for AI agents.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%23f2b25c'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e05d5d'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%234fb3a4'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%23c77b9e'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --text-xs: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem; --text-lg: 1.125rem; --text-xl: 1.5rem;
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-6: 1.5rem; --space-8: 2rem;
+  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
+  --bg: #191714; --panel: #211f1b; --panel-2: #272421; --panel-3: #2e2a26;
+  --line: #383329; --line-soft: #322e28;
+  --text: #ece7dd; --text-muted: #a89e8f; --text-faint: #6e675c;
+  --accent: #f2b25c; --accent-strong: #e0a043; --accent-ink: #241a0a;
+  --accent-2: #e05d5d; --accent-3: #4fb3a4; --accent-4: #c77b9e;
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.35); --shadow-lg: 0 14px 36px rgba(0,0,0,0.45);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+body {
+  font-family: 'Outfit', system-ui, sans-serif; font-size: var(--text-base);
+  color: var(--text); background: var(--bg); line-height: 1.65;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+header.site {
+  position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: var(--space-3);
+  padding: 10px clamp(16px, 4vw, 40px); background: rgba(25,23,20,0.92); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line-soft);
+}
+header.site h1 { font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.01em; }
+header.site .tag { font-size: var(--text-xs); color: var(--text-muted); padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; }
+header.site .spacer { flex: 1; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: var(--radius-sm);
+  background: var(--panel-3); color: var(--text); font-size: var(--text-sm); font-weight: 500; white-space: nowrap;
+  transition: background 150ms cubic-bezier(0.16,1,0.3,1);
+}
+.btn:hover { background: #383431; text-decoration: none; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.primary:hover { background: var(--accent-strong); }
+main { max-width: 880px; margin: 0 auto; padding: var(--space-8) clamp(16px, 4vw, 40px) 96px; }
+.hero { padding: var(--space-8) 0 var(--space-6); }
+.kicker { color: var(--accent); font-size: var(--text-xs); letter-spacing: 0.12em; font-weight: 600; text-transform: uppercase; }
+.hero h2 { font-size: clamp(28px, 4.5vw, 42px); font-weight: 600; letter-spacing: -0.03em; line-height: 1.15; margin: 10px 0 14px; }
+.hero p { color: var(--text-muted); max-width: 640px; }
+nav.toc { display: flex; flex-wrap: wrap; gap: 8px; margin: var(--space-6) 0 var(--space-8); }
+nav.toc a { font-size: var(--text-xs); padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--text-muted); }
+nav.toc a:hover { color: var(--text); border-color: var(--accent); text-decoration: none; }
+section { margin-bottom: var(--space-8); scroll-margin-top: 72px; }
+section h3 { font-size: var(--text-xl); font-weight: 600; letter-spacing: -0.02em; margin-bottom: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--line-soft); }
+section h3:first-of-type { border-top: none; }
+section h4 { font-size: var(--text-base); font-weight: 600; margin: var(--space-4) 0 var(--space-2); }
+section p, section li { color: var(--text-muted); }
+section p strong, section li strong { color: var(--text); }
+ul, ol { padding-left: 22px; display: flex; flex-direction: column; gap: 6px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-4); margin: var(--space-3) 0; }
+.card p { margin: 0; }
+table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); margin: var(--space-3) 0; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+th { color: var(--text); font-weight: 600; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; }
+td { color: var(--text-muted); }
+td code, p code, li code { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.85em; background: var(--panel-3); color: var(--accent); padding: 2px 6px; border-radius: 4px; }
+kbd { font-family: ui-monospace, monospace; font-size: 0.8em; background: var(--panel-3); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 2px 7px; color: var(--text); }
+pre { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 14px 16px; overflow-x: auto; font-size: var(--text-xs); line-height: 1.6; color: #d8d2c6; margin: var(--space-3) 0; }
+pre code { background: none; color: inherit; padding: 0; }
+.note { border-left: 3px solid var(--accent); background: var(--panel); padding: 12px 16px; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin: var(--space-3) 0; }
+.note.warn { border-left-color: var(--accent-2); }
+.note p { margin: 0; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-3); }
+footer { border-top: 1px solid var(--line-soft); padding: var(--space-6) 0; color: var(--text-faint); font-size: var(--text-xs); text-align: center; }
+@media (max-width: 640px) {
+  th, td { padding: 8px 8px; font-size: var(--text-xs); }
+  .btn { padding: 10px 14px; }
+}
+</style>
+</head>
+<body>
+<header class="site">
+  <h1>VideoCraft</h1>
+  <span class="tag">Guide & docs</span>
+  <span class="spacer"></span>
+  <a class="btn" href="index.html">Open the studio</a>
+</header>
+<main>
+  <div class="hero">
+    <div class="kicker">3D movie studio in your browser</div>
+    <h2>Plan it, build it, animate it, export it.</h2>
+    <p>VideoCraft is a ten-workspace browser studio for making 3D short films: paint assets, design characters, build scenes, add cinematic particle FX, import GLB models, keyframe animations across shots, and export a frame-accurate WebM movie. This page is the manual — for humans and for AI agents.</p>
+  </div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#quick-start">Quick start</a>
+    <a href="#workspaces">Workspaces</a>
+    <a href="#fx">FX engine</a>
+    <a href="#glb">GLB models</a>
+    <a href="#phone">Phone & touch</a>
+    <a href="#shortcuts">Shortcuts</a>
+    <a href="#export">Export</a>
+    <a href="#limits">Honest limits</a>
+    <a href="#agents">For AI agents</a>
+  </nav>
+
+  <section id="quick-start">
+    <h3>Quick start</h3>
+    <ol>
+      <li><strong>Open the studio</strong> — <a href="index.html">index.html</a>. Press <strong>Starter scene</strong> or <strong>3D race movie</strong> in the top bar to load a ready project you can pull apart.</li>
+      <li><strong>Build a shot</strong> — in the <strong>Scene</strong> workspace, add boxes, spheres, drawings and characters, then position them with the gizmo.</li>
+      <li><strong>Add FX</strong> — add a <strong>fire</strong>, <strong>smoke</strong>, <strong>sparks</strong>, <strong>explosion</strong> or <strong>fountain</strong> object anywhere in the scene.</li>
+      <li><strong>Animate</strong> — in the <strong>Animate</strong> workspace, set a keyframe (position/rotation/scale per object), scrub the timeline, move things, key again. Add more shots and reorder them into a movie.</li>
+      <li><strong>Export</strong> — use <strong>Export movie</strong> in frame-accurate mode. Leave the range fields blank for the whole movie, or fill them to export one section at a time.</li>
+    </ol>
+    <div class="note"><p>Everything runs locally in your browser — no account, no upload. Projects save as a small <code>.videocraft</code> JSON file you can reopen, share, or hand to another tool.</p></div>
+  </section>
+
+  <section id="workspaces">
+    <h3>Workspaces</h3>
+    <p>The left rail switches between ten workspaces. The four hands-on ones are:</p>
+    <div class="grid2">
+      <div class="card"><p><strong>Draw</strong> — a 2D paint canvas. Brush size, softness, colour and shapes. Saved drawings become textured planes you can place in 3D scenes.</p></div>
+      <div class="card"><p><strong>Cast</strong> — a parametric character builder: head, hair, eyes, brows, nose, mouth, torso, arms, legs, colours. Characters come with a simple rig (head/arm/leg pivots) you can keyframe.</p></div>
+      <div class="card"><p><strong>Scene</strong> — the 3D stage. Add primitives, your drawings, characters, GLB models and FX objects. Drag with the gizmo, tweak colour/opacity/scale in the props panel.</p></div>
+      <div class="card"><p><strong>Animate</strong> — timeline and shots. Keyframe every object channel, play the shot or the whole movie, and manage the shot list that becomes your film.</p></div>
+    </div>
+    <p>The other six (Plan, Design, Storyboard, Sound, Assets, Deliver) are lighter production tabs — checklists, asset cards, storyboard frames, audio clip planning and a delivery checklist. The look of the render (background colour, fog, vignette, grade) lives in the Scene workspace's Look panel.</p>
+  </section>
+
+  <section id="fx">
+    <h3>FX engine</h3>
+    <p>FX objects are GPU particle systems — deterministic, timeline-driven, and identical between preview and export. Each has an <strong>intensity</strong>, <strong>size</strong>, <strong>speed</strong> and <strong>start time</strong> you can animate like any other object.</p>
+    <table>
+      <thead><tr><th>Preset</th><th>Feel</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td>fire</td><td>Looping embers and flame</td><td>Good default for torches, campfires, engines</td></tr>
+        <tr><td>smoke</td><td>Slow, soft, looping</td><td>Non-additive — reads well over bright backgrounds</td></tr>
+        <tr><td>sparks</td><td>Fast falling sparks</td><td>Welding, electrical damage</td></tr>
+        <tr><td>explosion</td><td>One-shot blast</td><td>Burns out once per <code>fxStart</code>; set the start time to trigger mid-shot</td></tr>
+        <tr><td>fountain</td><td>Looping upward jets</td><td>Water, confetti, magic</td></tr>
+      </tbody>
+    </table>
+    <p>Because particles are seeded deterministically from the timeline, scrubbing back and forth shows the same particles — no randomness between preview and export.</p>
+  </section>
+
+  <section id="glb">
+    <h3>GLB models</h3>
+    <p>The Scene workspace has a <strong>GLB import</strong> in the props panel. Models are loaded, cached per-project and re-fetched automatically before any export starts — a broken URL aborts the export with a clear message instead of silently rendering a missing model.</p>
+    <div class="note warn"><p><strong>Static models only.</strong> VideoCraft renders GLBs as placed props: geometry, materials and textures. Rigged/skinned animation inside the GLB is not played back. Animate a GLB by keyframing its position, rotation and scale like any other object.</p></div>
+  </section>
+
+  <section id="phone">
+    <h3>Phone & touch</h3>
+    <p>On screens under 760px wide the studio flips to a viewport-first layout: the 3D view fills the screen and every side panel becomes a slide-in sheet.</p>
+    <ul>
+      <li><strong>Panels</strong> — a floating dock on the right edge (Tools / Cast / Props / Shots / Animate) opens the panels for the workspace you're in. Tap the dimmed backdrop or press <kbd>Esc</kbd> to close.</li>
+      <li><strong>Timeline</strong> — the <strong>Timeline</strong> dock button slides it up from the bottom.</li>
+      <li><strong>Touch targets</strong> — buttons, tools and sliders are enlarged to comfortable touch sizes.</li>
+      <li><strong>Canvas gestures</strong> — one finger orbits, and the gizmo handles are touch-sized too.</li>
+    </ul>
+  </section>
+
+  <section id="shortcuts">
+    <h3>Keyboard shortcuts</h3>
+    <table>
+      <thead><tr><th>Key</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>G</kbd></td><td>Gizmo: translate</td></tr>
+        <tr><td><kbd>R</kbd></td><td>Gizmo: rotate</td></tr>
+        <tr><td><kbd>S</kbd></td><td>Gizmo: scale</td></tr>
+        <tr><td><kbd>Q</kbd></td><td>Gizmo: off</td></tr>
+        <tr><td><kbd>Space</kbd></td><td>Play/pause (Animate workspace)</td></tr>
+        <tr><td><kbd>Delete</kbd> / <kbd>Backspace</kbd></td><td>Delete the selected keyframe (Animate workspace)</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="export">
+    <h3>Export</h3>
+    <p>Two modes, one button. The export panel is in the Animate workspace.</p>
+    <h4>Real-time recording</h4>
+    <p>Records the canvas with <code>MediaRecorder</code> while the movie plays — includes audio, but the timing depends on your device keeping up. Keep the tab visible and foregrounded.</p>
+    <h4>Frame-accurate export</h4>
+    <p>Renders every frame through <code>WebCodecs</code> (VP8, WebM) and muxes a file — identical frames regardless of device speed, no audio yet. This is the mode for reliable output.</p>
+    <ul>
+      <li><strong>Resolution</strong> — 720p or 1080p, plus the project's export aspect.</li>
+      <li><strong>Quality</strong> — 8 / 4 / 2.5 Mbps.</li>
+      <li><strong>Range start / end (seconds)</strong> — export a <strong>section</strong> of a long movie. Blank = whole movie. Sections restart at timestamp zero, so you can render a 30-minute film in stress-free chunks.</li>
+    </ul>
+    <h4>Stitching sections</h4>
+    <p>Sections are standalone WebM files — do not join them by concatenating bytes. Use a remuxing tool, e.g. with ffmpeg:</p>
+    <pre><code>printf "file 'part1.webm'\nfile 'part2.webm'\nfile 'part3.webm'\n" > list.txt
+ffmpeg -f concat -safe 0 -i list.txt -c copy movie.webm</code></pre>
+    <p>Each section starts on a keyframe, so concat needs no re-encode. Add audio in the same pass (real-time recording, or your own soundtrack) with a second input and <code>-shortest</code>.</p>
+    <div class="note"><p>Export speed: the frame-accurate renderer keeps the encoder pipeline saturated and yields to the UI periodically, so a 720p export typically renders faster than real time on a modern laptop — but plan around real-time-ish speeds on phones.</p></div>
+  </section>
+
+  <section id="limits">
+    <h3>Honest limits</h3>
+    <p>VideoCraft is a browser studio for short 3D films, not a replacement for a render farm. Things you should know before promising anyone a feature-length movie:</p>
+    <ul>
+      <li><strong>Memory is the hard wall.</strong> Everything — scene, encoder, muxed video — lives in one browser tab. Movies beyond ~5 minutes of 720p start to strain the tab; beyond ~10 minutes, export in sections.</li>
+      <li><strong>25 minutes in one go: not recommended.</strong> It is roughly 45,000 frames and about 1.5 GB of encoded video buffered in memory before the file is written — on most machines the tab will crash and you lose the render. The supported path for a 25-minute film is: export it in sections (e.g. 3–5 minute chunks), stitch with ffmpeg concat, and add audio separately. That workflow is reliable, resumable and restartable — one crashed section costs minutes, not hours.</li>
+      <li><strong>The >300s warning is real.</strong> Whole-movie exports over five minutes prompt a confirmation first. That is a checkpoint, not a formality — treat it as "use sections".</li>
+      <li><strong>No audio in frame-accurate mode yet.</strong> Real-time recording has sound; frame-accurate exports are video-only.</li>
+      <li><strong>Static GLBs only</strong> — rigged GLB animation is not played back.</li>
+      <li><strong>No Marvel movies.</strong> There is no character mocap, no path-traced global illumination, no crowd systems. What it does — small stylised 3D shorts with FX and camera work — it does well.</li>
+    </ul>
+  </section>
+
+  <section id="agents">
+    <h3>For AI agents</h3>
+    <p>VideoCraft is automatable from a browser driver (Playwright, Puppeteer, CDP). The UI uses stable IDs everywhere; there is no login, no server and no API to call — the app <em>is</em> the interface.</p>
+    <h4>Stable selectors</h4>
+    <table>
+      <thead><tr><th>Action</th><th>Selector</th></tr></thead>
+      <tbody>
+        <tr><td>Switch workspace</td><td><code>.rail-btn[data-ws="scene"]</code> (draw / char / scene / anim)</td></tr>
+        <tr><td>Add object / FX / GLB</td><td>buttons inside <code>#scene-list</code>, matched by text: <code>+ box</code>, <code>+ sphere</code>, <code>+ fire FX</code>, <code>+ import GLB model</code>, <code>+ drawing: name</code>, <code>+ character name</code></td></tr>
+        <tr><td>Import GLB file</td><td>click <code>+ import GLB model</code> in <code>#scene-list</code> — this creates <code>#glb-file-input</code>; then set it via DataTransfer</td></tr>
+        <tr><td>Selection props</td><td><code>#scene-props</code> (rebuilt on selection)</td></tr>
+        <tr><td>Play movie</td><td><code>#btn-movie</code> / <code>#btn-play</code></td></tr>
+        <tr><td>Export</td><td><code>#btn-record</code> (frame-accurate), <code>#btn-download-video</code> (real-time)</td></tr>
+        <tr><td>Section range</td><td><code>#export-start</code>, <code>#export-end</code> (seconds, blank = full)</td></tr>
+        <tr><td>Save / open project</td><td><code>#btn-save</code> / <code>#btn-open</code> + <code>#file-open</code> (DataTransfer works for both)</td></tr>
+        <tr><td>Export status</td><td><code>#rec-status</code> textContent</td></tr>
+      </tbody>
+    </table>
+    <h4>Project file format</h4>
+    <p>Projects are a single JSON file (extension <code>.videocraft</code> or <code>.json</code>). Top-level shape:</p>
+    <pre><code>{
+  "version": 2,
+  "name": "My film",
+  "fps": 30,                      // 10–60, used by the timeline and exports
+  "exportAspect": "16:9",
+  "drawings": [...],              // painted assets: {id, name, dataURL}
+  "glbAssets": [...],            // imported models: {id, name, url}
+  "characters": [...],            // parametric rigs (see Cast workspace)
+  "shots": [{
+    "id": "shot-1", "name": "Shot 1", "duration": 5,
+    "sceneObjects": [{ "id": "obj-1", "name": "Fire", "type": "fx",
+                       "pos": [x,y,z], "rot": [x,y,z], "scale": [x,y,z],
+                       "color": "#fff", "opacity": 1, "fxKind": "fire",
+                       "intensity": 1, "fxSize": 1, "fxSpeed": 1, "fxStart": 0 }],
+    "keyframes": { "obj-1": { "pos": [{"t": 0, "v": [0,0,0], "ease": "linear"}] } }
+  }],
+  "activeShotId": "shot-1",
+  "audioAssets": [...], "audioClips": [...],
+  "studio": {...},                 // production-tab state (plan, storyboard…)
+  "look": {...}                    // render look: background, fog, vignette, grade
+}</code></pre>
+    <p>Object <code>type</code> is one of <code>box | sphere | cylinder | cone | torus | plane | engineKit | drawing | character | glb | fx</code>. Rotation is in degrees, positions/scales are plain arrays, keyframe channels are per-object (<code>pos</code>, <code>rot</code>, <code>scale</code>, FX params). The safest way to author one is to build a small project in the UI, <strong>Save project</strong>, and read the file — or load your JSON through the real <strong>Open</strong> flow (<code>#file-open</code>) so the app's migration and validation run on it.</p>
+    <p>A machine-readable version of this page lives next to the app as <a href="GUIDE.md">GUIDE.md</a>.</p>
+  </section>
+
+  <footer>VideoCraft — a browser-native 3D movie studio. Runs entirely client-side.</footer>
+</main>
+</body>
+</html>

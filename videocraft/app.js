@@ -2909,7 +2909,18 @@ async function exportOfflineMovie() {
   const width = +document.getElementById('export-res').value;
   const [, height] = exportSize(width, project.exportAspect);
   const fps = Math.max(1, Math.min(60, Number(project.fps) || 30));
-  const frameCount = Math.ceil(totalDuration() * fps);
+  const fullFrameCount = Math.ceil(totalDuration() * fps);
+  // section range: default = whole movie; a range exports a stitchable chunk
+  const totalDur = totalDuration();
+  const clampNum = (v, min, max) => Math.max(min, Math.min(max, v));
+  const rangeStartEl = document.getElementById('export-start'), rangeEndEl = document.getElementById('export-end');
+  const rawStart = parseFloat(rangeStartEl?.value), rawEnd = parseFloat(rangeEndEl?.value);
+  const rangeStart = Number.isFinite(rawStart) ? clampNum(rawStart, 0, totalDur) : 0;
+  const rangeEnd = Number.isFinite(rawEnd) ? clampNum(rawEnd, rangeStart + 1 / fps, totalDur) : totalDur;
+  const startFrame = Math.round(rangeStart * fps); // snap to the movie frame grid
+  const endFrame = Math.min(fullFrameCount, Math.round(rangeEnd * fps));
+  const isSection = startFrame > 0 || endFrame < fullFrameCount;
+  const frameCount = Math.max(1, endFrame - startFrame);
   const bitrate = { high: 8000000, medium: 4000000, low: 2500000 }[document.getElementById('export-quality').value] || 8000000;
   const config = { codec: 'vp8', width, height, bitrate, framerate: fps, latencyMode: 'quality' };
   const restore = { shotId: project.activeShotId, time: animTime, pixelRatio: renderer.getPixelRatio(),
@@ -2936,28 +2947,44 @@ async function exportOfflineMovie() {
     if (tcontrols.object) tcontrols.detach();
     tcontrols.enabled = false;
     lightHelpers.forEach(h => h.visible = false);
-    for (let frame = 0; frame < frameCount && !offlineCancel; frame++) {
+    if (isSection) recStatus.textContent = `Rendering section ${(startFrame / fps).toFixed(1)}s–${(endFrame / fps).toFixed(1)}s (${frameCount} frames)…`;
+    // pipeline the encoder: keep feeding frames and only wait (never flush) when it
+    // saturates — a mid-stream flush() drains the encoder's internal batching and
+    // used to make exports several times slower than the encoder can actually go.
+    let lastYield = performance.now();
+    for (let frame = startFrame; frame < endFrame && !offlineCancel; frame++) {
       if (encoderError) throw encoderError;
-      const time = frame / fps;
+      const time = frame / fps; // scene evaluates at the ORIGINAL movie position
       const hit = shotAtGlobal(time);
       if (project.activeShotId !== hit.shot.id) applyShotPlayback(hit.shot.id);
       animTime = hit.local; movieTime = time; evaluateAt(animTime);
       camera.lookAt(controls.target); renderFinalFrame(true, hit.local);
-      const videoFrame = new VideoFrame(renderer.domElement, { timestamp: Math.round(frame * 1e6 / fps), duration: Math.round(1e6 / fps) });
-      try { encoder.encode(videoFrame, { keyFrame: frame % (fps * 2) === 0 }); } finally { videoFrame.close(); }
+      const outFrame = frame - startFrame; // section output starts at timestamp zero
+      const videoFrame = new VideoFrame(renderer.domElement, { timestamp: Math.round(outFrame * 1e6 / fps), duration: Math.round(1e6 / fps) });
+      try { encoder.encode(videoFrame, { keyFrame: outFrame === 0 || outFrame % (fps * 2) === 0 }); } finally { videoFrame.close(); }
       framesWritten++;
-      recStatus.textContent = `Rendering ${Math.round(framesWritten / frameCount * 100)}% · frame ${framesWritten}/${frameCount}. Slower than real time is normal.`;
-      if (encoder.encodeQueueSize > 4) await encoder.flush();
-      await new Promise(resolve => setTimeout(resolve, 0)); // allow stop/progress, without advancing the movie clock
+      // backpressure: wait while saturated (2ms naps), keeping the pipeline full
+      while (encoder.encodeQueueSize > 8 && !encoderError && !offlineCancel) {
+        await new Promise(r => setTimeout(r, 2));
+      }
+      // yield every ~50ms or 6 frames so Stop/progress stay responsive, without
+      // advancing the movie clock (setTimeout, not rAF)
+      if (outFrame % 6 === 5 || performance.now() - lastYield > 50) {
+        recStatus.textContent = `Rendering ${Math.round(framesWritten / frameCount * 100)}% · frame ${framesWritten}/${frameCount}. Slower than real time is normal.`;
+        await new Promise(resolve => setTimeout(resolve, 0));
+        lastYield = performance.now();
+      }
     }
     await encoder.flush();
     if (encoderError) throw encoderError;
     if (framesWritten) {
       muxer.finalize();
       const blob = new Blob([target.buffer], { type: 'video/webm' });
-      const fileName = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + (offlineCancel ? '_partial' : '') + '.webm';
+      const base = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_');
+      const part = isSection ? `_part_${(startFrame / fps).toFixed(1).replace('.', '-')}-${(endFrame / fps).toFixed(1).replace('.', '-')}s` : '';
+      const fileName = base + part + (offlineCancel ? '_partial' : '') + '.webm';
       downloadBlob(blob, fileName);
-      recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps · ${(blob.size / 1e6).toFixed(1)} MB`;
+      recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps · ${(blob.size / 1e6).toFixed(1)} MB${isSection ? ' (section — stitch parts with ffmpeg concat)' : ''}`;
       toast('Frame-accurate movie saved');
     } else recStatus.textContent = 'Export cancelled.';
   } catch (e) {
