@@ -14,22 +14,29 @@ function makeTextTexture(lines, opts) {
   x.textAlign = 'center'; x.textBaseline = 'middle';
   x.lineJoin = 'round';
   const cx = opts.W / 2;
-  let y = opts.H / 2;
-  if (opts.speaker) {
-    x.font = '600 ' + Math.round(opts.H * 0.14) + 'px Outfit, sans-serif';
+  // lay the whole block out centred: speaker line + text lines, all inside H.
+  // the font shrinks automatically so 3 wrapped lines (+ speaker) still fit.
+  const hasSpeaker = !!opts.speaker;
+  const speakerFont = Math.round(opts.H * 0.14);
+  const speakerH = hasSpeaker ? speakerFont * 1.4 : 0;
+  const font = Math.min(opts.font, Math.floor((opts.H - speakerH - 8) / (Math.max(1, lines.length) * 1.18)));
+  const lineH = font * 1.18;
+  const blockH = speakerH + lines.length * lineH;
+  let y = (opts.H - blockH) / 2;
+  if (hasSpeaker) {
+    x.font = '600 ' + speakerFont + 'px Outfit, sans-serif';
     x.fillStyle = opts.speakerColor || '#efb855';
     x.shadowColor = 'rgba(0,0,0,0.7)'; x.shadowBlur = 8;
-    x.fillText(opts.speaker.toUpperCase(), cx, y - opts.H * 0.24);
+    x.fillText(opts.speaker.toUpperCase(), cx, y + speakerH / 2);
+    y += speakerH;
   }
-  x.font = '700 ' + opts.font + 'px Outfit, sans-serif';
+  x.font = '700 ' + font + 'px Outfit, sans-serif';
   x.fillStyle = opts.color || '#ece7dd';
   x.shadowColor = 'rgba(0,0,0,0.75)'; x.shadowBlur = 12;
-  const size = x.font;
   for (const line of lines) {
-    x.fillText(line, cx, y);
-    y += opts.font * 1.18;
+    x.fillText(line, cx, y + lineH / 2);
+    y += lineH;
   }
-  x.font = size;
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
@@ -87,16 +94,16 @@ export function createCutsceneOverlay() {
       const t = state?.title;
       title.visible = !!t && t.alpha > 0.01;
       if (title.visible) {
-        setText(title, titleMat, titleCache, 't:' + t.text + '|' + t.speaker, () => makeTextTexture(wrapText(t.text, 26), {
-          W: 1024, H: 256, font: 72, color: '#ece7dd', speaker: t.speaker, speakerColor: '#efb855',
+        setText(title, titleMat, titleCache, 't:' + t.text + '|' + t.speaker + '|' + t.color, () => makeTextTexture(wrapText(t.text, 26), {
+          W: 1024, H: 256, font: 72, color: t.color || '#ece7dd', speaker: t.speaker, speakerColor: '#efb855',
         }));
         titleMat.opacity = t.alpha;
       }
       const s = state?.subtitle;
       subtitle.visible = !!s && s.alpha > 0.01;
       if (subtitle.visible) {
-        setText(subtitle, subMat, subCache, 's:' + s.text + '|' + s.speaker, () => makeTextTexture(wrapText(s.text, 44), {
-          W: 1200, H: 200, font: 44, color: '#f4f0e8', speaker: s.speaker, speakerColor: '#efb855',
+        setText(subtitle, subMat, subCache, 's:' + s.text + '|' + s.speaker + '|' + s.color, () => makeTextTexture(wrapText(s.text, 44), {
+          W: 1200, H: 200, font: 44, color: s.color || '#f4f0e8', speaker: s.speaker, speakerColor: '#efb855',
         }));
         subMat.opacity = s.alpha;
       }

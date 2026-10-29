@@ -58,12 +58,15 @@ export function evalShotOverlay(shot, t) {
       case 'letterbox': state.letterbox = true; break;
       case 'title': {
         const alpha = Math.min(1, local / 0.12, (1 - local) / 0.12);
-        if (!state.title || alpha >= state.title.alpha) state.title = { text: e.text, speaker: e.speaker, alpha };
+        // '#000000' is the generic event default — titles fall back to the standard light tone
+        const color = /^#[0-9a-f]{6}$/i.test(e.color) && e.color !== '#000000' ? e.color : '#ece7dd';
+        if (!state.title || alpha >= state.title.alpha) state.title = { text: e.text, speaker: e.speaker, color, alpha };
         break;
       }
       case 'subtitle': {
         const alpha = Math.min(1, local / 0.1, (1 - local) / 0.1);
-        if (!state.subtitle || alpha >= state.subtitle.alpha) state.subtitle = { text: e.text, speaker: e.speaker, alpha };
+        const color = /^#[0-9a-f]{6}$/i.test(e.color) && e.color !== '#000000' ? e.color : '#f4f0e8';
+        if (!state.subtitle || alpha >= state.subtitle.alpha) state.subtitle = { text: e.text, speaker: e.speaker, color, alpha };
         break;
       }
       case 'shake': {
