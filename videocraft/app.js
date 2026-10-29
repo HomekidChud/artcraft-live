@@ -1108,7 +1108,7 @@ $('#btn-export-top').addEventListener('click', () => { state.tab = 'export'; ren
 
 // ---------------------------------------------------------------- export
 
-let exporting = false, recorder = null, exportChunks = [], exportStartWall = 0;
+let exporting = false, recorder = null, exportChunks = [], exportStartWall = 0, exportStream = null;
 
 function pickMime() {
   for (const m of ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']) {
@@ -1127,8 +1127,19 @@ async function startExport() {
   // resize canvases to export resolution
   preview.width = a.ex[0]; preview.height = a.ex[1];
   const stream = preview.captureStream(state.fps);
-  const audioTracks = streamDest.stream.getAudioTracks();
-  for (const t of audioTracks) stream.addTrack(t);
+  exportStream = stream;
+  // only record audio when the context is actually running — a suspended context's
+  // audio track can make MediaRecorder produce an empty file
+  if (audioCtx.state !== 'running') {
+    await new Promise((res) => {
+      const t0 = setTimeout(res, 300);
+      audioCtx.resume().then(() => { clearTimeout(t0); res(); }).catch(res);
+    });
+  }
+  if (audioCtx.state === 'running') {
+    const audioTracks = streamDest.stream.getAudioTracks();
+    for (const t of audioTracks) stream.addTrack(t);
+  }
   const mime = pickMime();
   recorder = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: 10_000_000, audioBitsPerSecond: 160_000 });
   exportChunks = [];
@@ -1155,6 +1166,9 @@ function finishExport() {
   if (!exporting) return;
   setTimeout(() => {
     try { recorder.stop(); } catch (e) {}
+    // release the canvas capture stream (keep the shared audio track alive)
+    try { exportStream?.getVideoTracks().forEach((t) => t.stop()); } catch (e) {}
+    exportStream = null;
     preview.width = ASPECTS[state.aspect].w; preview.height = ASPECTS[state.aspect].h;
     $('#export-overlay').style.display = 'none';
     exporting = false;
