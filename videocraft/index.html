@@ -1,729 +1,318 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VideoCraft — 3D Movie Studio</title>
-<meta name="description" content="VideoCraft: plan films, design reusable 3D models, organise assets, storyboard, build scenes, animate rigged characters, mix sound and export movies in a ten-workspace browser studio.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%23f2b25c'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e05d5d'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%234fb3a4'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%23c77b9e'/%3E%3C/svg%3E">
+<title>VideoCraft — Video Studio for Shorts & Long-form</title>
+<meta name="description" content="VideoCraft: a browser video studio — import clips, images and audio, trim and arrange on a timeline, add captions, build 3D film and anime scenes, and export YouTube Shorts or widescreen videos.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='7' fill='%23e8a13d'/%3E%3Cpath d='M13 10.5v11l9-5.5z' fill='%23141312'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
 :root {
   --text-xs: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem; --text-lg: 1.125rem; --text-xl: 1.5rem;
   --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-6: 1.5rem; --space-8: 2rem;
-  --radius-sm: 6px; --radius-md: 10px; --radius-lg: 14px;
-  --transition-interactive: 150ms cubic-bezier(0.16, 1, 0.3, 1);
-
-  /* warm graphite studio + ember accents (no purple, no gradients) */
-  --bg: #191714; --panel: #211f1b; --panel-2: #272421; --panel-3: #2e2a26;
-  --line: #383329; --line-soft: #322e28;
-  --text: #ece7dd; --text-muted: #a89e8f; --text-faint: #6e675c;
-  --accent: #f2b25c; --accent-strong: #e0a043; --accent-ink: #241a0a;
-  --accent-2: #e05d5d; --accent-3: #4fb3a4; --accent-4: #c77b9e;
-  --focus: #f2b25c;
-  --shadow-md: 0 4px 14px rgba(0,0,0,0.35); --shadow-lg: 0 14px 36px rgba(0,0,0,0.45);
+  --bg: #131211; --surface: #1a1917; --surface-2: #201e1c; --surface-3: #262422;
+  --border: #2d2b28; --border-strong: #3a3835;
+  --text: #e6e2dc; --text-muted: #9b968f; --text-faint: #6b675f;
+  --accent: #e8a13d; --accent-strong: #f0b35a; --accent-dim: #7a5518;
+  --record: #e05d5d; --ok: #6db56b;
+  --radius-sm: 0.375rem; --radius-md: 0.5rem; --radius-lg: 0.75rem;
+  --font-body: 'Satoshi', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --transition: 160ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { -webkit-font-smoothing: antialiased; }
+html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 body {
-  height: 100dvh; overflow: hidden;
-  font-family: 'Outfit', system-ui, sans-serif; font-size: var(--text-sm); color: var(--text); background: var(--bg);
-  display: grid; grid-template-rows: 1fr; grid-template-columns: 1fr;
+  min-height: 100dvh; line-height: 1.55; font-family: var(--font-body); font-size: var(--text-base);
+  color: var(--text); background: var(--bg); overflow: hidden;
 }
-button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
-input, select { font: inherit; color: inherit; }
-canvas { display: block; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+button { cursor: pointer; background: none; border: none; color: inherit; font: inherit; }
+input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+svg { display: block; }
 
-/* ============ app shell ============ */
-#app { display: grid; grid-template-columns: 56px 1fr; height: 100dvh; }
-#rail {
-  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
-  padding: var(--space-2) 0; background: var(--panel); border-right: 1px solid var(--line-soft);
-}
-#logo { width: 36px; height: 36px; margin-bottom: var(--space-2); }
-.rail-btn {
-  width: 40px; height: 40px; border-radius: var(--radius-md);
-  display: grid; place-items: center; color: var(--text-muted);
-  transition: background var(--transition-interactive), color var(--transition-interactive);
-}
-.rail-btn:hover { background: var(--panel-3); color: var(--text); }
-.rail-btn.active { background: var(--accent); color: var(--accent-ink); }
-.rail-btn svg { width: 19px; height: 19px; }
-
-#main { display: grid; grid-template-rows: 48px 1fr; min-width: 0; }
+/* ---------- top bar ---------- */
 #topbar {
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: 0 var(--space-4); background: var(--panel); border-bottom: 1px solid var(--line-soft);
+  height: 54px; display: flex; align-items: center; gap: var(--space-3);
+  padding: 0 var(--space-4); background: var(--surface); border-bottom: 1px solid var(--border);
+  user-select: none;
 }
-#topbar h1 { font-size: var(--text-base); font-weight: 600; letter-spacing: 0.01em; }
-#topbar .tag {
-  font-size: var(--text-xs); color: var(--text-muted);
-  padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; white-space: nowrap;
+.brand { display: flex; align-items: center; gap: var(--space-2); font-weight: 900; letter-spacing: -0.01em; }
+.brand .logo { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); display: grid; place-items: center; color: #131211; }
+.brand .logo svg { width: 15px; height: 15px; }
+#project-name {
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2); font-weight: 700; min-width: 60px; max-width: 220px; color: var(--text);
 }
-#topbar .spacer { flex: 1; }
+#project-name:hover { border-color: var(--border-strong); }
+#project-name:focus { border-color: var(--accent); outline: none; }
+.spacer { flex: 1; }
+.field { display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--text-muted); }
+select, input[type='text'], input[type='number'] {
+  background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2); font-size: var(--text-sm);
+}
+input[type='color'] { width: 34px; height: 24px; padding: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-2); cursor: pointer; }
+input[type='range'] { accent-color: var(--accent); }
+textarea { font-family: var(--font-body); }
+select:focus, input:focus { border-color: var(--accent); outline: none; }
+.badge {
+  font-size: var(--text-xs); font-weight: 700; padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full, 999px); background: var(--surface-2); border: 1px solid var(--border-strong);
+  font-family: var(--font-mono); white-space: nowrap;
+}
+.badge.ok { color: var(--ok); border-color: var(--ok); }
+.badge.warn { color: var(--accent); border-color: var(--accent-dim); }
 .btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 6px 12px; border-radius: var(--radius-sm);
-  background: var(--panel-3); color: var(--text);
-  font-size: var(--text-sm); font-weight: 500; white-space: nowrap;
-  transition: background var(--transition-interactive), transform var(--transition-interactive);
+  display: inline-flex; align-items: center; gap: var(--space-1); font-size: var(--text-sm); font-weight: 700;
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-md);
+  background: var(--surface-2); border: 1px solid var(--border-strong);
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+  white-space: nowrap;
 }
-.btn:hover { background: #383431; }
-.btn:active { transform: translateY(1px); }
-.btn.primary { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn:hover { background: var(--surface-3); border-color: var(--text-faint); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #131211; }
 .btn.primary:hover { background: var(--accent-strong); }
-.btn.ghost { background: transparent; }
-.btn.ghost:hover { background: var(--panel-3); }
-.btn.small { padding: 4px 9px; font-size: var(--text-xs); }
-.btn svg { width: 14px; height: 14px; }
-#save-state { font-size: var(--text-xs); color: var(--text-faint); margin-left: var(--space-2); }
+.btn.danger { color: var(--record); }
+.btn.tiny { padding: var(--space-1) var(--space-2); font-size: var(--text-xs); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* ============ workspaces ============ */
-#content { position: relative; overflow: hidden; background: var(--bg); }
-.ws { position: absolute; inset: 0; display: none; }
-.ws.active { display: grid; }
+/* ---------- main layout ---------- */
+#main { display: flex; height: calc(100dvh - 54px - 218px); min-height: 320px; }
+#rail {
+  width: 62px; background: var(--surface); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2); user-select: none;
+}
+.rail-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: var(--space-2) 0;
+  border-radius: var(--radius-md); color: var(--text-muted); font-size: 10px; font-weight: 700;
+  transition: background var(--transition), color var(--transition);
+}
+.rail-btn svg { width: 19px; height: 19px; }
+.rail-btn:hover { color: var(--text); background: var(--surface-2); }
+.rail-btn.active { color: var(--accent); background: color-mix(in oklab, var(--accent) 12%, transparent); }
 
-/* ============ DRAW workspace ============ */
-#ws-draw.active { grid-template-columns: 1fr 232px; }
-#draw-stage { display: flex; align-items: center; justify-content: center; padding: var(--space-6); min-width: 0; overflow: hidden; }
-#draw-wrap { position: relative; box-shadow: var(--shadow-lg); border-radius: var(--radius-sm); overflow: hidden; }
-#draw-canvas { background: #f6f1e6; cursor: crosshair; touch-action: none; }
-#draw-hint {
-  position: absolute; left: 0; right: 0; top: 14px; text-align: center;
-  color: #7a7468; font-size: var(--text-sm); pointer-events: none; transition: opacity 400ms;
+#stage { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+#preview-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center; padding: var(--space-4);
+  background:
+    radial-gradient(1200px 500px at 50% -10%, color-mix(in oklab, var(--surface-2) 70%, transparent), transparent),
+    var(--bg);
+  position: relative; overflow: hidden; min-height: 0;
 }
-#draw-hint.hidden { opacity: 0; }
-#draw-side {
-  background: var(--panel); border-left: 1px solid var(--line-soft);
-  padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto;
+#preview {
+  background: #000; border-radius: var(--radius-lg); box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  max-width: 100%; max-height: 100%; touch-action: none; cursor: grab;
 }
-.side-title { font-size: var(--text-xs); font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
-.tool-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.tool {
-  height: 36px; border-radius: var(--radius-sm); background: var(--panel-3);
-  display: grid; place-items: center; color: var(--text-muted);
-  transition: background var(--transition-interactive), color var(--transition-interactive);
+#safe-margins { position: absolute; inset: var(--space-4); pointer-events: none; display: none; }
+#transport {
+  height: 52px; display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-4);
+  background: var(--surface); border-top: 1px solid var(--border); user-select: none;
 }
-.tool:hover { color: var(--text); }
-.tool.active { background: var(--accent); color: var(--accent-ink); }
-.tool svg { width: 16px; height: 16px; }
-.field-row { display: flex; align-items: center; gap: var(--space-2); }
-.field-row label { flex: 1; font-size: var(--text-xs); color: var(--text-muted); }
-.field-row output { font-size: var(--text-xs); color: var(--text); min-width: 30px; text-align: right; }
-input[type="range"] { width: 100%; accent-color: var(--accent); height: 20px; }
-input[type="color"] { width: 100%; height: 34px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel-3); cursor: pointer; padding: 3px; }
-.shape-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.chk { display: flex; align-items: center; gap: 8px; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; }
-.chk input { accent-color: var(--accent); width: 15px; height: 15px; }
-#asset-list { display: flex; flex-direction: column; gap: 6px; }
-.asset-item {
-  display: flex; align-items: center; gap: var(--space-2); padding: 6px;
-  background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
-}
-.asset-item img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; background: #f6f1e6; }
-.asset-item .meta { flex: 1; min-width: 0; }
-.asset-item .name { font-size: var(--text-xs); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.asset-item .kind { font-size: var(--text-xs); color: var(--text-faint); }
-.asset-item button { color: var(--text-faint); font-size: var(--text-xs); padding: 4px; border-radius: 4px; }
-.asset-item button:hover { color: var(--accent-2); background: var(--panel-3); }
+#transport .time { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--text-muted); min-width: 150px; }
+#transport .time b { color: var(--text); font-weight: 600; }
+#btn-play { width: 38px; height: 38px; border-radius: 50%; background: var(--accent); color: #131211; display: grid; place-items: center; }
+#btn-play:hover { background: var(--accent-strong); }
+#btn-play svg { width: 17px; height: 17px; }
 
-/* ============ CHARACTER workspace ============ */
-#ws-char.active { grid-template-columns: 240px 1fr 250px; }
-#char-side {
-  background: var(--panel); border-right: 1px solid var(--line-soft);
-  padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto;
+#inspector {
+  width: 300px; background: var(--surface); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden; user-select: none;
 }
-#char-list { display: flex; flex-direction: column; gap: 6px; }
-.char-card {
-  display: flex; align-items: center; gap: var(--space-2); padding: 6px;
-  background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
-  cursor: pointer; text-align: left; width: 100%;
+#inspector .insp-head {
+  padding: var(--space-3) var(--space-4); font-size: var(--text-sm); font-weight: 900;
+  border-bottom: 1px solid var(--border); letter-spacing: 0.02em; text-transform: uppercase; color: var(--text-muted);
 }
-.char-card:hover { background: var(--panel-3); }
-.char-card.active { border-color: var(--accent); }
-.char-card img { width: 44px; height: 44px; object-fit: contain; }
-.char-card .meta { flex: 1; min-width: 0; }
-.char-card .name { font-size: var(--text-xs); font-weight: 600; }
-.char-card .sub { font-size: var(--text-xs); color: var(--text-faint); }
-#char-stage { display: flex; align-items: center; justify-content: center; padding: var(--space-6); overflow: hidden; }
-#char-canvas { border-radius: var(--radius-md); background: repeating-conic-gradient(#262320 0% 25%, #211e1a 0% 50%) 50% / 16px 16px; cursor: pointer; touch-action: none; box-shadow: var(--shadow-lg); }
-#char-props {
-  background: var(--panel); border-left: 1px solid var(--line-soft);
-  padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); overflow-y: auto;
+#inspector .insp-body { flex: 1; overflow-y: auto; padding: var(--space-3) var(--space-4) var(--space-8); }
+.insp-section { margin-bottom: var(--space-6); }
+.insp-title { font-size: var(--text-xs); font-weight: 700; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: var(--space-2); }
+.row { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.row label { font-size: var(--text-sm); flex: 1; color: var(--text-muted); min-width: 0; }
+.row input[type='range'] { flex: 1.2; accent-color: var(--accent); }
+.row .val { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); min-width: 34px; text-align: right; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-2); }
+.list-item {
+  display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2);
+  border-radius: var(--radius-md); border: 1px solid transparent; cursor: pointer; margin-bottom: var(--space-1);
 }
-.swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.swatch { height: 26px; border-radius: 5px; border: 2px solid transparent; cursor: pointer; transition: transform var(--transition-interactive); }
-.swatch:hover { transform: scale(1.06); }
-.swatch.active { border-color: var(--text); }
-#char-tabs { display: flex; gap: 4px; }
-#char-tabs button {
-  flex: 1; padding: 6px 4px; border-radius: var(--radius-sm); font-size: var(--text-xs); color: var(--text-muted);
-  background: var(--panel-2); border: 1px solid var(--line-soft);
-}
-#char-tabs button.active { background: var(--panel-3); color: var(--text); border-color: var(--line); }
-#char-tabs-panel { display: flex; flex-direction: column; gap: var(--space-2); }
-.dots { display: flex; gap: 6px; flex-wrap: wrap; }
-.dot { width: 30px; height: 30px; border-radius: 999px; cursor: pointer; border: 2px solid transparent; display: grid; place-items: center; color: #241a0a; font-size: var(--text-xs); font-weight: 700; }
-.dot.active { border-color: var(--text); }
+.list-item:hover { background: var(--surface-2); }
+.list-item.selected { background: var(--surface-2); border-color: var(--accent-dim); }
+.list-item .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.list-item .nm { flex: 1; font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list-item .meta { font-size: var(--text-xs); color: var(--text-faint); font-family: var(--font-mono); }
+.note { font-size: var(--text-xs); color: var(--text-faint); line-height: 1.5; margin-bottom: var(--space-2); }
+.empty { padding: var(--space-6) var(--space-2); text-align: center; color: var(--text-faint); font-size: var(--text-sm); }
 
-/* ============ SCENE workspace ============ */
-#ws-scene.active { grid-template-columns: 200px 1fr 236px; }
-#scene-side {
-  background: var(--panel); border-right: 1px solid var(--line-soft);
-  padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto;
+/* ---------- timeline ---------- */
+#timeline { height: 218px; background: var(--surface); border-top: 1px solid var(--border); display: flex; flex-direction: column; user-select: none; }
+#tl-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--border); }
+#tl-head .title { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.05em; }
+#tl-zoom { width: 130px; accent-color: var(--accent); }
+#tl-body { flex: 1; display: flex; min-height: 0; }
+#tl-labels { width: 88px; border-right: 1px solid var(--border); flex-shrink: 0; display: flex; flex-direction: column; }
+.tl-label {
+  height: 30px; display: flex; align-items: center; padding: 0 var(--space-3); gap: var(--space-2);
+  font-size: var(--text-xs); font-weight: 700; color: var(--text-muted); border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
-#scene-list { display: flex; flex-direction: column; gap: 6px; }
-.scene-item { display: flex; flex-direction: column; gap: 4px; }
-.scene-item button.main {
-  display: flex; align-items: center; gap: 8px; padding: 8px; width: 100%; text-align: left;
-  background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
-  font-size: var(--text-xs); font-weight: 500;
+.tl-label + .tl-label { height: 44px; }
+.tl-label:last-child { flex: 1; min-height: 44px; }
+.tl-label .tag { font-size: 9px; padding: 1px 5px; border-radius: 3px; background: var(--surface-3); color: var(--text-faint); font-family: var(--font-mono); }
+#tl-scroll { flex: 1; overflow-x: auto; overflow-y: hidden; position: relative; }
+#tl-inner { position: relative; height: 100%; min-width: 100%; display: flex; flex-direction: column; }
+#ruler { height: 30px; border-bottom: 1px solid var(--border); position: relative; cursor: pointer; flex-shrink: 0; }
+#ruler canvas { width: 100%; height: 100%; }
+.tl-track { height: 44px; border-bottom: 1px solid var(--border); position: relative; flex-shrink: 0; }
+.tl-track.cap { height: 44px; flex: 1; min-height: 44px; }
+.clip {
+  position: absolute; top: 5px; height: 34px; border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, var(--surface-3), var(--surface-2)); border: 1px solid var(--border-strong);
+  display: flex; align-items: center; overflow: hidden; cursor: grab;
 }
-.scene-item button.main:hover { background: var(--panel-3); }
-.scene-item.active button.main { border-color: var(--accent); background: var(--panel-3); }
-.scene-item .chip { width: 22px; height: 22px; border-radius: 5px; flex: none; background: #f6f1e6; overflow: hidden; }
-.scene-item .chip img { width: 100%; height: 100%; object-fit: contain; }
-.scene-item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.scene-item .sub { font-size: var(--text-xs); color: var(--text-faint); }
-#scene-props {
-  background: var(--panel); border-left: 1px solid var(--line-soft);
-  padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-3); overflow-y: auto;
+.clip .grip { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.clip .grip.l { left: 0; } .clip .grip.r { right: 0; }
+.clip .lbl { font-size: var(--text-xs); font-weight: 700; padding: 0 var(--space-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.clip.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); z-index: 2; }
+.clip.video { border-left: 3px solid var(--accent); }
+.clip.scene { border-left: 3px solid #7fa8d9; background: linear-gradient(160deg, #24303c, var(--surface-2)); }
+.clip.audio { border-left: 3px solid #6db56b; top: 5px; height: 34px; }
+.clip.image { border-left: 3px solid #c77b9e; }
+.cap-pill {
+  position: absolute; border-radius: var(--radius-sm); border: 1px dashed var(--text-faint);
+  display: flex; align-items: center; padding: 0 var(--space-2); cursor: grab; overflow: hidden;
+  color: var(--text-muted); font-size: var(--text-xs);
 }
-#scene-viewport { position: relative; overflow: hidden; }
-#scene-viewport canvas:not(#axis-badge) { width: 100%; height: 100%; touch-action: none; }
-#scene-viewport.select-cursor canvas { cursor: crosshair; }
-#scene-viewport.paint-cursor canvas { cursor: crosshair; }
-#gizmo-hint {
-  position: absolute; top: 10px; left: 10px; display: flex; gap: 4px;
-  padding: 4px; background: rgba(25, 23, 20, 0.8); backdrop-filter: blur(6px);
-  border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
-}
-#gizmo-hint button {
-  padding: 4px 8px; border-radius: 4px; font-size: var(--text-xs); color: var(--text-muted); font-weight: 500;
-}
-#gizmo-hint button.active { background: var(--accent); color: var(--accent-ink); }
-#gizmo-hint button kbd { font-family: inherit; opacity: 0.7; margin-left: 4px; }
-#axis-badge {
-  position: absolute; right: 10px; bottom: 64px; width: 88px; height: 88px; border-radius: 8px;
-  background: rgba(25, 23, 20, 0.55); backdrop-filter: blur(4px); border: 1px solid var(--line-soft);
-  pointer-events: none; z-index: 5;
-}
+.cap-pill.selected { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cap-pill .grip { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+.cap-pill .grip.l { left: 0; } .cap-pill .grip.r { right: 0; }
+#playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--record); z-index: 5; pointer-events: none; }
+#playhead::before { content: ''; position: absolute; top: 0; left: -4px; border: 5px solid transparent; border-top: 7px solid var(--record); }
+#tl-inner.dragging, #tl-inner.dragging * { cursor: ew-resize !important; }
 
-/* ============ ANIMATE workspace ============ */
-#ws-anim.active { grid-template-columns: 210px 1fr; grid-template-rows: 1fr 240px; }
-#anim-viewport { grid-column: 2; position: relative; overflow: hidden; }
-#anim-viewport canvas { width: 100%; height: 100%; touch-action: none; }
-#anim-side {
-  background: var(--panel); border-right: 1px solid var(--line-soft);
-  padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); overflow-y: auto;
+/* export progress overlay */
+#export-overlay {
+  position: fixed; inset: 0; background: rgba(10,9,8,0.82); display: none; place-items: center; z-index: 100;
 }
-#anim-side .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-#playbar { display: flex; align-items: center; gap: var(--space-2); }
-#playbar .time { font-size: var(--text-xs); color: var(--text-muted); min-width: 74px; font-variant-numeric: tabular-nums; }
-#rec-status { font-size: var(--text-xs); color: var(--accent-2); }
-#actor-tools { display: flex; flex-direction: column; gap: var(--space-2); }
-.studio-select { width: 100%; min-width: 0; text-align: left; }
-.rig-badge { color: var(--accent-3); font-size: var(--text-xs); line-height: 1.5; }
-details.studio-details { border-block: 1px solid var(--line); padding-block: var(--space-2); }
-details.studio-details summary { cursor: pointer; font-size: var(--text-xs); padding-block: var(--space-1); }
-.joint-editor { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }
-#main { grid-template-rows: auto minmax(0, 1fr); }
-#topbar { flex-wrap: wrap; min-height: 48px; padding-block: var(--space-2); }
-#anim-side { min-height: 0; }
-#ws-anim.active { grid-template-columns: 240px minmax(0, 1fr); }
-#anim-viewport, #scene-viewport { min-width: 0; min-height: 0; }
-#scene-props input, #scene-props select { min-width: 0; }
-#tl-head { min-height: 32px; }
-#timeline { grid-template-rows: 32px minmax(0, 1fr); }
-.tl-track-label, #tl-track-labels, .shot-chip, .shot-chip .t { font-size: 12px; }
-#timeline {
-  grid-column: 1 / 3; background: var(--panel); border-top: 1px solid var(--line-soft);
-  display: grid; grid-template-rows: 26px 1fr; min-height: 0;
+#export-overlay .card {
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+  padding: var(--space-8); text-align: center; min-width: 320px;
 }
-#tl-head {
-  display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3);
-  font-size: var(--text-xs); color: var(--text-muted); overflow: hidden;
-}
-#tl-head .btn { padding: 3px 8px; }
-#shot-strip { flex: 1; display: flex; gap: 3px; height: 22px; min-width: 60px; position: relative; margin: 0 var(--space-2); }
-.shot-chip {
-  position: relative; min-width: 34px; border-radius: 4px; background: var(--panel-3);
-  border: 1px solid var(--line-soft); color: var(--text-muted); font-size: 10px;
-  display: flex; align-items: center; justify-content: center; white-space: nowrap; cursor: pointer;
-  overflow: hidden; transition: background var(--transition-interactive);
-}
-.shot-chip:hover { background: #383431; }
-.shot-chip.active { background: var(--accent); color: var(--accent-ink); font-weight: 600; border-color: var(--accent); }
-.shot-chip .t { position: absolute; right: 3px; bottom: 1px; font-size: 9px; opacity: 0.75; }
-#shot-strip-playhead { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--accent-2); pointer-events: none; z-index: 2; }
-#shot-duration { width: 100%; background: var(--panel-3); border: 1px solid var(--line-soft); border-radius: var(--radius-sm); color: var(--text); padding: 5px 8px; }
-#shot-list { display: flex; flex-direction: column; gap: 4px; }
-.shot-row { display: flex; gap: 4px; align-items: stretch; }
-.shot-row .main {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 6px 8px;
-  background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
-  font-size: var(--text-xs); text-align: left;
-}
-.shot-row .main:hover { background: var(--panel-3); }
-.shot-row.active .main { border-color: var(--accent); background: var(--panel-3); }
-.shot-row .idx { color: var(--text-faint); font-weight: 600; }
-.shot-row .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.shot-row .dur { color: var(--text-faint); }
-.shot-row .mini, .audio-row .mini {
-  width: 26px; flex: none; background: var(--panel-3); border-radius: 4px; color: var(--text-muted);
-  font-size: var(--text-xs); display: grid; place-items: center;
-}
-.shot-row .mini:hover, .audio-row .mini:hover { color: var(--accent-2); }
-#audio-list { display: flex; flex-direction: column; gap: 6px; }
-.audio-row {
-  background: var(--panel-2); border: 1px solid var(--line-soft); border-radius: var(--radius-sm);
-  padding: 6px; display: flex; flex-direction: column; gap: 5px;
-}
-.audio-row .an { font-size: var(--text-xs); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.audio-row .ar { display: flex; align-items: center; gap: 6px; font-size: 10px; color: var(--text-muted); }
-.audio-row .ar input[type=number] { width: 58px; background: var(--panel-3); border: 1px solid var(--line-soft); border-radius: 4px; color: var(--text); padding: 2px 4px; }
-.audio-row .ar input[type=range] { flex: 1; }
-#tl-body { display: flex; min-height: 0; min-width: 0; }
-#tl-tracks { width: 158px; flex: none; border-right: 1px solid var(--line-soft); overflow: hidden; background: var(--panel); }
-#tl-track-labels { height: 26px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; padding: 0 var(--space-2); font-size: 10px; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.06em; }
-#tl-track-list { overflow-y: auto; overflow-x: hidden; }
-#tl-track-list { height: calc(100% - 26px); }
-.tl-track-label {
-  height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 var(--space-2);
-  font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; border-bottom: 1px solid var(--line-soft);
-  white-space: nowrap; overflow: hidden;
-}
-.tl-track-label:hover { background: var(--panel-3); }
-.tl-track-label .chip { width: 16px; height: 16px; border-radius: 4px; flex: none; background: #f6f1e6; overflow: hidden; }
-.tl-track-label .chip img { width: 100%; height: 100%; object-fit: contain; }
-.tl-track-label .dotmark { width: 8px; height: 8px; border-radius: 99px; background: var(--text-faint); flex: none; }
-.tl-track-label.has-keys .dotmark { background: var(--accent); }
-#tl-scroll { flex: 1; min-width: 0; overflow: auto; position: relative; background: var(--bg); }
-#tl-canvas-wrap { position: relative; height: 100%; min-width: 100%; }
-#tl-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
-#tl-keys { position: absolute; inset: 0; }
-.tl-key {
-  position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px;
-  display: grid; place-items: center; cursor: grab; touch-action: none;
-}
-.tl-key .diamond { width: 11px; height: 11px; background: var(--accent); transform: rotate(45deg); border-radius: 2px; outline: 2px solid rgba(25,23,20,0.9); }
-.tl-key:hover .diamond { background: var(--accent-strong); }
-.tl-key.selected .diamond { background: var(--accent-2); box-shadow: 0 0 0 2px rgba(224, 93, 93, 0.35); }
-.tl-key.played .diamond { background: var(--text); }
-.tl-playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--accent-2); pointer-events: none; }
-.tl-playhead::after {
-  content: ''; position: absolute; top: 0; left: -5px; border: 5px solid transparent; border-top-color: var(--accent-2);
-}
-.tl-row { position: absolute; left: 0; right: 0; height: 26px; border-bottom: 1px solid var(--line-soft); }
-.tl-row.active { background: rgba(242, 178, 92, 0.06); }
-
-/* ============ toast ============ */
-#toasts { position: fixed; bottom: var(--space-4); right: var(--space-4); display: flex; flex-direction: column; gap: 8px; z-index: 100; }
-.toast {
-  padding: 10px 14px; border-radius: var(--radius-md); font-size: var(--text-sm);
-  background: var(--panel-3); color: var(--text); border: 1px solid var(--line);
-  box-shadow: var(--shadow-lg); animation: toast-in 240ms cubic-bezier(0.16, 1, 0.3, 1); max-width: 300px;
-}
-@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
-
-.empty-note { font-size: var(--text-xs); color: var(--text-faint); line-height: 1.5; }
-.empty-state { text-align: center; color: var(--text-faint); font-size: var(--text-sm); padding: var(--space-8); }
-.empty-state b { color: var(--text-muted); display: block; margin-bottom: 4px; font-weight: 600; }
-
-@media (max-width: 900px) {
-  #ws-draw.active, #ws-char.active { grid-template-columns: 1fr; display: block; overflow-y: auto; }
-  #ws-scene.active, #ws-anim.active { grid-template-columns: 1fr; display: flex; flex-direction: column; overflow-y: auto; }
-  #scene-viewport { order: 1; flex: none; height: 46dvh; }
-  #timeline { order: 3; flex: none; height: 220px; grid-column: auto; }
-  #anim-viewport { order: 1; flex: none; height: 40dvh; }
-  #scene-side { order: 4; }
-  #anim-side { order: 5; }
-  #scene-props { order: 6; }
-  #draw-side, #char-side, #char-props, #scene-side, #scene-props, #anim-side {
-    display: flex; border-left: none; border-right: none; border-top: 1px solid var(--line-soft); max-height: none;
-  }
-  #draw-stage, #char-stage { min-height: 52dvh; padding: var(--space-3); }
-  #tl-tracks { width: 110px; }
-  #topbar { flex-wrap: wrap; height: auto; min-height: 48px; padding: 8px 12px; row-gap: 6px; }
-  #topbar h1 { font-size: 15px; }
-  #topbar .tag, #save-state, #btn-download-video { display: none; }
-  #app { grid-template-columns: 44px minmax(0, 1fr); }
-  #main, #content { min-height: 0; }
-  #topbar { gap: var(--space-1); padding-inline: var(--space-2); }
-  #topbar .btn { padding: 5px 7px; font-size: var(--text-xs); }
-  #anim-viewport { min-height: 240px; }
-  #timeline { min-height: 220px; }
-  #anim-side, #scene-side, #scene-props { flex-shrink: 0; }
-}
-/* ============ phone: slide-in sheet panels (<=759px) ============ */
-#mobile-dock {
-  position: fixed; right: 10px; top: 50%; transform: translateY(-50%);
-  display: none; flex-direction: column; gap: 8px; z-index: 78;
-}
-.dock-btn {
-  min-width: 44px; min-height: 44px; padding: 6px 10px;
-  border-radius: 999px; background: var(--panel-3); color: var(--text);
-  border: 1px solid var(--line); box-shadow: var(--shadow-md);
-  font-size: var(--text-xs); font-weight: 600; text-align: center;
-}
-.dock-btn:active { background: var(--accent); color: var(--accent-ink); }
-#sheet-backdrop {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-  z-index: 68; display: none; border: none; padding: 0;
-}
-body.any-sheet-open #sheet-backdrop { display: block; }
-
-@media (max-width: 759px) {
-  #mobile-dock { display: flex; }
-  /* viewport-first: canvas fills the screen, panels/timeline become sheets */
-  #ws-draw.active, #ws-char.active, #ws-scene.active, #ws-anim.active {
-    display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); overflow: hidden;
-  }
-  #draw-stage, #char-stage { min-height: 0; padding: var(--space-2); }
-  #scene-viewport, #anim-viewport { order: 0; flex: none; height: auto; min-height: 0; }
-  #draw-side, #char-side, #char-props, #scene-side, #scene-props, #anim-side {
-    position: fixed; top: 0; bottom: 0; right: 0; left: auto;
-    width: min(88vw, 330px); max-height: none; z-index: 70;
-    transform: translateX(103%); transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: var(--shadow-lg); border-left: 1px solid var(--line);
-    overscroll-behavior: contain;
-  }
-  #draw-side.sheet-open, #char-side.sheet-open, #char-props.sheet-open,
-  #scene-side.sheet-open, #scene-props.sheet-open, #anim-side.sheet-open { transform: none; }
-  #timeline {
-    position: fixed; left: 0; right: 0; bottom: 0; top: auto; grid-column: auto;
-    height: min(58dvh, 420px); z-index: 70; border-top: 1px solid var(--line);
-    transform: translateY(103%); transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: var(--shadow-lg);
-  }
-  #timeline.sheet-open { transform: none; }
-  /* comfortable touch targets */
-  .tool { height: 44px; }
-  .btn { padding: 9px 12px; }
-  .btn.small { padding: 8px 10px; }
-  .char-card, .scene-item .btn { padding: 10px; }
-  input[type='range'] { height: 36px; }
-  #topbar { gap: var(--space-1); }
-  #topbar .btn { padding: 8px 10px; font-size: var(--text-xs); }
-}
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+#export-overlay h3 { font-size: var(--text-lg); margin-bottom: var(--space-2); }
+#export-overlay .bar { height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; margin: var(--space-4) 0; }
+#export-overlay .bar i { display: block; height: 100%; background: var(--accent); width: 0%; transition: width 200ms linear; }
+#export-overlay .rec { color: var(--record); font-family: var(--font-mono); font-size: var(--text-sm); }
+.hidden { display: none !important; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
 </style>
-<link rel="stylesheet" href="studio.css?v=0.6.0">
 </head>
 <body>
-<div id="app">
-  <nav id="rail" aria-label="Workspaces">
-    <svg id="logo" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="13" height="13" rx="3" fill="#f2b25c"/><rect x="17" y="17" width="13" height="13" rx="3" fill="#e05d5d"/><rect x="17" y="2" width="13" height="13" rx="3" fill="#4fb3a4"/><rect x="2" y="17" width="13" height="13" rx="3" fill="#c77b9e"/></svg>
-    <button class="rail-btn" data-ws="draw" title="Draw" aria-label="Draw workspace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16.5 3.5 4 4L7 21l-4 1 1-4z"/><path d="m15 5 4 4"/></svg></button>
-    <button class="rail-btn" data-ws="char" title="Characters" aria-label="Character workspace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></button>
-    <button class="rail-btn" data-ws="scene" title="Scene (3D)" aria-label="3D scene workspace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg></button>
-    <button class="rail-btn" data-ws="anim" title="Animate" aria-label="Animate workspace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 2 2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/><path d="M19 15l1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/></svg></button>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="logo"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>
+    <span>VideoCraft</span>
+  </div>
+  <input id="project-name" type="text" value="Untitled video" aria-label="Project name">
+  <div class="field">
+    <select id="aspect" aria-label="Aspect ratio">
+      <option value="16:9">16:9 · Widescreen</option>
+      <option value="9:16">9:16 · Shorts</option>
+      <option value="1:1">1:1 · Square</option>
+      <option value="4:5">4:5 · Portrait</option>
+      <option value="2.39:1">2.39:1 · Cinema</option>
+    </select>
+  </div>
+  <span class="badge ok" id="dur-badge">0:00</span>
+  <div class="spacer"></div>
+  <button class="btn" id="btn-new">New</button>
+  <button class="btn" id="btn-save">Save</button>
+  <button class="btn" id="btn-open">Open</button>
+  <button class="btn primary" id="btn-export-top">Export</button>
+</header>
+
+<div id="main">
+  <nav id="rail" aria-label="Tools">
+    <button class="rail-btn active" data-tab="media" title="Media"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h14"/><path d="M18 15l6-4-6-4z"/></svg>Media</button>
+    <button class="rail-btn" data-tab="scene" title="3D Scene"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 5-8 5-8-5z"/><path d="M12 22V12"/><path d="M4 7v10l8 5 8-5V7"/></svg>Scene</button>
+    <button class="rail-btn" data-tab="captions" title="Captions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 12h6M14 12h4"/></svg>Caption</button>
+    <button class="rail-btn" data-tab="look" title="Look & render"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 4"/></svg>Look</button>
+    <button class="rail-btn" data-tab="export" title="Export"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/></svg>Export</button>
   </nav>
 
-  <div id="main">
-    <header id="topbar">
-      <h1>VideoCraft</h1>
-      <span class="tag" id="project-tag">Untitled project</span>
-      <span class="spacer"></span>
-      <span id="save-state"></span>
-      <button class="btn ghost" id="btn-starter">Starter scene</button>
-      <button class="btn primary" id="btn-race">3D race movie</button>
-      <button class="btn ghost" id="btn-new">New</button>
-      <button class="btn ghost" id="btn-open">Open</button>
-      <input type="file" id="file-open" accept=".videocraft,.json" class="sr-only">
-      <button class="btn ghost" id="btn-save">Save project</button>
-      <button class="btn ghost" id="btn-download-video">Export movie</button>
-      <a class="btn ghost" id="btn-help" href="docs.html" target="_blank" rel="noopener" style="text-decoration:none">Help</a>
-    </header>
+  <section id="stage">
+    <div id="preview-wrap">
+      <canvas id="preview" width="960" height="540"></canvas>
+      <div id="safe-margins"></div>
+    </div>
+    <div id="transport">
+      <button id="btn-back" class="btn" title="Back to start"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button id="btn-play" title="Play / pause (space)"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button>
+      <span class="time" id="time-label"><b>0:00.00</b> / 0:00.00</span>
+      <div class="spacer"></div>
+      <label class="field"><input type="checkbox" id="safe-toggle"> Safe margins</label>
+      <span class="badge" id="fps-badge">30 fps</span>
+    </div>
+  </section>
 
-    <div id="content">
+  <aside id="inspector">
+    <div class="insp-head" id="insp-head">Media</div>
+    <div class="insp-body" id="insp-body"></div>
+  </aside>
+</div>
 
-      <!-- DRAW -->
-      <section class="ws" id="ws-draw" aria-label="Drawing">
-        <div id="draw-stage">
-          <div id="draw-wrap">
-            <canvas id="draw-canvas"></canvas>
-            <div id="draw-hint">Paint, then Save to assets to use it in your 3D scene</div>
-          </div>
-        </div>
-        <aside id="draw-side">
-          <div class="side-title">Tools</div>
-          <div class="tool-grid" id="draw-tools"></div>
-          <div class="field-row"><label for="brush-size">Size</label><output id="brush-size-out">6</output></div>
-          <input type="range" id="brush-size" min="1" max="80" value="6" aria-label="Brush size">
-          <div class="field-row"><label for="brush-soft">Softness</label><output id="brush-soft-out">0</output></div>
-          <input type="range" id="brush-soft" min="0" max="100" value="0" aria-label="Brush softness">
-          <div class="side-title">Color</div>
-          <input type="color" id="brush-color" value="#2b2417" aria-label="Brush color">
-          <div class="side-title">Shapes</div>
-          <div class="shape-grid" id="draw-shapes"></div>
-          <label class="chk"><input type="checkbox" id="draw-fill" checked> Fill shape</label>
-          <div class="side-title">Canvas</div>
-          <button class="btn" id="btn-clear">Clear canvas</button>
-          <button class="btn" id="btn-undo">Undo</button>
-          <div class="side-title">Assets</div>
-          <button class="btn primary" id="btn-save-asset">Save to assets</button>
-          <div id="asset-list"></div>
-        </aside>
-      </section>
-
-      <!-- CHARACTER -->
-      <section class="ws" id="ws-char" aria-label="Character creator">
-        <aside id="char-side">
-          <div class="side-title">Characters</div>
-          <button class="btn primary" id="btn-new-char">+ New character</button>
-          <div id="char-list"></div>
-        </aside>
-        <div id="char-stage"><canvas id="char-canvas" aria-label="Character preview"></canvas></div>
-        <aside id="char-props">
-          <div class="side-title">Name</div>
-          <input class="btn" id="char-name" style="width:100%;text-align:left" aria-label="Character name">
-          <div id="char-tabs">
-            <button data-tab="body" class="active">Body</button>
-            <button data-tab="face">Face</button>
-          </div>
-          <div id="char-tabs-panel"></div>
-          <div class="side-title">Parts & pivots</div>
-          <div class="empty-note">On the stage, drag a part near its pivot to rotate it. Head, torso and hips define the skeleton; arms and legs swing around their joints.</div>
-          <div class="side-title">Presets</div>
-          <button class="btn" id="btn-preset-wave">Wave pose</button>
-          <button class="btn" id="btn-preset-walk">Walk pose</button>
-          <button class="btn" id="btn-preset-idle">Idle pose</button>
-          <div class="side-title">Actions</div>
-          <button class="btn primary" id="btn-save-char">Save character</button>
-          <button class="btn" id="btn-char-copy">Duplicate</button>
-          <button class="btn" id="btn-char-delete">Delete</button>
-        </aside>
-      </section>
-
-      <!-- SCENE -->
-      <section class="ws" id="ws-scene" aria-label="3D scene">
-        <aside id="scene-side">
-          <div class="side-title">Objects</div>
-          <div id="scene-list"></div>
-          <button class="btn" id="btn-clear-scene">Clear scene</button>
-        </aside>
-        <div id="scene-viewport">
-          <div id="gizmo-hint">
-            <button data-gizmo="translate" class="active">Move <kbd>G</kbd></button>
-            <button data-gizmo="rotate">Rotate <kbd>R</kbd></button>
-            <button data-gizmo="scale">Scale <kbd>S</kbd></button>
-            <button data-gizmo="none">Select <kbd>Q</kbd></button>
-            <button id="btn-gizmo-snap" title="Snap moves to 0.25m, rotations to 15°, scale to 0.1">Snap</button>
-            <button id="btn-gizmo-space" title="Toggle between world and local axes">World</button>
-            <button id="btn-gizmo-helpers" title="Show key and rim light helpers">Helpers</button>
-          </div>
-          <canvas id="axis-badge" width="176" height="176" aria-hidden="true"></canvas>
-        </div>
-        <aside id="scene-props"></aside>
-      </section>
-
-      <!-- ANIMATE -->
-      <section class="ws" id="ws-anim" aria-label="Animation">
-        <aside id="anim-side">
-          <div class="side-title">Timeline</div>
-          <div id="playbar">
-            <button class="btn small" id="btn-play" aria-label="Play or pause">
-              <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-              <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
-            </button>
-            <span class="time" id="time-label">0.00s / 0.00s</span>
-          </div>
-          <button class="btn" id="btn-movie">Play movie</button>
-          <div class="field-row"><label for="shot-duration">Shot duration (s)</label><output id="shot-duration-out">5s</output></div>
-          <input type="number" id="shot-duration" min="0.5" step="0.5" value="5" aria-label="Shot duration in seconds">
-          <div class="field-row"><label for="anim-fps">FPS</label><output id="anim-fps-out">30</output></div>
-          <input type="range" id="anim-fps" min="10" max="60" step="5" value="30" aria-label="Frames per second">
-          <div class="side-title">Shots</div>
-          <div id="shot-list"></div>
-          <div class="row2">
-            <button class="btn" id="btn-shot-add">+ Shot</button>
-            <button class="btn" id="btn-shot-dup">Duplicate</button>
-          </div>
-          <div class="row2">
-            <button class="btn" id="btn-shot-up">Move up</button>
-            <button class="btn" id="btn-shot-down">Move down</button>
-          </div>
-          <button class="btn" id="btn-shot-del">Delete shot</button>
-          <div class="side-title">Selected object</div>
-          <select class="btn" id="anim-object" style="width:100%" aria-label="Animated object"></select>
-          <div class="side-title">Selected channel</div>
-          <div id="anim-channel-info" class="empty-note">Click a track on the timeline, then drag keyframes. Space plays the current shot; Play movie runs the whole film.</div>
-          <div class="row2">
-            <button class="btn" id="btn-key-add">Add key</button>
-            <button class="btn" id="btn-key-del">Delete key</button>
-          </div>
-          <div id="key-editor" hidden>
-            <label class="side-title" for="key-time">Key time (s)</label>
-            <input class="btn studio-select" id="key-time" type="number" step="0.01" min="0">
-            <label class="side-title" for="key-value">Key value</label>
-            <input class="btn studio-select" id="key-value" type="number" step="0.1">
-          </div>
-          <div class="field-row"><label for="key-ease">Easing</label></div>
-          <select class="btn" id="key-ease" style="width:100%" aria-label="Key easing">
-            <option value="linear">Linear</option>
-            <option value="ease" selected>Smooth (ease)</option>
-            <option value="step">Step (hold)</option>
-          </select>
-          <div class="side-title">Actor performance</div>
-          <div id="actor-tools"></div>
-          <details class="studio-details">
-            <summary>Cinematography</summary>
-            <div class="joint-editor">
-              <label class="side-title" for="camera-preset">Camera move</label>
-              <select class="btn studio-select" id="camera-preset">
-                <option value="dolly">Dolly in</option><option value="pullback">Pull back</option>
-                <option value="orbit">Orbit subject</option><option value="crane">Crane reveal</option>
-                <option value="tracking">Track selected actor</option>
-              </select>
-              <button class="btn" id="btn-camera-preset">Apply camera move</button>
-              <label class="side-title" for="camera-lens">Lens (full-frame equivalent)</label>
-              <select class="btn studio-select" id="camera-lens">
-                <option value="24">24mm wide</option><option value="35" selected>35mm cinema</option>
-                <option value="50">50mm natural</option><option value="85">85mm portrait</option>
-              </select>
-              <button class="btn" id="btn-camera-lens">Set lens</button>
-              <label class="side-title" for="shot-lighting">Shot lighting</label>
-              <select class="btn studio-select" id="shot-lighting">
-                <option value="studio">Warm studio</option><option value="daylight">Daylight stadium</option>
-                <option value="sunset">Golden hour</option><option value="night">Blue-hour floodlights</option>
-              </select>
-              <div class="empty-note">Camera moves become editable timeline keys. Lighting is saved independently for each shot.</div>
-            </div>
-          </details>
-          <details class="studio-details" id="look-details">
-            <summary>Look & effects</summary>
-            <div class="joint-editor" id="look-panel"></div>
-          </details>
-          <details class="studio-details" id="cutscene-details">
-            <summary>Cutscene & transitions</summary>
-            <div class="joint-editor" id="events-panel"></div>
-          </details>
-          <div id="anim-audio-home"><div id="movie-audio-tools" class="studio-stack">
-          <div class="side-title">Audio</div>
-          <button class="btn" id="btn-audio-add">+ Add audio file</button>
-          <input type="file" id="file-audio" accept="audio/*" class="sr-only">
-          <div id="audio-list"></div>
-          </div></div>
-          <div id="anim-export-home"><div id="movie-export-tools" class="studio-stack">
-          <div class="side-title">Export movie</div>
-          <label class="side-title" for="export-mode">Render mode</label>
-          <select class="btn studio-select" id="export-mode">
-            <option value="offline" selected>Frame-accurate (video only)</option>
-            <option value="realtime">Real-time recording (with audio)</option>
-          </select>
-          <div class="field-row"><label for="export-res">Resolution</label></div>
-          <select class="btn" id="export-res" style="width:100%" aria-label="Export resolution">
-            <option value="1280">1280 px wide (HD landscape)</option>
-            <option value="1920">1920 px wide (Full HD landscape)</option>
-            <option value="3840">3840 wide (4K landscape; demanding)</option>
-          </select>
-          <label class="side-title" for="export-aspect">Frame shape</label>
-          <select class="btn studio-select" id="export-aspect">
-            <option value="16:9">16:9 widescreen</option><option value="2.39:1">2.39:1 cinema</option>
-            <option value="9:16">9:16 vertical</option><option value="1:1">1:1 square</option>
-          </select>
-          <div class="field-row"><label for="export-quality">Quality</label></div>
-          <select class="btn" id="export-quality" style="width:100%" aria-label="Export bitrate">
-            <option value="high">High (8 Mbps)</option>
-            <option value="medium">Medium (4 Mbps)</option>
-            <option value="low">Small file (2.5 Mbps)</option>
-          </select>
-          <div class="field-row"><label for="export-start">Range start (s)</label></div>
-          <input type="number" id="export-start" min="0" step="0.1" value="0" style="width:100%" aria-label="Export range start in seconds">
-          <div class="field-row"><label for="export-end">Range end (s)</label></div>
-          <input type="number" id="export-end" min="0" step="0.1" placeholder="end of movie" style="width:100%" aria-label="Export range end in seconds">
-          <div class="empty-note" id="export-range-hint">Export a section (frame-accurate mode): leave both blank for the whole movie, or set a start/end in seconds — great for long movies, exported in stitchable chunks. Sections start at timestamp zero; join parts with a remux tool (e.g. ffmpeg concat) and mix audio separately.</div>
-          <button class="btn primary" id="btn-record">Export movie (webm)</button>
-          <span id="rec-status"></span>
-          <div class="empty-note">Frame-accurate mode renders every frame, even on slow devices, but does not include audio yet. Choose real-time recording for sound and keep the tab visible. Both modes export all shots back to back.</div>
-          </div></div>
-        </aside>
-        <div id="anim-viewport"></div>
-        <div id="timeline">
-          <div id="tl-head">
-            <span>Movie</span>
-            <div id="shot-strip"><div id="shot-strip-playhead"></div></div>
-            <button class="btn small" id="btn-zoom-fit">Fit</button>
-          </div>
-          <div id="tl-body">
-            <div id="tl-tracks"><div id="tl-track-labels">Tracks</div><div id="tl-track-list"></div></div>
-            <div id="tl-scroll"><div id="tl-canvas-wrap"><canvas id="tl-canvas"></canvas><div id="tl-keys"></div><div class="tl-playhead" id="tl-playhead"></div></div></div>
-          </div>
-        </div>
-      </section>
-
+<footer id="timeline">
+  <div id="tl-head">
+    <span class="title">Timeline</span>
+    <div class="spacer" style="flex:1"></div>
+    <label class="field">Zoom <input type="range" id="tl-zoom" min="20" max="400" value="80"></label>
+    <button class="btn tiny" id="btn-split">Split at playhead</button>
+    <button class="btn tiny danger" id="btn-del">Delete selected</button>
+  </div>
+  <div id="tl-body">
+    <div id="tl-labels">
+      <div class="tl-label">Ruler</div>
+      <div class="tl-label">V1 <span class="tag">video</span></div>
+      <div class="tl-label">A1 <span class="tag">audio</span></div>
+      <div class="tl-label">Caps <span class="tag">text</span></div>
+    </div>
+    <div id="tl-scroll">
+      <div id="tl-inner">
+        <div id="ruler"><canvas id="ruler-canvas"></canvas></div>
+        <div class="tl-track" id="track-v"></div>
+        <div class="tl-track" id="track-a"></div>
+        <div class="tl-track cap" id="track-cap"></div>
+        <div id="playhead"></div>
+      </div>
     </div>
   </div>
+</footer>
+
+<div id="export-overlay">
+  <div class="card">
+    <h3>Recording export</h3>
+    <p class="note" id="export-note">Recording in real time…</p>
+    <div class="bar"><i id="export-bar"></i></div>
+    <span class="rec" id="export-time">0:00.00</span>
+  </div>
 </div>
-<div id="toasts" aria-live="polite"></div>
-<div id="sheet-backdrop"></div>
-<nav id="mobile-dock" aria-label="Panels"></nav>
-<script>
-/* Phone UI: side panels and the timeline become slide-in sheets, opened from a
-   floating dock. Desktop/tablet layouts are untouched. No app handlers change. */
-(function () {
-  var PANELS = {
-    'ws-draw': [['draw-side', 'Tools']],
-    'ws-char': [['char-side', 'Cast'], ['char-props', 'Props']],
-    'ws-scene': [['scene-side', 'Shots'], ['scene-props', 'Props']],
-    'ws-anim': [['anim-side', 'Animate']]
-  };
-  var dock = document.getElementById('mobile-dock');
-  var backdrop = document.getElementById('sheet-backdrop');
-  function closeAll() {
-    document.querySelectorAll('.sheet-open').forEach(function (el) { el.classList.remove('sheet-open'); });
-    document.body.classList.remove('any-sheet-open');
-  }
-  function toggle(id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    var wasOpen = el.classList.contains('sheet-open');
-    closeAll();
-    if (!wasOpen) { el.classList.add('sheet-open'); document.body.classList.add('any-sheet-open'); }
-  }
-  backdrop.addEventListener('click', closeAll);
-  function refresh() {
-    var phone = window.matchMedia('(max-width: 759px)').matches;
-    if (!phone) { closeAll(); return; }
-    var active = document.querySelector('.ws.active');
-    var wsId = active ? active.id : null;
-    if (wsId !== refresh._ws) { closeAll(); refresh._ws = wsId; }
-    dock.innerHTML = '';
-    (PANELS[wsId] || []).forEach(function (def) {
-      var b = document.createElement('button');
-      b.className = 'dock-btn'; b.type = 'button'; b.textContent = def[1];
-      b.setAttribute('aria-label', 'Toggle ' + def[1] + ' panel');
-      b.addEventListener('click', function () { toggle(def[0]); });
-      dock.appendChild(b);
-    });
-    if (wsId === 'ws-anim') {
-      var t = document.createElement('button');
-      t.className = 'dock-btn'; t.type = 'button'; t.textContent = 'Timeline';
-      t.setAttribute('aria-label', 'Toggle timeline');
-      t.addEventListener('click', function () { toggle('timeline'); });
-      dock.appendChild(t);
-    }
-  }
-  window.addEventListener('resize', refresh);
-  window.addEventListener('orientationchange', refresh);
-  new MutationObserver(refresh).observe(document.getElementById('content'), { attributes: true, subtree: true, attributeFilter: ['class'] });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeAll(); });
-  refresh();
-})();
-</script>
+
+<input type="file" id="file-import" accept="video/*,image/*,audio/*" multiple class="hidden">
+<input type="file" id="file-open" accept=".vfproject,.json" class="hidden">
+
 <script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-  }
-}
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
 </script>
-<script type="module" src="app.js?v=0.6.6"></script>
+<script type="module" src="app.js?v=1.0.2"></script>
 </body>
 </html>
