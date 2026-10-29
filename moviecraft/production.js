@@ -1,5 +1,5 @@
 // Renderer-independent, additive production workspace data.
-import { validateCharacter } from './vf-charcraft.js';
+import { validateCharacter } from './charcraft.js';
 export const PART_TYPES = ['box', 'sphere', 'cylinder', 'cone', 'torus'];
 export const PRODUCTION_TABS = ['plan', 'design', 'assets', 'board', 'sound', 'delivery', 'forge'];
 const text = (v, fallback = '') => typeof v === 'string' ? v.slice(0, 1000000) : fallback;

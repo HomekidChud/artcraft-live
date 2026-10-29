@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { buildModel, disposeModel } from './vf-models.js';
-import { PRODUCTION_TABS, PART_TYPES, newPart, validateModel, modelTemplate, modelInstance, makeId } from './vf-production.js';
-import { FORGE_PART_TYPES, newBone, newPart as newForgePart, humanoidTemplate, blankCharacter, validateCharacter } from './vf-charcraft.js';
-import { buildCharacterGroup } from './vf-charbuild.js';
+import { buildModel, disposeModel } from './models.js';
+import { PRODUCTION_TABS, PART_TYPES, newPart, validateModel, modelTemplate, modelInstance, makeId } from './production.js';
+import { FORGE_PART_TYPES, newBone, newPart as newForgePart, humanoidTemplate, blankCharacter, validateCharacter } from './charcraft.js';
+import { buildCharacterGroup } from './charbuild.js';
 
 const names = { plan: 'Planning', design: 'Design', assets: 'Assets', board: 'Storyboard', sound: 'Sound', delivery: 'Delivery', forge: 'Forge' };
 const icons = {
@@ -289,7 +289,7 @@ export function createStudioWorkspaces(api) {
               s().draft = { name: asset.name, assetId: asset.id, parts: structuredClone(asset.parts) };
               selectedPart = null; change(); open('design');
             }),
-            button('Export model JSON', () => downloadJSON({ format: 'moviecraft.model.v1', model: asset }, asset.name.replace(/[^a-z0-9-_]/gi, '_') + '.model.json')),
+            button('Export model JSON', () => downloadJSON({ format: 'videocraft.model.v1', model: asset }, asset.name.replace(/[^a-z0-9-_]/gi, '_') + '.model.json')),
             button('Remove library model', () => {
               if (!confirm('Remove this library model? Existing shot instances will be kept.')) return;
               s().models = s().models.filter(m => m.id !== asset.id); if (s().draft.assetId === asset.id) s().draft.assetId = ''; change(); renderCards();
@@ -577,7 +577,7 @@ export function createStudioWorkspaces(api) {
       } catch (e) { api.toast(e.message); }
     }));
     const exportBtn = button('Export character JSON', () => {
-      try { downloadJSON({ format: 'moviecraft.character.v1', character: validateCharacter(draft) }, draft.name.replace(/[^a-z0-9-_]/gi, '_') + '.character.json'); }
+      try { downloadJSON({ format: 'videocraft.character.v1', character: validateCharacter(draft) }, draft.name.replace(/[^a-z0-9-_]/gi, '_') + '.character.json'); }
       catch (e) { api.toast(e.message); }
     });
     const importInput = node('input'); importInput.type = 'file'; importInput.accept = '.json'; importInput.hidden = true;

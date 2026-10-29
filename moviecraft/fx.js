@@ -2,8 +2,8 @@
 // function of (seed, t) — no simulation state — so scrubbing, playback and
 // frame-accurate export all produce identical frames.
 import * as THREE from 'three';
-import { FX_PRESETS, fxSeeds } from './vf-fx-core.js';
-export { FX_KINDS, FX_LABELS, FX_PRESETS, defaultFxProps, fxParticleAge, fxAgeFade } from './vf-fx-core.js';
+import { FX_PRESETS, fxSeeds } from './fx-core.js?v=0.8.1';
+export { FX_KINDS, FX_LABELS, FX_PRESETS, defaultFxProps, fxParticleAge, fxAgeFade } from './fx-core.js?v=0.8.1';
 
 
 

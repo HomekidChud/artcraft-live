@@ -1,7 +1,7 @@
 // Cutscene events & shot transitions — pure, deterministic evaluation.
 // Event visibility is derived from shot-local time only: scrubbing backwards,
 // switching shots and exporting individual frames all produce the same state.
-import { makeId } from './vf-production.js';
+import { makeId } from './production.js';
 
 export const EVENT_TYPES = ['title', 'subtitle', 'fadein', 'fadeout', 'letterbox', 'shake'];
 export const EVENT_LABELS = {

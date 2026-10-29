@@ -3,8 +3,8 @@
 // bones. Posing rotates bones; motion presets apply only when the character
 // contains the standard joint names (see isPresetCompatible).
 import * as THREE from 'three';
-import { motionPose, JOINTS } from './vf-motion.js';
-import { isPresetCompatible } from './vf-charcraft.js';
+import { motionPose, JOINTS } from './motion.js';
+import { isPresetCompatible } from './charcraft.js';
 
 const D2R = Math.PI / 180;
 

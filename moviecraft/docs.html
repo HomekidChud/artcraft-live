@@ -116,7 +116,7 @@ footer { border-top: 1px solid var(--line-soft); padding: var(--space-6) 0; colo
       <li><strong>Animate</strong> — in the <strong>Animate</strong> workspace, set a keyframe (position/rotation/scale per object), scrub the timeline, move things, key again. Add more shots and reorder them into a movie.</li>
       <li><strong>Export</strong> — use <strong>Export movie</strong> in frame-accurate mode. Leave the range fields blank for the whole movie, or fill them to export one section at a time.</li>
     </ol>
-    <div class="note"><p>Everything runs locally in your browser — no account, no upload. Projects save as a small <code>.moviecraft</code> JSON file you can reopen, share, or hand to another tool.</p></div>
+    <div class="note"><p>Everything runs locally in your browser — no account, no upload. Projects save as a small <code>.videocraft</code> JSON file you can reopen, share, or hand to another tool.</p></div>
   </section>
 
   <section id="workspaces">
@@ -145,20 +145,6 @@ footer { border-top: 1px solid var(--line-soft); padding: var(--space-6) 0; colo
       </tbody>
     </table>
     <p>Because particles are seeded deterministically from the timeline, scrubbing back and forth shows the same particles — no randomness between preview and export.</p>
-  </section>
-
-  <section id="styles">
-    <h3>Render styles — film & anime</h3>
-    <p>MovieCraft has two render styles, set movie-wide in <strong>Look & effects</strong> and overridable <strong>per shot</strong> in the Cinematography panel. Both render into exports in both export modes.</p>
-    <table>
-      <thead><tr><th>Style</th><th>What it does</th><th>Controls</th></tr></thead>
-      <tbody>
-        <tr><td><strong>Film</strong></td><td>PBR materials, ACES tone mapping, bloom, depth of field, colour grades, film grain, vignette, chromatic aberration — and <strong>anamorphic lens flares</strong>, horizontal blue streaks that bloom off bright highlights.</td><td>Flare strength, plus all the classic look controls</td></tr>
-        <tr><td><strong>Anime</strong></td><td>Stepped <strong>toon shading</strong> (2–5 light steps), <strong>ink outlines</strong> from a per-frame depth pass (they track characters, keyframed motion and imported GLBs), and a bright, saturated anime colour grade.</td><td>Ink outline strength, toon steps</td></tr>
-      </tbody>
-    </table>
-    <p>The per-shot <strong>Render style</strong> selector lets one movie mix both: film for your establishing shots, anime for the showdown. Pair the anime style with the <strong>Anime bright key</strong> lighting preset for the full cel look. New anime grades: <code>anime</code> and <code>anime-dusk</code>.</p>
-    <p>Try it: hit <strong>Demo movie</strong> — the four-shot mini movie flips to anime on shot 3.</p>
   </section>
 
   <section id="glb">
@@ -245,7 +231,7 @@ ffmpeg -f concat -safe 0 -i list.txt -c copy movie.webm</code></pre>
       </tbody>
     </table>
     <h4>Project file format</h4>
-    <p>Projects are a single JSON file (extension <code>.moviecraft</code> or <code>.json</code>). Top-level shape:</p>
+    <p>Projects are a single JSON file (extension <code>.videocraft</code> or <code>.json</code>). Top-level shape:</p>
     <pre><code>{
   "version": 2,
   "name": "My film",
