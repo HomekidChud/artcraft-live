@@ -1,4 +1,7 @@
 // VideoCraft — draw / build / animate / make movies in the browser. ArtCraft family tool.
+// v0.8 — cinematic FX engine (deterministic GPU particles: fire, smoke, sparks,
+//        explosions, fountains) + GLB model import for detailed assets.
+// v0.7 — character forge + cutscenes (titles, subtitles, fades, shake).
 // v0.2 — movie studio: shots, per-shot camera, audio, fixed-res export.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -13,6 +16,8 @@ import { boneJoints, isPresetCompatible } from './charcraft.js';
 import { buildCharacterGroup, sketchCharacter } from './charbuild.js';
 import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './cutscene.js';
 import { createCutsceneOverlay } from './overlay.js';
+import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.8.1';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 installWorkspaceShell();
 let studioWorkspaces = null;
@@ -40,6 +45,7 @@ function defaultProject() {
     exportAspect: '16:9',
     studio: defaultStudio(),
     drawings: [],        // { id, name, dataURL } raster assets (movie-wide)
+    glbAssets: [],       // { id, name, dataURL } imported GLB models (movie-wide)
     characters: [],      // character rigs (movie-wide)
     shots: [shot],
     activeShotId: shot.id,
@@ -92,6 +98,7 @@ function migrateProject(data) {
   data.audioAssets = Array.isArray(data.audioAssets) ? data.audioAssets : [];
   data.audioClips = Array.isArray(data.audioClips) ? data.audioClips : [];
   data.studio = normalizeStudio(data.studio);
+  if (!Array.isArray(data.glbAssets)) data.glbAssets = []; // v0.3: imported GLB models
   data.look = { ...defaultLook(), ...(data.look || {}) }; // additive: old projects get the cinematic defaults
   if (!data.shots.some(s => s.id === data.activeShotId)) data.activeShotId = data.shots[0].id;
   return data;
@@ -100,7 +107,7 @@ function migrateProject(data) {
 function serializeProject() {
   return {
     version: 2, name: project.name, fps: project.fps, exportAspect: project.exportAspect,
-    drawings: project.drawings, characters: project.characters,
+    drawings: project.drawings, glbAssets: project.glbAssets, characters: project.characters,
     shots: project.shots, activeShotId: project.activeShotId,
     audioAssets: project.audioAssets, audioClips: project.audioClips,
     studio: project.studio, look: project.look,
@@ -1254,6 +1261,87 @@ function rigTexture(rigRef) {
   return tex;
 }
 
+/* ---------- GLB model import (detailed assets) ---------- */
+const glbCache = new Map(); // assetId -> normalized THREE.Group template (shared geometry/textures)
+const glbPending = new Map(); // assetId -> in-flight parse promise
+const glbLoader = new GLTFLoader();
+function dataURLToArrayBuffer(dataURL) {
+  const base64 = dataURL.slice(dataURL.indexOf(',') + 1);
+  const bin = atob(base64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+// parse (or reuse) an asset's normalized template. Always returns a promise so
+// callers can await readiness — parsing is asynchronous.
+function parseGlbAsset(asset) {
+  const cached = glbCache.get(asset.id);
+  if (cached) return Promise.resolve(cached);
+  const existing = glbPending.get(asset.id);
+  if (existing) return existing;
+  const promise = new Promise((resolve, reject) => {
+    glbLoader.parse(dataURLToArrayBuffer(asset.dataURL), '', gltf => {
+      // normalize once: fit to ~3 units, center, rest on the ground
+      const root = gltf.scene;
+      const box = new THREE.Box3().setFromObject(root);
+      const size = box.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      root.scale.multiplyScalar(3 / maxDim);
+      const box2 = new THREE.Box3().setFromObject(root);
+      const center = box2.getCenter(new THREE.Vector3());
+      root.position.x -= center.x; root.position.y -= box2.min.y; root.position.z -= center.z;
+      root.traverse(m => {
+        if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.userData.sharedAsset = true; }
+      });
+      glbCache.set(asset.id, root);
+      glbPending.delete(asset.id);
+      resolve(root);
+    }, err => {
+      glbPending.delete(asset.id);
+      reject(err);
+    });
+  });
+  glbPending.set(asset.id, promise);
+  return promise;
+}
+function attachGlb(group, asset) {
+  const cached = glbCache.get(asset.id);
+  if (cached) { instanceGlb(group, cached); return; } // synchronous: a cached model must be in the scene for the very next rendered frame
+  parseGlbAsset(asset).then(template => {
+    instanceGlb(group, template);
+    markDirty(); // re-run sync so the finished model lands (and the scene list updates)
+  }).catch(err => {
+    console.error('GLB parse failed', err);
+    toast('Could not read that GLB file — is it a valid glTF binary?');
+  });
+}
+// per-object instance: shares geometry AND textures with the template; materials
+// are cloned (flagged sharedAsset so their maps are never disposed by an
+// instance teardown) so per-object opacity/edits never leak across instances
+function instanceGlb(group, template) {
+  const inst = template.clone(true);
+  inst.traverse(m => {
+    if (m.isMesh) {
+      if (Array.isArray(m.material)) m.material = m.material.map(mm => { const c = mm.clone(); c.userData.sharedAsset = true; return c; });
+      else { m.material = m.material.clone(); m.material.userData.sharedAsset = true; }
+      m.userData.sharedAsset = true; // keep disposeGroup() from freeing the shared geometry
+    }
+  });
+  group.add(inst);
+}
+// await every GLB model the movie references before an export captures frames
+// (parsing is async; without this a freshly-opened project could export
+// missing models — especially ones first used in a later shot). A model that
+// cannot be loaded aborts the export rather than silently rendering without it.
+async function ensureGlbAssetsReady() {
+  const assetIds = new Set();
+  project.shots.forEach(s => (s.sceneObjects || []).forEach(o => { if (o.type === 'glb' && o.assetId) assetIds.add(o.assetId); }));
+  const assets = [...assetIds].map(id => project.glbAssets.find(a => a.id === id)).filter(Boolean);
+  const results = await Promise.allSettled(assets.map(a => parseGlbAsset(a)));
+  const failed = results.filter(r => r.status === 'rejected');
+  if (failed.length) throw new Error('An imported model could not be loaded — export aborted so no frame is captured without it.');
+}
+
 let drawingImageCache = {};
 function drawingTexture(d) {
   let img = drawingImageCache[d.id];
@@ -1286,6 +1374,16 @@ function build3DObject(o) {
     const plane = makeMesh(new THREE.PlaneGeometry(3.8, 0.95), new THREE.MeshStandardMaterial({ map: textTexture(o.text, o.color), transparent: true, side: THREE.DoubleSide, roughness: 0.9 }));
     group.add(plane);
     group.userData.redraw = () => { plane.material.map = textTexture(o.text, o.color); plane.material.needsUpdate = true; };
+  } else if (o.type === 'fx') {
+    // cinematic particle effect — positions are computed in the shader from
+    // timeline time, so preview, playback and both export modes agree exactly
+    const fx = buildFxPoints(o, renderer);
+    group.add(fx.points);
+    group.userData.updateFx = (t, opacity, scaleAvg) => fx.update(t, opacity, scaleAvg, renderer.getPixelRatio());
+  } else if (o.type === 'glb') {
+    // imported GLB model — parsed once per asset, normalized to ~3 units, instanced per object
+    const asset = project.glbAssets.find(a => a.id === o.assetId);
+    if (asset) attachGlb(group, asset);
   } else if (o.type === 'character') {
     const rig = project.characters.find(c => c.id === o.assetId);
     if (rig && rig.kind === 'forge') {
@@ -1381,6 +1479,7 @@ function syncSceneObjects() {
   project.sceneObjects.forEach(o => {
     let g = objectGroups.get(o.id);
     const signature = JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text, o.rigMode, o.modelParts, o.roughness, o.metalness, o.emissive,
+      o.fxKind, o.fxStart, o.intensity, o.fxSize, o.fxSpeed,
       o.rigMode === '3d' ? project.characters.find(c => c.id === o.assetId) : null]);
     const needsRebuild = !g || g.userData.builtFrom !== signature;
     if (needsRebuild) {
@@ -1420,11 +1519,11 @@ function setGroupOpacity(group, value) {
 function disposeGroup(g) {
   g.traverse(m => {
     m.userData.skeleton?.dispose();
-    m.geometry?.dispose?.();
+    if (!m.userData.sharedAsset) m.geometry?.dispose?.(); // GLB geometry is shared with the cache template
     if (m.material) {
       const mats = Array.isArray(m.material) ? m.material : [m.material];
       mats.forEach(mm => {
-        mm.map?.dispose?.();
+        if (!mm.userData?.sharedAsset) mm.map?.dispose?.(); // GLB textures are shared with the cache template
         mm.dispose?.();
       });
     }
@@ -1567,7 +1666,7 @@ function renderSceneList() {
   const list = document.getElementById('scene-list');
   list.innerHTML = '';
   if (!project.sceneObjects.length) {
-    list.innerHTML = '<div class="empty-note">Scene is empty. Add a primitive, engine part, drawing or character below.</div>';
+    list.innerHTML = '<div class="empty-note">Scene is empty. Add a primitive, engine part, effect, drawing or character below.</div>';
   }
   project.sceneObjects.forEach(o => {
     const div = document.createElement('div');
@@ -1602,7 +1701,10 @@ function renderSceneList() {
   ['block', 'piston', 'crankshaft', 'flywheel', 'propeller'].forEach(p => {
     addRow('+ ' + p, () => addEnginePart(p));
   });
+  FX_KINDS.forEach(k => addRow('+ ' + k.toLowerCase() + ' FX', () => addFx(k)));
   addRow('+ text card', addTextCard);
+  addRow('+ import GLB model', importGlbFile);
+  project.glbAssets.forEach(a => addRow('+ model: ' + a.name, () => addGlbObject(a)));
   project.drawings.forEach(d => {
     addRow('+ drawing: ' + d.name, () => addDrawingPlane(d));
   });
@@ -1640,6 +1742,49 @@ function addEnginePart(part) {
   const o = {
     id: uid('obj'), name: part[0].toUpperCase() + part.slice(1), type: 'engineKit', enginePart: part,
     color: '#8a8f96', pos: (() => { const [x, z] = freeSpot(); return [x, 0, z]; })(),
+    rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1,
+  };
+  project.sceneObjects.push(o);
+  syncSceneObjects();
+  selectObject(o.id); markDirty();
+}
+function addFx(kind) {
+  const props = { fxKind: kind, intensity: 1, fxSize: 1, fxSpeed: 1, fxStart: 0 };
+  const o = {
+    id: uid('obj'), name: FX_LABELS[kind] + ' FX', type: 'fx', ...props,
+    color: '#ffffff',
+    pos: (() => { const [x, z] = freeSpot(); return [x, kind === 'fire' || kind === 'smoke' || kind === 'explosion' ? 0.05 : 0.5, z]; })(),
+    rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1,
+  };
+  project.sceneObjects.push(o);
+  syncSceneObjects();
+  selectObject(o.id); markDirty();
+}
+function importGlbFile() {
+  const input = document.createElement('input');
+  input.id = 'glb-file-input'; input.type = 'file'; input.accept = '.glb,model/gltf-binary'; input.style.display = 'none';
+  input.addEventListener('change', () => {
+    input.remove();
+    const file = input.files?.[0];
+    if (!file) return;
+    if (file.size > 40 * 1024 * 1024) { toast('That GLB is over 40 MB — too heavy for a browser project file. Use a smaller/compressed model.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const asset = { id: uid('glb'), name: file.name.replace(/\.glb$/i, ''), dataURL: reader.result };
+      project.glbAssets.push(asset);
+      addGlbObject(asset);
+      toast('Imported "' + asset.name + '" — it is embedded in your project file.');
+    };
+    reader.readAsDataURL(file);
+  });
+  document.body.appendChild(input);
+  input.click();
+}
+function addGlbObject(asset) {
+  const o = {
+    id: uid('obj'), name: asset.name, type: 'glb', assetId: asset.id,
+    color: '#ffffff',
+    pos: (() => { const [x, z] = freeSpot(); return [x, 0, z]; })(),
     rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1,
   };
   project.sceneObjects.push(o);
@@ -1705,6 +1850,21 @@ function renderSceneProps() {
     const ci = document.createElement('input'); ci.type = 'color'; ci.value = o.color;
     ci.addEventListener('input', () => { o.color = ci.value; syncSceneObjects(); markDirty(); });
     panel.appendChild(ci);
+  }
+  if (o.type === 'fx') {
+    const ft = document.createElement('div'); ft.className = 'side-title'; ft.textContent = 'Effect';
+    panel.appendChild(ft);
+    const sel = document.createElement('select'); sel.className = 'btn'; sel.style.width = '100%'; sel.style.textAlign = 'left';
+    FX_KINDS.forEach(k => { const op = document.createElement('option'); op.value = k; op.textContent = FX_LABELS[k]; if (o.fxKind === k) op.selected = true; sel.appendChild(op); });
+    sel.addEventListener('change', () => { o.fxKind = sel.value; syncSceneObjects(); markDirty(); });
+    panel.appendChild(sel);
+    panel.appendChild(mkNum('Intensity', o, 'intensity', v => { o.intensity = v; syncSceneObjects(); markDirty(); }, 0.2, 3, 0.05));
+    panel.appendChild(mkNum('Particle size', o, 'fxSize', v => { o.fxSize = v; syncSceneObjects(); markDirty(); }, 0.2, 3, 0.05));
+    panel.appendChild(mkNum('Speed', o, 'fxSpeed', v => { o.fxSpeed = v; syncSceneObjects(); markDirty(); }, 0.2, 3, 0.05));
+    panel.appendChild(mkNum('Start (s into shot)', o, 'fxStart', v => { o.fxStart = v; syncSceneObjects(); markDirty(); }, 0, 30, 0.1));
+    const fxHint = document.createElement('div'); fxHint.className = 'empty-note';
+    fxHint.textContent = 'Effects run from the shot timeline — scrub or play to preview, and they render identically in exported movies. Explosion is one-shot: set its start time.';
+    panel.appendChild(fxHint);
   }
   if (o.type === 'character') renderActorControls(panel, o);
   const t = document.createElement('div'); t.className = 'side-title'; t.textContent = 'Name';
@@ -1839,7 +1999,13 @@ function evaluateAt(t) {
     if (kf['scale']) { const s = sampleTrack(kf['scale'], T); g.scale.set(o.scale[0] * s, o.scale[1] * s, o.scale[2] * s); }
     else g.scale.fromArray(o.scale);
     // opacity
-    setGroupOpacity(g, kf.opacity ? sampleTrack(kf.opacity, T) : o.opacity ?? 1);
+    const op = kf.opacity ? sampleTrack(kf.opacity, T) : o.opacity ?? 1;
+    setGroupOpacity(g, op);
+    // cinematic FX: advance from timeline time (pure function of t — exports match preview)
+    if (o.type === 'fx' && g.userData.updateFx) {
+      const s = g.scale;
+      g.userData.updateFx(T, op, (Math.abs(s.x) + Math.abs(s.y) + Math.abs(s.z)) / 3);
+    }
     if (o.rigMode === '3d') {
       const joints = { ...(o.joints || {}) };
       Object.keys(kf).filter(ch => ch.startsWith('joint.')).forEach(ch => { joints[ch.slice(6)] = sampleTrack(kf[ch], T); });
@@ -2497,6 +2663,7 @@ async function exportMovie() {
   // unlock/resume audio INSIDE the click gesture, before any await
   getAudioCtx();
   if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  try { await ensureGlbAssetsReady(); } catch (err) { toast(err.message); return; } // GLB models parse asynchronously — never capture a missing model
 
   const resSel = document.getElementById('export-res');
   const qualSel = document.getElementById('export-quality');
@@ -2738,6 +2905,7 @@ async function exportOfflineMovie() {
   if (project.audioClips.length) { toast('Frame-accurate mode is video-only. Choose real-time recording to include your audio.'); return; }
   if (totalDuration() > 300 && !confirm('Frame-accurate export currently keeps the compressed video in memory. For long movies, export shorter sections. Continue?')) return;
   if (moviePlaying) stopMovie(); setPlaying(false); setWorkspace('anim');
+  try { await ensureGlbAssetsReady(); } catch (err) { toast(err.message); return; } // GLB models parse asynchronously — never capture a missing model
   const width = +document.getElementById('export-res').value;
   const [, height] = exportSize(width, project.exportAspect);
   const fps = Math.max(1, Math.min(60, Number(project.fps) || 30));

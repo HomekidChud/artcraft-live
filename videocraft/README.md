@@ -4,12 +4,15 @@ VideoCraft is a static, browser-based scene and movie editor. This upgrade is a
 practical foundation for stylised 3D filmmaking, not a claim of feature parity
 with a Hollywood production pipeline.
 
-Version 0.7 adds the **Character Forge** (build custom characters with your own
-bone rigs, not just preset avatars) and a **cutscene system** (title cards,
-subtitles, fades, cinema bars, camera shake and shot transitions), all baked
-into exported movies. Version 0.6 added the cinematic look/effects pipeline,
-transform gizmos and a majorly more detailed character body. Existing projects
-keep loading; all new fields are additive.
+Version 0.8 adds the **cinematic FX engine** (timeline-driven GPU particle
+effects — fire, smoke, sparks, explosions and fountains — driven by the shot
+timeline, so preview, playback and export repeat the same motion) and **GLB
+model import** for detailed assets. Version 0.7 added the **Character Forge** (build custom
+characters with your own bone rigs, not just preset avatars) and a **cutscene
+system** (title cards, subtitles, fades, cinema bars, camera shake and shot
+transitions), all baked into exported movies. Version 0.6 added the cinematic
+look/effects pipeline, transform gizmos and a majorly more detailed character
+body. Existing projects keep loading; all new fields are additive.
 
 ## Start with a complete movie
 
@@ -157,6 +160,45 @@ movies in both export modes:
 
 The whole look can be switched off with one toggle. The project `look` field is
 additive; old projects load with the cinematic default.
+
+## Cinematic FX (particle effects)
+
+Add fire, smoke, sparks, explosions or fountains from the Scene list. Effects
+are real scene objects — transform, scale, keyframe, duplicate and delete them
+like anything else. Each effect is evaluated from the shot timeline (a
+particle is a pure function of seed and time — there is no simulation state),
+so scrubbing, playing and exporting are all repeatable: the same timeline
+position always produces the same motion.
+
+- **Intensity** scales the particle count, **particle size** and **speed** tune
+  the look, and **start (s)** delays the effect into the shot.
+- **Explosion** is one-shot: it triggers at its start time, burns once and
+  disappears — set the start on the timeline you want the blast.
+- Fire and sparks use additive blending; smoke uses soft alpha so it reads as
+  volumetric against any backdrop.
+- Effects participate in the existing grade/bloom/DoF pipeline, so a fire
+  inside a depth-of-field shot defocuses exactly like the rest of the scene.
+
+## GLB model import
+
+Click **+ import GLB model** in the Scene list to load a static glTF binary
+(.glb) model — for example props and scenery exported from a DCC tool or
+downloaded from a model library. Models are:
+
+- Normalised on import — fitted to about 3 units tall, centred and grounded —
+  so they behave like the built-in objects.
+- Parsed once per asset and instanced per object; geometry and textures are
+  shared with the asset cache, and per-object materials are cloned so opacity
+  and edits never leak between instances.
+- Embedded in the project file as a data URL (kept under 40 MB per model), so
+  projects stay fully self-contained and portable.
+- Awaited before both export modes start, so a freshly-opened project never
+  captures a frame with a model still parsing.
+
+Known limits: static models only. Rigged/skinned GLBs are unsupported —
+skeleton animation is not retargeted to the timeline, and such models may not
+import correctly. If a referenced model fails to load, exports are aborted
+with an error rather than rendering frames without it.
 
 ## Transform gizmos
 
