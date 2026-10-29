@@ -1,4 +1,7 @@
 // VideoCraft — draw / build / animate / make movies in the browser. ArtCraft family tool.
+// v0.10 — full-length exports: frame-accurate export streams to disk (File
+//         System Access API) and muxes an offline Opus mix of the audio clips,
+//         so long movies render in one pass with sound, memory bounded.
 // v0.8 — cinematic FX engine (deterministic GPU particles: fire, smoke, sparks,
 //        explosions, fountains) + GLB model import for detailed assets.
 // v0.7 — character forge + cutscenes (titles, subtitles, fades, shake).
@@ -18,6 +21,7 @@ import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRAN
 import { createCutsceneOverlay } from './overlay.js';
 import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.8.1';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { planBlocks, clipSegmentsInBlock, chunkPlan } from './export-audio.js?v=0.10.2';
 
 installWorkspaceShell();
 let studioWorkspaces = null;
@@ -2649,7 +2653,11 @@ async function exportMovie() {
     finishExport(exportRestore.shotId, exportRestore.cam);
     return;
   }
-  if (exportPreparing) { toast('Preparing the export…'); return; }
+  if (exportPreparing) { // during offline audio preparation the button acts as Stop
+    if (offlinePreparing) { offlineCancel = true; toast('Stopping the export…'); }
+    else toast('Preparing the export…');
+    return;
+  }
   if (exportFinalizing) { toast('Still saving the previous export…'); return; }
   if (!project.shots.length) { toast('Add a shot first'); return; }
   if (document.getElementById('export-mode').value === 'offline') return exportOfflineMovie();
@@ -2889,7 +2897,7 @@ document.addEventListener('visibilitychange', () => {
 });
 document.getElementById('btn-record').addEventListener('click', exportMovie);
 
-let offlineRendering = false, offlineCancel = false;
+let offlineRendering = false, offlineCancel = false, offlinePreparing = false;
 function shotAtGlobal(time) {
   let offset = 0;
   for (const shot of project.shots) {
@@ -2900,12 +2908,19 @@ function shotAtGlobal(time) {
   const shot = project.shots[project.shots.length - 1];
   return { shot, local: shot.duration };
 }
+/* ============================================================
+   Frame-accurate export (WebCodecs + webm-muxer)
+   v0.10: asks for a save location up front and STREAMS the
+   movie to disk (File System Access API + FileSystemWritableFileStream
+   target) — memory stays bounded, so full-length movies export in
+   one pass. It also renders an offline Opus mix of the movie's
+   audio clips and muxes it in, so exports are no longer video-only.
+   Browsers without those APIs fall back to the old in-RAM path
+   (with its length warning) or video-only audio.
+   ============================================================ */
 async function exportOfflineMovie() {
   if (!window.VideoEncoder || !window.VideoFrame) { toast('Frame-accurate export needs WebCodecs. Choose real-time recording in this browser.'); return; }
-  if (project.audioClips.length) { toast('Frame-accurate mode is video-only. Choose real-time recording to include your audio.'); return; }
-  if (totalDuration() > 300 && !confirm('Frame-accurate export currently keeps the compressed video in memory. For long movies, export shorter sections. Continue?')) return;
   if (moviePlaying) stopMovie(); setPlaying(false); setWorkspace('anim');
-  try { await ensureGlbAssetsReady(); } catch (err) { toast(err.message); return; } // GLB models parse asynchronously — never capture a missing model
   const width = +document.getElementById('export-res').value;
   const [, height] = exportSize(width, project.exportAspect);
   const fps = Math.max(1, Math.min(60, Number(project.fps) || 30));
@@ -2925,20 +2940,95 @@ async function exportOfflineMovie() {
   const config = { codec: 'vp8', width, height, bitrate, framerate: fps, latencyMode: 'quality' };
   const restore = { shotId: project.activeShotId, time: animTime, pixelRatio: renderer.getPixelRatio(),
     pos: camera.position.clone(), target: controls.target.clone(), fov: camera.fov };
-  let encoder, encoderError, framesWritten = 0;
+  const base = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_');
+  const part = isSection ? `_part_${(startFrame / fps).toFixed(1).replace('.', '-')}-${(endFrame / fps).toFixed(1).replace('.', '-')}s` : '';
+  const fileName = base + part + '.webm';
+  // Ask for the save location FIRST, while the click's user activation is
+  // fresh. Streaming straight to a real file keeps memory bounded, so
+  // full-length movies can export in a single pass instead of crashing the tab.
+  let saveStream = null;
+  if (typeof window.showSaveFilePicker === 'function') {
+    try {
+      const handle = await window.showSaveFilePicker({ suggestedName: fileName, types: [{ description: 'Video', accept: { 'video/webm': ['.webm'] } }] });
+      saveStream = await handle.createWritable();
+    } catch (e) {
+      if (e?.name === 'AbortError') { toast('Export cancelled — nothing was saved'); return; }
+      saveStream = null; // picker unavailable (e.g. insecure context) — in-RAM fallback below
+    }
+  }
+  if (!saveStream && totalDur > 300 && !confirm('This browser cannot stream the export to disk, so the compressed video is kept in memory. For long movies, export shorter sections. Continue?')) return;
+  let encoder, encoderError, audioEncoder = null, audioError = null, framesWritten = 0, fileFinalized = false;
+  offlineCancel = false; // one reset per export — clicks during preparation or rendering stop it
+  offlinePreparing = true; // the export button acts as Stop while audio is decoded/mixed
   exportPreparing = true; lockExportControls(true);
   try {
+    try { await ensureGlbAssetsReady(); } catch (err) { toast(err.message); return; } // GLB models parse asynchronously — never capture a missing model
     const support = await VideoEncoder.isConfigSupported(config);
     if (!support.supported) throw new Error('This frame size is not supported by the video encoder. Try a smaller frame or real-time mode.');
-    const { Muxer, ArrayBufferTarget } = await import('./vendor/webm-muxer.mjs');
-    const target = new ArrayBufferTarget();
-    const muxer = new Muxer({ target, video: { codec: 'V_VP8', width, height, frameRate: fps }, firstTimestampBehavior: 'strict' });
+    const { Muxer, ArrayBufferTarget, StreamTarget } = await import('./vendor/webm-muxer.mjs');
+    // Stream to disk through the generic StreamTarget (same chunked writes the
+    // muxer's own FileSystemWritableFileStreamTarget uses, without its strict
+    // instanceof check that rejects polyfilled/fake streams). Writes are
+    // chained and watched: a failed disk write aborts the export instead of
+    // producing a corrupt file.
+    let streamWrites = Promise.resolve(), streamWriteError = null;
+    const target = saveStream
+      ? new StreamTarget({ chunked: true, onData: (data, position) => {
+          streamWrites = streamWrites.then(() => saveStream.write({ type: 'write', data, position }))
+            .catch(e => { streamWriteError = streamWriteError || e; });
+        } })
+      : new ArrayBufferTarget();
+    // ---- audio: decode the clips this movie references, then decide if we can mux an Opus mix ----
+    const sampleRate = 48000, channels = 2, opusBitrate = 128000;
+    const decoded = new Map(); // assetId -> AudioBuffer (resampled to 48 kHz by decodeAudioData)
+    const missingAudio = [];
+    if (project.audioClips.length && window.AudioEncoder) {
+      recStatus.textContent = 'Decoding audio…';
+      const decodeCtx = new OfflineAudioContext(channels, 1, sampleRate);
+      const wanted = new Set(project.audioClips.map(c => c.assetId)); // only what the movie references
+      for (const asset of project.audioAssets) {
+        if (!wanted.has(asset.id) || !asset.dataURL || decoded.has(asset.id)) continue;
+        try {
+          const res = await fetch(asset.dataURL);
+          decoded.set(asset.id, await decodeCtx.decodeAudioData(await res.arrayBuffer()));
+        } catch { missingAudio.push(asset.name); }
+      }
+    }
+    // mix time = movie time − range start, snapped to the SAME frame grid as the
+    // video (startFrame/endFrame), so audio and video always cover identical spans.
+    // A clip that began before the range keeps a negative start and continues
+    // from the right source offset instead of restarting.
+    const audioStart = startFrame / fps, audioEnd = endFrame / fps;
+    const mixClips = [];
+    for (const clip of project.audioClips) {
+      const buf = decoded.get(clip.assetId);
+      if (!buf) continue;
+      const start = (clip.start ?? 0) - audioStart;
+      if (start + buf.duration <= 1e-6 || start >= audioEnd - audioStart) continue;
+      mixClips.push({ ...clip, start, duration: buf.duration });
+    }
+    let useAudio = false;
+    if (mixClips.length && window.AudioEncoder) {
+      try { useAudio = (await AudioEncoder.isConfigSupported({ codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: opusBitrate })).supported; }
+      catch { useAudio = false; }
+    }
+    if (project.audioClips.length && !useAudio) toast('Audio could not be included in this export (unsupported encoder or undecodable files) — rendering video only. Real-time recording keeps sound.');
+    const muxer = new Muxer({ target, video: { codec: 'V_VP8', width, height, frameRate: fps },
+      ...(useAudio ? { audio: { codec: 'A_OPUS', numberOfChannels: channels, sampleRate } } : {}),
+      firstTimestampBehavior: 'strict' });
     encoder = new VideoEncoder({
       output: (chunk, metadata) => { try { muxer.addVideoChunk(chunk, metadata); } catch (e) { encoderError = e; } },
       error: e => { encoderError = e; },
     });
     encoder.configure(config);
-    offlineCancel = false; offlineRendering = true; recMode = true; exportPreparing = false;
+    if (useAudio) {
+      audioEncoder = new AudioEncoder({
+        output: (chunk, metadata) => { try { muxer.addAudioChunk(chunk, metadata); } catch (e) { audioError = e; } },
+        error: e => { audioError = e; },
+      });
+      audioEncoder.configure({ codec: 'opus', sampleRate, numberOfChannels: channels, bitrate: opusBitrate });
+    }
+    offlineRendering = true; recMode = true; exportPreparing = false;
     document.getElementById('btn-record').textContent = 'Stop export';
     renderer.setPixelRatio(1); renderer.setSize(width, height, false);
     camera.aspect = width / height; camera.updateProjectionMatrix(); controls.enabled = false;
@@ -2948,51 +3038,110 @@ async function exportOfflineMovie() {
     tcontrols.enabled = false;
     lightHelpers.forEach(h => h.visible = false);
     if (isSection) recStatus.textContent = `Rendering section ${(startFrame / fps).toFixed(1)}s–${(endFrame / fps).toFixed(1)}s (${frameCount} frames)…`;
-    // pipeline the encoder: keep feeding frames and only wait (never flush) when it
-    // saturates — a mid-stream flush() drains the encoder's internal batching and
-    // used to make exports several times slower than the encoder can actually go.
+    // Interleaved render in ~30 s windows: each window's audio is mixed and
+    // encoded just before its video frames. A whole-movie mix buffer would need
+    // GBs for feature-length films — windows stay at ~23 MB, decoded audio
+    // sources are released once no later window needs them, and cancelling
+    // stops audio and video together instead of leaving a full audio tail.
+    // pipeline the video encoder: keep feeding frames and only wait (never
+    // flush) when it saturates — a mid-stream flush() drains the encoder's
+    // internal batching and used to make exports several times slower.
     let lastYield = performance.now();
-    for (let frame = startFrame; frame < endFrame && !offlineCancel; frame++) {
-      if (encoderError) throw encoderError;
-      const time = frame / fps; // scene evaluates at the ORIGINAL movie position
-      const hit = shotAtGlobal(time);
-      if (project.activeShotId !== hit.shot.id) applyShotPlayback(hit.shot.id);
-      animTime = hit.local; movieTime = time; evaluateAt(animTime);
-      camera.lookAt(controls.target); renderFinalFrame(true, hit.local);
-      const outFrame = frame - startFrame; // section output starts at timestamp zero
-      const videoFrame = new VideoFrame(renderer.domElement, { timestamp: Math.round(outFrame * 1e6 / fps), duration: Math.round(1e6 / fps) });
-      try { encoder.encode(videoFrame, { keyFrame: outFrame === 0 || outFrame % (fps * 2) === 0 }); } finally { videoFrame.close(); }
-      framesWritten++;
-      // backpressure: wait while saturated (2ms naps), keeping the pipeline full
-      while (encoder.encodeQueueSize > 8 && !encoderError && !offlineCancel) {
-        await new Promise(r => setTimeout(r, 2));
+    const rangeDur = audioEnd - audioStart;
+    for (const block of planBlocks(rangeDur, 30)) {
+      if (offlineCancel || encoderError || audioError || streamWriteError) break;
+      if (useAudio) {
+        const ctx = new OfflineAudioContext(channels, Math.max(1, Math.ceil(block.duration * sampleRate)), sampleRate);
+        for (const seg of clipSegmentsInBlock(mixClips, block.start, block.duration)) {
+          const src = ctx.createBufferSource(); src.buffer = decoded.get(seg.clip.assetId);
+          const gain = ctx.createGain(); gain.gain.value = seg.clip.volume ?? 1;
+          src.connect(gain); gain.connect(ctx.destination);
+          src.start(seg.when, seg.offset, seg.duration); // clip volume + placement, same as preview
+        }
+        const rendered = await ctx.startRendering();
+        const L = rendered.getChannelData(0);
+        const R = rendered.numberOfChannels > 1 ? rendered.getChannelData(1) : L;
+        for (const step of chunkPlan(block.start, rendered.length, sampleRate, 960)) { // 20 ms Opus frames
+          if (audioError || offlineCancel) break;
+          const data = new Float32Array(step.frames * channels);
+          data.set(L.subarray(step.startSample, step.startSample + step.frames), 0);
+          if (R !== L) data.set(R.subarray(step.startSample, step.startSample + step.frames), step.frames);
+          else data.copyWithin(step.frames, 0, step.frames); // mono source — duplicate L into R
+          const ad = new AudioData({ format: 'f32-planar', sampleRate, numberOfFrames: step.frames, numberOfChannels: channels, timestamp: step.timestampUs, data });
+          try { audioEncoder.encode(ad); } finally { ad.close(); }
+          while (audioEncoder.encodeQueueSize > 16 && !audioError && !offlineCancel) await new Promise(r => setTimeout(r, 2));
+        }
+        recStatus.textContent = `Audio mixed through ${Math.round(block.start + block.duration)}s of ${Math.round(rangeDur)}s…`;
+        // release decoded sources no later window needs — bounded audio memory
+        const blockEnd = block.start + block.duration;
+        for (const id of [...decoded.keys()]) {
+          const stillNeeded = mixClips.some(c => c.assetId === id && (c.start + c.duration) > blockEnd + 1e-9);
+          if (!stillNeeded) decoded.delete(id);
+        }
       }
-      // yield every ~50ms or 6 frames so Stop/progress stay responsive, without
-      // advancing the movie clock (setTimeout, not rAF)
-      if (outFrame % 6 === 5 || performance.now() - lastYield > 50) {
-        recStatus.textContent = `Rendering ${Math.round(framesWritten / frameCount * 100)}% · frame ${framesWritten}/${frameCount}. Slower than real time is normal.`;
-        await new Promise(resolve => setTimeout(resolve, 0));
-        lastYield = performance.now();
+      // this window's video frames, on the section frame grid
+      const f0 = Math.max(startFrame, startFrame + Math.round(block.start * fps));
+      const f1 = Math.min(endFrame, startFrame + Math.round((block.start + block.duration) * fps));
+      for (let frame = f0; frame < f1 && !offlineCancel; frame++) {
+        if (encoderError) throw encoderError;
+        if (streamWriteError) throw streamWriteError; // disk write failed — no corrupt file
+        const time = frame / fps; // scene evaluates at the ORIGINAL movie position
+        const hit = shotAtGlobal(time);
+        if (project.activeShotId !== hit.shot.id) applyShotPlayback(hit.shot.id);
+        animTime = hit.local; movieTime = time; evaluateAt(animTime);
+        camera.lookAt(controls.target); renderFinalFrame(true, hit.local);
+        const outFrame = frame - startFrame; // section output starts at timestamp zero
+        const videoFrame = new VideoFrame(renderer.domElement, { timestamp: Math.round(outFrame * 1e6 / fps), duration: Math.round(1e6 / fps) });
+        try { encoder.encode(videoFrame, { keyFrame: outFrame === 0 || outFrame % (fps * 2) === 0 }); } finally { videoFrame.close(); }
+        framesWritten++;
+        // backpressure: wait while saturated (2ms naps), keeping the pipeline full
+        while (encoder.encodeQueueSize > 8 && !encoderError && !offlineCancel) {
+          await new Promise(r => setTimeout(r, 2));
+        }
+        // yield every ~50ms or 6 frames so Stop/progress stay responsive, without
+        // advancing the movie clock (setTimeout, not rAF)
+        if (outFrame % 6 === 5 || performance.now() - lastYield > 50) {
+          recStatus.textContent = `Rendering ${Math.round(framesWritten / frameCount * 100)}% · frame ${framesWritten}/${frameCount}. Slower than real time is normal.`;
+          await new Promise(resolve => setTimeout(resolve, 0));
+          lastYield = performance.now();
+        }
       }
+      await streamWrites; // window-level write backpressure for streaming exports
+      if (streamWriteError) throw streamWriteError;
+    }
+    if (audioEncoder) {
+      await audioEncoder.flush();
+      if (audioError) throw audioError;
+      if (missingAudio.length) toast(missingAudio.length + ' audio file(s) could not be decoded — the export continues without them');
     }
     await encoder.flush();
     if (encoderError) throw encoderError;
     if (framesWritten) {
       muxer.finalize();
-      const blob = new Blob([target.buffer], { type: 'video/webm' });
-      const base = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_');
-      const part = isSection ? `_part_${(startFrame / fps).toFixed(1).replace('.', '-')}-${(endFrame / fps).toFixed(1).replace('.', '-')}s` : '';
-      const fileName = base + part + (offlineCancel ? '_partial' : '') + '.webm';
-      downloadBlob(blob, fileName);
-      recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps · ${(blob.size / 1e6).toFixed(1)} MB${isSection ? ' (section — stitch parts with ffmpeg concat)' : ''}`;
-      toast('Frame-accurate movie saved');
+      if (saveStream) {
+        await streamWrites; // surface any queued disk-write failure before closing
+        if (streamWriteError) throw streamWriteError;
+        await saveStream.close();
+        fileFinalized = true; // only now is the file safely on disk
+        recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps${useAudio ? ' · audio included' : ''}${isSection ? ' (section — stitch parts with ffmpeg concat)' : ''} — saved to disk as ${fileName}`;
+        toast('Frame-accurate movie saved to disk');
+      } else {
+        const blob = new Blob([target.buffer], { type: 'video/webm' });
+        downloadBlob(blob, fileName.replace(/\.webm$/, (offlineCancel ? '_partial' : '') + '.webm'));
+        recStatus.textContent = `${offlineCancel ? 'Partial movie' : 'Movie'} rendered · ${framesWritten} frames at ${fps} fps · ${(blob.size / 1e6).toFixed(1)} MB${useAudio ? ' · audio included' : ''}${isSection ? ' (section — stitch parts with ffmpeg concat)' : ''}`;
+        toast('Frame-accurate movie saved');
+      }
     } else recStatus.textContent = 'Export cancelled.';
   } catch (e) {
     recStatus.textContent = 'Export failed: ' + e.message;
     toast('Frame-accurate export failed. Try a smaller frame or real-time mode.');
   } finally {
+    // a disk-streamed export that failed or was cancelled before finalizing
+    // discards its partial file rather than leaving a corrupt one behind
+    if (saveStream && !fileFinalized) { try { await saveStream.abort?.(); } catch {} }
     try { encoder?.close(); } catch {}
-    offlineRendering = false; recMode = false; exportPreparing = false;
+    try { audioEncoder?.close(); } catch {}
+    offlineRendering = false; recMode = false; exportPreparing = false; offlinePreparing = false;
     applyShotPlayback(restore.shotId); animTime = restore.time; evaluateAt(animTime);
     camera.position.copy(restore.pos); controls.target.copy(restore.target); camera.fov = restore.fov;
     camera.lookAt(controls.target); renderer.setPixelRatio(restore.pixelRatio); controls.enabled = true; grid.visible = true;

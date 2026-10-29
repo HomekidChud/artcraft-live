@@ -185,30 +185,32 @@ footer { border-top: 1px solid var(--line-soft); padding: var(--space-6) 0; colo
     <h4>Real-time recording</h4>
     <p>Records the canvas with <code>MediaRecorder</code> while the movie plays — includes audio, but the timing depends on your device keeping up. Keep the tab visible and foregrounded.</p>
     <h4>Frame-accurate export</h4>
-    <p>Renders every frame through <code>WebCodecs</code> (VP8, WebM) and muxes a file — identical frames regardless of device speed, no audio yet. This is the mode for reliable output.</p>
+    <p>Renders every frame through <code>WebCodecs</code> (VP8, WebM) and muxes a file — identical frames regardless of device speed. Audio clips are mixed offline and muxed in as an Opus track, so exports are no longer video-only.</p>
     <ul>
       <li><strong>Resolution</strong> — 720p or 1080p, plus the project's export aspect.</li>
       <li><strong>Quality</strong> — 8 / 4 / 2.5 Mbps.</li>
-      <li><strong>Range start / end (seconds)</strong> — export a <strong>section</strong> of a long movie. Blank = whole movie. Sections restart at timestamp zero, so you can render a 30-minute film in stress-free chunks.</li>
+      <li><strong>Range start / end (seconds)</strong> — export a <strong>section</strong> of a long movie. Blank = whole movie. Sections restart at timestamp zero with their audio offset to match, so you can render a 30-minute film in stress-free chunks.</li>
+      <li><strong>Full-length movies</strong> — in browsers with the File System Access API (Chrome, Edge, Opera, and Chromium-based mobile), the export asks where to save and <strong>streams the movie to that file as it renders</strong>. Memory stays bounded, so a feature-length film exports in one pass. Browsers without it fall back to keeping the video in memory, which is only safe for shorts.</li>
     </ul>
     <h4>Stitching sections</h4>
     <p>Sections are standalone WebM files — do not join them by concatenating bytes. Use a remuxing tool, e.g. with ffmpeg:</p>
     <pre><code>printf "file 'part1.webm'\nfile 'part2.webm'\nfile 'part3.webm'\n" > list.txt
 ffmpeg -f concat -safe 0 -i list.txt -c copy movie.webm</code></pre>
-    <p>Each section starts on a keyframe, so concat needs no re-encode. Add audio in the same pass (real-time recording, or your own soundtrack) with a second input and <code>-shortest</code>.</p>
+    <p>Each section starts on a keyframe and carries its own audio, so concat needs no re-encode and the soundtrack comes along for free.</p>
     <div class="note"><p>Export speed: the frame-accurate renderer keeps the encoder pipeline saturated and yields to the UI periodically, so a 720p export typically renders faster than real time on a modern laptop — but plan around real-time-ish speeds on phones.</p></div>
   </section>
 
   <section id="limits">
     <h3>Honest limits</h3>
-    <p>VideoCraft is a browser studio for short 3D films, not a replacement for a render farm. Things you should know before promising anyone a feature-length movie:</p>
+    <p>VideoCraft is a browser studio for stylised 3D films, not a replacement for a render farm. Things you should know before promising anyone a feature-length movie:</p>
     <ul>
-      <li><strong>Memory is the hard wall.</strong> Everything — scene, encoder, muxed video — lives in one browser tab. Movies beyond ~5 minutes of 720p start to strain the tab; beyond ~10 minutes, export in sections.</li>
-      <li><strong>25 minutes in one go: not recommended.</strong> It is roughly 45,000 frames and about 1.5 GB of encoded video buffered in memory before the file is written — on most machines the tab will crash and you lose the render. The supported path for a 25-minute film is: export it in sections (e.g. 3–5 minute chunks), stitch with ffmpeg concat, and add audio separately. That workflow is reliable, resumable and restartable — one crashed section costs minutes, not hours.</li>
-      <li><strong>The >300s warning is real.</strong> Whole-movie exports over five minutes prompt a confirmation first. That is a checkpoint, not a formality — treat it as "use sections".</li>
-      <li><strong>No audio in frame-accurate mode yet.</strong> Real-time recording has sound; frame-accurate exports are video-only.</li>
+      <li><strong>Memory — now much less of a wall.</strong> In browsers with the File System Access API, frame-accurate export streams to a file you pick as it renders: a feature-length movie no longer buffers the whole video in RAM. In browsers without it (Safari, Firefox), the export still keeps the compressed video in memory — keep those to shorts, or export in sections.</li>
+      <li><strong>Audio works in both export modes now.</strong> Frame-accurate export mixes your audio clips offline (30-second blocks, so memory stays bounded at any length) and muxes them in as Opus. Undecodable audio files are skipped with a note rather than aborting the render. One caveat: each audio file is decoded into memory for the mix — a one-hour stereo track is over 1 GB, so keep individual audio files to a few minutes (per scene or per shot) and add a feature-length continuous soundtrack with ffmpeg after stitching, if you need one.</li>
+      <li><strong>Section joins add ~20 ms of audio padding each.</strong> Opus rounds each section's audio to whole packets, so concatenating sections leaves a tiny gap per join — about 1 per section. The one-pass streaming export has no joins, which is the recommended path for long films; sections are for browsers without the save-file dialog or for resumable renders.</li>
+      <li><strong>Rendering time is the real cost of length.</strong> A 90-minute film is ~162,000 frames at 30 fps; at faster-than-real-time speeds that is still hours. Stop export keeps the partial file, and section export remains the restartable path for very long films.</li>
+      <li><strong>The >300s warning</strong> now only appears in the in-memory fallback (browsers without the save-file dialog). Treat it as "use sections or a streaming browser".</li>
       <li><strong>Static GLBs only</strong> — rigged GLB animation is not played back.</li>
-      <li><strong>No Marvel movies.</strong> There is no character mocap, no path-traced global illumination, no crowd systems. What it does — small stylised 3D shorts with FX and camera work — it does well.</li>
+      <li><strong>No Marvel movies.</strong> There is no character mocap, no path-traced global illumination, no crowd systems. What it does — stylised 3D films of any length with FX, camera work and sound — it does well.</li>
     </ul>
   </section>
 

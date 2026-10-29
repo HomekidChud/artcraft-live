@@ -22,6 +22,14 @@ body. Existing projects keep loading; all new fields are additive.
 - **[GUIDE.md](videocraft/GUIDE.md)** — a machine-readable guide for AI agents:
   stable UI selectors, the project JSON schema, key flows, and limits.
 
+Version 0.10 makes **full-length movies a supported path**: frame-accurate
+export now streams to a file you pick (File System Access API) instead of
+buffering the whole movie in RAM, and it mixes your audio clips offline and
+muxes them in as an Opus track — sound in every export mode. Browsers without
+those APIs keep the previous in-memory/video-only behaviour with its warnings.
+The audio-mix math lives in `export-audio.js` (pure, unit-tested); the browser
+glue is in `app.js`.
+
 Version 0.9 adds a **phone UI** (slide-in panel sheets with a floating dock,
 bottom-sheet timeline, touch-sized targets — desktop layouts unchanged),
 **section export** (export long movies frame-accurately in stitchable chunks
@@ -272,9 +280,11 @@ demanding; use a smaller width on limited hardware.
 
 **Frame-accurate** mode evaluates each movie frame at its exact time and encodes
 it with WebCodecs and a vendored WebM muxer. A slow GPU takes longer rather than
-skipping animation frames. This mode is **video-only**: if a movie has audio
-clips, the editor asks you to use real-time recording rather than silently
-discarding sound. WebCodecs needs a supported secure browser/encoder.
+skipping animation frames. Audio clips are mixed offline in 30-second blocks
+(bounded memory at any movie length) and muxed in as an Opus track — exports are
+no longer video-only. Keep individual audio files to a few minutes (they decode
+into memory for the mix); add a feature-length continuous soundtrack with ffmpeg
+afterwards if needed. WebCodecs needs a supported secure browser/encoder.
 
 **Real-time recording** uses MediaRecorder and includes the existing audio mix.
 Frame delivery depends on the machine; a slow browser may record choppy
@@ -284,12 +294,14 @@ do not create an unnecessary audio track.
 4K needs suitable GPU/encoder support and was not performance-certified on
 every device. Stop export saves a partial movie in either mode. Mutating
 controls are locked during export, and the editor's frame size, camera and
-controls are restored afterward. Offline output currently keeps compressed
-video in memory and warns for movies longer than five minutes; use shorter
-sections for large productions rather than assuming feature-length output
-will fit in browser memory.
+controls are restored afterward. In browsers with the File System Access API
+(Chrome, Edge, Opera, Chromium-based mobile), frame-accurate export asks where
+to save and **streams the movie to that file as it renders** — memory stays
+bounded, so full-length films export in one pass. Browsers without it keep the
+compressed video in memory and warn for movies longer than five minutes; use
+shorter sections there rather than assuming feature-length output will fit.
 
-MP4/ProRes, offline audio mixing, path tracing, physically accurate motion blur,
+MP4/ProRes, path tracing, physically accurate motion blur,
 compositing, transition libraries beyond the included cut/fade, GLTF/FBX
 import, external mocap, dialogue/lip-sync and
 distributed/render-farm processing are not implemented here. Depth of field and

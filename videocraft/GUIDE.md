@@ -31,7 +31,7 @@ Machine-readable guide for AI agents driving [VideoCraft](./index.html), a brows
 
 1. **Build**: switch to Scene (`data-ws="scene"`), add objects, set `pos/rot/scale/color/opacity` in `#scene-props`. FX objects: kind in `fire | smoke | sparks | explosion | fountain`, params `intensity`, `fxSize`, `fxSpeed`, `fxStart` (all keyframable).
 2. **Animate**: Animate workspace. Select object, move gizmo, `#btn-key-add` (keyframe). Channels: `pos`, `rot`, `scale` (+ FX params). Shots are sequential; `totalDuration = Σ shot.duration`.
-3. **Export frame-accurate**: set `#export-start`/`#export-end` (seconds; blank = full movie), click `#btn-record`. Output WebM (VP8, 720p/1080p, 8/4/2.5 Mbps). Sections start at timestamp 0 with a keyframe — stitch with ffmpeg concat (`-c copy`), do not byte-concatenate.
+3. **Export frame-accurate**: set `#export-start`/`#export-end` (seconds; blank = full movie), click `#btn-record`. Output WebM (VP8, 720p/1080p, 8/4/2.5 Mbps) with an Opus audio track when the project has audio clips. With `showSaveFilePicker` a save dialog appears first (streams to disk; full-length OK). Sections start at timestamp 0 with a keyframe and their audio offset to match — stitch with ffmpeg concat (`-c copy`), do not byte-concatenate.
 4. **Export real-time**: `#btn-download-video` (MediaRecorder; has audio; keep tab visible).
 5. **Project I/O**: `#btn-save` downloads JSON; `#btn-open` + `#file-open` loads it (runs migration/validation).
 
@@ -78,7 +78,14 @@ Machine-readable guide for AI agents driving [VideoCraft](./index.html), a brows
 
 ## Honest limits (do not oversell to users)
 
-- Frame-accurate export is **video-only** (no audio). Real-time mode has audio.
-- Memory ceiling: whole-movie export beyond ~5 min (720p) risks tab crash; **use section export + ffmpeg concat for anything long**. A 25-minute movie ≈ 45,000 frames ≈ 1.5 GB buffered — one-shot export is not a supported path; sections are.
+- Frame-accurate export **includes audio** (offline Opus mix) since v0.10. Audio
+  files decode into memory for the mix — keep them to a few minutes each.
+- Where `window.showSaveFilePicker` exists (Chromium browsers), frame-accurate
+  export **streams to disk** — memory is bounded, full-length movies export in
+  one pass. Headless runs: stub `window.showSaveFilePicker = undefined` to use
+  the in-RAM fallback, or provide a fake handle whose `createWritable()` returns
+  an object with `write()`/`close()` collecting chunks.
+- Without the File System Access API (Safari, Firefox): whole-movie export
+  beyond ~300 s triggers a `confirm()` and risks tab crash; **use section
+  export + ffmpeg concat for anything long**. Sections carry their own audio.
 - Static GLBs only (no rigged/skinned playback). No mocap, GI, or crowd systems.
-- >300s movies trigger a `confirm()` warning (not a hard block).
