@@ -361,7 +361,7 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
 </style>
-<link rel="stylesheet" href="studio.css?v=0.5.0">
+<link rel="stylesheet" href="studio.css?v=0.6.0">
 </head>
 <body>
 <div id="app">
@@ -461,6 +461,9 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
             <button data-gizmo="rotate">Rotate <kbd>R</kbd></button>
             <button data-gizmo="scale">Scale <kbd>S</kbd></button>
             <button data-gizmo="none">Select <kbd>Q</kbd></button>
+            <button id="btn-gizmo-snap" title="Snap moves to 0.25m, rotations to 15°, scale to 0.1">Snap</button>
+            <button id="btn-gizmo-space" title="Toggle between world and local axes">World</button>
+            <button id="btn-gizmo-helpers" title="Show key and rim light helpers">Helpers</button>
           </div>
           <canvas id="axis-badge" width="176" height="176" aria-hidden="true"></canvas>
         </div>
@@ -540,6 +543,10 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
               <div class="empty-note">Camera moves become editable timeline keys. Lighting is saved independently for each shot.</div>
             </div>
           </details>
+          <details class="studio-details" id="look-details">
+            <summary>Look & effects</summary>
+            <div class="joint-editor" id="look-panel"></div>
+          </details>
           <div id="anim-audio-home"><div id="movie-audio-tools" class="studio-stack">
           <div class="side-title">Audio</div>
           <button class="btn" id="btn-audio-add">+ Add audio file</button>
@@ -601,6 +608,6 @@ details.studio-details summary { cursor: pointer; font-size: var(--text-xs); pad
   }
 }
 </script>
-<script type="module" src="app.js?v=0.5.0"></script>
+<script type="module" src="app.js?v=0.6.0"></script>
 </body>
 </html>

@@ -4,6 +4,10 @@ VideoCraft is a static, browser-based scene and movie editor. This upgrade is a
 practical foundation for stylised 3D filmmaking, not a claim of feature parity
 with a Hollywood production pipeline.
 
+Version 0.6 adds a cinematic look/effects pipeline, transform gizmos and a
+majorly more detailed character body (see below). Existing projects keep
+loading; all new fields are additive.
+
 ## Start with a complete movie
 
 Click **3D race movie**, then **Play movie**. The editable example, **The Final
@@ -58,6 +62,13 @@ them between projects.
 - Newly placed characters are volumetric, weighted `THREE.SkinnedMesh` avatars
   with a 19-bone `THREE.Skeleton`. Geometry is original procedural geometry,
   built from the existing character's body proportions and colours.
+- Version 0.6 bodies are far more detailed: capsule limbs, a shaped torso with
+  waist and chest, a detailed head (skull, jaw, chin, ears, eyeballs with iris
+  and pupil, eyelids, brows, nose and lips), five-fingered hands and shoes with
+  soles. Skin uses a clear-coated `MeshPhysicalMaterial`; cloth uses sheen.
+- Body controls add bulk, shoulder width, neck length, hand and foot size,
+  ears, iris colour and nine hair styles (flat, side, spiky, bald, buzz, afro,
+  mohawk, ponytail, long). Old projects fall back to sensible defaults.
 - The skeleton contains hips, spine, chest, neck, head, shoulders, upper arms,
   forearms, hands, upper/lower legs and feet. Each joint supports X/Y/Z rotation.
 - Choose a character in **Selected object** to open **Actor performance**.
@@ -75,11 +86,40 @@ them between projects.
   **Upgrade this actor to 3D** to convert one instance explicitly. A 3D actor's
   origin is at its feet; conversion adjusts the old billboard's height.
 
-The generated avatars use stylised rigid segment skin weights. They do not
-include production facial rigs, fingers, IK solvers, muscle deformation, motion
+The generated avatars use stylised segment skin weights. They do not include
+production facial animation rigs, IK solvers, muscle deformation, motion
 capture retargeting or realistic anatomy. The Character workspace remains a
 2D design/colour preview; inspect and pose the actual 3D character in Scene or
 Animate.
+
+## Cinematic look and effects
+
+Expand **Look & effects** in Animate. The render pipeline is an
+`EffectComposer` chain (render, depth of field, bloom, grade, output) applied to
+the same canvas the exporter captures, so every effect is baked into exported
+movies in both export modes:
+
+- **Colour grades**: neutral, cinematic, blockbuster, golden, noir and neon,
+  combining lift, gain, contrast, saturation and warmth.
+- **Bloom**, **vignette**, **film grain** (animated) and **chromatic
+  aberration** (grows toward the frame edge, like a real lens).
+- **Depth of field** with focus distance and aperture controls.
+- **Ambient reflections**: a PMREM room environment map lights materials with
+  physically plausible reflections (toggleable for performance).
+
+The whole look can be switched off with one toggle. The project `look` field is
+additive; old projects load with the cinematic default.
+
+## Transform gizmos
+
+Selecting an object in Scene or Animate now shows a full transform gizmo
+(move/rotate/scale handles) instead of ground-plane dragging only:
+
+- Keyboard shortcuts: **G** move, **R** rotate, **S** scale, **Q** select-only.
+- **Snap** toggles 0.25 m / 15° / 0.1 increments; **World/Local** switches the
+  gizmo space; **Helpers** shows the key/rim light direction gizmos.
+- Dragging a handle writes position, rotation and scale back into the project
+  data and timeline, and gizmos hide during movie playback and recording.
 
 ## Cinematography
 
@@ -142,11 +182,12 @@ video in memory and warns for movies longer than five minutes; use shorter
 sections for large productions rather than assuming feature-length output
 will fit in browser memory.
 
-MP4/ProRes, offline audio mixing, path tracing, depth of field, physically accurate motion blur,
-colour grading nodes, compositing, transitions, GLTF/FBX import, external mocap,
-dialogue/lip-sync and distributed/render-farm processing are not implemented here.
-You can make multi-shot stylised movies, but these are future work for a
-professional feature-film pipeline.
+MP4/ProRes, offline audio mixing, path tracing, physically accurate motion blur,
+compositing, transitions, GLTF/FBX import, external mocap, dialogue/lip-sync and
+distributed/render-farm processing are not implemented here. Depth of field and
+colour grading exist (see above) but are stylised real-time effects, not a
+physically based render pipeline. You can make multi-shot stylised movies, but
+these are future work for a professional feature-film pipeline.
 
 ## Development and checks
 

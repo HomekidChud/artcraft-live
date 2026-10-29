@@ -2,10 +2,12 @@
 // v0.2 — movie studio: shots, per-shot camera, audio, fixed-res export.
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { buildAvatar } from './avatar3d.js';
 import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js';
 import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js';
 import { buildModel } from './models.js';
+import { defaultLook, GRADES, createLookEngine } from './effects.js';
 import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
 
 installWorkspaceShell();
@@ -39,6 +41,7 @@ function defaultProject() {
     activeShotId: shot.id,
     audioAssets: [],     // { id, name, dataURL, duration } imported audio (movie-wide)
     audioClips: [],      // { id, assetId, start, volume } placed on the global movie timeline
+    look: defaultLook(), // cinematic look & effects (movie-wide)
     // live mirror of the ACTIVE shot (kept in sync by applyShot / setShotDuration):
     sceneObjects: shot.sceneObjects,
     keyframes: shot.keyframes,
@@ -81,6 +84,7 @@ function migrateProject(data) {
   data.audioAssets = Array.isArray(data.audioAssets) ? data.audioAssets : [];
   data.audioClips = Array.isArray(data.audioClips) ? data.audioClips : [];
   data.studio = normalizeStudio(data.studio);
+  data.look = { ...defaultLook(), ...(data.look || {}) }; // additive: old projects get the cinematic defaults
   if (!data.shots.some(s => s.id === data.activeShotId)) data.activeShotId = data.shots[0].id;
   return data;
 }
@@ -91,7 +95,7 @@ function serializeProject() {
     drawings: project.drawings, characters: project.characters,
     shots: project.shots, activeShotId: project.activeShotId,
     audioAssets: project.audioAssets, audioClips: project.audioClips,
-    studio: project.studio,
+    studio: project.studio, look: project.look,
   };
 }
 function loadProjectData(data) {
@@ -100,6 +104,8 @@ function loadProjectData(data) {
   project.sceneObjects = s.sceneObjects;
   project.keyframes = s.keyframes;
   project.duration = s.duration;
+  applyLook();
+  buildLookPanel();
 }
 // sceneObject:
 // { id, name, type: 'box'|'sphere'|'cylinder'|'cone'|'torus'|'plane'|'engineKit'|'drawing'|'character',
@@ -119,11 +125,12 @@ function defaultRig(name = 'Character 1') {
   return {
     id: uid('char'), name,
     headR: 52, headColor: '#f0b98c', hairStyle: 'flat', hairColor: '#3a2a1c',
-    eyes: 'round', eyeColor: '#ffffff', pupilColor: '#221a12',
-    browStyle: 'flat', nose: true, mouth: 'smile',
+    eyes: 'round', eyeColor: '#ffffff', pupilColor: '#221a12', irisColor: '#5a4636',
+    browStyle: 'flat', nose: true, mouth: 'smile', ears: true,
     torsoW: 92, torsoH: 120, torsoColor: '#e05d5d',
     legsW: 30, legsH: 96, legsColor: '#42506e', feetColor: '#2b2417',
     armW: 26, armLen: 96, armColor: '#f0b98c', handColor: '#f0b98c',
+    bulk: 0.5, shoulderW: 96, neckLen: 1, handSize: 1, footSize: 1,
     pivots: { head: 0, leftArm: -12, rightArm: 12, leftLeg: -10, rightLeg: 10 },
   };
 }
@@ -616,8 +623,13 @@ function renderRig(ctx, rig, cx, cy, s = 1, forTexture = false) {
 
   // ---- torso ----
   const tw = rig.torsoW, th = rig.torsoH;
+  const bulkMul = 0.75 + (rig.bulk ?? 0.5) * 0.5;
   ctx.fillStyle = rig.torsoColor;
   rr(ctx, -tw / 2, 96, tw, th, Math.min(tw, th) * 0.18);
+  ctx.fill();
+  // shoulder bar (shoulder width)
+  const shw = tw * ((rig.shoulderW ?? 96) / 96);
+  rr(ctx, -shw / 2, 96, shw, 20, 9);
   ctx.fill();
 
   // ---- head ----
@@ -633,7 +645,10 @@ function renderRig(ctx, rig, cx, cy, s = 1, forTexture = false) {
   if (rig.hairStyle !== 'bald') {
     ctx.beginPath();
     ctx.arc(0, 0, rig.headR, Math.PI, 0); // top half
-    if (rig.hairStyle === 'flat') ctx.fill();
+    if (rig.hairStyle === 'flat' || rig.hairStyle === 'buzz') {
+      if (rig.hairStyle === 'buzz') { ctx.lineWidth = rig.headR * 0.18; ctx.strokeStyle = rig.hairColor; ctx.stroke(); }
+      else ctx.fill();
+    }
     else if (rig.hairStyle === 'side') { ctx.fill(); rr(ctx, rig.headR * 0.55, -rig.headR * 0.55, rig.headR * 0.5, rig.headR * 0.75, 4); ctx.fill(); }
     else if (rig.hairStyle === 'spiky') {
       ctx.fill();
@@ -644,6 +659,27 @@ function renderRig(ctx, rig, cx, cy, s = 1, forTexture = false) {
         ctx.lineTo(i * rig.headR * 0.38 + 6, -rig.headR * 0.92);
         ctx.closePath(); ctx.fill();
       }
+    }
+    else if (rig.hairStyle === 'afro') {
+      ctx.beginPath(); ctx.arc(0, -rig.headR * 0.25, rig.headR * 1.28, 0, Math.PI * 2); ctx.fill();
+    }
+    else if (rig.hairStyle === 'mohawk') {
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * rig.headR * 0.3 - 5, -rig.headR * 0.95);
+        ctx.lineTo(i * rig.headR * 0.3, -rig.headR * 1.5);
+        ctx.lineTo(i * rig.headR * 0.3 + 5, -rig.headR * 0.95);
+        ctx.closePath(); ctx.fill();
+      }
+    }
+    else if (rig.hairStyle === 'ponytail') {
+      ctx.fill();
+      rr(ctx, -rig.headR * 0.22, -rig.headR * 0.3, rig.headR * 0.44, rig.headR * 1.5, rig.headR * 0.2); ctx.fill();
+    }
+    else if (rig.hairStyle === 'long') {
+      ctx.fill();
+      rr(ctx, -rig.headR * 1.12, -rig.headR * 0.2, rig.headR * 0.5, rig.headR * 1.7, rig.headR * 0.2); ctx.fill();
+      rr(ctx, rig.headR * 0.62, -rig.headR * 0.2, rig.headR * 0.5, rig.headR * 1.7, rig.headR * 0.2); ctx.fill();
     }
   }
   // face — eyes at y -rig.headR*0.1, spread rig.headR*0.38
@@ -707,7 +743,8 @@ function drawLeg(ctx, rig, side, rotDeg, hipY, legLen) {
   ctx.translate(side * rig.torsoW * 0.26, hipY);
   ctx.rotate(rotDeg * Math.PI / 180);
   ctx.fillStyle = rig.legsColor;
-  rr(ctx, -rig.legsW / 2, 0, rig.legsW, legLen, rig.legsW * 0.35);
+  const lw = rig.legsW * (0.75 + (rig.bulk ?? 0.5) * 0.5);
+  rr(ctx, -lw / 2, 0, lw, legLen, lw * 0.35);
   ctx.fill();
   // foot
   ctx.fillStyle = rig.feetColor;
@@ -720,7 +757,8 @@ function drawArm(ctx, rig, side, rotDeg, shoulderY) {
   ctx.translate(side * (rig.torsoW / 2 + rig.armW * 0.18), shoulderY);
   ctx.rotate(rotDeg * Math.PI / 180);
   ctx.fillStyle = rig.armColor;
-  rr(ctx, -rig.armW / 2, 0, rig.armW, rig.armLen, rig.armW * 0.45);
+  const aw = rig.armW * (0.75 + (rig.bulk ?? 0.5) * 0.5);
+  rr(ctx, -aw / 2, 0, aw, rig.armLen, aw * 0.45);
   ctx.fill();
   ctx.fillStyle = rig.handColor;
   ctx.beginPath(); ctx.arc(0, rig.armLen + 6, rig.armW * 0.42, 0, Math.PI * 2); ctx.fill();
@@ -839,19 +877,25 @@ function renderCharProps() {
     addSlider('Head size', 30, 70, rig.headR, v => { rig.headR = v; });
     addSlider('Torso width', 60, 130, rig.torsoW, v => { rig.torsoW = v; });
     addSlider('Torso height', 90, 150, rig.torsoH, v => { rig.torsoH = v; });
+    addSlider('Shoulder width', 60, 140, rig.shoulderW ?? 96, v => { rig.shoulderW = v; });
+    addSlider('Bulk', 0, 100, Math.round((rig.bulk ?? 0.5) * 100), v => { rig.bulk = v / 100; });
     addSlider('Arm length', 60, 130, rig.armLen, v => { rig.armLen = v; });
+    addSlider('Hand size', 50, 180, Math.round((rig.handSize ?? 1) * 100), v => { rig.handSize = v / 100; });
     addSlider('Leg length', 70, 130, rig.legsH, v => { rig.legsH = v; });
+    addSlider('Foot size', 50, 180, Math.round((rig.footSize ?? 1) * 100), v => { rig.footSize = v / 100; });
+    addSlider('Neck length', 50, 150, Math.round((rig.neckLen ?? 1) * 100), v => { rig.neckLen = v / 100; });
     addSwatches('Skin', SKIN, () => rig.headColor, v => { rig.headColor = v; rig.armColor = v; rig.handColor = v; });
     addSwatches('Hair', HAIR, () => rig.hairColor, v => rig.hairColor = v);
     addSwatches('Shirt', SHIRT, () => rig.torsoColor, v => rig.torsoColor = v);
     addSwatches('Pants', PANTS, () => rig.legsColor, v => rig.legsColor = v);
     addSwatches('Shoes', SHIRT, () => rig.feetColor, v => rig.feetColor = v);
-    const hairSel = addSelect('Hair style', ['flat', 'side', 'spiky', 'bald'], rig.hairStyle, v => rig.hairStyle = v);
+    const hairSel = addSelect('Hair style', ['flat', 'side', 'spiky', 'bald', 'buzz', 'afro', 'mohawk', 'ponytail', 'long'], rig.hairStyle, v => rig.hairStyle = v);
   } else {
     const eyeSel = addSelect('Eyes', ['round', 'happy', 'wink', 'dizzy'], rig.eyes, v => rig.eyes = v);
     const browSel = addSelect('Brows', ['none', 'flat', 'raised', 'angry'], rig.browStyle, v => rig.browStyle = v);
     const mouthSel = addSelect('Mouth', ['smile', 'grin', 'open', 'flat', 'sad'], rig.mouth, v => rig.mouth = v);
     addToggle('Nose', rig.nose, v => rig.nose = v);
+    addToggle('Ears', rig.ears !== false, v => rig.ears = v);
   }
 }
 function addSlider(label, min, max, val, onChange) {
@@ -952,7 +996,7 @@ controls.enableDamping = true; controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI / 2 - 0.02;
 controls.target.set(0, 1.2, 0);
 controls.addEventListener('end', () => {
-  if (!recMode && !moviePlaying && !playing && !dragState) { captureCameraBase(); markDirty(); }
+  if (!recMode && !moviePlaying && !playing) { captureCameraBase(); markDirty(); }
 });
 
 // lights
@@ -969,6 +1013,74 @@ three.add(sun);
 const rimLight = new THREE.DirectionalLight('#a6c9ff', 1.5);
 rimLight.position.set(-6, 5, -8);
 three.add(rimLight);
+
+// editor-only helpers (lights) — never exported into movies
+const lightHelpers = [new THREE.DirectionalLightHelper(sun, 0.9, '#f2b25c'), new THREE.DirectionalLightHelper(rimLight, 0.7, '#7fb2ff')];
+lightHelpers.forEach(h => { h.visible = false; three.add(h); });
+let helpersOn = false;
+function setHelpers(on) {
+  helpersOn = on;
+  lightHelpers.forEach(h => h.visible = on && !moviePlaying && !recMode);
+}
+
+// cinematic look & effects (grade, bloom, DoF, grain, vignette, env reflections)
+const lookEngine = createLookEngine(renderer, three, camera);
+function applyLook() { lookEngine.apply(project.look || defaultLook()); markLookPanel(); }
+
+/* ---------- look & effects panel (Animate workspace) ---------- */
+const lookPanelEl = document.getElementById('look-panel');
+applyLook();
+function ensureLook() { if (!project.look) project.look = defaultLook(); return project.look; }
+function markLookPanel() {
+  const look = ensureLook();
+  lookPanelEl?.querySelectorAll('[data-look-field]').forEach(el => {
+    const f = el.dataset.lookField;
+    if (el.type === 'checkbox') el.checked = !!look[f];
+    else el.value = look[f];
+    const out = el.closest('div')?.querySelector('output');
+    if (out) out.textContent = Math.round(look[f] * 1000) / 1000;
+  });
+}
+function buildLookPanel() {
+  if (!lookPanelEl) return;
+  const look = ensureLook();
+  lookPanelEl.innerHTML = '';
+  const mk = (label, field, min, max, step) => {
+    const w = mkNum(label, look, field, v => { look[field] = v; applyLook(); markDirty(); }, min, max, step);
+    w.querySelector('input')?.setAttribute('data-look-field', field);
+    return w;
+  };
+  const toggle = (label, field) => {
+    const l = document.createElement('label'); l.className = 'chk';
+    const c = document.createElement('input'); c.type = 'checkbox'; c.checked = !!look[field]; c.setAttribute('data-look-field', field);
+    c.addEventListener('change', () => { look[field] = c.checked; applyLook(); markDirty(); buildLookPanel(); });
+    l.append(c, document.createTextNode(label));
+    return l;
+  };
+  const sel = (label, field, opts) => {
+    const t = document.createElement('div'); t.className = 'side-title'; t.textContent = label;
+    const s = document.createElement('select'); s.className = 'btn'; s.style.width = '100%'; s.setAttribute('data-look-field', field);
+    opts.forEach(o => { const op = document.createElement('option'); op.value = op.textContent = o; if (o === look[field]) op.selected = true; s.appendChild(op); });
+    s.addEventListener('change', () => { look[field] = s.value; applyLook(); markDirty(); });
+    const w = document.createElement('div'); w.append(t, s); return w;
+  };
+  const title = document.createElement('div'); title.className = 'empty-note';
+  title.textContent = 'Grades and effects render into exported movies in both export modes.';
+  lookPanelEl.append(toggle('Cinematic look & effects', 'on'));
+  lookPanelEl.append(sel('Colour grade', 'grade', Object.keys(GRADES)));
+  lookPanelEl.append(mk('Bloom', 'bloom', 0, 1, 0.01));
+  lookPanelEl.append(mk('Vignette', 'vignette', 0, 1, 0.01));
+  lookPanelEl.append(mk('Film grain', 'grain', 0, 0.5, 0.01));
+  lookPanelEl.append(mk('Chromatic aberration', 'chroma', 0, 0.4, 0.01));
+  lookPanelEl.append(toggle('Depth of field', 'dof'));
+  if (look.dof) {
+    lookPanelEl.append(mk('Focus distance', 'focus', 1, 30, 0.5));
+    lookPanelEl.append(mk('Aperture', 'aperture', 0.005, 0.1, 0.005));
+  }
+  lookPanelEl.append(toggle('Ambient reflections', 'env'));
+  lookPanelEl.append(title);
+}
+
 function applyLighting(preset) {
   const looks = {
     studio: ['#211d18', '#ffe3b0', 1.9, '#a6c9ff', 1.1, 1.1],
@@ -1010,13 +1122,16 @@ function resize3D() {
   renderer.setSize(host.clientWidth, host.clientHeight, false);
   camera.aspect = host.clientWidth / host.clientHeight;
   camera.updateProjectionMatrix();
+  lookEngine.resize(host.clientWidth, host.clientHeight);
 }
 new ResizeObserver(() => resize3D()).observe(sceneViewport);
 new ResizeObserver(() => resize3D()).observe(animViewport);
 
 /* ---------- object factories ---------- */
-function stdMat(color, opacity = 1) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.08, transparent: opacity < 1, opacity });
+function stdMat(color, opacity = 1, o = null) {
+  const m = new THREE.MeshStandardMaterial({ color, roughness: o?.roughness ?? 0.55, metalness: o?.metalness ?? 0.08, transparent: opacity < 1, opacity });
+  if (o?.emissive) { m.emissive = new THREE.Color(color); m.emissiveIntensity = o.emissive; }
+  return m;
 }
 function makeMesh(geo, mat) {
   const m = new THREE.Mesh(geo, mat);
@@ -1064,7 +1179,7 @@ function build3DObject(o) {
   if (o.type === 'model') {
     group.add(buildModel(o.modelParts || []));
   } else if (o.type === 'box' || o.type === 'sphere' || o.type === 'cylinder' || o.type === 'cone' || o.type === 'torus' || o.type === 'plane') {
-    group.add(makeMesh(GEOMETRIES[o.type](), stdMat(o.color, o.opacity)));
+    group.add(makeMesh(GEOMETRIES[o.type](), stdMat(o.color, o.opacity, o)));
   } else if (o.type === 'engineKit') {
     buildEngineKit(group, o);
   } else if (o.type === 'drawing') {
@@ -1172,7 +1287,7 @@ function syncSceneObjects() {
   // add new / refresh
   project.sceneObjects.forEach(o => {
     let g = objectGroups.get(o.id);
-    const signature = JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text, o.rigMode, o.modelParts,
+    const signature = JSON.stringify([o.type, o.assetId, o.enginePart, o.color, o.opacity, o.text, o.rigMode, o.modelParts, o.roughness, o.metalness, o.emissive,
       o.rigMode === '3d' ? project.characters.find(c => c.id === o.assetId) : null]);
     const needsRebuild = !g || g.userData.builtFrom !== signature;
     if (needsRebuild) {
@@ -1194,6 +1309,7 @@ function syncSceneObjects() {
     }
   });
   updateSelectionVisuals();
+  lookEngine.refreshEnv(); // new meshes pick up env reflections
 }
 // free GPU memory held by a removed group (geometries, materials, textures)
 function setGroupOpacity(group, value) {
@@ -1237,23 +1353,64 @@ function removeSceneObjectsWhere(pred) {
   });
 }
 
-/* ---------- selection & gizmo ---------- */
+/* ---------- selection & gizmos ---------- */
 let selectedId = null;
 let gizmoMode = 'translate';
 const raycaster = new THREE.Raycaster();
+// real transform gizmo: draggable axis handles, snapping, world/local space
+const tcontrols = new TransformControls(camera, renderer.domElement);
+tcontrols.enabled = false;
+three.add(tcontrols);
+let snapOn = false;
+function setSnap(on) {
+  snapOn = on;
+  tcontrols.setTranslationSnap(on ? 0.25 : null);
+  tcontrols.setRotationSnap(on ? THREE.MathUtils.degToRad(15) : null);
+  tcontrols.setScaleSnap(on ? 0.1 : null);
+  document.getElementById('btn-gizmo-snap')?.classList.toggle('active', on);
+}
+function toggleSpace() {
+  const next = tcontrols.space === 'world' ? 'local' : 'world';
+  tcontrols.setSpace(next);
+  const b = document.getElementById('btn-gizmo-space');
+  if (b) b.textContent = next === 'world' ? 'World' : 'Local';
+}
+function syncFromGizmo() {
+  const o = selObj();
+  if (!o || o.id === CAMERA_ID) return;
+  const g = objectGroups.get(o.id);
+  if (!g) return;
+  o.pos = [round2(g.position.x), round2(g.position.y), round2(g.position.z)];
+  o.rot = [round2(THREE.MathUtils.radToDeg(g.rotation.x)), round2(THREE.MathUtils.radToDeg(g.rotation.y)), round2(THREE.MathUtils.radToDeg(g.rotation.z))];
+  o.scale = [round2(g.scale.x), round2(g.scale.y), round2(g.scale.z)];
+}
+tcontrols.addEventListener('dragging-changed', e => {
+  controls.enabled = !e.value && !moviePlaying && !recMode;
+  if (!e.value) { syncFromGizmo(); renderSceneProps(); markDirty(); updateSelectionVisuals(); }
+});
+tcontrols.addEventListener('objectChange', () => syncFromGizmo());
+document.getElementById('btn-gizmo-snap')?.addEventListener('click', () => setSnap(!snapOn));
+document.getElementById('btn-gizmo-space')?.addEventListener('click', toggleSpace);
+document.getElementById('btn-gizmo-helpers')?.addEventListener('click', () => setHelpers(!helpersOn));
 function setGizmoMode(m) {
   gizmoMode = m;
-  document.querySelectorAll('#gizmo-hint button').forEach(b => b.classList.toggle('active', b.dataset.gizmo === m));
+  document.querySelectorAll('#gizmo-hint button[data-gizmo]').forEach(b => b.classList.toggle('active', b.dataset.gizmo === m));
   sceneViewport.classList.toggle('select-cursor', m === 'none');
+  if (m !== 'none') tcontrols.setMode(m);
+  updateSelectionVisuals();
 }
-document.querySelectorAll('#gizmo-hint button').forEach(b => b.addEventListener('click', () => setGizmoMode(b.dataset.gizmo)));
+document.querySelectorAll('#gizmo-hint button[data-gizmo]').forEach(b => b.addEventListener('click', () => setGizmoMode(b.dataset.gizmo)));
 function updateSelectionVisuals() {
   const o = selObj();
-  if (!o) { gizmo.visible = false; selRing.visible = false; return; }
+  const busy = moviePlaying || recMode;
+  if (!o || o.id === CAMERA_ID || gizmoMode === 'none' || busy) {
+    gizmo.visible = false; selRing.visible = false; tcontrols.detach(); tcontrols.enabled = false;
+    return;
+  }
   const g = objectGroups.get(o.id);
-  if (!g) { gizmo.visible = false; selRing.visible = false; return; }
+  if (!g) { gizmo.visible = false; selRing.visible = false; tcontrols.detach(); tcontrols.enabled = false; return; }
   const box = new THREE.Box3().setFromObject(g);
-  if (box.isEmpty()) { gizmo.visible = false; selRing.visible = false; return; }
+  if (box.isEmpty()) { gizmo.visible = false; selRing.visible = false; tcontrols.detach(); tcontrols.enabled = false; return; }
   gizmo.box.copy(box);
   gizmo.visible = true;
   const c = box.getCenter(new THREE.Vector3());
@@ -1261,59 +1418,19 @@ function updateSelectionVisuals() {
   selRing.scale.setScalar(r);
   selRing.position.set(c.x, 0.02, c.z);
   selRing.visible = true;
+  tcontrols.attach(g);
+  tcontrols.enabled = true;
 }
 function selObj() {
   if (selectedId === CAMERA_ID) return { id: CAMERA_ID, name: 'Shot camera', type: 'camera', pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 };
   return project.sceneObjects.find(o => o.id === selectedId) || null;
 }
 
+// click to select; the transform gizmo owns its own drags
 renderer.domElement.addEventListener('pointerdown', e => {
-  if (gizmoMode === 'none') {
-    // click select
-    const hit = pickObject(e);
-    if (hit) selectObject(hit);
-    return;
-  }
-  // dragging on empty space = orbit (default). dragging on selected object = move it.
+  if (tcontrols.axis) return; // the user grabbed a gizmo handle
   const hit = pickObject(e);
-  if (hit === selectedId) {
-    controls.enabled = false;
-    dragState = { obj: selObj(), start: pickGround(e), mode: gizmoMode, startVals: null };
-    e.target.setPointerCapture(e.pointerId);
-    renderer.domElement.style.cursor = 'grabbing';
-  } else if (hit) {
-    selectObject(hit);
-  }
-});
-let dragState = null;
-renderer.domElement.addEventListener('pointermove', e => {
-  if (!dragState) return;
-  const p = pickGround(e);
-  if (!p) return;
-  const o = dragState.obj;
-  if (dragState.mode === 'translate') {
-    if (!dragState.startVals) dragState.startVals = { pos: [...o.pos] };
-    o.pos = [round2(dragState.startVals.pos[0] + (p.x - dragState.start.x)), dragState.startVals.pos[1], round2(dragState.startVals.pos[2] + (p.z - dragState.start.z))];
-  } else if (dragState.mode === 'rotate') {
-    if (!dragState.startVals) {
-      dragState.startVals = { angle: Math.atan2(p.z - dragState.start.z, p.x - dragState.start.x), rot: [...o.rot] };
-    }
-    const a = Math.atan2(p.z - dragState.start.z, p.x - dragState.start.x);
-    const d = (a - dragState.startVals.angle) * 180 / Math.PI;
-    o.rot = [dragState.startVals.rot[0], round2(dragState.startVals.rot[1] + d), dragState.startVals.rot[2]];
-  } else if (dragState.mode === 'scale') {
-    if (!dragState.startVals) dragState.startVals = { d: 0, s: [...o.scale] };
-    const d = Math.hypot(p.x - dragState.start.x, p.z - dragState.start.z);
-    const f = clamp(1 + d / 6, 0.2, 5);
-    o.scale = [round2(dragState.startVals.s[0] * f), round2(dragState.startVals.s[1] * f), round2(dragState.startVals.s[2] * f)];
-  }
-  syncSceneObjects(); renderSceneProps(); markDirty();
-});
-renderer.domElement.addEventListener('pointerup', () => {
-  if (dragState) { dragState = null; controls.enabled = true; renderer.domElement.style.cursor = ''; markDirty(); }
-});
-renderer.domElement.addEventListener('pointercancel', () => {
-  if (dragState) { dragState = null; controls.enabled = true; renderer.domElement.style.cursor = ''; }
+  if (hit) selectObject(hit);
 });
 function pickObject(e) {
   const r = renderer.domElement.getBoundingClientRect();
@@ -1511,6 +1628,11 @@ function renderSceneProps() {
   });
   if (o.type !== 'drawing' && o.type !== 'character') {
     panel.appendChild(mkNum('Opacity', o, 'opacity', v => { o.opacity = v; syncSceneObjects(); markDirty(); }, 0.05, 1, 0.05));
+  }
+  if (['box', 'sphere', 'cylinder', 'cone', 'torus', 'plane'].includes(o.type)) {
+    panel.appendChild(mkNum('Roughness', o, 'roughness', v => { o.roughness = v; syncSceneObjects(); markDirty(); }, 0, 1, 0.05));
+    panel.appendChild(mkNum('Metalness', o, 'metalness', v => { o.metalness = v; syncSceneObjects(); markDirty(); }, 0, 1, 0.05));
+    panel.appendChild(mkNum('Glow (emissive)', o, 'emissive', v => { o.emissive = v; syncSceneObjects(); markDirty(); }, 0, 2, 0.05));
   }
   // channels hint
   const hint = document.createElement('div'); hint.className = 'empty-note';
@@ -2027,14 +2149,18 @@ function tick(now) {
   }
   if (activeWs === 'scene' && !playing && !moviePlaying && !recMode) evaluateAt(animTime);
   const cameraIsAnimated = (playing || moviePlaying || recMode) && Object.keys(project.keyframes[CAMERA_ID] || {}).length;
-  controls.enabled = !recMode && !moviePlaying && !cameraIsAnimated && !dragState;
+  controls.enabled = !recMode && !moviePlaying && !cameraIsAnimated && !tcontrols.dragging;
   // A damping update can overwrite an authored camera move, so don't orbit during playback.
   if (!moviePlaying && !recMode && !cameraIsAnimated) controls.update();
   else camera.lookAt(controls.target);
   grid.visible = !moviePlaying && !recMode;
-  if (moviePlaying || recMode) { gizmo.visible = false; selRing.visible = false; }
+  if (moviePlaying || recMode) {
+    gizmo.visible = false; selRing.visible = false;
+    if (tcontrols.object) { tcontrols.detach(); tcontrols.enabled = false; }
+    lightHelpers.forEach(h => h.visible = false);
+  }
   drawAxisBadge();
-  renderer.render(three, camera);
+  lookEngine.render();
 }
 const axisCanvas = document.getElementById('axis-badge');
 const axisCtx = axisCanvas.getContext('2d');
@@ -2293,8 +2419,12 @@ async function exportMovie() {
     renderer.domElement.style.height = '100%';
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
+    lookEngine.resize(W, H);
     controls.enabled = false;
     grid.visible = false; gizmo.visible = false; selRing.visible = false;
+    if (tcontrols.object) tcontrols.detach();
+    tcontrols.enabled = false;
+    lightHelpers.forEach(h => h.visible = false);
 
     // one video track + one mixed audio track
     const tracks = [renderer.domElement.captureStream(project.fps).getVideoTracks()[0]];
@@ -2373,7 +2503,7 @@ async function exportMovie() {
     // pre-roll: show shot 1 at t=0 so the recording starts on a real frame
     applyShotPlayback(project.shots[0].id);
     evaluateAt(0);
-    renderer.render(three, camera);
+    lookEngine.render();
 
     mediaRecorder.start(1000);
     recMode = true;
@@ -2515,13 +2645,17 @@ async function exportOfflineMovie() {
     renderer.setPixelRatio(1); renderer.setSize(width, height, false);
     camera.aspect = width / height; camera.updateProjectionMatrix(); controls.enabled = false;
     grid.visible = false; gizmo.visible = false; selRing.visible = false;
+    lookEngine.resize(width, height);
+    if (tcontrols.object) tcontrols.detach();
+    tcontrols.enabled = false;
+    lightHelpers.forEach(h => h.visible = false);
     for (let frame = 0; frame < frameCount && !offlineCancel; frame++) {
       if (encoderError) throw encoderError;
       const time = frame / fps;
       const hit = shotAtGlobal(time);
       if (project.activeShotId !== hit.shot.id) applyShotPlayback(hit.shot.id);
       animTime = hit.local; movieTime = time; evaluateAt(animTime);
-      camera.lookAt(controls.target); renderer.render(three, camera);
+      camera.lookAt(controls.target); lookEngine.render();
       const videoFrame = new VideoFrame(renderer.domElement, { timestamp: Math.round(frame * 1e6 / fps), duration: Math.round(1e6 / fps) });
       try { encoder.encode(videoFrame, { keyFrame: frame % (fps * 2) === 0 }); } finally { videoFrame.close(); }
       framesWritten++;
@@ -2609,6 +2743,7 @@ document.getElementById('btn-new').addEventListener('click', () => {
   project = defaultProject();
   currentCharId = null; selectedId = null;
   document.getElementById('project-tag').textContent = project.name;
+  applyLook(); buildLookPanel();
   markDirty();
   clearDraw();
   applyShot(project.shots[0].id);
@@ -2835,10 +2970,16 @@ function loadRaceMovie() {
   if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject(); project.name = 'The Final Straight'; project.exportAspect = '2.39:1';
   const colors = ['#e05d5d', '#efb855', '#4fb3a4', '#648fe1'];
+  const builds = [
+    { bulk: 0.85, shoulderW: 108, hairStyle: 'spiky', neckLen: 1.05 },
+    { bulk: 0.4, shoulderW: 86, hairStyle: 'ponytail', neckLen: 1.1 },
+    { bulk: 0.65, shoulderW: 98, hairStyle: 'afro', neckLen: 0.95 },
+    { bulk: 0.95, shoulderW: 116, hairStyle: 'bald', neckLen: 1 },
+  ];
   project.characters = ['Blaze', 'Dash', 'Nova', 'Jet'].map((name, i) => {
     const rig = defaultRig(name); rig.torsoColor = colors[i]; rig.feetColor = colors[i];
     rig.headColor = SKIN[(i * 2) % SKIN.length]; rig.armColor = rig.headColor; rig.handColor = rig.headColor;
-    rig.hairStyle = ['spiky', 'side', 'flat', 'bald'][i]; return rig;
+    Object.assign(rig, builds[i]); return rig;
   });
   const defs = [
     ['The contenders', 4, -9, -9, 'idle', [0, 12, 17, -2, 0.8, 0, 46], [-4, 6, 13, -8, 1, 0, 42]],
@@ -2890,6 +3031,7 @@ function loadRaceMovie() {
   project.sceneObjects = project.shots[0].sceneObjects; project.keyframes = project.shots[0].keyframes; project.duration = project.shots[0].duration;
   animTime = 0; selectedId = null; currentCharId = project.characters[0].id;
   document.getElementById('project-tag').textContent = project.name;
+  applyLook(); buildLookPanel();
   applyShot(project.activeShotId); setWorkspace('anim'); evaluateAt(0);
   markDirty(); renderCharList(); drawCharPreview(); renderCharProps(); renderAssetList(); renderAudioList();
   toast('3D race movie ready: 4 rigged actors, 5 shots, 26 seconds. Press Play movie.');
@@ -2930,6 +3072,7 @@ if (!project.characters.length && !project.shots.some(s => s.sceneObjects.length
   currentCharId = rig.id;
 }
 document.getElementById('char-name').value = currentRig()?.name || '';
+buildLookPanel();
 renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
 renderAudioList();
 applyShot(project.activeShotId);
