@@ -283,8 +283,9 @@ it with WebCodecs and a vendored WebM muxer. A slow GPU takes longer rather than
 skipping animation frames. Audio clips are mixed offline in 30-second blocks
 (the mix buffer stays small at any movie length) and muxed in as an Opus track
 — exports are no longer video-only. Keep individual audio files to a few
-minutes (each decoded track is held in memory while windows still need it, so
-a single long soundtrack still scales with its length); add a feature-length
+minutes: all referenced files are decoded up front, so peak RAM scales with
+their combined decoded size, and each track is then held only while later
+windows still need it; add a feature-length
 continuous soundtrack with ffmpeg afterwards if needed. WebCodecs needs a
 supported secure browser/encoder.
 
