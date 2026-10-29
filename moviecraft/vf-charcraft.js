@@ -2,7 +2,7 @@
 // A forge character is a rigid-part rig: an editable bone hierarchy with
 // primitive parts bound to bones. Posing rotates bones; parts follow rigidly.
 // This is deliberate part-based rigging, not mesh sculpting or skin weights.
-import { JOINTS } from './motion.js';
+import { JOINTS } from './vf-motion.js';
 
 export const FORGE_PART_TYPES = ['box', 'sphere', 'cylinder', 'cone', 'capsule', 'torus'];
 export const FORGE_LIMITS = { bones: 64, parts: 200, boneChildren: 24 };

@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VideoCraft — 3D Movie Studio</title>
-<meta name="description" content="VideoCraft: plan films, design reusable 3D models, organise assets, storyboard, build scenes, animate rigged characters, mix sound and export movies in a ten-workspace browser studio.">
+<title>MovieCraft — Cinematic 3D Movie Studio</title>
+<meta name="description" content="MovieCraft: a cinematic 3D movie studio in your browser — film and anime render styles, toon shading with ink outlines, anamorphic flares, shots, keyframes, FX and movie export. MovieCraft upgrade.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%23f2b25c'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e05d5d'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%234fb3a4'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%23c77b9e'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -426,15 +426,15 @@ body.any-sheet-open #sheet-backdrop { display: block; }
 
   <div id="main">
     <header id="topbar">
-      <h1>VideoCraft</h1>
+      <h1>MovieCraft</h1>
       <span class="tag" id="project-tag">Untitled project</span>
       <span class="spacer"></span>
       <span id="save-state"></span>
-      <button class="btn ghost" id="btn-starter">Starter scene</button>
+      <button class="btn ghost" id="btn-starter">Demo movie</button>
       <button class="btn primary" id="btn-race">3D race movie</button>
       <button class="btn ghost" id="btn-new">New</button>
       <button class="btn ghost" id="btn-open">Open</button>
-      <input type="file" id="file-open" accept=".videocraft,.json" class="sr-only">
+      <input type="file" id="file-open" accept=".moviecraft,.json" class="sr-only">
       <button class="btn ghost" id="btn-save">Save project</button>
       <button class="btn ghost" id="btn-download-video">Export movie</button>
       <a class="btn ghost" id="btn-help" href="docs.html" target="_blank" rel="noopener" style="text-decoration:none">Help</a>
@@ -591,8 +591,14 @@ body.any-sheet-open #sheet-backdrop { display: block; }
               <select class="btn studio-select" id="shot-lighting">
                 <option value="studio">Warm studio</option><option value="daylight">Daylight stadium</option>
                 <option value="sunset">Golden hour</option><option value="night">Blue-hour floodlights</option>
+                <option value="anime">Anime bright key</option>
               </select>
-              <div class="empty-note">Camera moves become editable timeline keys. Lighting is saved independently for each shot.</div>
+              <label class="side-title" for="shot-style">Render style</label>
+              <select class="btn studio-select" id="shot-style">
+                <option value="">Movie default</option><option value="film">Film — cinematic</option>
+                <option value="anime">Anime — toon</option>
+              </select>
+              <div class="empty-note">Camera moves become editable timeline keys. Lighting and render style are saved independently for each shot.</div>
             </div>
           </details>
           <details class="studio-details" id="look-details">
@@ -724,6 +730,6 @@ body.any-sheet-open #sheet-backdrop { display: block; }
   }
 }
 </script>
-<script type="module" src="app.js?v=0.6.6"></script>
+<script type="module" src="vf-studio.js?v=0.9.5"></script>
 </body>
 </html>

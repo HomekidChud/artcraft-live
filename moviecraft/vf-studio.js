@@ -1,4 +1,8 @@
-// VideoCraft — draw / build / animate / make movies in the browser. ArtCraft family tool.
+// MovieCraft — draw / build / animate / make movies in the browser. ArtCraft family tool.
+// A MovieCraft upgrade: same project model, cinematic render engine.
+// v0.9 — render styles: film (PBR, ACES, anamorphic flares) and anime
+//        (stepped toon shading, ink outlines from a depth pre-pass).
+//        Per-shot style override, anime lighting preset, 4-shot demo movie.
 // v0.8 — cinematic FX engine (deterministic GPU particles: fire, smoke, sparks,
 //        explosions, fountains) + GLB model import for detailed assets.
 // v0.7 — character forge + cutscenes (titles, subtitles, fades, shake).
@@ -6,17 +10,17 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
-import { buildAvatar } from './avatar3d.js';
-import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js';
-import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js';
-import { buildModel } from './models.js';
-import { defaultLook, GRADES, createLookEngine } from './effects.js';
-import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
-import { boneJoints, isPresetCompatible } from './charcraft.js';
-import { buildCharacterGroup, sketchCharacter } from './charbuild.js';
-import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './cutscene.js';
-import { createCutsceneOverlay } from './overlay.js';
-import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.8.1';
+import { buildAvatar } from './vf-avatar3d.js';
+import { JOINTS, MOTIONS, cameraTracks, exportSize } from './vf-motion.js';
+import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './vf-production.js';
+import { buildModel } from './vf-models.js';
+import { defaultLook, GRADES, createLookEngine } from './vf-effects.js';
+import { installWorkspaceShell, createStudioWorkspaces } from './vf-workspaces.js';
+import { boneJoints, isPresetCompatible } from './vf-charcraft.js';
+import { buildCharacterGroup, sketchCharacter } from './vf-charbuild.js';
+import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './vf-cutscene.js';
+import { createCutsceneOverlay } from './vf-overlay.js';
+import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './vf-fx.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 installWorkspaceShell();
@@ -34,6 +38,8 @@ function newShot(name = 'Shot 1', duration = 5) {
     keyframes: {},      // [sceneObjectId][channel] -> [{t, v, ease}]
     camera: null,
     lighting: 'studio',
+    style: '',          // '' movie default | 'film' | 'anime' (per-shot render style)
+    events: [],         // cutscene events (titles, subtitles, fades, bars, shake)
   };
 }
 function defaultProject() {
@@ -158,7 +164,7 @@ const storage = (() => {
     return localStorage;
   } catch { return null; }
 })();
-const SAVE_KEY = 'videocraft_project_v2';
+const SAVE_KEY = 'moviecraft_project_v2';
 let project = defaultProject();
 let dirty = false;
 let autosaveTimer = null;
@@ -172,7 +178,7 @@ function markDirty(msg) {
     autosaveTimer = setTimeout(() => {
       try {
         storage.setItem(SAVE_KEY, JSON.stringify(serializeProject()));
-        try { storage.removeItem('videocraft_project_v1'); } catch {} // upgraded: v1 key no longer needed
+        try { storage.removeItem('moviecraft_project_v1'); } catch {} // upgraded: v1 key no longer needed
         dirty = false;
         if (el) el.textContent = 'Saved automatically';
       } catch {
@@ -194,7 +200,7 @@ function loadSaved() {
   try {
     let raw = storage.getItem(SAVE_KEY);
     if (!raw) { // upgrade path from v1 autosaves (v1 key removed once a v2 save succeeds)
-      raw = storage.getItem('videocraft_project_v1');
+      raw = storage.getItem('moviecraft_project_v1');
       if (raw) { loadProjectData(JSON.parse(raw)); markDirty(); }
       return;
     }
@@ -263,6 +269,7 @@ function applyShot(id) {
   applyCameraBase(s);
   syncSceneObjects();
   evaluateAt(animTime);
+  applyLook(); // per-shot render style override
   renderSceneList(); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
   renderShotsUI(); syncShotControls(); updatePlayhead();
 }
@@ -302,6 +309,7 @@ function applyShotPlayback(id) {
   if (!s.camera) s.camera = cameraBaseSnapshot(); // deterministic framing for every shot
   applyCameraBase(s);
   syncSceneObjects();
+  applyLook(); // per-shot render style override (mid-playback / mid-export)
   // keep the sidebar + strip highlight on the shot that is playing
   document.querySelectorAll('#shot-list .shot-row').forEach((row, i) => {
     row.classList.toggle('active', project.shots[i] && project.shots[i].id === project.activeShotId);
@@ -312,6 +320,7 @@ function applyShotPlayback(id) {
 }
 function syncShotControls() {
   document.getElementById('shot-lighting').value = activeShot().lighting || 'studio';
+  document.getElementById('shot-style').value = activeShot().style || '';
   document.getElementById('export-aspect').value = project.exportAspect || '16:9';
   const inp = document.getElementById('shot-duration');
   if (inp) inp.value = project.duration;
@@ -449,6 +458,7 @@ function duplicateShot() {
   const copy = newShot(src.name + ' copy', src.duration);
   if (src.camera) copy.camera = JSON.parse(JSON.stringify(src.camera));
   copy.lighting = src.lighting || 'studio';
+  copy.style = src.style || '';
   copy.referenceDrawingId = src.referenceDrawingId || '';
   if (project.studio.shotNotes[src.id]) project.studio.shotNotes[copy.id] = project.studio.shotNotes[src.id];
   // regenerate object ids so the copy is fully independent
@@ -1123,7 +1133,20 @@ function setHelpers(on) {
 
 // cinematic look & effects (grade, bloom, DoF, grain, vignette, env reflections)
 const lookEngine = createLookEngine(renderer, three, camera);
-function applyLook() { lookEngine.apply(project.look || defaultLook()); markLookPanel(); }
+// the active look = movie defaults, with the active shot's style override applied
+function effectiveLook() {
+  const look = ensureLook();
+  const s = activeShot();
+  if (s && s.style === 'anime') {
+    // the anime shot style is a full look: toon shading + ink outlines + anime grade
+    // (unless the movie already uses an anime grade)
+    const animeGrade = ['anime', 'anime-dusk'].includes(look.grade) ? look.grade : 'anime';
+    return { ...look, style: 'anime', grade: animeGrade };
+  }
+  if (s && s.style === 'film') return { ...look, style: 'film' };
+  return look;
+}
+function applyLook() { lookEngine.apply(effectiveLook()); markLookPanel(); }
 
 /* ---------- look & effects panel (Animate workspace) ---------- */
 const lookPanelEl = document.getElementById('look-panel');
@@ -1165,11 +1188,28 @@ function buildLookPanel() {
   const title = document.createElement('div'); title.className = 'empty-note';
   title.textContent = 'Grades and effects render into exported movies in both export modes.';
   lookPanelEl.append(toggle('Cinematic look & effects', 'on'));
+  const styleSel = document.createElement('div');
+  const styleTitle = document.createElement('div'); styleTitle.className = 'side-title'; styleTitle.textContent = 'Render style';
+  const styleSelect = document.createElement('select'); styleSelect.className = 'btn'; styleSelect.style.width = '100%';
+  styleSelect.setAttribute('data-look-field', 'style');
+  [['film', 'Film — cinematic PBR'], ['anime', 'Anime — toon + ink outlines']].forEach(([v, t]) => {
+    const op = document.createElement('option'); op.value = v; op.textContent = t; styleSelect.appendChild(op);
+  });
+  styleSelect.value = look.style || 'film';
+  styleSelect.addEventListener('change', () => { look.style = styleSelect.value; applyLook(); markDirty(); buildLookPanel(); });
+  styleSel.append(styleTitle, styleSelect);
+  lookPanelEl.append(styleSel);
   lookPanelEl.append(sel('Colour grade', 'grade', Object.keys(GRADES)));
   lookPanelEl.append(mk('Bloom', 'bloom', 0, 1, 0.01));
   lookPanelEl.append(mk('Vignette', 'vignette', 0, 1, 0.01));
   lookPanelEl.append(mk('Film grain', 'grain', 0, 0.5, 0.01));
   lookPanelEl.append(mk('Chromatic aberration', 'chroma', 0, 0.4, 0.01));
+  if ((look.style || 'film') === 'anime') {
+    lookPanelEl.append(mk('Ink outline', 'outline', 0, 2, 0.05));
+    lookPanelEl.append(mk('Toon steps', 'toonSteps', 2, 5, 1));
+  } else {
+    lookPanelEl.append(mk('Anamorphic flare', 'flare', 0, 1, 0.05));
+  }
   lookPanelEl.append(toggle('Depth of field', 'dof'));
   if (look.dof) {
     lookPanelEl.append(mk('Focus distance', 'focus', 1, 30, 0.5));
@@ -1185,6 +1225,7 @@ function applyLighting(preset) {
     daylight: ['#9ab9ce', '#fff2d9', 2.8, '#c7e4ff', 1.2, 1.15],
     sunset: ['#493b47', '#ffb56b', 3.4, '#759eff', 2.3, 1.0],
     night: ['#101b2b', '#d3e8ff', 2.1, '#70a8ff', 3.0, 0.95],
+    anime: ['#8fc1dd', '#fff6dd', 3.2, '#8fd6ff', 3.2, 1.18], // bright key + strong cool rim for cel looks
   };
   const [bg, key, intensity, rim, rimIntensity, exposure] = looks[preset] || looks.studio;
   three.background.set(bg); three.fog.color.set(bg);
@@ -1502,6 +1543,7 @@ function syncSceneObjects() {
   });
   updateSelectionVisuals();
   lookEngine.refreshEnv(); // new meshes pick up env reflections
+  lookEngine.refreshStyle(); // new meshes pick up the active render style (toon)
 }
 // free GPU memory held by a removed group (geometries, materials, textures)
 function setGroupOpacity(group, value) {
@@ -1526,6 +1568,9 @@ function disposeGroup(g) {
         if (!mm.userData?.sharedAsset) mm.map?.dispose?.(); // GLB textures are shared with the cache template
         mm.dispose?.();
       });
+      // toon swap keeps the original PBR materials stashed — free those too
+      const film = m.userData.vfFilm;
+      if (film) film.forEach(mm => mm.dispose?.());
     }
   });
 }
@@ -2672,7 +2717,7 @@ async function exportMovie() {
   const kbps = { high: 8000, medium: 4000, low: 2500 }[qualSel ? qualSel.value : 'high'] || 8000;
 
   const ext = mime.includes('webm') ? 'webm' : 'mp4';
-  const fileName = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + '.' + ext;
+  const fileName = (project.name || 'moviecraft').replace(/[^a-z0-9-_]+/gi, '_') + '.' + ext;
 
   // fixed export frame — restored afterwards
   exportRestore = {
@@ -2980,7 +3025,7 @@ async function exportOfflineMovie() {
     if (framesWritten) {
       muxer.finalize();
       const blob = new Blob([target.buffer], { type: 'video/webm' });
-      const base = (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_');
+      const base = (project.name || 'moviecraft').replace(/[^a-z0-9-_]+/gi, '_');
       const part = isSection ? `_part_${(startFrame / fps).toFixed(1).replace('.', '-')}-${(endFrame / fps).toFixed(1).replace('.', '-')}s` : '';
       const fileName = base + part + (offlineCancel ? '_partial' : '') + '.webm';
       downloadBlob(blob, fileName);
@@ -3018,7 +3063,7 @@ function downloadBlob(blob, name) {
    ============================================================ */
 document.getElementById('btn-save').addEventListener('click', () => {
   const data = JSON.stringify(serializeProject(), null, 1);
-  downloadBlob(new Blob([data], { type: 'application/json' }), (project.name || 'videocraft').replace(/[^a-z0-9-_]+/gi, '_') + '.videocraft.json');
+  downloadBlob(new Blob([data], { type: 'application/json' }), (project.name || 'moviecraft').replace(/[^a-z0-9-_]+/gi, '_') + '.moviecraft.json');
   dirty = false;
   document.getElementById('save-state').textContent = '';
   toast('Project file saved to downloads — includes all shots and audio');
@@ -3044,7 +3089,7 @@ document.getElementById('file-open').addEventListener('change', e => {
       renderAudioList();
       setWorkspace(activeWs);
       toast('Project loaded: ' + project.name + ' (' + project.shots.length + ' shot' + (project.shots.length > 1 ? 's' : '') + ')');
-    } catch { toast('That file is not a VideoCraft project'); }
+    } catch { toast('That file is not a MovieCraft project'); }
     e.target.value = '';
   };
   reader.readAsText(f);
@@ -3068,15 +3113,21 @@ document.getElementById('btn-new').addEventListener('click', () => {
 });
 
 /* ============================================================
-   Starter demo — a two-shot mini movie: engine room + hero close-up
+   Starter demo — a four-shot mini movie that shows off both
+   render styles: cinematic film look (flare, DoF, grade) for
+   shots 1-2-4, and the anime cel look (toon + ink outlines) for
+   the showdown in shot 3.
    ============================================================ */
 function loadStarterScene() {
   const hasWork = project.shots.some(s => s.sceneObjects.length) || project.drawings.length || project.audioAssets.length || project.name !== 'Untitled movie' || hasProductionWork(project.studio);
-  if (hasWork && !confirm('Replace the current movie with the starter scene?')) return;
+  if (hasWork && !confirm('Replace the current movie with the starter demo?')) return;
   if (moviePlaying) stopMovie(); setPlaying(false);
   project = defaultProject();
-  project.name = 'Starter — mini movie';
+  project.name = 'Demo — The Last Light';
   selectedId = null; currentCharId = null;
+
+  // movie-wide look: cinematic film defaults (shot 3 overrides to anime)
+  project.look = { ...defaultLook(), grade: 'cinematic', bloom: 0.42, flare: 0.38, vignette: 0.36, grain: 0.12, dof: true, focus: 8, aperture: 0.04 };
 
   // 1) draw an asset programmatically (a sunny poster)
   const c = document.createElement('canvas'); c.width = c.height = 400;
@@ -3084,7 +3135,7 @@ function loadStarterScene() {
   x.fillStyle = '#f6d8a8'; x.fillRect(0, 0, 400, 400);
   x.fillStyle = '#e8836b'; x.beginPath(); x.arc(200, 250, 90, 0, Math.PI * 2); x.fill();
   x.fillStyle = '#5b4632'; x.font = '700 44px Outfit, sans-serif'; x.textAlign = 'center';
-  x.fillText('VideoCraft', 200, 70);
+  x.fillText('MovieCraft', 200, 70);
   x.font = '400 22px Outfit, sans-serif'; x.fillStyle = '#7a5b3a';
   x.fillText('draw, build, animate', 200, 110);
   project.drawings.push({ id: uid('draw'), name: 'Sun poster', dataURL: c.toDataURL('image/png') });
@@ -3094,37 +3145,104 @@ function loadStarterScene() {
   project.characters.push(hero);
   currentCharId = hero.id;
 
-  // ---------- SHOT 1: the engine room ----------
+  // ---------- SHOT 1: cold open — rooftop, night, flare ----------
   const s1 = project.shots[0];
-  s1.name = 'Engine room';
+  s1.name = 'Cold open';
   s1.duration = 6;
+  s1.lighting = 'night';
+  s1.style = 'film';
   const mk = (o) => { s1.sceneObjects.push(o); return o; };
-  mk({ id: uid('obj'), name: 'Engine block', type: 'engineKit', enginePart: 'block', color: '#8a8f96', pos: [0, 0, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
-  const fly = mk({ id: uid('obj'), name: 'Flywheel', type: 'engineKit', enginePart: 'flywheel', color: '#8a8f96', pos: [2.4, 1.15, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
-  const crank = mk({ id: uid('obj'), name: 'Crankshaft', type: 'engineKit', enginePart: 'crankshaft', color: '#8a8f96', pos: [0, 0.35, 1.7], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  mk({ id: uid('obj'), name: 'Crate A', type: 'box', color: '#3d4450', pos: [-3.2, 0.5, -1.5], rot: [0, 18, 0], scale: [1, 1, 1], opacity: 1 });
+  mk({ id: uid('obj'), name: 'Crate B', type: 'box', color: '#333a44', pos: [-2.4, 0.35, 0.6], rot: [0, -12, 0], scale: [0.7, 0.7, 0.7], opacity: 1 });
+  mk({ id: uid('obj'), name: 'Beacon', type: 'sphere', color: '#9fc8ff', emissive: 1.6, pos: [3.6, 2.6, -3], rot: [0, 0, 0], scale: [0.5, 0.5, 0.5], opacity: 1 });
   mk({ id: uid('obj'), name: 'Sun poster', type: 'drawing', assetId: project.drawings[0].id, color: '#fff', pos: [-4.5, 1.7, -2], rot: [0, 24, 0], scale: [1, 1, 1], opacity: 1 });
-  mk({ id: uid('obj'), name: 'Title', type: 'text', text: 'THE ENGINE ROOM', color: '#f2b25c', pos: [0, 3.1, -3.5], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
-  const heroObj1 = mk({ id: uid('obj'), name: 'Hero', type: 'character', assetId: hero.id, color: '#fff', pos: [-5, 1.3, 2.5], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  mk({ id: uid('obj'), name: 'Title', type: 'text', text: 'THE LAST LIGHT', color: '#f2b25c', pos: [0, 3.1, -3.5], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  const heroObj1 = mk({ id: uid('obj'), name: 'Hero', type: 'character', assetId: hero.id, color: '#fff', pos: [-5, 1.3, 2.5], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1, motion: { clip: 'walk', speed: 1 } });
   const kf1 = s1.keyframes;
-  kf1[fly.id] = { 'rot.y': [{ t: 0, v: 0, ease: 'linear' }, { t: 6, v: 720, ease: 'linear' }] };
-  kf1[crank.id] = { 'rot.y': [{ t: 0, v: 0, ease: 'linear' }, { t: 6, v: 720, ease: 'linear' }] };
   kf1[heroObj1.id] = {
     'pos.x': [{ t: 0, v: -5, ease: 'ease' }, { t: 4, v: 3.5, ease: 'ease' }],
     'pos.z': [{ t: 0, v: 2.5, ease: 'ease' }, { t: 4, v: 2.5, ease: 'ease' }],
-    'pose': [{ t: 0, v: 0, ease: 'linear' }, { t: 3.5, v: 7, ease: 'linear' }, { t: 4, v: 0, ease: 'linear' }],
   };
+  // slow high-angle push-in
+  kf1[CAMERA_ID] = {
+    'cam.px': [{ t: 0, v: 9, ease: 'ease' }, { t: 6, v: 6.5, ease: 'ease' }],
+    'cam.py': [{ t: 0, v: 6.5, ease: 'ease' }, { t: 6, v: 3.4, ease: 'ease' }],
+    'cam.pz': [{ t: 0, v: 12, ease: 'ease' }, { t: 6, v: 8.5, ease: 'ease' }],
+    'cam.tx': [{ t: 0, v: 0, ease: 'ease' }, { t: 6, v: 0, ease: 'ease' }],
+    'cam.ty': [{ t: 0, v: 1.6, ease: 'ease' }, { t: 6, v: 1.4, ease: 'ease' }],
+    'cam.tz': [{ t: 0, v: 0, ease: 'ease' }, { t: 6, v: 0, ease: 'ease' }],
+  };
+  const ev1 = (type, start, duration, extra = {}) => { const e = newEvent(type, start, duration); Object.assign(e, extra); s1.events.push(e); };
+  ev1('fadein', 0, 0.8);
+  ev1('letterbox', 0, 6);
+  ev1('title', 0.8, 3, { text: 'THE LAST LIGHT' });
 
-  // ---------- SHOT 2: hero close-up, with a camera move ----------
-  const s2 = newShot('Hero close-up', 4);
+  // ---------- SHOT 2: golden hour walk, tracking camera ----------
+  const s2 = newShot('Golden hour walk', 6);
   project.shots.push(s2);
+  s2.lighting = 'sunset';
+  s2.style = 'film';
+  s2.transition = 'fade';
   const mk2 = (o) => { s2.sceneObjects.push(o); return o; };
-  const heroObj2 = mk2({ id: uid('obj'), name: 'Hero', type: 'character', assetId: hero.id, color: '#fff', pos: [0, 1.3, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
-  mk2({ id: uid('obj'), name: 'The end', type: 'text', text: 'THE END', color: '#ece7dd', pos: [0, 2.8, -2], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  const heroObj2 = mk2({ id: uid('obj'), name: 'Hero', type: 'character', assetId: hero.id, color: '#fff', pos: [-4, 1.3, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1, motion: { clip: 'walk', speed: 1 } });
+  mk2({ id: uid('obj'), name: 'Ember fire', type: 'fx', fxKind: 'fire', intensity: 0.8, fxSize: 1, fxSpeed: 1, fxStart: 0, pos: [3.4, 0.2, -1.6], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  mk2({ id: uid('obj'), name: 'Smoke', type: 'fx', fxKind: 'smoke', intensity: 0.5, fxSize: 1, fxSpeed: 0.7, fxStart: 0, pos: [3.4, 1.4, -1.6], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
   const kf2 = s2.keyframes;
   kf2[heroObj2.id] = {
-    'pose': [{ t: 0, v: 0, ease: 'linear' }, { t: 2, v: 6, ease: 'linear' }, { t: 4, v: 0, ease: 'linear' }],
+    'pos.x': [{ t: 0, v: -4, ease: 'linear' }, { t: 5.5, v: 3, ease: 'linear' }],
+    'rot.y': [{ t: 0, v: 0, ease: 'linear' }, { t: 5.5, v: 0, ease: 'linear' }],
   };
+  // camera tracks the hero across the golden frame
   kf2[CAMERA_ID] = {
+    'cam.px': [{ t: 0, v: -2.5, ease: 'ease' }, { t: 6, v: 2.5, ease: 'ease' }],
+    'cam.py': [{ t: 0, v: 1.9, ease: 'ease' }, { t: 6, v: 1.8, ease: 'ease' }],
+    'cam.pz': [{ t: 0, v: 5.5, ease: 'ease' }, { t: 6, v: 5, ease: 'ease' }],
+    'cam.tx': [{ t: 0, v: -1, ease: 'ease' }, { t: 6, v: 1, ease: 'ease' }],
+    'cam.ty': [{ t: 0, v: 1.5, ease: 'ease' }, { t: 6, v: 1.5, ease: 'ease' }],
+    'cam.tz': [{ t: 0, v: 0, ease: 'ease' }, { t: 6, v: 0, ease: 'ease' }],
+  };
+  const ev2 = (type, start, duration, extra = {}) => { const e = newEvent(type, start, duration); Object.assign(e, extra); s2.events.push(e); };
+  ev2('subtitle', 1.5, 2.6, { text: 'We move at dawn. No mistakes this time.', speaker: 'KIRA' });
+  ev2('letterbox', 0, 6);
+
+  // ---------- SHOT 3: the showdown — ANIME style ----------
+  const s3 = newShot('Showdown', 5);
+  project.shots.push(s3);
+  s3.lighting = 'anime';
+  s3.style = 'anime'; // <- the whole look flips: toon shading + ink outlines + anime grade
+  const mk3 = (o) => { s3.sceneObjects.push(o); return o; };
+  const heroObj3 = mk3({ id: uid('obj'), name: 'Hero', type: 'character', assetId: hero.id, color: '#fff', pos: [0, 1.3, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1, motion: { clip: 'celebrate', speed: 1 } });
+  mk3({ id: uid('obj'), name: 'Explosion', type: 'fx', fxKind: 'explosion', intensity: 1.4, fxSize: 1.4, fxSpeed: 1, fxStart: 1.2, pos: [2.6, 0.9, -1], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  mk3({ id: uid('obj'), name: 'Sparks', type: 'fx', fxKind: 'sparks', intensity: 1, fxSize: 1, fxSpeed: 1, fxStart: 1.4, pos: [2.6, 0.8, -1], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  mk3({ id: uid('obj'), name: 'Smoke', type: 'fx', fxKind: 'smoke', intensity: 0.8, fxSize: 1.2, fxSpeed: 0.8, fxStart: 1.6, pos: [2.6, 1.2, -1], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  mk3({ id: uid('obj'), name: 'Fountain', type: 'fx', fxKind: 'fountain', intensity: 0.7, fxSize: 1, fxSpeed: 1, fxStart: 0, pos: [-3, 0, -2.4], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  const kf3 = s3.keyframes;
+  kf3[heroObj3.id] = {
+    'rot.y': [{ t: 0, v: 0, ease: 'ease' }, { t: 1, v: -35, ease: 'ease' }, { t: 5, v: -35, ease: 'ease' }],
+  };
+  kf3[CAMERA_ID] = {
+    'cam.px': [{ t: 0, v: 5.5, ease: 'ease' }, { t: 5, v: 2.2, ease: 'ease' }],
+    'cam.py': [{ t: 0, v: 2.6, ease: 'ease' }, { t: 5, v: 1.7, ease: 'ease' }],
+    'cam.pz': [{ t: 0, v: 6.5, ease: 'ease' }, { t: 5, v: 3.6, ease: 'ease' }],
+    'cam.tx': [{ t: 0, v: 0.8, ease: 'ease' }, { t: 5, v: 0.4, ease: 'ease' }],
+    'cam.ty': [{ t: 0, v: 1.5, ease: 'ease' }, { t: 5, v: 1.4, ease: 'ease' }],
+    'cam.tz': [{ t: 0, v: -0.5, ease: 'ease' }, { t: 5, v: 0, ease: 'ease' }],
+  };
+  const ev3 = (type, start, duration, extra = {}) => { const e = newEvent(type, start, duration); Object.assign(e, extra); s3.events.push(e); };
+  ev3('subtitle', 1.3, 2, { text: 'Not. Even. Close.', speaker: 'KIRA' });
+  ev3('shake', 1.2, 1.4, { strength: 0.75 });
+  ev3('letterbox', 0, 5);
+
+  // ---------- SHOT 4: the end — back to film ----------
+  const s4 = newShot('The end', 4);
+  project.shots.push(s4);
+  s4.lighting = 'studio';
+  s4.style = 'film';
+  const mk4 = (o) => { s4.sceneObjects.push(o); return o; };
+  const heroObj4 = mk4({ id: uid('obj'), name: 'Hero', type: 'character', assetId: hero.id, color: '#fff', pos: [0, 1.3, 0], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1, motion: { clip: 'wave', speed: 1 } });
+  mk4({ id: uid('obj'), name: 'The end', type: 'text', text: 'THE END', color: '#ece7dd', pos: [0, 2.8, -2], rot: [0, 0, 0], scale: [1, 1, 1], opacity: 1 });
+  const kf4 = s4.keyframes;
+  kf4[CAMERA_ID] = {
     'cam.px': [{ t: 0, v: 7, ease: 'ease' }, { t: 4, v: 2.4, ease: 'ease' }],
     'cam.py': [{ t: 0, v: 5.5, ease: 'ease' }, { t: 4, v: 1.9, ease: 'ease' }],
     'cam.pz': [{ t: 0, v: 9, ease: 'ease' }, { t: 4, v: 3.4, ease: 'ease' }],
@@ -3132,6 +3250,8 @@ function loadStarterScene() {
     'cam.ty': [{ t: 0, v: 1.4, ease: 'ease' }, { t: 4, v: 1.4, ease: 'ease' }],
     'cam.tz': [{ t: 0, v: 0, ease: 'ease' }, { t: 4, v: 0, ease: 'ease' }],
   };
+  const ev4 = (type, start, duration, extra = {}) => { const e = newEvent(type, start, duration); Object.assign(e, extra); s4.events.push(e); };
+  ev4('fadeout', 3.2, 0.8);
   hero._base = { ...hero.pivots };
 
   // load the poster onto the draw canvas too, so Draw workspace shows something real
@@ -3142,14 +3262,17 @@ function loadStarterScene() {
   document.getElementById('project-tag').textContent = project.name;
   applyShot(s1.id);
   // set deterministic base framings AFTER applyShot (which captures the old editor camera)
-  s1.camera = { pos: [8.5, 7, 11], tgt: [0, 1.2, 0], fov: 46 };
-  s2.camera = { pos: [7, 5.5, 9], tgt: [0, 1.4, 0], fov: 46 };
+  s1.camera = { pos: [9, 6.5, 12], tgt: [0, 1.6, 0], fov: 40 };
+  s2.camera = { pos: [-2.5, 1.9, 5.5], tgt: [-1, 1.5, 0], fov: 46 };
+  s3.camera = { pos: [5.5, 2.6, 6.5], tgt: [0.8, 1.5, -0.5], fov: 42 };
+  s4.camera = { pos: [7, 5.5, 9], tgt: [0, 1.4, 0], fov: 46 };
   applyCameraBase(s1);
   markDirty();
   renderAssetList(); renderCharList(); drawCharPreview(); renderCharProps();
   renderAudioList();
   setWorkspace('anim');
-  toast('Starter movie loaded — 2 shots, 10s. Try Play movie.');
+  applyLook();
+  toast('Demo loaded — 4 shots, 21s. Play movie: shot 3 flips to anime. Tweak it all in Look & effects.');
 }
 
 /* ============================================================
@@ -3241,6 +3364,9 @@ function renderActorControls(panel, o) {
 
 document.getElementById('shot-lighting').addEventListener('change', e => {
   activeShot().lighting = e.target.value; applyLighting(e.target.value); markDirty();
+});
+document.getElementById('shot-style').addEventListener('change', e => {
+  activeShot().style = e.target.value; applyLook(); markDirty(); // re-render with the shot's style
 });
 document.getElementById('export-aspect').addEventListener('change', e => {
   project.exportAspect = e.target.value; markDirty();
@@ -3427,4 +3553,11 @@ window.__vc = {
     nodes: [...audioNodes.entries()].map(([id, n]) => ({ id, paused: n.el.paused, ct: Math.round(n.el.currentTime * 100) / 100, ready: n.el.readyState })),
     masterConnected: !!(masterGain && exportDest),
   }),
+};
+
+// testing/debug hook (dev) — lets the console inspect the look pipeline
+window.__vfDebug = {
+  effectiveLook, ensureLook, applyLook, activeShot,
+  get project() { return project; },
+  engine: lookEngine.debug,
 };

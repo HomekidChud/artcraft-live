@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { JOINTS, motionPose } from './motion.js';
+import { JOINTS, motionPose } from './vf-motion.js';
 
 // Volumetric humanoids: 19-bone Skeleton + weighted SkinnedMesh, capsule limbs,
 // lathed torso, articulated hands, detailed faces (ears, brows, lids, lips)

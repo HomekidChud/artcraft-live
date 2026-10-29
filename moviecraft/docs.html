@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VideoCraft — Guide & Docs</title>
-<meta name="description" content="VideoCraft documentation: quick start, workspaces, FX and GLB models, phone controls, export modes and section stitching, honest limits, and automation notes for AI agents.">
+<title>MovieCraft — Guide & Docs</title>
+<meta name="description" content="MovieCraft documentation: quick start, workspaces, FX and GLB models, phone controls, export modes and section stitching, honest limits, and automation notes for AI agents.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%23f2b25c'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e05d5d'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%234fb3a4'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%23c77b9e'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -84,7 +84,7 @@ footer { border-top: 1px solid var(--line-soft); padding: var(--space-6) 0; colo
 </head>
 <body>
 <header class="site">
-  <h1>VideoCraft</h1>
+  <h1>MovieCraft</h1>
   <span class="tag">Guide & docs</span>
   <span class="spacer"></span>
   <a class="btn" href="index.html">Open the studio</a>
@@ -93,7 +93,7 @@ footer { border-top: 1px solid var(--line-soft); padding: var(--space-6) 0; colo
   <div class="hero">
     <div class="kicker">3D movie studio in your browser</div>
     <h2>Plan it, build it, animate it, export it.</h2>
-    <p>VideoCraft is a ten-workspace browser studio for making 3D short films: paint assets, design characters, build scenes, add cinematic particle FX, import GLB models, keyframe animations across shots, and export a frame-accurate WebM movie. This page is the manual — for humans and for AI agents.</p>
+    <p>MovieCraft is a ten-workspace browser studio for making 3D short films: paint assets, design characters, build scenes, add cinematic particle FX, import GLB models, keyframe animations across shots, and export a frame-accurate WebM movie. This page is the manual — for humans and for AI agents.</p>
   </div>
   <nav class="toc" aria-label="Sections">
     <a href="#quick-start">Quick start</a>
@@ -116,7 +116,7 @@ footer { border-top: 1px solid var(--line-soft); padding: var(--space-6) 0; colo
       <li><strong>Animate</strong> — in the <strong>Animate</strong> workspace, set a keyframe (position/rotation/scale per object), scrub the timeline, move things, key again. Add more shots and reorder them into a movie.</li>
       <li><strong>Export</strong> — use <strong>Export movie</strong> in frame-accurate mode. Leave the range fields blank for the whole movie, or fill them to export one section at a time.</li>
     </ol>
-    <div class="note"><p>Everything runs locally in your browser — no account, no upload. Projects save as a small <code>.videocraft</code> JSON file you can reopen, share, or hand to another tool.</p></div>
+    <div class="note"><p>Everything runs locally in your browser — no account, no upload. Projects save as a small <code>.moviecraft</code> JSON file you can reopen, share, or hand to another tool.</p></div>
   </section>
 
   <section id="workspaces">
@@ -147,10 +147,24 @@ footer { border-top: 1px solid var(--line-soft); padding: var(--space-6) 0; colo
     <p>Because particles are seeded deterministically from the timeline, scrubbing back and forth shows the same particles — no randomness between preview and export.</p>
   </section>
 
+  <section id="styles">
+    <h3>Render styles — film & anime</h3>
+    <p>MovieCraft has two render styles, set movie-wide in <strong>Look & effects</strong> and overridable <strong>per shot</strong> in the Cinematography panel. Both render into exports in both export modes.</p>
+    <table>
+      <thead><tr><th>Style</th><th>What it does</th><th>Controls</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Film</strong></td><td>PBR materials, ACES tone mapping, bloom, depth of field, colour grades, film grain, vignette, chromatic aberration — and <strong>anamorphic lens flares</strong>, horizontal blue streaks that bloom off bright highlights.</td><td>Flare strength, plus all the classic look controls</td></tr>
+        <tr><td><strong>Anime</strong></td><td>Stepped <strong>toon shading</strong> (2–5 light steps), <strong>ink outlines</strong> from a per-frame depth pass (they track characters, keyframed motion and imported GLBs), and a bright, saturated anime colour grade.</td><td>Ink outline strength, toon steps</td></tr>
+      </tbody>
+    </table>
+    <p>The per-shot <strong>Render style</strong> selector lets one movie mix both: film for your establishing shots, anime for the showdown. Pair the anime style with the <strong>Anime bright key</strong> lighting preset for the full cel look. New anime grades: <code>anime</code> and <code>anime-dusk</code>.</p>
+    <p>Try it: hit <strong>Demo movie</strong> — the four-shot mini movie flips to anime on shot 3.</p>
+  </section>
+
   <section id="glb">
     <h3>GLB models</h3>
     <p>The Scene workspace has a <strong>GLB import</strong> in the props panel. Models are loaded, cached per-project and re-fetched automatically before any export starts — a broken URL aborts the export with a clear message instead of silently rendering a missing model.</p>
-    <div class="note warn"><p><strong>Static models only.</strong> VideoCraft renders GLBs as placed props: geometry, materials and textures. Rigged/skinned animation inside the GLB is not played back. Animate a GLB by keyframing its position, rotation and scale like any other object.</p></div>
+    <div class="note warn"><p><strong>Static models only.</strong> MovieCraft renders GLBs as placed props: geometry, materials and textures. Rigged/skinned animation inside the GLB is not played back. Animate a GLB by keyframing its position, rotation and scale like any other object.</p></div>
   </section>
 
   <section id="phone">
@@ -201,7 +215,7 @@ ffmpeg -f concat -safe 0 -i list.txt -c copy movie.webm</code></pre>
 
   <section id="limits">
     <h3>Honest limits</h3>
-    <p>VideoCraft is a browser studio for short 3D films, not a replacement for a render farm. Things you should know before promising anyone a feature-length movie:</p>
+    <p>MovieCraft is a browser studio for short 3D films, not a replacement for a render farm. Things you should know before promising anyone a feature-length movie:</p>
     <ul>
       <li><strong>Memory is the hard wall.</strong> Everything — scene, encoder, muxed video — lives in one browser tab. Movies beyond ~5 minutes of 720p start to strain the tab; beyond ~10 minutes, export in sections.</li>
       <li><strong>25 minutes in one go: not recommended.</strong> It is roughly 45,000 frames and about 1.5 GB of encoded video buffered in memory before the file is written — on most machines the tab will crash and you lose the render. The supported path for a 25-minute film is: export it in sections (e.g. 3–5 minute chunks), stitch with ffmpeg concat, and add audio separately. That workflow is reliable, resumable and restartable — one crashed section costs minutes, not hours.</li>
@@ -214,7 +228,7 @@ ffmpeg -f concat -safe 0 -i list.txt -c copy movie.webm</code></pre>
 
   <section id="agents">
     <h3>For AI agents</h3>
-    <p>VideoCraft is automatable from a browser driver (Playwright, Puppeteer, CDP). The UI uses stable IDs everywhere; there is no login, no server and no API to call — the app <em>is</em> the interface.</p>
+    <p>MovieCraft is automatable from a browser driver (Playwright, Puppeteer, CDP). The UI uses stable IDs everywhere; there is no login, no server and no API to call — the app <em>is</em> the interface.</p>
     <h4>Stable selectors</h4>
     <table>
       <thead><tr><th>Action</th><th>Selector</th></tr></thead>
@@ -231,7 +245,7 @@ ffmpeg -f concat -safe 0 -i list.txt -c copy movie.webm</code></pre>
       </tbody>
     </table>
     <h4>Project file format</h4>
-    <p>Projects are a single JSON file (extension <code>.videocraft</code> or <code>.json</code>). Top-level shape:</p>
+    <p>Projects are a single JSON file (extension <code>.moviecraft</code> or <code>.json</code>). Top-level shape:</p>
     <pre><code>{
   "version": 2,
   "name": "My film",
@@ -257,7 +271,7 @@ ffmpeg -f concat -safe 0 -i list.txt -c copy movie.webm</code></pre>
     <p>A machine-readable version of this page lives next to the app as <a href="GUIDE.md">GUIDE.md</a>.</p>
   </section>
 
-  <footer>VideoCraft — a browser-native 3D movie studio. Runs entirely client-side.</footer>
+  <footer>MovieCraft — a browser-native 3D movie studio. Runs entirely client-side.</footer>
 </main>
 </body>
 </html>
