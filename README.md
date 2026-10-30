@@ -26,6 +26,7 @@ Hosted on GitHub Pages, one path per app:
 | PlaneCraft | Plane project-management reconstruction (work items, cycles, modules, views, pages) | [/planecraft/](https://homekidchud.github.io/artcraft-live/planecraft/) |
 | EditCraft | Full text editor with a Claude AI panel (rich text, Markdown, code, find & replace, snippets, sandboxes, agent teams) | [/editcraft/](https://homekidchud.github.io/artcraft-live/editcraft/) |
 | AirplaneCraft | Owner-supplied flight simulator — workshop airframe builder and open-world flying (v17.2) | [/airplanecraft/](https://homekidchud.github.io/artcraft-live/airplanecraft/) |
+| YtFrameCraft | YouTube → frame-perfect AI-ready MP4 converter (CLI) + browser frame inspector | [/yt-framecraft/](https://homekidchud.github.io/artcraft-live/yt-framecraft/) |
 
 Each app folder at the repository root comes from the official `*-web-<version>.zip` static bundle from that app's GitHub release. The generated application assets are preserved; the HTML entrypoints include the shared chat overlay described below. DeckCraft was updated to v0.8.0 on 2026-10-20 after re-testing the web bundle in the sandbox browser. All apps use relative URLs, so they work at these subpaths. (Note: [AniCraft](https://github.com/storytold/AniCraft) has no release yet, and support projects like `artcraft`, `craft-libs` and `craft-fonts` are libraries rather than apps, so they are not hosted here.)
 

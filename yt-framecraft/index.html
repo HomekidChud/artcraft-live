@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FrameCraft — Frame-Perfect Video Inspector for AI</title>
+<meta name="description" content="FrameCraft: inspect any MP4 frame by frame — step, jump, export exact frames as PNG and copy frame references for AI pipelines. Runs entirely in your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='7' fill='%23e8a13d'/%3E%3Cpath d='M6 10h3v12H6zM11 10h3v12h-3zM16.5 10l9 6-9 6z' fill='%23141312'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://api.fontshare.com">
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #131211; --surface: #1a1917; --surface-2: #201e1c; --surface-3: #262422;
+  --border: #2d2b28; --border-strong: #3a3835;
+  --text: #e6e2dc; --text-muted: #9b968f; --text-faint: #6b675f;
+  --accent: #e8a13d; --accent-strong: #f0b35a; --accent-dim: #7a5518;
+  --record: #e05d5d; --ok: #6db56b;
+  --font-body: 'Satoshi', 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-font-smoothing: antialiased; }
+body {
+  background: var(--bg); color: var(--text); font-family: var(--font-body);
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  padding: 2.5rem 1.25rem 4rem; line-height: 1.55;
+}
+header { width: 100%; max-width: 980px; margin-bottom: 1.75rem; }
+.brand { display: flex; align-items: center; gap: 0.7rem; }
+.brand svg { width: 34px; height: 34px; flex: none; }
+.brand h1 { font-size: 1.35rem; font-weight: 900; letter-spacing: -0.02em; }
+.brand h1 span { color: var(--accent); }
+.tag { color: var(--text-muted); font-size: 0.9rem; margin-top: 0.15rem; }
+main { width: 100%; max-width: 980px; display: flex; flex-direction: column; gap: 1.25rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 0.75rem; padding: 1.25rem;
+}
+.card h2 { font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 1rem; }
+
+/* drop zone */
+#drop {
+  border: 2px dashed var(--border-strong); border-radius: 0.75rem;
+  padding: 2.25rem 1.5rem; text-align: center; cursor: pointer;
+  transition: border-color 160ms, background 160ms;
+}
+#drop:hover, #drop.over { border-color: var(--accent); background: var(--surface-2); }
+#drop .big { font-weight: 700; font-size: 1.05rem; }
+#drop .hint { color: var(--text-faint); font-size: 0.85rem; margin-top: 0.3rem; }
+#drop input { display: none; }
+
+/* viewer */
+#viewer { display: none; }
+.stage {
+  position: relative; background: #000; border-radius: 0.6rem; overflow: hidden;
+  border: 1px solid var(--border);
+}
+.stage video { display: block; width: 100%; max-height: 62vh; background: #000; }
+.stage .badge {
+  position: absolute; top: 0.75rem; left: 0.75rem;
+  background: rgba(0,0,0,0.65); color: var(--text);
+  font-family: var(--font-mono); font-size: 0.8rem; font-weight: 600;
+  padding: 0.3rem 0.6rem; border-radius: 0.4rem; pointer-events: none;
+}
+.stage .badge b { color: var(--accent); }
+
+.bar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; margin-top: 1rem; }
+button {
+  background: var(--surface-3); color: var(--text); border: 1px solid var(--border-strong);
+  border-radius: 0.5rem; padding: 0.5rem 0.85rem; font-family: var(--font-body);
+  font-weight: 700; font-size: 0.9rem; cursor: pointer;
+  transition: background 160ms, border-color 160ms;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #141312; }
+button.primary:hover { background: var(--accent-strong); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+label.inline { display: flex; align-items: center; gap: 0.45rem; color: var(--text-muted); font-size: 0.85rem; }
+input[type=number] {
+  width: 6.2rem; background: var(--surface-3); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: 0.5rem;
+  padding: 0.5rem 0.6rem; font-family: var(--font-mono); font-size: 0.9rem;
+}
+input[type=number]:focus { outline: none; border-color: var(--accent); }
+.spacer { flex: 1; }
+.frameinfo {
+  font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-muted);
+  margin-top: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.4rem 1.4rem;
+}
+.frameinfo b { color: var(--text); font-weight: 600; }
+.frameinfo .f { color: var(--accent); font-weight: 600; }
+
+/* quickstart */
+.cli {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 0.6rem;
+  padding: 0.9rem 1rem; font-family: var(--font-mono); font-size: 0.82rem;
+  color: var(--text-muted); overflow-x: auto; white-space: pre; line-height: 1.7;
+}
+.cli .c { color: var(--accent); }
+.cli .d { color: var(--text-faint); }
+p.note { color: var(--text-muted); font-size: 0.88rem; margin-top: 0.75rem; }
+p.note code {
+  font-family: var(--font-mono); font-size: 0.82rem; background: var(--surface-3);
+  border: 1px solid var(--border); border-radius: 0.3rem; padding: 0.05rem 0.35rem;
+}
+.keys { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 0.9rem; }
+.keys span { font-size: 0.83rem; color: var(--text-muted); }
+kbd {
+  font-family: var(--font-mono); font-size: 0.75rem; background: var(--surface-3);
+  border: 1px solid var(--border-strong); border-bottom-width: 2px;
+  border-radius: 0.3rem; padding: 0.1rem 0.4rem; color: var(--text);
+}
+#toast {
+  position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(150%);
+  background: var(--surface-3); border: 1px solid var(--border-strong); color: var(--text);
+  padding: 0.6rem 1.1rem; border-radius: 0.6rem; font-size: 0.9rem; font-weight: 500;
+  transition: transform 200ms cubic-bezier(0.16,1,0.3,1); z-index: 10;
+}
+#toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <svg viewBox="0 0 32 32"><rect x="2" y="2" width="28" height="28" rx="7" fill="#e8a13d"/><path d="M6 10h3v12H6zM11 10h3v12h-3zM16.5 10l9 6-9 6z" fill="#141312"/></svg>
+    <div>
+      <h1>Frame<span>Craft</span></h1>
+      <div class="tag">yt-framecraft web inspector — step through any MP4 frame by frame, export exact frames, copy frame refs for AI. Runs entirely in your browser.</div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="card" id="dropcard">
+    <h2>Load a video</h2>
+    <div id="drop" tabindex="0" role="button" aria-label="Choose or drop a video file">
+      <div class="big">Drop an MP4 here, or click to choose a file</div>
+      <div class="hint">Nothing is uploaded — the file never leaves your machine</div>
+      <input type="file" id="file" accept="video/*">
+    </div>
+  </div>
+
+  <div class="card" id="viewer">
+    <h2>Frame inspector</h2>
+    <div class="stage">
+      <video id="v" playsinline></video>
+      <div class="badge">frame <b id="badgeF">0</b> / <span id="badgeTotal">0</span> &nbsp;·&nbsp; <span id="badgeT">0.000s</span></div>
+    </div>
+    <div class="bar">
+      <button id="play" class="primary">Pause</button>
+      <button id="b10" title="Back 10 frames">&#9666;&#9666; 10f</button>
+      <button id="b1" title="Previous frame">&#9666; 1f</button>
+      <button id="f1" title="Next frame">1f &#9656;</button>
+      <button id="f10" title="Forward 10 frames">10f &#9656;&#9656;</button>
+      <label class="inline">fps <input type="number" id="fps" value="30" min="1" max="240" step="0.001"></label>
+      <label class="inline">go to frame <input type="number" id="goto" min="0" step="1"></label>
+      <span class="spacer"></span>
+      <button id="shot">Export frame PNG</button>
+      <button id="copy">Copy AI ref</button>
+    </div>
+    <div class="frameinfo">
+      <span>frame <b class="f" id="iF">0</b> / <b id="iTotal">0</b></span>
+      <span>time <b id="iT">0.000s</b></span>
+      <span>fps <b id="iFps">30</b></span>
+      <span>size <b id="iSize">—</b></span>
+      <span>duration <b id="iDur">—</b></span>
+    </div>
+    <div class="keys">
+      <span><kbd>Space</kbd> play / pause</span>
+      <span><kbd>,</kbd> / <kbd>.</kbd> step one frame</span>
+      <span><kbd>&larr;</kbd> / <kbd>&rarr;</kbd> step one frame</span>
+      <span><kbd>Shift</kbd> + <kbd>&larr;</kbd>/<kbd>&rarr;</kbd> jump 10 frames</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>YouTube &rarr; frame-perfect MP4 (CLI)</h2>
+    <div class="cli"><span class="d"># grab any YouTube video as a frame-perfect, AI-ready MP4</span>
+<span class="c">python3 yt-framecraft</span> https://www.youtube.com/watch?v=VIDEO_ID
+
+<span class="d"># force 24 fps, cap the long edge at 1280px for vision models</span>
+<span class="c">python3 yt-framecraft</span> VIDEO_ID <span class="d">--fps 24 --scale 1280</span>
+
+<span class="d"># also dump every frame as PNG + 5x5 contact sheets</span>
+<span class="c">python3 yt-framecraft</span> VIDEO_ID <span class="d">--frames png_out --grid sheets</span>
+
+<span class="d"># convert a local file instead</span>
+<span class="c">python3 yt-framecraft</span> <span class="d">--file</span> lecture.mp4 <span class="d">-o</span> lecture_ai.mp4</div>
+    <p class="note">The CLI produces a constant-frame-rate H.264 MP4 with keyframes every second, burned-in frame numbers and timestamps, and a <code>.json</code> sidecar (fps, frame count, duration) so AI pipelines can reference frames exactly. Requires <code>yt-dlp</code> and <code>ffmpeg</code>. Only download videos you have the rights to.</p>
+    <p class="note">Set the <code>fps</code> field above to match your encode (the CLI keeps the source rate by default) — the inspector rounds to the nearest frame, and the burned-in numbers let you verify alignment.</p>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const video = $('v'), drop = $('drop'), viewer = $('viewer');
+  let fps = 30;
+
+  const toast = msg => {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._h);
+    t._h = setTimeout(() => t.classList.remove('show'), 1800);
+  };
+
+  const frameOf = t => Math.max(0, Math.round(t * fps));
+  const totalFrames = () => video.duration ? Math.round(video.duration * fps) : 0;
+
+  function render() {
+    const f = frameOf(video.currentTime);
+    $('badgeF').textContent = f;
+    $('iF').textContent = f;
+    $('iT').textContent = video.currentTime.toFixed(3) + 's';
+    $('badgeT').textContent = video.currentTime.toFixed(3) + 's';
+  }
+
+  video.addEventListener('timeupdate', render);
+  video.addEventListener('seeked', render);
+  video.addEventListener('play', () => $('play').textContent = 'Pause');
+  video.addEventListener('pause', () => $('play').textContent = 'Play');
+  video.addEventListener('loadedmetadata', () => {
+    $('iTotal').textContent = totalFrames();
+    $('badgeTotal').textContent = totalFrames();
+    $('iSize').textContent = video.videoWidth + '\u00d7' + video.videoHeight;
+    $('iDur').textContent = video.duration.toFixed(3) + 's';
+    render();
+  });
+
+  function load(file) {
+    if (!file || !file.type.startsWith('video/') && !/\.(mp4|webm|mov|m4v)$/i.test(file.name)) {
+      toast('That does not look like a video file');
+      return;
+    }
+    video.src = URL.createObjectURL(file);
+    viewer.style.display = 'block';
+    viewer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toast('Loaded ' + file.name);
+  }
+
+  // file picking / drag-drop
+  drop.addEventListener('click', () => $('file').click());
+  drop.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } });
+  $('file').addEventListener('change', e => load(e.target.files[0]));
+  ['dragover', 'dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => load(e.dataTransfer.files[0]));
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', e => e.preventDefault());
+
+  // fps + goto
+  $('fps').addEventListener('input', e => {
+    const v = parseFloat(e.target.value);
+    if (v > 0 && v <= 240) { fps = v; $('iFps').textContent = v; render(); }
+  });
+  $('goto').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const f = Math.min(Math.max(0, parseInt(e.target.value, 10) || 0), totalFrames() - 1);
+    video.currentTime = Math.min(f / fps, Math.max(0, video.duration - 1 / fps));
+    video.pause();
+  });
+
+  // transport
+  function step(n) {
+    video.pause();
+    const f = Math.min(Math.max(0, frameOf(video.currentTime) + n), Math.max(0, totalFrames() - 1));
+    video.currentTime = Math.min(f / fps, Math.max(0, video.duration - 1 / fps));
+    render();
+  }
+  $('play').addEventListener('click', () => video.paused ? video.play() : video.pause());
+  $('b10').addEventListener('click', () => step(-10));
+  $('b1').addEventListener('click', () => step(-1));
+  $('f1').addEventListener('click', () => step(1));
+  $('f10').addEventListener('click', () => step(10));
+
+  document.addEventListener('keydown', e => {
+    if (viewer.style.display === 'none' || e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') { e.preventDefault(); video.paused ? video.play() : video.pause(); }
+    else if (e.key === ',') step(-1);
+    else if (e.key === '.') step(1);
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); step(e.shiftKey ? -10 : -1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); step(e.shiftKey ? 10 : 1); }
+  });
+
+  // export current frame as PNG
+  $('shot').addEventListener('click', () => {
+    if (!video.videoWidth) return;
+    const c = document.createElement('canvas');
+    c.width = video.videoWidth;
+    c.height = video.videoHeight;
+    c.getContext('2d').drawImage(video, 0, 0, c.width, c.height);
+    c.toBlob(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const f = String(frameOf(video.currentTime)).padStart(6, '0');
+      a.download = 'frame_' + f + '.png';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      toast('Exported frame_' + f + '.png');
+    }, 'image/png');
+  });
+
+  // copy machine-readable frame reference
+  $('copy').addEventListener('click', () => {
+    const f = frameOf(video.currentTime);
+    const ref = 'frame ' + f + ' @ ' + (f / fps).toFixed(3) +
+      's (fps ' + fps + ', ' + video.videoWidth + 'x' + video.videoHeight + ')';
+    navigator.clipboard.writeText(ref)
+      .then(() => toast('Copied: ' + ref))
+      .catch(() => toast(ref));
+  });
+})();
+</script>
+</body>
+</html>

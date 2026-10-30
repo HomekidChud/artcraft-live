@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""
+yt-framecraft — turn any YouTube video into a frame-perfect MP4 for AI vision.
+
+yt-dlp fetches the video, then ffmpeg re-encodes it so every frame lands exactly
+on the clock: constant frame rate, deinterlaced, yuv420p H.264, closed GOPs with
+keyframes every second, faststart, optional burned-in frame numbers + timestamps.
+A JSON sidecar describes the result so AI pipelines can reference frames
+exactly ("frame 1234 @ 41.133s, 30.000 fps").
+
+Usage:
+  yt-framecraft https://www.youtube.com/watch?v=dQw4w9WgXcQ
+  yt-framecraft dQw4w9WgXcQ --fps 24 --scale 1280
+  yt-framecraft --file lecture.mp4 -o lecture_ai.mp4
+  yt-framecraft --file clip.mp4 --frames png_out --grid
+
+Requires: yt-dlp and ffmpeg on PATH. Python 3.8+, stdlib only.
+
+Only download videos you have the rights to download.
+"""
+
+import argparse
+import json
+import math
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+FONT_CANDIDATES = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/TTF/DejaVuSans.ttf",
+    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+    "/usr/share/fonts/freefont/FreeSans.ttf",
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+    "C:\\Windows\\Fonts\\arial.ttf",
+]
+
+YT_ID_RE = re.compile(r"^[\w-]{11}$")
+
+
+def die(msg):
+    print(f"yt-framecraft: {msg}", file=sys.stderr)
+    sys.exit(1)
+
+
+def run(cmd, **kw):
+    proc = subprocess.run(cmd, **kw)
+    if proc.returncode != 0:
+        die(f"command failed ({proc.returncode}): {' '.join(map(str, cmd))}")
+
+
+def check_tools(need_ytdlp):
+    missing = [t for t in (["yt-dlp"] if need_ytdlp else []) + ["ffmpeg", "ffprobe"]
+               if shutil.which(t) is None]
+    if missing:
+        die(f"missing required tools on PATH: {', '.join(missing)}")
+
+
+def probe(path):
+    proc = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-print_format", "json",
+         "-show_streams", "-show_format", path],
+        capture_output=True, text=True)
+    if proc.returncode != 0:
+        die(f"ffprobe could not read {path}")
+    data = json.loads(proc.stdout)
+    video = next((s for s in data.get("streams", []) if s.get("codec_type") == "video"), None)
+    if video is None:
+        die(f"no video stream found in {path}")
+    num, den = (int(x) for x in video["r_frame_rate"].split("/"))
+    fps = num / den if den else 0.0
+    if fps <= 0:
+        die(f"could not determine source frame rate ({video['r_frame_rate']})")
+    fmt = data.get("format", {})
+    duration = float(fmt.get("duration", 0) or 0)
+    return {
+        "path": path,
+        "width": int(video.get("width", 0)),
+        "height": int(video.get("height", 0)),
+        "fps": fps,
+        "fps_exact": video["r_frame_rate"],
+        "duration": duration,
+        "has_audio": any(s.get("codec_type") == "audio" for s in data.get("streams", [])),
+        "nb_frames": video.get("nb_frames"),
+        "interlaced": (video.get("field_order") or "progressive") not in ("progressive", ""),
+    }
+
+
+def download(url, tmpdir):
+    out_tmpl = os.path.join(tmpdir, "src.%(ext)s")
+    print(f"[fetch] {url}")
+    run(["yt-dlp", "--no-playlist", "--no-warnings",
+         "-f", "bv*+ba/b", "-o", out_tmpl, url])
+    files = [f for f in os.listdir(tmpdir)
+             if f.startswith("src.") and not f.endswith((".part", ".ytdl"))]
+    if not files:
+        die("yt-dlp produced no output file")
+    path = os.path.join(tmpdir, files[0])
+    print(f"[fetch] got {os.path.basename(path)}")
+    return path
+
+
+def find_font():
+    for f in FONT_CANDIDATES:
+        if os.path.isfile(f):
+            return f
+    return None
+
+
+def even(n):
+    return max(2, int(round(n / 2.0)) * 2)
+
+
+def build_filters(meta, args, fps, font):
+    filters = []
+    if meta["interlaced"]:
+        filters.append("yadif=deint=interlaced")
+    filters.append(f"fps={fps}")
+    if args.scale and max(meta["width"], meta["height"], 1) > args.scale:
+        w, h = meta["width"], meta["height"]
+        if w >= h:
+            tw, th = args.scale, even(args.scale * h / w)
+        else:
+            tw, th = even(args.scale * w / h), args.scale
+        filters.append(f"scale={tw}:{th}:flags=lanczos")
+    if not args.no_burn:
+        if font:
+            filters.append(
+                "drawtext=fontfile='{}':text='f %{{n}}  %{{pts}}s':"
+                "x=w-tw-14:y=h-th-14:fontsize=h/26:"
+                "fontcolor=white@0.9:box=1:boxcolor=black@0.45:boxborderw=8".format(font))
+        else:
+            print("[warn] no system font found — skipping frame-number burn-in")
+    return filters
+
+
+def encode(src, dst, meta, args, fps, font):
+    filters = build_filters(meta, args, fps, font)
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-stats",
+           "-i", src]
+    if filters:
+        cmd += ["-vf", ",".join(filters)]
+    gop = max(1, int(math.ceil(fps)))
+    cmd += [
+        "-c:v", "libx264", "-preset", args.preset, "-crf", str(args.crf),
+        "-pix_fmt", "yuv420p", "-profile:v", "high",
+        "-g", str(gop), "-keyint_min", str(gop), "-sc_threshold", "0",
+        "-force_key_frames", "expr:gte(t,n_forced*1)",
+    ]
+    if meta["has_audio"]:
+        cmd += ["-c:a", "aac", "-b:a", "160k"]
+    cmd += ["-movflags", "+faststart", dst]
+    print(f"[encode] -> {os.path.basename(dst)}  "
+          f"(cfr {fps:g} fps, crf {args.crf}, keyframe every 1s)")
+    run(cmd)
+    return dst
+
+
+def sidecar(dst, meta, args, fps, source_url):
+    out = probe(dst)
+    frames = out.get("nb_frames")
+    if frames is None:
+        frames = int(round(out["duration"] * fps))
+    info = {
+        "file": os.path.basename(dst),
+        "source": source_url or meta["path"],
+        "width": out["width"],
+        "height": out["height"],
+        "fps": fps,
+        "frame_count": int(frames),
+        "duration_seconds": round(out["duration"], 3),
+        "video": "h264 yuv420p",
+        "audio": "aac 160k" if out["has_audio"] else "none",
+        "keyframes": "every 1 second (closed GOP)",
+        "burned_frame_numbers": not args.no_burn,
+        "frame_reference_format": "frame N @ (N / fps) seconds",
+    }
+    path = dst + ".json"
+    with open(path, "w") as fh:
+        json.dump(info, fh, indent=2)
+    print(f"[sidecar] {os.path.basename(path)}  "
+          f"({info['frame_count']} frames @ {fps:g} fps)")
+
+
+def dump_frames(dst, outdir):
+    os.makedirs(outdir, exist_ok=True)
+    print(f"[frames] PNG dump -> {outdir}/")
+    run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-stats",
+         "-i", dst, "-start_number", "0", os.path.join(outdir, "f_%06d.png")])
+
+
+def contact_sheets(dst, outdir):
+    os.makedirs(outdir, exist_ok=True)
+    print(f"[grid] contact sheets -> {outdir}/")
+    run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+         "-i", dst,
+         "-vf", "fps=1,scale=320:-2,tile=5x5:padding=4:margin=2:color=black",
+         os.path.join(outdir, "grid_%03d.png")])
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        prog="yt-framecraft",
+        description="Convert any YouTube video (or local file) into a "
+                    "frame-perfect MP4 for AI vision.")
+    ap.add_argument("source", nargs="?", help="YouTube URL or 11-char video ID")
+    ap.add_argument("--file", help="convert a local video file instead")
+    ap.add_argument("-o", "--output", help="output MP4 path (default: <name>_ai.mp4)")
+    ap.add_argument("--fps", type=float, default=None,
+                    help="force constant frame rate (default: keep source fps)")
+    ap.add_argument("--scale", type=int, default=0, metavar="N",
+                    help="cap the long edge at N pixels (e.g. 1280 for vision models)")
+    ap.add_argument("--no-burn", action="store_true",
+                    help="skip burning frame numbers + timestamps into the video")
+    ap.add_argument("--frames", metavar="DIR", help="also export every frame as PNG")
+    ap.add_argument("--grid", metavar="DIR", help="also export 5x5 contact sheets (1 sheet/25s)")
+    ap.add_argument("--crf", type=int, default=18, help="x264 quality, lower=better (default 18)")
+    ap.add_argument("--preset", default="medium", help="x264 speed preset (default medium)")
+    ap.add_argument("--keep-temp", action="store_true", help="keep the intermediate download")
+    args = ap.parse_args()
+
+    if not args.source and not args.file:
+        ap.error("give a YouTube URL/ID, or use --file <local video>")
+    if args.source and args.file:
+        ap.error("use either a URL or --file, not both")
+
+    check_tools(need_ytdlp=not args.file)
+
+    source_url = None
+    tmpdir = None
+    if args.file:
+        src = os.path.abspath(args.file)
+        if not os.path.isfile(src):
+            die(f"file not found: {src}")
+    else:
+        url = args.source
+        if YT_ID_RE.match(url):
+            url = f"https://www.youtube.com/watch?v={url}"
+        if "youtube.com" in url or "youtu.be" in url:
+            source_url = url
+        tmpdir = tempfile.mkdtemp(prefix="ytframecraft_")
+        src = download(url, tmpdir)
+
+    meta = probe(src)
+    fps = args.fps or meta["fps"]
+    if args.fps is None:
+        print(f"[probe] {meta['width']}x{meta['height']}, "
+              f"{fps:.3f} fps ({meta['fps_exact']}), "
+              f"{meta['duration']:.1f}s — keeping source rate as CFR")
+    else:
+        print(f"[probe] source {meta['fps']:.3f} fps -> forcing CFR {fps:g}")
+
+    if args.output:
+        dst = os.path.abspath(args.output)
+    else:
+        stem = os.path.splitext(os.path.basename(src))[0]
+        if stem == "src" and source_url:
+            stem = "video"
+        dst = os.path.abspath(f"{stem}_ai.mp4")
+    if not dst.endswith(".mp4"):
+        dst += ".mp4"
+
+    font = find_font()
+    encode(src, dst, meta, args, fps, font)
+    sidecar(dst, meta, args, fps, source_url)
+    if args.frames:
+        dump_frames(dst, args.frames)
+    if args.grid:
+        contact_sheets(dst, args.grid)
+
+    if tmpdir and not args.keep_temp:
+        shutil.rmtree(tmpdir, ignore_errors=True)
+
+    print(f"\ndone: {dst}")
+    print("open index.html in this repo to inspect it frame by frame")
+
+
+if __name__ == "__main__":
+    main()

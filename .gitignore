@@ -7,6 +7,16 @@ assistant/training/*.log
 server/data/
 shots/
 
+# YtFrameCraft outputs
+yt-framecraft/*_ai.mp4
+yt-framecraft/*_ai.mp4.json
+yt-framecraft/png_out/
+yt-framecraft/frames/
+yt-framecraft/sheets/
+yt-framecraft/f_*.png
+yt-framecraft/grid_*.png
+yt-framecraft/src.*
+
 # ChatCraft runtime state (generated files + custom-model keys)
 chatcraft/files/
 chatcraft/data/
