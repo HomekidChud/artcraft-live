@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MovieCraft — 3D Movie Studio</title>
 <meta name="description" content="MovieCraft: plan films, design reusable 3D models, organise assets, storyboard, build scenes, animate rigged characters, mix sound and export movies in a ten-workspace browser studio.">
+<!-- AI-HELP — start here if you are an AI agent driving this app.
+     Full machine-readable guide: moviecraft/GUIDE.md (stable selectors, project JSON schema,
+     headless Chrome recipe, render gotchas, honest limits).
+     Fast facts: pure client-side SPA, no backend/auth; localStorage autosave key
+     'videocraft_project_v2' (raw serializeProject JSON — write it before page load);
+     camera keyframes live in shot.keyframes.__camera__; character bone ids animate limbs;
+     scale must be [x,y,z]; export long films in sections + ffmpeg concat. -->
+<link rel="ai-guide" href="GUIDE.md">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%23f2b25c'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e05d5d'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%234fb3a4'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%23c77b9e'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -724,6 +732,6 @@ body.any-sheet-open #sheet-backdrop { display: block; }
   }
 }
 </script>
-<script type="module" src="app.js?v=0.6.6"></script>
+<script type="module" src="app.js?v=0.6.7"></script>
 </body>
 </html>

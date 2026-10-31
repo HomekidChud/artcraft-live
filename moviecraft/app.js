@@ -15,7 +15,7 @@ import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
 import { boneJoints, isPresetCompatible } from './charcraft.js';
 import { buildCharacterGroup, sketchCharacter } from './charbuild.js';
 import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './cutscene.js';
-import { createCutsceneOverlay } from './overlay.js';
+import { createCutsceneOverlay } from './overlay.js?v=0.6.7';
 import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.8.1';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 

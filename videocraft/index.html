@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>VideoCraft — Video Studio for Shorts & Long-form</title>
 <meta name="description" content="VideoCraft: a browser video studio — import clips, images and audio, trim and arrange on a timeline, add captions, build 3D film and anime scenes, and export YouTube Shorts or widescreen videos.">
+<!-- AI-HELP — start here if you are an AI agent driving this app.
+     Full machine-readable guide: videocraft/GUIDE.md (headless API, UI selectors, export
+     paths, gotchas, end-to-end recipe, honest limits).
+     Fast facts: open with ?headless=1 for window.vc.loadProject()/render() with a
+     __vcPostUrl blob receiver (receiver must answer CORS OPTIONS); a fresh page has a
+     default 6s hero scene clip — delete it before importing media, or clips append at
+     t=6s and desync; media items are '#insp-body .list-item' (id, not class);
+     real-time WebM export also POSTs to window.__vcPostUrl since v1.1.1. -->
+<link rel="ai-guide" href="GUIDE.md">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='7' fill='%23e8a13d'/%3E%3Cpath d='M13 10.5v11l9-5.5z' fill='%23141312'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
@@ -313,6 +322,6 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<script type="module" src="app.js?v=1.1.0"></script>
+<script type="module" src="app.js?v=1.1.1"></script>
 </body>
 </html>

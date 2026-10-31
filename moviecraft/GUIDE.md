@@ -76,6 +76,22 @@ Machine-readable guide for AI agents driving [MovieCraft](./index.html), a brows
 
 - Side panels + timeline become fixed slide-in sheets; floating dock `#mobile-dock` (buttons: Tools/Cast/Props/Shots/Animate/Timeline per workspace). Backdrop `#sheet-backdrop`, close on tap or Esc. Desktop/tablet layouts unchanged.
 
+## Field notes from a full-length agent render (v0.6.7)
+
+Lessons from an agent-built 10-shot, 242 s, 720p/24fps film ("The Spark") — all verified against the running app:
+
+- **Persistence key is `videocraft_project_v2`** (yes, VideoCraft's name — shared key family from before the apps split). It holds the raw JSON of `serializeProject()` output. Inject a project headlessly by writing this key **before** the page loads (an `addInitScript` that runs before app.js), or via the real `#btn-open` flow.
+- **Camera animation is not on scene objects.** Camera keyframes live in `shot.keyframes.__camera__` with channels `cam.px / cam.py / cam.pz / cam.tx / cam.ty / cam.tz / cam.fov`, each an array of `{ t, v, ease }` where `ease` is `ease | linear | step`. `t` is **shot-local** seconds. `shot.camera` also accepts a static `base` + a `cam` map of channel → keyframe list.
+- **Character keyframes target bone ids, not the character id.** A character object's `id` is what `assetId` references; to animate limbs, keyframe the joint names (`hips`, `chest`, `head`, `armL`, `armR`, `legL`, `legR`…) as keyframe subjects with channel `rot` (degrees). Built-in motion clips (`walk`, `wave`, `celebrate`, …) are set via the object's `clip` + `speed` props and are much cheaper than hand-keying.
+- **`scale` must be `[x,y,z]`** — a single number or `[s]` is silently ignored (object renders at default size).
+- **`color` doubles as the emissive glow color**: set `emissive` (number, 0–~2) for glow strength. High-emissive colors bloom nicely against `night`/`sunset` lighting.
+- **`shot.lighting`**: `studio | daylight | sunset | night`.
+- **Events** (`shot.events`): `title` (`text`, `start`, `dur`, optional `color`), `subtitle` (same + optional `speaker`), `fadein`/`fadeout` (`start`, `dur`), `letterbox`, `shake`. `start`/`dur` are shot-local seconds.
+- **Letterbox + subtitles (fixed in v0.6.7)**: the letterbox bars used to overlap the subtitle plane and clip descenders; subtitles are now lifted above the bottom bar whenever letterbox is active. Projects that avoided letterbox for this reason can re-enable it.
+- **Long films**: render in ≤60 s sections (`#export-start`/`#export-end`), stitch with `ffmpeg -f concat -safe 0 -c copy`. On a 2-core headless Chrome (SwiftShader WebGL2), expect roughly 0.65–0.7× real time per section (a 52 s section ≈ 11–12 min, ~50 MB). WebCodecs in headless Chrome supports **VP8 + Opus only** — no H.264/AAC encode; plan the VideoCraft/MovieCraft export path accordingly.
+- **Headless Chrome recipe that works**: `chrome-headless-shell` with `--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required`. Verify WebGL2 via `canvas.getContext('webgl2')` before trusting the render.
+- **Validate every shot with a 3-second snippet render** before committing to the full render: catches schema typos (bad `type`, wrong `fxKind`, missing `id`) at 1/10th the cost.
+
 ## Honest limits (do not oversell to users)
 
 - Frame-accurate export is **video-only** (no audio). Real-time mode has audio.

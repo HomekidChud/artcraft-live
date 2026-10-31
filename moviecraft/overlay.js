@@ -91,6 +91,10 @@ export function createCutsceneOverlay() {
       fade.visible = !!has && state.fade > 0.001;
       if (fade.visible) { bg.opacity = Math.min(1, state.fade); bg.color.set(state.fadeColor || '#000000'); }
       topBar.visible = bottomBar.visible = !!state?.letterbox;
+      // Letterbox bars cover NDC y in [0.76, 1] and [-1, -0.76]. The subtitle
+      // plane (height 0.3 at y=-0.74) would sit half behind the bottom bar,
+      // clipping descenders — lift it just above the bar while letterboxed.
+      subtitle.position.y = state?.letterbox ? -0.60 : -0.74;
       const t = state?.title;
       title.visible = !!t && t.alpha > 0.01;
       if (title.visible) {

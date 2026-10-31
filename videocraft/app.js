@@ -1161,11 +1161,16 @@ async function startExport() {
   recorder.onstop = () => {
     const blob = new Blob(exportChunks, { type: mime.split(';')[0] || 'video/webm' });
     const name = (state.name || 'video').replace(/[^\w\- ]+/g, '').trim() || 'video';
-    const a2 = document.createElement('a');
-    a2.href = URL.createObjectURL(blob);
-    a2.download = `${name} (${state.aspect.replace(':', 'x')}).webm`;
-    a2.click();
-    setTimeout(() => URL.revokeObjectURL(a2.href), 30_000);
+    if (window.__vcPostUrl) {
+      // agent channel: POST the exported blob instead of downloading
+      fetch(window.__vcPostUrl, { method: 'POST', body: blob }).catch(() => {});
+    } else {
+      const a2 = document.createElement('a');
+      a2.href = URL.createObjectURL(blob);
+      a2.download = `${name} (${state.aspect.replace(':', 'x')}).webm`;
+      a2.click();
+      setTimeout(() => URL.revokeObjectURL(a2.href), 30_000);
+    }
   };
   exporting = true;
   $('#export-overlay').style.display = 'grid';
