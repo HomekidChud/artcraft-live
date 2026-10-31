@@ -2,19 +2,23 @@
 """
 yt-framecraft — turn any YouTube video into a frame-perfect MP4 for AI vision.
 
-yt-dlp fetches the video, then ffmpeg re-encodes it so every frame lands exactly
-on the clock: constant frame rate, deinterlaced, yuv420p H.264, closed GOPs with
-keyframes every second, faststart, optional burned-in frame numbers + timestamps.
-A JSON sidecar describes the result so AI pipelines can reference frames
-exactly ("frame 1234 @ 41.133s, 30.000 fps").
+Fetching is a chain: yt-dlp first; if YouTube bot-walls it, the public mirror
+network (Piped + Invidious) is raced in parallel and the video is pulled
+through whichever mirror answers. Then ffmpeg re-encodes it so every frame
+lands exactly on the clock: constant frame rate, deinterlaced, yuv420p H.264,
+closed GOPs with keyframes every second, faststart, optional burned-in frame
+numbers + timestamps. A JSON sidecar describes the result so AI pipelines can
+reference frames exactly ("frame 1234 @ 41.133s, 30.000 fps").
 
 Usage:
   yt-framecraft https://www.youtube.com/watch?v=dQw4w9WgXcQ
   yt-framecraft dQw4w9WgXcQ --fps 24 --scale 1280
   yt-framecraft --file lecture.mp4 -o lecture_ai.mp4
-  yt-framecraft --file clip.mp4 --frames png_out --grid
+  yt-framecraft --file clip.mp4 --frames png_out --grid sheets
+  yt-framecraft VIDEO_ID --mirror https://yt.chocolatemoo53.com   # force one mirror
 
-Requires: yt-dlp and ffmpeg on PATH. Python 3.8+, stdlib only.
+Requires: ffmpeg on PATH (yt-dlp optional — mirrors are the fallback).
+Python 3.8+, stdlib only.
 
 Only download videos you have the rights to download.
 """
@@ -28,6 +32,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.request
+import urllib.error
+from concurrent.futures import ThreadPoolExecutor
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -41,6 +48,39 @@ FONT_CANDIDATES = [
 ]
 
 YT_ID_RE = re.compile(r"^[\w-]{11}$")
+YT_URL_RE = re.compile(r"(?:youtube\.com/(?:watch\?.*?v=|shorts/|embed/)|youtu\.be/)([\w-]{11})")
+
+PIPED_MIRRORS = [
+    "https://api.piped.private.coffee",
+    "https://api.piped.projectsegfau.lt",
+    "https://pipedapi.ducks.party",
+    "https://pipedapi.reallyaweso.me",
+    "https://piapi.ggtyler.dev",
+    "https://pipedapi.drgns.space",
+    "https://pipedapi.adminforge.de",
+    "https://pipedapi.kavin.rocks",
+    "https://pipedapi.orkiv.com",
+    "https://api.piped.coldforge.net",
+    "https://pipedapi.leptons.xyz",
+    "https://pipedapi.nosebs.ru",
+]
+
+INVIDIOUS_MIRRORS = [
+    "https://yt.chocolatemoo53.com",
+    "https://yewtu.be",
+    "https://inv.nadeko.net",
+    "https://invidious.nerdvpn.de",
+    "https://iv.ggtyler.dev",
+    "https://invidious.jing.rocks",
+    "https://invidious.privacyredirect.com",
+    "https://invidious.tiekoetter.com",
+    "https://iv.melmac.space",
+    "https://invidious.f5.si",
+    "https://invidious.lunivers.trade",
+]
+
+MIRROR_TIMEOUT = 12
+UA = "Mozilla/5.0 (X11; Linux x86_64) yt-framecraft/1.1"
 
 
 def die(msg):
@@ -60,6 +100,194 @@ def check_tools(need_ytdlp):
     if missing:
         die(f"missing required tools on PATH: {', '.join(missing)}")
 
+
+# ---------------------------------------------------------------- fetching
+
+def http_json(url, timeout=MIRROR_TIMEOUT):
+    req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8", "replace"))
+
+
+def http_download(url, dst, label=""):
+    """Stream a URL to a file with a simple progress line."""
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=60) as r, open(dst, "wb") as f:
+        total = int(r.headers.get("Content-Length") or 0)
+        got = 0
+        last = 0.0
+        while True:
+            chunk = r.read(1 << 16)
+            if not chunk:
+                break
+            f.write(chunk)
+            got += len(chunk)
+            if label and (total and got - last >= total / 20 or got - last >= 5 << 20):
+                last = got
+                pct = f" ({100 * got // total}%)" if total else ""
+                sys.stderr.write(f"\r          {label}: {got / 1048576:.1f} MB{pct}   ")
+                sys.stderr.flush()
+    if label:
+        sys.stderr.write("\n")
+    return got
+
+
+def video_id_from(source):
+    m = YT_URL_RE.search(source or "")
+    if m:
+        return m.group(1)
+    if YT_ID_RE.match(source or ""):
+        return source
+    return None
+
+
+def _int(v):
+    try:
+        return int(v or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _height(quality):
+    m = re.search(r"(\d+)", str(quality or ""))
+    return int(m.group(1)) if m else 0
+
+
+def from_piped(d, base):
+    """Pick best mp4 video + audio from a Piped /streams response."""
+    if not isinstance(d, dict) or d.get("error") or not d.get("videoStreams"):
+        return None
+    mp4 = lambda s: "mp4" in (s.get("mimeType") or "")
+    vonly = [s for s in d["videoStreams"] if s.get("videoOnly") and mp4(s)]
+    muxed = [s for s in d["videoStreams"] if not s.get("videoOnly") and mp4(s)
+             and _height(s.get("quality")) > 0]
+    lbry = [s for s in d["videoStreams"] if not s.get("videoOnly") and mp4(s)
+            and _height(s.get("quality")) == 0]
+    auds = [s for s in (d.get("audioStreams") or []) if mp4(s)]
+    best = lambda arr, key: max(arr, key=key) if arr else None
+    v = best(vonly, key=lambda s: (_height(s.get("quality")), _int(s.get("bitrate"))))
+    a = best(auds, key=lambda s: _int(s.get("bitrate")))
+    if v and a:
+        return {"title": d.get("title"), "duration": d.get("duration"),
+                "video": v["url"], "audio": a["url"], "mirror": base}
+    m = best(muxed, key=lambda s: (_height(s.get("quality")), _int(s.get("bitrate")))) \
+        or (lbry[0] if lbry else None)
+    if m:
+        return {"title": d.get("title"), "duration": d.get("duration"),
+                "video": m["url"], "audio": None, "mirror": base}
+    return None
+
+
+def from_invidious(d, vid, base):
+    """Pick best mp4 video + audio from an Invidious /api/v1/videos response."""
+    if not isinstance(d, dict) or d.get("error"):
+        return None
+    fmts = d.get("adaptiveFormats") or []
+    vids = [f for f in fmts if str(f.get("type") or "").startswith("video/mp4")]
+    auds = [f for f in fmts if str(f.get("type") or "").startswith("audio/mp4")]
+    lv = lambda itag: f"{base}/latest_version?id={vid}&itag={itag}&local=true"
+    if vids:
+        v = max(vids, key=lambda f: _int(f.get("bitrate")))
+        a = max(auds, key=lambda f: _int(f.get("bitrate"))) if auds else None
+        return {"title": d.get("title"), "duration": d.get("lengthSeconds"),
+                "video": lv(v["itag"]), "audio": lv(a["itag"]) if a else None,
+                "mirror": base}
+    muxed = d.get("formatStreams") or []
+    if muxed:
+        return {"title": d.get("title"), "duration": d.get("lengthSeconds"),
+                "video": lv(muxed[0]["itag"]), "audio": None, "mirror": base}
+    return None
+
+
+def try_piped(base, vid):
+    return from_piped(http_json(f"{base}/streams/{vid}"), base)
+
+
+def try_invidious(base, vid):
+    d = http_json(f"{base}/api/v1/videos/{vid}"
+                  "?fields=title,lengthSeconds,videoId,adaptiveFormats,formatStreams")
+    return from_invidious(d, vid, base)
+
+
+def resolve_mirrors(vid, only=None):
+    """Race every mirror in parallel; return the first workable result.
+
+    only: optional base URL to use a single custom mirror (tries both kinds).
+    """
+    jobs = []
+    if only:
+        jobs = [(f"piped:{only}", lambda: try_piped(only, vid)),
+                (f"invidious:{only}", lambda: try_invidious(only, vid))]
+    else:
+        jobs += [(f"piped:{b}", lambda b=b: try_piped(b, vid)) for b in PIPED_MIRRORS]
+        jobs += [(f"invidious:{b}", lambda b=b: try_invidious(b, vid)) for b in INVIDIOUS_MIRRORS]
+    with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+        futs = {pool.submit(fn): name for name, fn in jobs}
+        for fut in list(futs):
+            try:
+                res = fut.result(timeout=MIRROR_TIMEOUT + 6)
+                if res:
+                    return res
+            except Exception:
+                continue
+    return None
+
+
+def fetch_via_ytdlp(url, tmpdir):
+    out_tmpl = os.path.join(tmpdir, "src.%(ext)s")
+    proc = subprocess.run(["yt-dlp", "--no-playlist", "--no-warnings",
+                           "-f", "bv*+ba/b", "-o", out_tmpl, url],
+                          capture_output=True, text=True)
+    if proc.returncode != 0:
+        tail = (proc.stderr or "").strip().splitlines()[-1:] or ["unknown error"]
+        raise RuntimeError(tail[0][:200])
+    files = [f for f in os.listdir(tmpdir)
+             if f.startswith("src.") and not f.endswith((".part", ".ytdl"))]
+    if not files:
+        raise RuntimeError("yt-dlp produced no output file")
+    return os.path.join(tmpdir, files[0])
+
+
+def fetch_via_mirrors(vid, tmpdir, only=None):
+    print(f"[fetch] racing public mirrors for {vid}…")
+    streams = resolve_mirrors(vid, only)
+    if not streams:
+        raise RuntimeError("every mirror failed (Piped + Invidious)")
+    print(f"[fetch] won via {streams['mirror']}"
+          + (f" — {streams['title']}" if streams.get("title") else ""))
+    vpath = os.path.join(tmpdir, "mirror_vid.mp4")
+    http_download(streams["video"], vpath, "video")
+    apath = None
+    if streams.get("audio"):
+        apath = os.path.join(tmpdir, "mirror_aud.m4a")
+        http_download(streams["audio"], apath, "audio")
+    if apath:
+        merged = os.path.join(tmpdir, "merged.mp4")
+        run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+             "-i", vpath, "-i", apath, "-c", "copy", "-shortest", merged])
+        return merged
+    return vpath
+
+
+def download(source, tmpdir, mirror=None):
+    """Full fetch chain: yt-dlp, then the mirror network."""
+    vid = video_id_from(source)
+    try:
+        print(f"[fetch] {source} (yt-dlp)")
+        path = fetch_via_ytdlp(source, tmpdir)
+        print(f"[fetch] got {os.path.basename(path)} via yt-dlp")
+        return path, "yt-dlp"
+    except FileNotFoundError:
+        die("yt-dlp is not installed and no --file was given")
+    except Exception as e:
+        print(f"[fetch] yt-dlp unavailable ({str(e)[:80]}…) — falling back to public mirrors")
+    if not vid:
+        die(f"could not extract a YouTube video ID from: {source}")
+    path = fetch_via_mirrors(vid, tmpdir, mirror)
+    return path, "mirror network"
+
+
+# ---------------------------------------------------------------- encode
 
 def probe(path):
     proc = subprocess.run(
@@ -89,20 +317,6 @@ def probe(path):
         "nb_frames": video.get("nb_frames"),
         "interlaced": (video.get("field_order") or "progressive") not in ("progressive", ""),
     }
-
-
-def download(url, tmpdir):
-    out_tmpl = os.path.join(tmpdir, "src.%(ext)s")
-    print(f"[fetch] {url}")
-    run(["yt-dlp", "--no-playlist", "--no-warnings",
-         "-f", "bv*+ba/b", "-o", out_tmpl, url])
-    files = [f for f in os.listdir(tmpdir)
-             if f.startswith("src.") and not f.endswith((".part", ".ytdl"))]
-    if not files:
-        die("yt-dlp produced no output file")
-    path = os.path.join(tmpdir, files[0])
-    print(f"[fetch] got {os.path.basename(path)}")
-    return path
 
 
 def find_font():
@@ -161,7 +375,7 @@ def encode(src, dst, meta, args, fps, font):
     return dst
 
 
-def sidecar(dst, meta, args, fps, source_url):
+def sidecar(dst, meta, args, fps, source_url, fetched_via):
     out = probe(dst)
     frames = out.get("nb_frames")
     if frames is None:
@@ -169,6 +383,7 @@ def sidecar(dst, meta, args, fps, source_url):
     info = {
         "file": os.path.basename(dst),
         "source": source_url or meta["path"],
+        "fetched_via": fetched_via,
         "width": out["width"],
         "height": out["height"],
         "fps": fps,
@@ -210,6 +425,9 @@ def main():
                     "frame-perfect MP4 for AI vision.")
     ap.add_argument("source", nargs="?", help="YouTube URL or 11-char video ID")
     ap.add_argument("--file", help="convert a local video file instead")
+    ap.add_argument("--mirror", metavar="URL",
+                    help="force a single Piped/Invidious mirror base URL "
+                         "(skips the parallel race)")
     ap.add_argument("-o", "--output", help="output MP4 path (default: <name>_ai.mp4)")
     ap.add_argument("--fps", type=float, default=None,
                     help="force constant frame rate (default: keep source fps)")
@@ -229,10 +447,11 @@ def main():
     if args.source and args.file:
         ap.error("use either a URL or --file, not both")
 
-    check_tools(need_ytdlp=not args.file)
+    check_tools(need_ytdlp=not args.file and shutil.which("yt-dlp") is not None)
 
     source_url = None
     tmpdir = None
+    fetched_via = None
     if args.file:
         src = os.path.abspath(args.file)
         if not os.path.isfile(src):
@@ -244,7 +463,7 @@ def main():
         if "youtube.com" in url or "youtu.be" in url:
             source_url = url
         tmpdir = tempfile.mkdtemp(prefix="ytframecraft_")
-        src = download(url, tmpdir)
+        src, fetched_via = download(url, tmpdir, args.mirror)
 
     meta = probe(src)
     fps = args.fps or meta["fps"]
@@ -259,7 +478,7 @@ def main():
         dst = os.path.abspath(args.output)
     else:
         stem = os.path.splitext(os.path.basename(src))[0]
-        if stem == "src" and source_url:
+        if stem.startswith("src") or stem.startswith("mirror_") or stem == "merged":
             stem = "video"
         dst = os.path.abspath(f"{stem}_ai.mp4")
     if not dst.endswith(".mp4"):
@@ -267,7 +486,7 @@ def main():
 
     font = find_font()
     encode(src, dst, meta, args, fps, font)
-    sidecar(dst, meta, args, fps, source_url)
+    sidecar(dst, meta, args, fps, source_url, fetched_via)
     if args.frames:
         dump_frames(dst, args.frames)
     if args.grid:
