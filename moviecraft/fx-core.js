@@ -4,10 +4,11 @@
 // so scrubbing backwards, playing and frame-accurate export all produce
 // identical frames. Effects are scene objects: they transform, keyframe,
 // save and export like any other object.
-export const FX_KINDS = ['fire', 'smoke', 'sparks', 'explosion', 'fountain', 'rain', 'snow', 'embers', 'magic', 'dust', 'fireworks'];
+export const FX_KINDS = ['fire', 'smoke', 'sparks', 'explosion', 'fountain', 'rain', 'snow', 'embers', 'magic', 'dust', 'fireworks', 'lightning', 'portal', 'hearts', 'stars'];
 export const FX_LABELS = {
   fire: 'Fire', smoke: 'Smoke', sparks: 'Sparks', explosion: 'Explosion', fountain: 'Fountain',
   rain: 'Rain', snow: 'Snow', embers: 'Embers', magic: 'Magic', dust: 'Dust', fireworks: 'Fireworks',
+  lightning: 'Lightning', portal: 'Portal', hearts: 'Hearts', stars: 'Stars',
 };
 
 // Per-kind look: velocity, physics and colour ramp shared by the shader.
@@ -23,6 +24,10 @@ export const FX_PRESETS = {
   magic:    { life: 2.6, count: 260, size: 0.11, vel: [0.3, 0.8, 0.3], gravity: 0.15, spread: 0.85, grow: -0.35, turb: 0.95, additive: true, oneShot: false, colors: ['#f5c2ff', '#b48cf5', '#7fe8ff'] },
   dust:     { life: 6.0, count: 200, size: 0.16, vel: [0.18, 0.12, 0.18], gravity: -0.04, spread: 1.0, grow: 0.35, turb: 0.3, additive: false, oneShot: false, colors: ['#b8ac97', '#94897a', '#6f675e'] },
   fireworks:{ life: 1.9, count: 380, size: 0.09, vel: [0.9, 4.6, 0.9], gravity: -2.6, spread: 1.0, grow: -0.25, turb: 0.08, additive: true, oneShot: false, colors: ['#fff6cf', '#ffc466', '#e05a8f'] },
+  lightning: { life: 0.16, count: 90, size: 0.22, vel: [0.5, -16.0, 0.5], gravity: 0, spread: 0.12, grow: 0.3, turb: 0.02, additive: true, oneShot: true, colors: ['#ffffff', '#cfe8ff', '#7fb0ff'] },
+  portal:   { life: 3.2, count: 300, size: 0.1, vel: [0.9, 0.2, 0.9], gravity: 0, spread: 1.0, grow: -0.15, turb: 1.2, additive: true, oneShot: false, colors: ['#d9b3ff', '#9d5cff', '#3fd0ff'] },
+  hearts:   { life: 3.0, count: 200, size: 0.13, vel: [0.3, 1.1, 0.3], gravity: 0.2, spread: 0.8, grow: 0.05, turb: 0.5, additive: false, oneShot: false, colors: ['#ff9ecb', '#ff6fae', '#e84a8a'] },
+  stars:    { life: 2.8, count: 260, size: 0.09, vel: [0.2, 0.35, 0.2], gravity: 0.05, spread: 1.0, grow: -0.2, turb: 0.7, additive: true, oneShot: false, colors: ['#fff8d6', '#ffe98a', '#ffd24a'] },
 };
 
 export function defaultFxProps(kind) {

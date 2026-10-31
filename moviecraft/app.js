@@ -7,16 +7,16 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { buildAvatar } from './avatar3d.js';
-import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js';
+import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js?v=0.10.0';
 import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js';
 import { buildModel } from './models.js';
-import { defaultLook, GRADES, createLookEngine } from './effects.js?v=0.9.0';
+import { defaultLook, GRADES, createLookEngine } from './effects.js?v=0.10.0';
 import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
 import { boneJoints, isPresetCompatible } from './charcraft.js';
 import { buildCharacterGroup, sketchCharacter } from './charbuild.js';
-import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './cutscene.js';
-import { createCutsceneOverlay } from './overlay.js?v=0.6.7';
-import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.9.0';
+import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './cutscene.js?v=0.7.0';
+import { createCutsceneOverlay } from './overlay.js?v=0.7.0';
+import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.10.0';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 installWorkspaceShell();
@@ -1190,6 +1190,9 @@ function applyLighting(preset) {
     moonlight: ['#0c1425', '#cfe0ff', 1.6, '#5f7fd0', 2.6, 0.9],
     horror: ['#140b0c', '#cfd8d2', 1.4, '#ff4030', 2.2, 0.85],
     golden: ['#4a3220', '#ffd9a0', 3.2, '#b78a4f', 2.0, 1.1],
+    sunrise: ['#2b2438', '#ff9d5c', 2.6, '#ffd9a8', 1.6, 1.0],
+    storm: ['#39434e', '#aab8c8', 1.6, '#5f708f', 2.6, 0.92],
+    forest: ['#26301f', '#d8ffb0', 2.4, '#a8d98f', 1.8, 1.0],
   };
   const [bg, key, intensity, rim, rimIntensity, exposure] = looks[preset] || looks.studio;
   three.background.set(bg); three.fog.color.set(bg);
@@ -1977,13 +1980,30 @@ function sampleTrack(kfs, t) {
     if (t >= kfs[i].t && t <= kfs[i + 1].t) {
       const a = kfs[i], b = kfs[i + 1];
       const u = (t - a.t) / (b.t - a.t || 1);
-      const eu = a.ease === 'step' ? 0 : a.ease === 'linear' ? u : smoothstep(u);
+      const eu = easeValue(a.ease, u);
       return a.v + (b.v - a.v) * eu;
     }
   }
   return kfs[kfs.length - 1].v;
 }
 function smoothstep(u) { return u * u * (3 - 2 * u); }
+function easeValue(ease, u) {
+  switch (ease) {
+    case 'step': return 0;
+    case 'linear': return u;
+    case 'easein': return u * u;
+    case 'easeout': return 1 - (1 - u) * (1 - u);
+    case 'back': { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(u - 1, 3) + c1 * Math.pow(u - 1, 2); }
+    case 'bounce': {
+      const n1 = 7.5625, d1 = 2.75;
+      if (u < 1 / d1) return n1 * u * u;
+      if (u < 2 / d1) return n1 * (u -= 1.5 / d1) * u + 0.75;
+      if (u < 2.5 / d1) return n1 * (u -= 2.25 / d1) * u + 0.9375;
+      return n1 * (u -= 2.625 / d1) * u + 0.984375;
+    }
+    default: return smoothstep(u); // 'ease'
+  }
+}
 
 // evaluateAt: the single source of truth for scrub, playback, and recording
 function evaluateAt(t) {

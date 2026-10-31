@@ -22,6 +22,9 @@ const GRADES = {
   dream: { shadow: [1.02, 1.0, 1.05], high: [1.05, 1.02, 1.0], sat: 0.95, con: 0.85 },
   moonlight: { shadow: [0.78, 0.88, 1.12], high: [0.9, 0.98, 1.15], sat: 0.8, con: 1.18 },
   cyberpunk: { shadow: [0.8, 0.9, 1.15], high: [1.12, 0.95, 1.05], sat: 1.35, con: 1.2 },
+  forest: { shadow: [0.9, 1.05, 0.92], high: [1.02, 1.08, 1.0], sat: 1.05, con: 1.1 },
+  crimson: { shadow: [1.1, 0.82, 0.85], high: [1.05, 0.92, 0.95], sat: 1.2, con: 1.25 },
+  arctic: { shadow: [0.9, 0.98, 1.1], high: [1.0, 1.05, 1.1], sat: 0.8, con: 1.15 },
 };
 
 const FinalShader = {

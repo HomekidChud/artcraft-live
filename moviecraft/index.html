@@ -14,7 +14,7 @@
 <script type="application/json" id="ai-guide">
 {
   "app": "MovieCraft",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "what": "Browser-native 3D movie studio. Pure client-side SPA — no backend, no auth. Automate by authoring project JSON, injecting it, and rendering sections via the export UI.",
   "headless": {
     "chromeFlags": "--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required",
@@ -35,14 +35,14 @@
   },
   "projectJSON": {
     "root": "version:2, name, fps, exportAspect, drawings[], glbAssets[], characters[], shots[], audioAssets[], audioClips[], look, studio, activeShotId",
-    "shot": "id, name, duration, lighting (studio|daylight|sunset|night|neon|candlelight|moonlight|horror|golden), sceneObjects[], keyframes{}, events[], transition, transitionDur",
+    "shot": "id, name, duration, lighting (studio|daylight|sunset|night|neon|candlelight|moonlight|horror|golden|sunrise|storm|forest), sceneObjects[], keyframes{}, events[], transition (cut|fade|fade-white|flash|wipe), transitionDur",
     "objectTypes": "box sphere cylinder cone torus plane engineKit drawing text fx glb character model",
     "object": "id, name, type, pos[3] rot[3](degrees) scale[3] color(#hex) opacity emissive(number, glow strength — color doubles as glow color) assetId(for drawing/glb/character) fxKind+intensity+fxSize+fxSpeed+fxStart",
-    "keyframes": "shot.keyframes[objId][channel] = [{t, v, ease}] — t is SHOT-LOCAL seconds; ease: ease|linear|step; v type matches channel (pos/rot/scale = [x,y,z], others scalar)",
+    "keyframes": "shot.keyframes[objId][channel] = [{t, v, ease}] — t is SHOT-LOCAL seconds; ease: ease|linear|step|easein|easeout|back(overshoot)|bounce; v type matches channel (pos/rot/scale = [x,y,z], others scalar)",
     "camera": "shot.keyframes.__camera__ with channels cam.px cam.py cam.pz cam.tx cam.ty cam.tz cam.fov — or shot.camera = { base: {pos,target,fov}, cam: {channel: [kf]} }",
-    "characters": "objects reference characters[].id via assetId; animate limbs by keyframing BONE ids (hips, chest, head, armL, armR, legL, legR, …) on channel rot; or set the object's clip + speed for built-in motion clips (walk, wave, celebrate, …)",
-    "fx": "fxKind: fire|smoke|sparks|explosion|fountain|rain|snow|embers|magic|dust|fireworks (explosion is one-shot via fxStart); deterministic seeds — same timeline position renders identically in preview and export",
-    "events": "shot.events[]: type title|subtitle|fadein|fadeout|letterbox|shake with start + duration (shot-local seconds), text/speaker/color/strength optional. Letterbox no longer clips subtitle descenders (fixed v0.6.7 — subtitles lift above the bars)."
+    "characters": "objects reference characters[].id via assetId; animate limbs by keyframing BONE ids (hips, chest, head, armL, armR, legL, legR, …) on channel rot; or set the object's clip + speed for built-in motion clips (idle, walk, run, wave, celebrate, jump, dance, point, nod, shakehead, punch, bow, sit)",
+    "fx": "fxKind: fire|smoke|sparks|explosion|fountain|rain|snow|embers|magic|dust|fireworks|lightning|portal|hearts|stars (explosion + lightning are one-shot via fxStart); deterministic seeds — same timeline position renders identically in preview and export",
+    "events": "shot.events[]: type title|subtitle|lowerthird|fadein|fadeout|letterbox|shake with start + duration (shot-local seconds), text/speaker/color/strength optional. Lower third renders bottom-left with the speaker name in gold. Letterbox no longer clips subtitle descenders (fixed v0.6.7 — subtitles lift above the bars)."
   },
   "longFilmsRecipe": [
     "render in <=60s sections: set #export-start / #export-end, click #btn-record",
@@ -620,6 +620,10 @@ body.any-sheet-open #sheet-backdrop { display: block; }
           <select class="btn" id="key-ease" style="width:100%" aria-label="Key easing">
             <option value="linear">Linear</option>
             <option value="ease" selected>Smooth (ease)</option>
+            <option value="easein">Ease in (accelerate)</option>
+            <option value="easeout">Ease out (decelerate)</option>
+            <option value="back">Overshoot (back)</option>
+            <option value="bounce">Bounce</option>
             <option value="step">Step (hold)</option>
           </select>
           <div class="side-title">Actor performance</div>
@@ -647,6 +651,8 @@ body.any-sheet-open #sheet-backdrop { display: block; }
                 <option value="neon">Neon city</option><option value="candlelight">Candlelight</option>
                 <option value="moonlight">Moonlight</option><option value="horror">Horror</option>
                 <option value="golden">Amber golden</option>
+                <option value="sunrise">Sunrise</option><option value="storm">Storm</option>
+                <option value="forest">Forest</option>
               </select>
               <div class="empty-note">Camera moves become editable timeline keys. Lighting is saved independently for each shot.</div>
             </div>
@@ -780,6 +786,6 @@ body.any-sheet-open #sheet-backdrop { display: block; }
   }
 }
 </script>
-<script type="module" src="app.js?v=0.9.0"></script>
+<script type="module" src="app.js?v=0.10.0"></script>
 </body>
 </html>

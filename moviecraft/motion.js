@@ -6,7 +6,7 @@ export const JOINTS = [
   'leftUpperLeg', 'leftLowerLeg', 'leftFoot',
   'rightUpperLeg', 'rightLowerLeg', 'rightFoot',
 ];
-export const MOTIONS = ['none', 'idle', 'walk', 'run', 'wave', 'celebrate'];
+export const MOTIONS = ['none', 'idle', 'walk', 'run', 'wave', 'celebrate', 'jump', 'dance', 'point', 'nod', 'shakehead', 'punch', 'bow', 'sit'];
 const finite = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 export function motionPose(motion = {}, time = 0, duration = Infinity) {
   const pose = {};
@@ -53,6 +53,66 @@ export function motionPose(motion = {}, time = 0, duration = Infinity) {
     pose.leftForeArm[0] = 15 + s * 14; pose.rightForeArm[0] = 15 - s * 14;
     lift = Math.max(0, s) * 0.22;
     pose.chest[1] = s * 8;
+  }
+  if (clip === 'jump') {
+    const T = t % 0.9;
+    const air = Math.sin(Math.min(T / 0.7, 1) * Math.PI);
+    const crouch = T < 0.12 ? T / 0.12 : T > 0.62 && T < 0.74 ? (0.74 - T) / 0.12 : 0;
+    pose.leftUpperLeg[0] = crouch * 40 + air * 25; pose.rightUpperLeg[0] = crouch * 40 + air * 25;
+    pose.leftLowerLeg[0] = -crouch * 70; pose.rightLowerLeg[0] = -crouch * 70;
+    pose.leftUpperArm[2] = -30 - air * 70; pose.rightUpperArm[2] = 30 + air * 70;
+    pose.leftForeArm[0] = -35; pose.rightForeArm[0] = -35;
+    lift = air * 0.85 - crouch * 0.18;
+  }
+  if (clip === 'dance') {
+    pose.hips[1] = Math.abs(s) * 9; pose.hips[0] = s * 10;
+    pose.chest[1] = -s * 14; pose.chest[0] = s * 6;
+    pose.leftUpperArm[2] = -85 + s * 40; pose.rightUpperArm[2] = 85 - s * 40;
+    pose.leftForeArm[0] = -60 + s * 25; pose.rightForeArm[0] = -60 - s * 25;
+    pose.leftUpperLeg[0] = -s * 15; pose.rightUpperLeg[0] = s * 15;
+    pose.leftLowerLeg[0] = -Math.abs(s) * 20; pose.rightLowerLeg[0] = -Math.abs(s) * 20;
+    lift = Math.abs(c) * 0.06;
+  }
+  if (clip === 'point') {
+    const raise = Math.min(1, t / 0.25);
+    pose.rightUpperArm[0] = -78 * raise; pose.rightForeArm[0] = -12 * raise;
+    pose.rightUpperArm[2] = 38 * raise;
+    pose.leftUpperArm[2] = -12; pose.leftForeArm[0] = -20;
+    pose.chest[1] = 10 * raise;
+  }
+  if (clip === 'nod') {
+    pose.head[0] = s * 13;
+  }
+  if (clip === 'shakehead') {
+    pose.head[1] = s * 20;
+  }
+  if (clip === 'punch') {
+    const P = t % 1.1;
+    const jab = P < 0.18 ? P / 0.18 : P < 0.4 ? 1 - (P - 0.18) / 0.22 : 0;
+    pose.rightUpperArm[0] = -40 - jab * 28; pose.rightUpperArm[2] = 40 - jab * 34;
+    pose.rightForeArm[0] = -85 + jab * 77;
+    pose.leftUpperArm[0] = -18; pose.leftUpperArm[2] = -22; pose.leftForeArm[0] = -70;
+    pose.chest[1] = -jab * 28;
+    pose.leftFoot[1] = jab * 6;
+  }
+  if (clip === 'bow') {
+    let p;
+    if (t < 0.45) p = t / 0.45;
+    else if (t < 1.35) p = 1;
+    else if (t < 1.8) p = 1 - (t - 1.35) / 0.45;
+    else p = 0;
+    pose.chest[0] = 43 * p; pose.head[0] = 20 * p;
+    pose.leftUpperArm[0] = 28 * p; pose.rightUpperArm[0] = 28 * p;
+    pose.leftUpperArm[2] = -12; pose.rightUpperArm[2] = 12;
+    pose.hips[1] = -3.5 * p;
+  }
+  if (clip === 'sit') {
+    pose.hips[1] = -32;
+    pose.leftUpperLeg[0] = 83; pose.rightUpperLeg[0] = 83;
+    pose.leftLowerLeg[0] = -77; pose.rightLowerLeg[0] = -77;
+    pose.leftUpperArm[0] = -14; pose.rightUpperArm[0] = -14;
+    pose.leftForeArm[0] = -50; pose.rightForeArm[0] = -50;
+    pose.chest[0] = 4;
   }
   JOINTS.forEach(j => { pose[j] = pose[j].map(v => v * strength); });
   return { pose, lift: lift * strength };

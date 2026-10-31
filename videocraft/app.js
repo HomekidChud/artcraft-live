@@ -1,6 +1,6 @@
 // app.js — VideoCraft editor core
-import { renderScene, makeScene, makeObject, attachControls, editorCamera, pickObject, sampleCamera, newId, CHAR_MOTIONS, FX_KINDS, LIGHT_PRESETS, controls } from './scene3d.js?v=1.2.0';
-import { LOOK_GRADES } from './look.js?v=1.2.0';
+import { renderScene, makeScene, makeObject, attachControls, editorCamera, pickObject, sampleCamera, newId, CHAR_MOTIONS, FX_KINDS, LIGHT_PRESETS, controls } from './scene3d.js?v=1.3.0';
+import { LOOK_GRADES } from './look.js?v=1.3.0';
 
 // ---------------------------------------------------------------- state
 
@@ -851,13 +851,16 @@ function renderSceneTab(sel) {
         <input type="number" step="0.1" data-scl-unif placeholder="uniform" style="width:100%">
       </div>
       <div class="row" style="margin-top:10px">
+        <select class="btn tiny" id="obj-ease" style="flex:1">
+          <option value="smooth">Smooth</option><option value="linear">Linear</option><option value="easein">Ease in</option><option value="easeout">Ease out</option><option value="back">Overshoot</option><option value="bounce">Bounce</option><option value="step">Step</option>
+        </select>
         <button class="btn tiny primary" id="obj-key">Key transform here</button>
         <button class="btn tiny danger" id="obj-del">Delete</button>
       </div>`;
     if (selObj.keys?.length) {
       html += `<div class="insp-title" style="margin-top:8px">Keys</div>`;
       selObj.keys.forEach((k, i) => {
-        html += `<div class="list-item" data-keydel="${i}"><span class="nm">@ ${k.t.toFixed(1)}s</span><span class="meta">remove</span></div>`;
+        html += `<div class="list-item" data-keydel="${i}"><span class="nm">@ ${k.t.toFixed(1)}s</span><span class="meta">${k.ease || 'smooth'} · remove</span></div>`;
       });
     }
     html += `</div>`;
@@ -868,10 +871,15 @@ function renderSceneTab(sel) {
     <div class="grid-2">
       <button class="btn tiny" id="cam-setbase">Save current view</button>
       <button class="btn tiny primary" id="cam-addkey">Add key @ ${(clip ? state.playhead - clip.start : 0).toFixed(1)}s</button>
+    </div>
+    <div class="row" style="margin-top:4px">
+      <select class="btn tiny" id="cam-ease" style="flex:1">
+        <option value="smooth">Ease: smooth</option><option value="linear">Ease: linear</option><option value="easein">Ease in</option><option value="easeout">Ease out</option><option value="back">Overshoot</option><option value="bounce">Bounce</option><option value="step">Step</option>
+      </select>
     </div>`;
   if (scene.camKeys?.length) {
     scene.camKeys.forEach((k, i) => {
-      html += `<div class="list-item" data-camkeydel="${i}"><span class="nm">@ ${k.t.toFixed(1)}s</span><span class="meta">remove</span></div>`;
+      html += `<div class="list-item" data-camkeydel="${i}"><span class="nm">@ ${k.t.toFixed(1)}s</span><span class="meta">${k.ease || 'smooth'} · remove</span></div>`;
     });
   }
   html += `</div>`;
@@ -937,7 +945,7 @@ function wireSceneTab(scene, clip) {
     $('#obj-key')?.addEventListener('click', () => {
       selObj.keys = selObj.keys || [];
       selObj.keys = selObj.keys.filter((k) => Math.abs(k.t - localT()) > 0.05);
-      selObj.keys.push({ t: localT(), pos: [...selObj.pos], rot: [...selObj.rot], scale: [...selObj.scale] });
+      selObj.keys.push({ t: localT(), pos: [...selObj.pos], rot: [...selObj.rot], scale: [...selObj.scale], ease: $('#obj-ease')?.value || 'smooth' });
       bump(); renderInspector();
     });
     $('#obj-del')?.addEventListener('click', () => { scene.objects = scene.objects.filter((o) => o !== selObj); state.sel = null; bump(); renderInspector(); });
@@ -952,7 +960,7 @@ function wireSceneTab(scene, clip) {
   $('#cam-addkey')?.addEventListener('click', () => {
     scene.camKeys = scene.camKeys || [];
     scene.camKeys = scene.camKeys.filter((k) => Math.abs(k.t - localT()) > 0.05);
-    scene.camKeys.push({ t: localT(), pos: [...editorCamera.position.toArray()], target: [...controls.target.toArray()] });
+    scene.camKeys.push({ t: localT(), pos: [...editorCamera.position.toArray()], target: [...controls.target.toArray()], ease: $('#cam-ease')?.value || 'smooth' });
     bump(); renderInspector();
   });
   inspBody.querySelectorAll('[data-camkeydel]').forEach((el) => el.addEventListener('click', () => {
@@ -1095,7 +1103,7 @@ function renderExportTab() {
       <div class="insp-title">Output</div>
       <div class="row"><label>Format</label><span style="font-size:var(--text-sm)">${a.label}</span></div>
       <div class="row"><label>Export size</label><span class="val" style="min-width:90px">${a.ex[0]} × ${a.ex[1]}</span></div>
-      <div class="row"><label>Frame rate</label><span class="val">${state.fps} fps</span></div>
+      <div class="row"><label>Frame rate</label><select id="ex-fps" style="flex:1.4">${[24, 25, 30, 50, 60].map((f) => `<option value="${f}" ${state.fps === f ? 'selected' : ''}>${f} fps${f === 24 ? ' (cinema)' : f === 30 ? ' (standard)' : f === 60 ? ' (smooth)' : ''}</option>`).join('')}</select></div>
       <div class="row"><label>Length</label><span class="val">${fmt1(totalDur())}</span></div>
       <div class="row"><label>Container</label><span class="val">${mp4ok ? 'MP4 (H.264 + AAC)' : 'WebM (VP9/VP8)'}</span></div>
       <div class="row"><label>Quality</label>
@@ -1114,6 +1122,7 @@ function renderExportTab() {
     </div>`;
   $('#btn-export').addEventListener('click', () => (mp4ok ? exportMp4() : startExport()));
   $('#btn-export-webm')?.addEventListener('click', startExport);
+  $('#ex-fps')?.addEventListener('change', (e) => { state.fps = +e.target.value; bump(); });
 }
 $('#btn-export-top').addEventListener('click', () => {
   state.tab = 'export'; renderRail(); renderInspector();

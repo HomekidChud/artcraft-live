@@ -46,7 +46,7 @@ await window.vc.render({ postUrl, quality })  // 'high' | 'standard' | 'draft'
 - Import is async (metadata probing + audio decode, up to ~10 s for large files): **poll for the list items**, don't assume they exist after a fixed sleep.
 - The media list re-renders on selection: click items by re-querying (`page.evaluate` with `querySelectorAll`), not by holding stale element handles.
 - Timeline length in the export tab is `totalDur()` — with the hero clip present it reads 6 s on an "empty" timeline. That's the tell you forgot step one.
-- Real-time WebM recording records the preview canvas at the export resolution (16:9 → 1920×1080 @ 30 fps fixed; `state.fps` has no UI). Expect ~1× wall-clock duration.
+- Real-time WebM recording records the preview canvas at the export resolution (16:9 → 1920×1080) at the frame rate chosen in the Output tab (24/25/30/50/60 fps; default 30). Expect ~1× wall-clock duration.
 - Exports POST a blob with a non-simple content type → **CORS preflight**; a receiver that only answers `POST` will silently swallow the export (the fetch failure is caught and ignored).
 
 ## Project JSON
@@ -66,6 +66,6 @@ await window.vc.render({ postUrl, quality })  // 'high' | 'standard' | 'draft'
 
 ## Honest limits (do not oversell to users)
 
-- Export resolution/framerate: fixed per aspect (16:9 → 1080p/30); no fps control in the UI.
+- Export resolution is fixed per aspect (16:9 → 1080p); frame rate is selectable in the Output tab (24/25/30/50/60 fps) and is saved with the project.
 - Real-time WebM capture is 1× wall-clock and can drop frames on slow machines; the WebCodecs MP4 path is faster but needs H.264/AAC encode support.
 - No keyframe audio mixing: audio clips play through WebAudio; a suspended AudioContext (autoplay policy) yields silent exports — pass `--autoplay-policy=no-user-gesture-required` headless.

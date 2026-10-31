@@ -4,6 +4,18 @@ MovieCraft is a static, browser-based scene and movie editor. This upgrade is a
 practical foundation for stylised 3D filmmaking, not a claim of feature parity
 with a Hollywood production pipeline.
 
+Version 0.10.0 is the biggest creative expansion yet:
+
+- **8 new motion clips** for characters: jump, dance, point, nod, shakehead,
+  punch, bow and sit (14 built-in clips total)
+- **Keyframe easing**: ease in, ease out, overshoot (back) and bounce joins
+  ease/linear/step — for objects, cameras and every keyframed channel
+- **4 new FX kinds**: lightning (one-shot), portal, hearts and stars
+- **3 new transitions**: fade from white, lightning flash and a sliding wipe
+- **Lower third events** — documentary/news-style name bars bottom-left
+- **3 new lighting looks** (sunrise, storm, forest) and **3 new grades**
+  (forest, crimson, arctic)
+
 Version 0.9.1 widens the creative palette for AI-driven filmmaking: six new
 deterministic FX kinds (**rain, snow, embers, magic, dust and fireworks**),
 five new shot-lighting looks (**neon city, candlelight, moonlight, horror and

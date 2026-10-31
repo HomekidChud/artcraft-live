@@ -21,7 +21,7 @@ test('defaultFxProps falls back to fire for unknown kinds', () => {
 });
 
 test('looping effects are pure functions of time (scrub-safe, export-safe)', () => {
-  for (const kind of ['fire', 'smoke', 'sparks', 'fountain', 'rain', 'snow', 'embers', 'magic', 'dust', 'fireworks']) {
+  for (const kind of ['fire', 'smoke', 'sparks', 'fountain', 'rain', 'snow', 'embers', 'magic', 'dust', 'fireworks', 'portal', 'hearts', 'stars']) {
     for (const seed of [0, 0.25, 0.9]) {
       const a = fxParticleAge(kind, seed, 1.234);
       const b = fxParticleAge(kind, seed, 1.234);
@@ -35,7 +35,7 @@ test('looping effects are pure functions of time (scrub-safe, export-safe)', () 
 });
 
 test('looping effects are hidden before their start time too', () => {
-  for (const kind of ['fire', 'smoke', 'sparks', 'fountain', 'rain', 'snow', 'embers', 'magic', 'dust', 'fireworks']) {
+  for (const kind of ['fire', 'smoke', 'sparks', 'fountain', 'rain', 'snow', 'embers', 'magic', 'dust', 'fireworks', 'portal', 'hearts', 'stars']) {
     const age = fxParticleAge(kind, 0.5, 1.0, 2.0);
     assert.equal(age, -1, kind + ' must gate on fxStart');
     assert.equal(fxAgeFade(kind, age), 0, kind + ' invisible before start');

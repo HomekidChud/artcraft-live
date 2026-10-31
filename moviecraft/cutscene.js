@@ -3,12 +3,15 @@
 // switching shots and exporting individual frames all produce the same state.
 import { makeId } from './production.js';
 
-export const EVENT_TYPES = ['title', 'subtitle', 'fadein', 'fadeout', 'letterbox', 'shake'];
+export const EVENT_TYPES = ['title', 'subtitle', 'lowerthird', 'fadein', 'fadeout', 'letterbox', 'shake'];
 export const EVENT_LABELS = {
-  title: 'Title card', subtitle: 'Subtitle / dialogue', fadein: 'Fade in',
-  fadeout: 'Fade out', letterbox: 'Cinema bars', shake: 'Camera shake',
+  title: 'Title card', subtitle: 'Subtitle / dialogue', lowerthird: 'Lower third',
+  fadein: 'Fade in', fadeout: 'Fade out', letterbox: 'Cinema bars', shake: 'Camera shake',
 };
-export const TRANSITIONS = [['cut', 'Hard cut'], ['fade', 'Fade from black']];
+export const TRANSITIONS = [
+  ['cut', 'Hard cut'], ['fade', 'Fade from black'], ['fade-white', 'Fade from white'],
+  ['flash', 'Lightning flash'], ['wipe', 'Wipe (slide in)'],
+];
 
 const evNum = (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback;
 const clamp01 = v => Math.max(0, Math.min(1, v));
@@ -69,6 +72,12 @@ export function evalShotOverlay(shot, t) {
         if (!state.subtitle || alpha >= state.subtitle.alpha) state.subtitle = { text: e.text, speaker: e.speaker, color, alpha };
         break;
       }
+      case 'lowerthird': {
+        const alpha = Math.min(1, local / 0.12, (1 - local) / 0.12);
+        const color = /^#[0-9a-f]{6}$/i.test(e.color) && e.color !== '#000000' ? e.color : '#ffffff';
+        if (!state.lowerthird || alpha >= state.lowerthird.alpha) state.lowerthird = { text: e.text, speaker: e.speaker, color, alpha };
+        break;
+      }
       case 'shake': {
         const envelope = Math.sin(Math.PI * local); // ease in and out
         state.shake = Math.max(state.shake, e.strength * envelope);
@@ -76,13 +85,28 @@ export function evalShotOverlay(shot, t) {
       }
     }
   }
-  // shot transition: fade from black at the very start of the shot
-  if (shot?.transition === 'fade') {
+  // shot transitions at the very start of the shot
+  if (shot?.transition === 'fade' || shot?.transition === 'fade-white') {
     const td = Math.max(0.05, evNum(shot.transitionDur, 0.5));
     if (t < td) {
       const a = 1 - t / td;
-      if (a > state.fade) { state.fade = a; state.fadeColor = '#000000'; }
+      if (a > state.fade) { state.fade = a; state.fadeColor = shot.transition === 'fade-white' ? '#ffffff' : '#000000'; }
     }
+  }
+  if (shot?.transition === 'flash') {
+    const td = Math.max(0.15, evNum(shot.transitionDur, 0.35));
+    if (t < td) {
+      // two quick white pulses: strong flash, brief gap, weaker echo
+      const a = t < td * 0.3 ? t / (td * 0.3)
+        : t < td * 0.45 ? 0.25
+        : t < td * 0.8 ? 0.85 * (1 - (t - td * 0.45) / (td * 0.35))
+        : 0;
+      if (a > state.fade) { state.fade = a; state.fadeColor = '#ffffff'; }
+    }
+  }
+  if (shot?.transition === 'wipe') {
+    const td = Math.max(0.1, evNum(shot.transitionDur, 0.45));
+    if (t < td) { state.wipe = 1 - t / td; state.fadeColor = '#000000'; }
   }
   return state;
 }

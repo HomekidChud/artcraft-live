@@ -1,16 +1,16 @@
 // scene3d.js — 3D scene clips: objects, characters, FX, camera moves, keyframes
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createLookEngine } from './look.js?v=1.2.0';
+import { createLookEngine } from './look.js?v=1.3.0';
 
 let uid = 1;
 export const newId = (p = 'id') => `${p}${(uid++).toString(36)}${Date.now().toString(36).slice(-4)}`;
 
 // ---------------------------------------------------------------- scene defs
 
-const CHAR_MOTIONS = ['none', 'idle', 'walk', 'run', 'wave', 'celebrate'];
-const FX_KINDS = ['fire', 'explosion', 'confetti', 'sparks', 'fountain', 'rain', 'snow', 'embers', 'magic', 'smoke'];
-const LIGHT_PRESETS = ['three-point', 'sunset', 'night', 'dramatic', 'daylight', 'neon', 'candlelight', 'horror'];
+const CHAR_MOTIONS = ['none', 'idle', 'walk', 'run', 'wave', 'celebrate', 'jump', 'dance', 'point', 'nod', 'shakehead', 'punch', 'bow', 'sit'];
+const FX_KINDS = ['fire', 'explosion', 'confetti', 'sparks', 'fountain', 'rain', 'snow', 'embers', 'magic', 'smoke', 'lightning', 'portal', 'hearts', 'stars'];
+const LIGHT_PRESETS = ['three-point', 'sunset', 'night', 'dramatic', 'daylight', 'neon', 'candlelight', 'horror', 'sunrise', 'storm', 'forest'];
 
 export function makeObject(type, over = {}) {
   const base = {
@@ -62,6 +62,25 @@ export function makeScene(preset = 'hero') {
 
 // ---------------------------------------------------------------- keyframes
 
+// Key easing: 'smooth' (default), 'linear', 'step', 'easein', 'easeout', 'back', 'bounce'
+export function easeFactor(ease, f) {
+  switch (ease) {
+    case 'linear': return f;
+    case 'step': return 0;
+    case 'easein': return f * f;
+    case 'easeout': return 1 - (1 - f) * (1 - f);
+    case 'back': { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(f - 1, 3) + c1 * Math.pow(f - 1, 2); }
+    case 'bounce': {
+      const n1 = 7.5625, d1 = 2.75;
+      if (f < 1 / d1) return n1 * f * f;
+      if (f < 2 / d1) return n1 * (f -= 1.5 / d1) * f + 0.75;
+      if (f < 2.5 / d1) return n1 * (f -= 2.25 / d1) * f + 0.9375;
+      return n1 * (f -= 2.625 / d1) * f + 0.984375;
+    }
+    default: return f * f * (3 - 2 * f); // 'smooth'
+  }
+}
+
 function sampleKeys(keys, t, base) {
   if (!keys || !keys.length) return { pos: base.pos, rot: base.rot, scale: base.scale };
   const sorted = [...keys].sort((a, b) => a.t - b.t);
@@ -70,7 +89,7 @@ function sampleKeys(keys, t, base) {
     const a = sorted[i], b = sorted[i + 1];
     if (t >= a.t && t <= b.t) {
       const f = b.t - a.t > 1e-6 ? (t - a.t) / (b.t - a.t) : 0;
-      const e = f * f * (3 - 2 * f); // smoothstep
+      const e = easeFactor(a.ease ?? 'smooth', f);
       const mix = (av, bv) => av.map((v, j) => v + (bv[j] - v) * e);
       return {
         pos: mix(a.pos ?? base.pos, b.pos ?? base.pos),
@@ -92,7 +111,7 @@ export function sampleCamera(scene, t) {
     const a = sorted[i], b = sorted[i + 1];
     if (t >= a.t && t <= b.t) {
       const f = b.t - a.t > 1e-6 ? (t - a.t) / (b.t - a.t) : 0;
-      const e = f * f * (3 - 2 * f);
+      const e = easeFactor(a.ease ?? 'smooth', f);
       const mix = (av, bv) => av.map((v, j) => v + (bv[j] - v) * e);
       return { pos: mix(a.pos, b.pos), target: mix(a.target, b.target) };
     }
@@ -201,6 +220,80 @@ function poseCharacter(ch, motion, t) {
       ch.torso.rotation.y = Math.sin(t * 1.2) * 0.1;
       break;
     }
+    case 'jump': {
+      const T = (t % 0.9), air = Math.sin(Math.min(T / 0.7, 1) * Math.PI);
+      const crouch = T < 0.12 ? T / 0.12 : (T > 0.62 && T < 0.74) ? (0.74 - T) / 0.12 : 0;
+      ch.hips.position.y = 0.92 + air * 0.85 - crouch * 0.2;
+      set(ch.torso.rotation, 0);
+      for (const s of [-1, 1]) {
+        set(A[s].shoulder.rotation, -0.3 - air * 0.9); set(A[s].elbow.rotation, -0.35);
+        set(L[s].hip.rotation, crouch * 0.7 + air * 0.4);
+        set(L[s].knee.rotation, crouch * 1.2 + 0.06);
+      }
+      break;
+    }
+    case 'dance': {
+      const b = Math.sin(t * 5.2), w = Math.sin(t * 2.6);
+      ch.hips.position.y = 0.92 + Math.abs(b) * 0.15;
+      ch.hips.position.x = w * 0.1;
+      ch.torso.rotation.y = -w * 0.25; set(ch.torso.rotation, b * 0.1);
+      for (const s of [-1, 1]) {
+        A[s].shoulder.rotation.set(0, 0, s * (-1.5 + b * 0.7));
+        set(A[s].elbow.rotation, -1.1 + b * 0.4 * s);
+        set(L[s].hip.rotation, -w * 0.25 * s);
+        set(L[s].knee.rotation, Math.abs(b) * 0.35 + 0.06);
+      }
+      break;
+    }
+    case 'point': {
+      const raise = Math.min(1, t / 0.25);
+      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.torso.rotation.y = 0.18 * raise;
+      A[1].shoulder.rotation.set(-1.35 * raise, 0, 0.35 * raise);
+      A[1].elbow.rotation.x = -0.15 * raise;
+      set(A[-1].shoulder.rotation, 0.1); set(A[-1].elbow.rotation, -0.2);
+      set(L[-1].hip.rotation, 0); set(L[1].hip.rotation, 0);
+      break;
+    }
+    case 'nod': {
+      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.head.rotation.x = Math.sin(t * 4.4) * 0.22;
+      break;
+    }
+    case 'shakehead': {
+      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.head.rotation.y = Math.sin(t * 5.6) * 0.35;
+      break;
+    }
+    case 'punch': {
+      const P = t % 1.1;
+      const jab = P < 0.18 ? P / 0.18 : P < 0.4 ? 1 - (P - 0.18) / 0.22 : 0;
+      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.torso.rotation.y = -jab * 0.5;
+      A[1].shoulder.rotation.set(-0.4 - jab * 0.3, 0, 0.7 - jab * 0.6);
+      A[1].elbow.rotation.x = -1.5 + jab * 1.35;
+      A[-1].shoulder.rotation.set(-0.18, 0, -0.22); A[-1].elbow.rotation.x = -1.2;
+      set(L[-1].hip.rotation, 0); set(L[1].hip.rotation, 0);
+      break;
+    }
+    case 'bow': {
+      let p;
+      if (t < 0.45) p = t / 0.45; else if (t < 1.35) p = 1; else if (t < 1.8) p = 1 - (t - 1.35) / 0.45; else p = 0;
+      ch.hips.position.y = 0.92 - p * 0.06;
+      set(ch.torso.rotation, 0.75 * p);
+      ch.head.rotation.x = 0.35 * p;
+      for (const s of [-1, 1]) { set(A[s].shoulder.rotation, 0.5 * p); set(A[s].elbow.rotation, -0.1); set(L[s].hip.rotation, 0); }
+      break;
+    }
+    case 'sit': {
+      ch.hips.position.y = 0.92 - 0.55;
+      set(ch.torso.rotation, 0.06);
+      for (const s of [-1, 1]) {
+        set(A[s].shoulder.rotation, -0.25); set(A[s].elbow.rotation, -0.9);
+        set(L[s].hip.rotation, 1.45); set(L[s].knee.rotation, -1.35);
+      }
+      break;
+    }
     default: {
       ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
       for (const s of [-1, 1]) { set(A[s].shoulder.rotation, 0); set(A[s].elbow.rotation, 0); set(L[s].hip.rotation, 0); set(L[s].knee.rotation, 0); }
@@ -233,6 +326,10 @@ const FX_COLORS = {
   embers: [[1, 0.8, 0.45], [1, 0.55, 0.2], [0.85, 0.3, 0.1]],
   magic: [[0.96, 0.8, 1], [0.7, 0.6, 1], [0.5, 0.9, 1]],
   smoke: [[0.45, 0.45, 0.5], [0.3, 0.3, 0.35], [0.2, 0.2, 0.25]],
+  lightning: [[1, 1, 1], [0.8, 0.9, 1], [0.5, 0.7, 1]],
+  portal: [[0.85, 0.7, 1], [0.62, 0.36, 1], [0.25, 0.8, 1]],
+  hearts: [[1, 0.62, 0.8], [1, 0.44, 0.68], [0.91, 0.29, 0.54]],
+  stars: [[1, 0.97, 0.84], [1, 0.91, 0.54], [1, 0.82, 0.29]],
 };
 
 function updateFX(def, pts, t) {
@@ -294,6 +391,30 @@ function updateFX(def, pts, t) {
       const a = seed * Math.PI * 2;
       const r = (0.15 + life * 0.45 + seed * 0.2) * S;
       pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = 0.2 + life * 2.2 * S; pos[i * 3 + 2] = Math.sin(a) * r;
+    } else if (kind === 'lightning') {
+      // jagged downward strike, visible in short deterministic bursts
+      const cycle = (t * 1.7 + seed * 5) % 3;
+      const on = cycle < 0.18 ? 1 : cycle < 0.5 ? 0.15 : 0;
+      const fall = ((t * 14 + seed * 4) % 3.4) * S;
+      const jx = Math.sin(seed * 40 + Math.floor(t * 20)) * 0.35;
+      pos[i * 3] = jx; pos[i * 3 + 1] = 3.4 * S - fall; pos[i * 3 + 2] = Math.cos(seed * 9.1) * 0.4;
+      col[i * 3] *= on; col[i * 3 + 1] *= on; col[i * 3 + 2] *= on;
+    } else if (kind === 'portal') {
+      // particles swirling around a vertical ring
+      const ang = seed * Math.PI * 2 + t * (1.2 + seed * 0.8) * (seed > 0.5 ? 1 : -1);
+      const r = (0.8 + Math.sin(t * 1.5 + seed * 7) * 0.18) * S;
+      pos[i * 3] = Math.cos(ang) * r; pos[i * 3 + 1] = (seed - 0.5) * 2.4 * S + Math.sin(t + seed * 5) * 0.1; pos[i * 3 + 2] = Math.sin(ang) * r;
+    } else if (kind === 'hearts') {
+      // slow rising hearts with a gentle sway
+      const life = ((t * (0.35 + seed * 0.2) + seed * 5) % 3);
+      pos[i * 3] = (seed - 0.5) * 2.2 * S + Math.sin(life * 2 + seed * 9) * 0.3; pos[i * 3 + 1] = 0.2 + life * 1.0 * S; pos[i * 3 + 2] = (Math.cos(seed * 5.3) * 1.2) * S;
+    } else if (kind === 'stars') {
+      // twinkling golden field, drifting slowly upward
+      const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(t * (2 + seed * 3) + seed * 20));
+      const life = ((t * (0.15 + seed * 0.15) + seed * 7) % 3.2);
+      const a = seed * Math.PI * 2;
+      pos[i * 3] = Math.cos(a) * (0.2 + seed * 1.8) * S; pos[i * 3 + 1] = 0.3 + life * 0.8 * S; pos[i * 3 + 2] = Math.sin(a) * (0.2 + seed * 1.8) * S;
+      col[i * 3] *= twinkle; col[i * 3 + 1] *= twinkle; col[i * 3 + 2] *= twinkle;
     } else { // fountain
       const a = seed * Math.PI * 2, tt = (t * 0.9 + seed * 2.3) % 1.9;
       const v = (1.5 + seed) * S;
@@ -365,6 +486,21 @@ function applyLighting(scene3, preset) {
     const spot = add(new THREE.SpotLight('#e8f4ff', 45, 26, 0.35, 0.55)); spot.position.set(0, 1.2, 6); // under-lit faces
     const blood = add(new THREE.PointLight('#ff3020', 9, 18)); blood.position.set(-4, 2.5, -5);
     const rim = add(new THREE.DirectionalLight('#4f8f6f', 0.7)); rim.position.set(0, 5, -10);
+  } else if (preset === 'sunrise') {
+    add(new THREE.AmbientLight('#2a2436', 1.4));
+    const sun = add(new THREE.DirectionalLight('#ff9d5c', 2.2)); sun.position.set(-14, 3.5, 6); // low, warm sun
+    const fill = add(new THREE.HemisphereLight('#7f9fd9', '#2b2018', 0.8));
+    const rim = add(new THREE.DirectionalLight('#ffd9a8', 1.0)); rim.position.set(8, 5, -8);
+  } else if (preset === 'storm') {
+    add(new THREE.AmbientLight('#39434e', 1.1));
+    const key = add(new THREE.DirectionalLight('#aab8c8', 1.6)); key.position.set(-6, 14, 4); // cold, overhead
+    const rim = add(new THREE.DirectionalLight('#5f708f', 2.0)); rim.position.set(0, 6, -10);
+    const flash = add(new THREE.PointLight('#dfe9ff', 6, 20)); flash.position.set(4, 10, -6);
+  } else if (preset === 'forest') {
+    add(new THREE.AmbientLight('#26301f', 1.3));
+    const sun = add(new THREE.DirectionalLight('#d8ffb0', 2.6)); sun.position.set(6, 12, 3); // dappled green key
+    const bounce = add(new THREE.HemisphereLight('#a8d98f', '#2a2013', 0.9));
+    const rim = add(new THREE.DirectionalLight('#e8ffd0', 0.8)); rim.position.set(0, 4, -9);
   }
 }
 

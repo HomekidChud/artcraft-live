@@ -76,8 +76,11 @@ export function createCutsceneOverlay() {
   const subMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthTest: false, depthWrite: false });
   const subtitle = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.3), subMat);
   subtitle.position.set(0, -0.74, -0.4); subtitle.renderOrder = 25; scene.add(subtitle);
+  const ltMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthTest: false, depthWrite: false });
+  const lower = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.3), ltMat);
+  lower.position.set(-0.22, -0.70, -0.4); lower.renderOrder = 26; scene.add(lower);
 
-  const titleCache = { key: '' }, subCache = { key: '' };
+  const titleCache = { key: '' }, subCache = { key: '' }, ltCache = { key: '' };
   function setText(mesh, mat, cache, key, make) {
     if (cache.key === key) return; // cached
     if (mat.map) mat.map.dispose();
@@ -87,9 +90,16 @@ export function createCutsceneOverlay() {
   }
   return {
     render(renderer, state) {
-      const has = state && (state.fade > 0.001 || state.letterbox || state.title || state.subtitle);
-      fade.visible = !!has && state.fade > 0.001;
-      if (fade.visible) { bg.opacity = Math.min(1, state.fade); bg.color.set(state.fadeColor || '#000000'); }
+      const wipe = Math.min(1, Math.max(0, state?.wipe || 0));
+      const has = state && (state.fade > 0.001 || wipe > 0.001 || state.letterbox || state.title || state.subtitle || state.lowerthird);
+      fade.visible = !!has && (state.fade > 0.001 || wipe > 0.001);
+      if (fade.visible) {
+        bg.opacity = wipe > 0.001 ? 1 : Math.min(1, state.fade);
+        bg.color.set(state.fadeColor || '#000000');
+      }
+      // wipe: black curtain anchored to the right edge, shrinking as the shot reveals
+      if (wipe > 0.001) { fade.scale.x = Math.max(0.0001, wipe); fade.position.x = 1 - wipe; }
+      else { fade.scale.x = 1; fade.position.x = 0; }
       topBar.visible = bottomBar.visible = !!state?.letterbox;
       // Letterbox bars cover NDC y in [0.76, 1] and [-1, -0.76]. The subtitle
       // plane (height 0.3 at y=-0.74) would sit half behind the bottom bar,
@@ -110,6 +120,14 @@ export function createCutsceneOverlay() {
           W: 1200, H: 200, font: 44, color: s.color || '#f4f0e8', speaker: s.speaker, speakerColor: '#efb855',
         }));
         subMat.opacity = s.alpha;
+      }
+      const lt = state?.lowerthird;
+      lower.visible = !!lt && lt.alpha > 0.01;
+      if (lower.visible) {
+        setText(lower, ltMat, ltCache, 'l:' + lt.text + '|' + lt.speaker + '|' + lt.color, () => makeTextTexture(wrapText(lt.text, 40), {
+          W: 1200, H: 200, font: 46, color: lt.color || '#ffffff', speaker: lt.speaker, speakerColor: '#efb855',
+        }));
+        ltMat.opacity = lt.alpha;
       }
       if (!has) return;
       const prev = renderer.autoClear;
