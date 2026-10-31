@@ -3,7 +3,7 @@
 // bones. Posing rotates bones; motion presets apply only when the character
 // contains the standard joint names (see isPresetCompatible).
 import * as THREE from 'three';
-import { motionPose, JOINTS } from './motion.js';
+import { motionPose, JOINTS } from './motion.js?v=0.11.0';
 import { isPresetCompatible } from './charcraft.js';
 
 const D2R = Math.PI / 180;
@@ -52,7 +52,10 @@ export function buildCharacterGroup(character) {
   group.userData.bones = boneNodes; // joint editor reads live bone rotations
   group.userData.animate = (motion, time, duration, jointValues = {}) => {
     const pose = {};
-    if (compatible && motion && motion.clip && motion.clip !== 'none') {
+    const isCustom = typeof motion?.clip === 'string' && motion.clip.startsWith('custom:');
+    // built-in presets need the standard joint names; user-authored clips just
+    // apply to whichever joints they were captured on
+    if (motion && motion.clip && motion.clip !== 'none' && (compatible || isCustom)) {
       Object.assign(pose, motionPose(motion, time, duration).pose); // standard names
     }
     for (const [id, node] of boneNodes) {

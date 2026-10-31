@@ -52,6 +52,7 @@ await window.vc.render({ postUrl, quality })  // 'high' | 'standard' | 'draft'
 ## Project JSON
 
 - `app: "videocraft"` required by `applyProjectData`.
+- **Characters are fully authorable**: scene objects of `type: 'character'` accept `build: { height, head, arms, legs, torso }` (proportion factors, default 1) plus `skin/hair/shirt/pants` colors — and `poseKeys: [{ t, pose }]` for free-form motion. Pose params (degrees): `shLx/shLz/elL`, `shRx/shRz/elR` (arms), `hipL/kneeL/hipR/kneeR` (legs), `headX/headY`, `torsoX/torsoY`. When `poseKeys` is non-empty it **replaces** the preset `motion` entirely; the rig interpolates between captured poses (scene-local seconds, smoothstep). Capture interactively with the inspector pose sliders + "Capture pose" button.
 - `media` entries can embed files as `data` (data URL) — restored via `importFiles`, ids re-mapped so existing clips re-link.
 - Persistence: **no autosave key of its own** — projects are files (`#btn-save` downloads JSON; `#btn-open` loads). MovieCraft's autosave key is `videocraft_project_v2` (shared key family); don't confuse the two apps' storage.
 

@@ -7,7 +7,7 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { buildAvatar } from './avatar3d.js';
-import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js?v=0.10.0';
+import { JOINTS, MOTIONS, cameraTracks, exportSize, normalizeCustomClip } from './motion.js?v=0.11.0';
 import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js';
 import { buildModel } from './models.js';
 import { defaultLook, GRADES, createLookEngine } from './effects.js?v=0.10.0';
@@ -43,6 +43,7 @@ function defaultProject() {
     name: 'Untitled movie',
     fps: 30,
     exportAspect: '16:9',
+    customClips: {},     // user-authored motion clips: { name: { duration, loop, keys } }
     studio: defaultStudio(),
     drawings: [],        // { id, name, dataURL } raster assets (movie-wide)
     glbAssets: [],       // { id, name, dataURL } imported GLB models (movie-wide)
@@ -98,6 +99,13 @@ function migrateProject(data) {
   data.audioAssets = Array.isArray(data.audioAssets) ? data.audioAssets : [];
   data.audioClips = Array.isArray(data.audioClips) ? data.audioClips : [];
   data.studio = normalizeStudio(data.studio);
+  // user-authored motion clips: { name: { duration, loop, keys: [{t, ease, pose}] } }
+  const clipsIn = data.customClips && typeof data.customClips === 'object' ? data.customClips : {};
+  data.customClips = {};
+  for (const [name, def] of Object.entries(clipsIn)) {
+    const norm = normalizeCustomClip(def);
+    if (norm && /^[^:]{1,40}$/.test(name)) data.customClips[name] = norm;
+  }
   if (!Array.isArray(data.glbAssets)) data.glbAssets = []; // v0.3: imported GLB models
   data.look = { ...defaultLook(), ...(data.look || {}) }; // additive: old projects get the cinematic defaults
   if (!data.shots.some(s => s.id === data.activeShotId)) data.activeShotId = data.shots[0].id;
@@ -110,7 +118,7 @@ function serializeProject() {
     drawings: project.drawings, glbAssets: project.glbAssets, characters: project.characters,
     shots: project.shots, activeShotId: project.activeShotId,
     audioAssets: project.audioAssets, audioClips: project.audioClips,
-    studio: project.studio, look: project.look,
+    studio: project.studio, look: project.look, customClips: project.customClips,
   };
 }
 function loadProjectData(data) {
@@ -2034,7 +2042,13 @@ function evaluateAt(t) {
     if (o.rigMode === '3d') {
       const joints = { ...(o.joints || {}) };
       Object.keys(kf).filter(ch => ch.startsWith('joint.')).forEach(ch => { joints[ch.slice(6)] = sampleTrack(kf[ch], T); });
-      g.children[0]?.userData.animate?.(o.motion, T, project.duration, joints, kf.pose ? sampleTrack(kf.pose, T) : null);
+      // resolve user-authored custom clips: 'custom:<name>' -> project.customClips[name]
+      let mo = o.motion;
+      if (mo && typeof mo.clip === 'string' && mo.clip.startsWith('custom:')) {
+        const def = project.customClips?.[mo.clip.slice(7)];
+        if (def) mo = { ...mo, custom: def };
+      }
+      g.children[0]?.userData.animate?.(mo, T, project.duration, joints, kf.pose ? sampleTrack(kf.pose, T) : null);
     }
     // Legacy billboard pose: clone the asset, never mutate a shared rig.
     if (kf['pose'] && g.userData.redraw) {
@@ -3189,6 +3203,8 @@ function labeledSelect(panel, label, options, value, onChange) {
   select.value = value; select.addEventListener('change', () => onChange(select.value));
   wrap.append(title, select); panel.appendChild(wrap); return select;
 }
+// custom-clip editor state (persists across panel rebuilds)
+let editingClipName = '', editingDraftName = '';
 function renderActorControls(panel, o) {
   const forgeChar = o.assetId ? project.characters.find(c => c.id === o.assetId && c.kind === 'forge') : null;
   const badge = document.createElement('div'); badge.className = 'rig-badge';
@@ -3211,9 +3227,12 @@ function renderActorControls(panel, o) {
   }
   const motion = o.motion ||= { clip: 'none', speed: 1 };
   if (!forgeChar || isPresetCompatible(forgeChar))
-  labeledSelect(panel, 'Motion preset', MOTIONS.map(m => [m, m[0].toUpperCase() + m.slice(1)]), motion.clip, v => {
+  labeledSelect(panel, 'Motion preset', [
+    ...MOTIONS.map(m => [m, m[0].toUpperCase() + m.slice(1)]),
+    ...Object.keys(project.customClips || {}).map(n => ['custom:' + n, 'Custom: ' + n]),
+  ], motion.clip, v => {
     motion.clip = v; motion.speed = v === 'run' ? 2.3 : v === 'walk' ? 1.3 : 1;
-    markDirty(); evaluateAt(animTime); renderSceneProps(); renderAnimObjectSelect();
+    markDirty(); evaluateAt(animTime); renderSceneProps(); renderAnimObjectSelect(); renderTimeline();
   });
   const motionNumber = (label, key, fallback, min, max, step) => {
     const holder = { [key]: motion[key] ?? fallback };
@@ -3224,6 +3243,111 @@ function renderActorControls(panel, o) {
   motionNumber('Motion phase', 'phase', 0, 0, 1, 0.05);
   motionNumber('Motion start (s)', 'start', 0, 0, project.duration, 0.1);
   motionNumber('Motion end (s)', 'end', project.duration, 0, project.duration, 0.1);
+
+  // ---------- custom motion: author any motion by posing, not presets ----------
+  if (o.rigMode === '3d' || (forgeChar && isPresetCompatible(forgeChar))) {
+    const box = document.createElement('details'); box.className = 'studio-details'; box.open = true;
+    const sum = document.createElement('summary'); sum.textContent = 'Custom motion — pose authoring';
+    const bd = document.createElement('div'); bd.className = 'joint-editor';
+    box.append(sum, bd); panel.appendChild(box);
+    const clipNames = Object.keys(project.customClips || {});
+    const clipWrap = document.createElement('label'); clipWrap.className = 'joint-editor';
+    const clipTitle = document.createElement('span'); clipTitle.className = 'side-title'; clipTitle.textContent = 'Editing clip';
+    const clipSel = document.createElement('select'); clipSel.className = 'btn studio-select';
+    const newOp = document.createElement('option'); newOp.value = '__new__'; newOp.textContent = '+ New clip…'; clipSel.appendChild(newOp);
+    clipNames.forEach(n => { const op = document.createElement('option'); op.value = n; op.textContent = n; clipSel.appendChild(op); });
+    if (editingClipName && project.customClips?.[editingClipName]) clipSel.value = editingClipName;
+    else { clipSel.value = '__new__'; editingClipName = ''; }
+    clipSel.addEventListener('change', () => { editingClipName = clipSel.value === '__new__' ? '' : clipSel.value; renderAnimObjectSelect(); });
+    clipWrap.append(clipTitle, clipSel); bd.appendChild(clipWrap);
+    const isNew = !editingClipName;
+    if (isNew) {
+      const nameWrap = document.createElement('label'); nameWrap.className = 'joint-editor';
+      const nameTitle = document.createElement('span'); nameTitle.className = 'side-title'; nameTitle.textContent = 'Clip name';
+      const nameIn = document.createElement('input'); nameIn.type = 'text'; nameIn.className = 'btn'; nameIn.placeholder = 'my-motion';
+      nameIn.value = editingDraftName || '';
+      nameIn.addEventListener('input', () => { editingDraftName = nameIn.value; });
+      nameWrap.append(nameTitle, nameIn); bd.appendChild(nameWrap);
+    }
+    const live = editingClipName ? project.customClips[editingClipName] : null;
+    if (live) {
+      bd.appendChild(mkNum('Clip duration (s)', { duration: live.duration }, 'duration', v => {
+        live.duration = Math.max(0.1, v); markDirty(); evaluateAt(animTime);
+      }, 0.1, 120, 0.1));
+      const loopWrap = document.createElement('label'); loopWrap.className = 'joint-editor';
+      const loopTitle = document.createElement('span'); loopTitle.className = 'side-title'; loopTitle.textContent = 'Loop';
+      const loopIn = document.createElement('input'); loopIn.type = 'checkbox'; loopIn.checked = live.loop !== false;
+      loopIn.addEventListener('change', () => { live.loop = loopIn.checked; markDirty(); evaluateAt(animTime); });
+      loopWrap.append(loopTitle, loopIn); bd.appendChild(loopWrap);
+      // pose keys captured along the timeline
+      const keyList = document.createElement('div'); keyList.className = 'joint-editor';
+      const listTitle = document.createElement('span'); listTitle.className = 'side-title';
+      listTitle.textContent = 'Pose keys (' + live.keys.length + ') — scrub, pose, capture';
+      keyList.appendChild(listTitle);
+      live.keys.slice().sort((a, b) => a.t - b.t).forEach(k => {
+        const row = document.createElement('div'); row.className = 'list-item';
+        const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = '@ ' + k.t.toFixed(2) + 's';
+        const rm = document.createElement('span'); rm.className = 'meta'; rm.textContent = 'remove';
+        rm.addEventListener('click', () => {
+          live.keys = live.keys.filter(x => x !== k);
+          const norm = normalizeCustomClip(live); if (norm) project.customClips[editingClipName] = norm;
+          markDirty(); evaluateAt(animTime); renderAnimObjectSelect();
+        });
+        row.append(nm, rm); keyList.appendChild(row);
+      });
+      bd.appendChild(keyList);
+    }
+    const capBtn = document.createElement('button'); capBtn.className = 'btn';
+    capBtn.textContent = 'Capture pose at playhead (' + animTime.toFixed(2) + 's)';
+    capBtn.addEventListener('click', () => {
+      const name = editingClipName || (editingDraftName || '').trim() || ('clip-' + (clipNames.length + 1));
+      if (!/^[^:]{1,40}$/.test(name)) { toast('Clip name: 1-40 chars, no colons'); return; }
+      const bones = objectGroups.get(o.id)?.children[0]?.userData.bones;
+      const jointDefs2 = forgeChar ? boneJoints(forgeChar) : JOINTS.map(j => ({ id: j }));
+      const pose = {};
+      for (const jd of jointDefs2) {
+        const bone = bones instanceof Map ? bones.get(jd.id) : bones?.[jd.id];
+        if (bone) pose[jd.id] = [
+          Math.round(THREE.MathUtils.radToDeg(bone.rotation.x) * 10) / 10,
+          Math.round(THREE.MathUtils.radToDeg(bone.rotation.y) * 10) / 10,
+          Math.round(THREE.MathUtils.radToDeg(bone.rotation.z) * 10) / 10,
+        ];
+      }
+      if (!Object.keys(pose).length) { toast('No rig found — pose the character first'); return; }
+      const clip = project.customClips[name] ||= { duration: Math.max(1, project.duration), loop: true, keys: [] };
+      const ex = clip.keys.find(k => Math.abs(k.t - animTime) < 0.02);
+      if (ex) { ex.pose = pose; }
+      else clip.keys.push({ t: Math.round(animTime * 100) / 100, ease: 'ease', pose });
+      const norm = normalizeCustomClip(clip);
+      if (norm) project.customClips[name] = norm; else delete project.customClips[name];
+      editingClipName = name; editingDraftName = '';
+      markDirty(); evaluateAt(animTime); renderAnimObjectSelect(); renderSceneProps();
+      toast('Pose captured into "' + name + '"');
+    });
+    bd.appendChild(capBtn);
+    if (editingClipName) {
+      const useBtn = document.createElement('button'); useBtn.className = 'btn';
+      useBtn.textContent = 'Use "' + editingClipName + '" as this actor\u2019s motion';
+      useBtn.addEventListener('click', () => {
+        o.motion = { ...o.motion, clip: 'custom:' + editingClipName, speed: 1 };
+        markDirty(); evaluateAt(animTime); renderAnimObjectSelect(); renderSceneProps();
+      });
+      bd.appendChild(useBtn);
+      const delBtn = document.createElement('button'); delBtn.className = 'btn';
+      delBtn.textContent = 'Delete clip';
+      delBtn.addEventListener('click', () => {
+        if (!confirm('Delete custom clip "' + editingClipName + '"?')) return;
+        delete project.customClips[editingClipName]; editingClipName = '';
+        if (typeof o.motion?.clip === 'string' && o.motion.clip.startsWith('custom:')) o.motion.clip = 'none';
+        markDirty(); evaluateAt(animTime); renderAnimObjectSelect(); renderSceneProps();
+      });
+      bd.appendChild(delBtn);
+    }
+    const hint = document.createElement('p'); hint.className = 'studio-muted';
+    hint.textContent = 'Scrub the timeline, pose the character with the joint editor below, then capture. Each capture becomes a pose key — the clip interpolates between them. Any motion, no presets.';
+    bd.appendChild(hint);
+  }
+
   const details = document.createElement('details'); details.className = 'studio-details';
   const summary = document.createElement('summary'); summary.textContent = 'Joint posing & keyframes';
   const body = document.createElement('div'); body.className = 'joint-editor';

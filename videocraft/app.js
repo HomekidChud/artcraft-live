@@ -1,5 +1,5 @@
 // app.js — VideoCraft editor core
-import { renderScene, makeScene, makeObject, attachControls, editorCamera, pickObject, sampleCamera, newId, CHAR_MOTIONS, FX_KINDS, LIGHT_PRESETS, controls } from './scene3d.js?v=1.3.0';
+import { renderScene, makeScene, makeObject, attachControls, editorCamera, pickObject, sampleCamera, newId, CHAR_MOTIONS, FX_KINDS, LIGHT_PRESETS, controls, POSE_PARAMS } from './scene3d.js?v=1.4.0';
 import { LOOK_GRADES } from './look.js?v=1.3.0';
 
 // ---------------------------------------------------------------- state
@@ -822,13 +822,29 @@ function renderSceneTab(sel) {
         <div class="row"><label>Size</label><input type="range" id="obj-size" min="0.3" max="6" step="0.1" value="${selObj.size}"><span class="val">${selObj.size}</span></div>`;
     }
     if (selObj.type === 'character') {
+      const B = { height: 1, head: 1, arms: 1, legs: 1, torso: 1, ...(selObj.build || {}) };
+      const draft = selObj._poseDraft ||= { ...POSE_PARAMS };
       html += `<div class="row"><label>Motion</label><select id="obj-motion" style="flex:1.4">${CHAR_MOTIONS.map((mm) => `<option ${selObj.motion === mm ? 'selected' : ''}>${mm}</option>`).join('')}</select></div>
+        <div class="insp-title" style="margin-top:8px">Build</div>
+        ${['height', 'head', 'arms', 'legs', 'torso'].map((k) => `<div class="row"><label>${k[0].toUpperCase() + k.slice(1)}</label><input type="range" data-build="${k}" min="0.5" max="1.6" step="0.05" value="${B[k]}"><span class="val">${(+B[k]).toFixed(2)}</span></div>`).join('')}
         <div class="grid-2">
           <div class="row"><label style="flex:1">Skin</label><input type="color" id="obj-skin" value="${selObj.skin}"></div>
           <div class="row"><label style="flex:1">Hair</label><input type="color" id="obj-hair" value="${selObj.hair}"></div>
           <div class="row"><label style="flex:1">Shirt</label><input type="color" id="obj-shirt" value="${selObj.shirt}"></div>
           <div class="row"><label style="flex:1">Pants</label><input type="color" id="obj-pants" value="${selObj.pants}"></div>
+        </div>
+        <div class="insp-title" style="margin-top:8px">Pose ${selObj.poseKeys?.length ? '· custom (' + selObj.poseKeys.length + ' keys — overrides motion)' : ''}</div>
+        ${Object.keys(POSE_PARAMS).map((p) => `<div class="row"><label>${p}</label><input type="range" data-pose="${p}" min="-160" max="160" step="1" value="${draft[p] ?? 0}"><span class="val">${Math.round(draft[p] ?? 0)}°</span></div>`).join('')}
+        <div class="row" style="margin-top:6px">
+          <button class="btn tiny primary" id="obj-posekey">Capture pose @ ${(clip ? state.playhead - clip.start : 0).toFixed(1)}s</button>
+          ${selObj.poseKeys?.length ? '<button class="btn tiny danger" id="obj-poseclear">Clear</button>' : ''}
         </div>`;
+      if (selObj.poseKeys?.length) {
+        html += `<div class="insp-title" style="margin-top:6px">Pose keys</div>`;
+        selObj.poseKeys.forEach((k, i) => {
+          html += `<div class="list-item" data-posekeydel="${i}"><span class="nm">@ ${k.t.toFixed(1)}s</span><span class="meta">remove</span></div>`;
+        });
+      }
     }
     if (selObj.type === 'fx') {
       html += `<div class="row"><label>Effect</label><select id="obj-fx" style="flex:1.4">${FX_KINDS.map((f) => `<option ${selObj.fx === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>`;
@@ -934,6 +950,33 @@ function wireSceneTab(scene, clip) {
     $('#obj-size')?.addEventListener('input', (e) => { selObj.size = +e.target.value; bump(); });
     $('#obj-opacity')?.addEventListener('input', (e) => { selObj.opacity = +e.target.value; bump(); });
     $('#obj-motion')?.addEventListener('change', (e) => { selObj.motion = e.target.value; bump(); });
+    // character build sliders — live proportions
+    inspBody.querySelectorAll('[data-build]').forEach((inp) => inp.addEventListener('input', (e) => {
+      selObj.build = { ...(selObj.build || {}) };
+      selObj.build[e.target.dataset.build] = +e.target.value;
+      e.target.parentElement.querySelector('.val').textContent = (+e.target.value).toFixed(2);
+      bump();
+    }));
+    // pose sliders — authored motion (draft until captured)
+    inspBody.querySelectorAll('[data-pose]').forEach((inp) => inp.addEventListener('input', (e) => {
+      const p = e.target.dataset.pose;
+      selObj._poseDraft = selObj._poseDraft || { ...POSE_PARAMS };
+      selObj._poseDraft[p] = +e.target.value;
+      e.target.parentElement.querySelector('.val').textContent = Math.round(+e.target.value) + '°';
+      // live-preview the draft at the playhead when there are no captured keys yet
+      if (!selObj.poseKeys?.length) { selObj.poseKeys = [{ t: localT(), pose: { ...selObj._poseDraft } }]; bump(); selObj.poseKeys = undefined; }
+    }));
+    $('#obj-posekey')?.addEventListener('click', () => {
+      selObj.poseKeys = selObj.poseKeys || [];
+      const draft = selObj._poseDraft || { ...POSE_PARAMS };
+      selObj.poseKeys = selObj.poseKeys.filter((k) => Math.abs(k.t - localT()) > 0.05);
+      selObj.poseKeys.push({ t: localT(), pose: { ...draft } });
+      bump(); renderInspector();
+    });
+    $('#obj-poseclear')?.addEventListener('click', () => { selObj.poseKeys = []; bump(); renderInspector(); });
+    inspBody.querySelectorAll('[data-posekeydel]').forEach((el) => el.addEventListener('click', () => {
+      selObj.poseKeys.splice(+el.dataset.posekeydel, 1); bump(); renderInspector();
+    }));
     $('#obj-fx')?.addEventListener('change', (e) => { selObj.fx = e.target.value; bump(); });
     for (const k of ['skin', 'hair', 'shirt', 'pants']) $(`#obj-${k}`)?.addEventListener('input', (e) => { selObj[k] = e.target.value; bump(); });
     inspBody.querySelectorAll('[data-pos]').forEach((inp) => inp.addEventListener('input', (e) => { selObj.pos[+e.target.dataset.pos] = +e.target.value || 0; bump(); }));
@@ -1424,7 +1467,7 @@ async function saveProject() {
     }
     data.media.push(entry);
   }
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(data, (k, v) => k.startsWith('_') ? undefined : v)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `${(state.name || 'project').replace(/[^\w\- ]+/g, '')}.vfproject.json`;

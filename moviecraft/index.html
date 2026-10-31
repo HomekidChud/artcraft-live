@@ -14,7 +14,7 @@
 <script type="application/json" id="ai-guide">
 {
   "app": "MovieCraft",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "what": "Browser-native 3D movie studio. Pure client-side SPA — no backend, no auth. Automate by authoring project JSON, injecting it, and rendering sections via the export UI.",
   "headless": {
     "chromeFlags": "--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required",
@@ -40,7 +40,8 @@
     "object": "id, name, type, pos[3] rot[3](degrees) scale[3] color(#hex) opacity emissive(number, glow strength — color doubles as glow color) assetId(for drawing/glb/character) fxKind+intensity+fxSize+fxSpeed+fxStart",
     "keyframes": "shot.keyframes[objId][channel] = [{t, v, ease}] — t is SHOT-LOCAL seconds; ease: ease|linear|step|easein|easeout|back(overshoot)|bounce; v type matches channel (pos/rot/scale = [x,y,z], others scalar)",
     "camera": "shot.keyframes.__camera__ with channels cam.px cam.py cam.pz cam.tx cam.ty cam.tz cam.fov — or shot.camera = { base: {pos,target,fov}, cam: {channel: [kf]} }",
-    "characters": "objects reference characters[].id via assetId; animate limbs by keyframing BONE ids (hips, chest, head, armL, armR, legL, legR, …) on channel rot; or set the object's clip + speed for built-in motion clips (idle, walk, run, wave, celebrate, jump, dance, point, nod, shakehead, punch, bow, sit)",
+    "characters": "objects reference characters[].id via assetId; animate limbs by keyframing BONE ids (hips, chest, head, armL, armR, legL, legR, …) on channel rot; or set the object's clip + speed for built-in motion clips (idle, walk, run, wave, celebrate, jump, dance, point, nod, shakehead, punch, bow, sit) — or ANY authored motion via customClips (custom:<name>)",
+    "customClips": "user-authored motion, no presets needed: project.customClips[name] = { duration, loop, keys: [{ t, ease, pose: {jointId: [x,y,z] deg}}] }. Author interactively: scrub, pose the character with the joint editor, 'Capture pose at playhead' — each capture is a key and the clip interpolates between poses. Apply with motion.clip = 'custom:<name>'. Works on avatars AND forge characters (joints just need to match). Saved with the project.",
     "fx": "fxKind: fire|smoke|sparks|explosion|fountain|rain|snow|embers|magic|dust|fireworks|lightning|portal|hearts|stars (explosion + lightning are one-shot via fxStart); deterministic seeds — same timeline position renders identically in preview and export",
     "events": "shot.events[]: type title|subtitle|lowerthird|fadein|fadeout|letterbox|shake with start + duration (shot-local seconds), text/speaker/color/strength optional. Lower third renders bottom-left with the speaker name in gold. Letterbox no longer clips subtitle descenders (fixed v0.6.7 — subtitles lift above the bars)."
   },
@@ -786,6 +787,6 @@ body.any-sheet-open #sheet-backdrop { display: block; }
   }
 }
 </script>
-<script type="module" src="app.js?v=0.10.0"></script>
+<script type="module" src="app.js?v=0.11.0"></script>
 </body>
 </html>

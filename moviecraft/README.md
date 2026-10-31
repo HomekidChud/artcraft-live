@@ -4,6 +4,14 @@ MovieCraft is a static, browser-based scene and movie editor. This upgrade is a
 practical foundation for stylised 3D filmmaking, not a claim of feature parity
 with a Hollywood production pipeline.
 
+Version 0.11.0 makes motion open-ended instead of preset-driven:
+
+- **Custom motion clips** — author any motion by posing: scrub the timeline,
+  pose the character with the joint editor, capture. Each capture is a pose key
+  and the clip interpolates between poses (all easings, scrub- and
+  export-safe). Saved as `customClips` in the project, applied via
+  `custom:<name>` to avatars or forge characters.
+
 Version 0.10.0 is the biggest creative expansion yet:
 
 - **8 new motion clips** for characters: jump, dance, point, nod, shakehead,

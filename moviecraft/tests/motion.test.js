@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { JOINTS, MOTIONS, motionPose, cameraTracks, exportSize } from '../motion.js';
+import { JOINTS, MOTIONS, motionPose, cameraTracks, exportSize, normalizeCustomClip, evalCustomClip } from '../motion.js';
 
 test('19 unique named joints with symmetric limbs', () => {
   assert.equal(JOINTS.length, 19);
@@ -53,4 +53,48 @@ test('export resolutions have even frame dimensions', () => {
   assert.deepEqual(exportSize(1080, '9:16'), [1080, 1920]);
   assert.deepEqual(exportSize(1920, '2.39:1'), [1920, 804]);
   assert.deepEqual(exportSize(1280, '1:1'), [1280, 1280]);
+});
+
+test('custom clips: pose keys interpolate, loop and survive normalization', () => {
+  const clip = {
+    duration: 2, loop: true,
+    keys: [
+      { t: 0, ease: 'linear', pose: { head: [10, 0, 0], leftUpperArm: [0, 0, -20] } },
+      { t: 2, ease: 'linear', pose: { head: [30, 0, 0], leftUpperArm: [0, 0, 20] } },
+    ],
+  };
+  const n = normalizeCustomClip(clip);
+  assert.ok(n && n.keys.length === 2, 'normalized clip keeps keys');
+  const mid = evalCustomClip(n, 1);
+  assert.ok(Math.abs(mid.head[0] - 20) < 1e-9, 'linear midpoint');
+  assert.ok(Math.abs(mid.leftUpperArm[2] - 0) < 1e-9, 'second joint midpoint');
+  const looped = evalCustomClip(n, 3); // wraps to t=1
+  assert.ok(Math.abs(looped.head[0] - 20) < 1e-9, 'loops after duration');
+  const before = evalCustomClip(n, -1);
+  assert.ok(Math.abs(before.head[0] - 10) < 1e-9, 'clamps before first key');
+  // non-linear ease stays within [0,1] range but differs from linear
+  const b = normalizeCustomClip({ duration: 2, keys: [{ t: 0, ease: 'ease', pose: { head: [0, 0, 0] } }, { t: 2, pose: { head: [30, 0, 0] } }] });
+  assert.ok(Math.abs(evalCustomClip(b, 1).head[0] - 15) < 1e-9, 'smoothstep midpoint');
+  // invalid data is rejected or cleaned
+  assert.equal(normalizeCustomClip(null), null);
+  assert.equal(normalizeCustomClip({ keys: [] }), null);
+  const cleaned = normalizeCustomClip({ keys: [{ t: 0, pose: {} }, null, { t: 1, pose: { head: [5, 0, 0] } }] });
+  assert.equal(cleaned.keys.length, 1, 'empty/invalid pose keys dropped');
+  assert.equal(cleaned.duration, 1, 'duration falls back to last key');
+});
+
+test('custom clips drive motionPose via custom:<name>', () => {
+  const motion = { clip: 'custom:x', speed: 1, strength: 1, custom: { duration: 2, loop: true, keys: [
+    { t: 0, ease: 'linear', pose: { head: [0, 0, 0] } },
+    { t: 2, ease: 'linear', pose: { head: [30, 0, 0] } },
+  ] } };
+  const mid = motionPose(motion, 1);
+  assert.ok(Math.abs(mid.pose.head[0] - 15) < 1e-9, 'custom clip evaluated');
+  assert.equal(mid.pose.head[1], 0);
+  // strength scales it
+  const soft = motionPose({ ...motion, strength: 0.5 }, 1);
+  assert.ok(Math.abs(soft.pose.head[0] - 7.5) < 1e-9, 'strength applied');
+  // unknown clip name without definition falls back to the neutral pose
+  const none = motionPose({ clip: 'custom:missing' }, 1);
+  assert.equal(none.pose.head[0], 0);
 });

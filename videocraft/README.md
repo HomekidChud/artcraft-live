@@ -8,6 +8,7 @@ A browser video studio for YouTube Shorts and long-form video. Runs entirely cli
 - **Edit for real** — trim, split, drag and reorder clips, scrub, set per-clip volume and fit (contain/cover/stretch)
 - **Captions** — timed text overlays with position, size, color and backdrop, burned into the exported video
 - **3D scenes** — optional creation mode: build shots with objects, animated characters (14 motion clips incl. jump, dance, punch, bow, sit), particle FX (fire, rain, snow, embers, magic, smoke, lightning, portal, hearts, stars), camera keyframes with per-key easing (smooth, linear, ease in/out, overshoot, bounce, step), 11 lighting presets (three-point, sunset, night, dramatic, daylight, neon, candlelight, horror, sunrise, storm, forest)
+- **Character creator & free-form motion** — every character is buildable live: height, head, arm, leg and torso proportions plus colors; and any motion can be authored with pose keys — set arm/leg/head/torso rotations at different times, capture, and the character interpolates between them (overrides presets entirely)
 - **Frame rate control** — export at 24/25/30/50/60 fps from the Output tab (24 for cinematic feel, 60 for smooth motion)
 - **Film & anime looks** — cinematic post-processing (bloom, flare streaks, 18 colour grades incl. teal-orange, bleach bypass, sepia, moonlight, cyberpunk, forest, crimson and arctic, grain, vignette) or toon shading with ink outlines
 - **Any format** — 16:9 widescreen, 9:16 Shorts, 1:1, 4:5 and 2.39:1, with Shorts 3:00 duration checking

@@ -133,48 +133,96 @@ function limb(len, rad, mat) {
 function buildCharacter(def) {
   const mat = (c) => new THREE.MeshStandardMaterial({ color: new THREE.Color(c), roughness: 0.75, metalness: 0.05 });
   const skin = mat(def.skin), shirt = mat(def.shirt), pants = mat(def.pants), hair = mat(def.hair);
+  // user-authored proportions — every value is a live slider, nothing fixed
+  const B = { height: 1, head: 1, arms: 1, legs: 1, torso: 1, ...(def.build || {}) };
   const root = new THREE.Group();
   root.name = def.id;
 
-  const hips = new THREE.Group(); hips.position.y = 0.92; root.add(hips);
+  const hips = new THREE.Group(); hips.position.y = 0.06 + 0.86 * B.legs; root.add(hips); // feet stay grounded at any leg length
   const pelvis = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.12, 3, 8), pants); pelvis.position.y = 0.06; hips.add(pelvis);
 
   const torso = new THREE.Group(); torso.position.y = 0.14; hips.add(torso);
   const chest = new THREE.Mesh(new THREE.CapsuleGeometry(0.21, 0.32, 4, 10), shirt); chest.position.y = 0.26; torso.add(chest);
+  chest.scale.set(B.torso, 1, B.torso);
 
-  const neck = new THREE.Group(); neck.position.y = 0.5; torso.add(neck);
+  const neck = new THREE.Group(); neck.position.y = 0.5 * B.height; torso.add(neck);
   const head = new THREE.Group(); head.position.y = 0.1; neck.add(head);
+  head.scale.setScalar(B.head);
   const skull = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 14), skin); skull.position.y = 0.12; head.add(skull);
   const hairM = new THREE.Mesh(new THREE.SphereGeometry(0.17, 16, 12), hair); hairM.position.set(0, 0.17, -0.015); hairM.scale.set(1, 0.82, 1); head.add(hairM);
 
   const arms = {};
   for (const side of [-1, 1]) {
-    const shoulder = new THREE.Group(); shoulder.position.set(side * 0.24, 0.42, 0); torso.add(shoulder);
-    const upper = limb(0.32, 0.07, shirt); shoulder.add(upper);
-    const elbow = new THREE.Group(); elbow.position.y = -0.32; upper.add(elbow);
-    const lower = limb(0.3, 0.055, skin); elbow.add(lower);
-    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), skin); hand.position.y = -0.32; elbow.add(hand);
+    const shoulder = new THREE.Group(); shoulder.position.set(side * 0.24 * B.torso, 0.42, 0); torso.add(shoulder);
+    const upper = limb(0.32 * B.arms, 0.07, shirt); shoulder.add(upper);
+    const elbow = new THREE.Group(); elbow.position.y = -0.32 * B.arms; upper.add(elbow);
+    const lower = limb(0.3 * B.arms, 0.055, skin); elbow.add(lower);
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 8), skin); hand.position.y = -0.32 * B.arms; elbow.add(hand);
     arms[side] = { shoulder, elbow };
   }
   const legs = {};
   for (const side of [-1, 1]) {
     const hip = new THREE.Group(); hip.position.set(side * 0.11, 0, 0); hips.add(hip);
-    const upper = limb(0.44, 0.085, pants); hip.add(upper);
-    const knee = new THREE.Group(); knee.position.y = -0.44; upper.add(knee);
-    const lower = limb(0.42, 0.07, pants); knee.add(lower);
-    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.2), mat('#20242c')); foot.position.set(0, -0.45, 0.05); knee.add(foot);
+    const upper = limb(0.44 * B.legs, 0.085, pants); hip.add(upper);
+    const knee = new THREE.Group(); knee.position.y = -0.44 * B.legs; upper.add(knee);
+    const lower = limb(0.42 * B.legs, 0.07, pants); knee.add(lower);
+    const foot = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.07, 0.2), mat('#20242c')); foot.position.set(0, -0.45 * B.legs, 0.05); knee.add(foot);
     legs[side] = { hip, knee };
   }
+  root.userData.baseHipsY = hips.position.y;
   return { root, arms, legs, hips, torso, head };
 }
 
-function poseCharacter(ch, motion, t) {
+// ---------------------------------------------------------------- pose keys
+// Free-form motion: a list of {t, pose} captured interactively.
+// pose params are degrees: shLx/shLz/elL (left arm), shRx/shRz/elR (right arm),
+// hipL/kneeL/hipR/kneeR (legs), headX/headY, torsoX/torsoY.
+export const POSE_PARAMS = {
+  shLx: 8, shLz: 0, elL: -15, shRx: 8, shRz: 0, elR: -15,
+  hipL: 0, kneeL: 4, hipR: 0, kneeR: 4,
+  headX: 0, headY: 0, torsoX: 0, torsoY: 0,
+};
+export function samplePoseKeys(keys, t) {
+  const sorted = [...keys].sort((a, b) => a.t - b.t);
+  if (!sorted.length) return { ...POSE_PARAMS };
+  if (t <= sorted[0].t) return { ...POSE_PARAMS, ...sorted[0].pose };
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i], b = sorted[i + 1];
+    if (t >= a.t && t <= b.t) {
+      const f = (t - a.t) / ((b.t - a.t) || 1);
+      const e = f * f * (3 - 2 * f); // smoothstep
+      const out = {};
+      for (const p of Object.keys(POSE_PARAMS)) {
+        const av = a.pose?.[p] ?? POSE_PARAMS[p], bv = b.pose?.[p] ?? POSE_PARAMS[p];
+        out[p] = av + (bv - av) * e;
+      }
+      return out;
+    }
+  }
+  return { ...POSE_PARAMS, ...sorted[sorted.length - 1].pose };
+}
+
+function poseCharacter(ch, def, t) {
   const A = ch.arms, L = ch.legs;
   const set = (e, x, z = 0) => { if (e) { e.x = x; e.z = z; } };
+  // user-authored motion overrides the preset entirely
+  if (def.poseKeys?.length) {
+    const p = samplePoseKeys(def.poseKeys, t), D = Math.PI / 180;
+    A[-1].shoulder.rotation.set(p.shLx * D, 0, p.shLz * D);
+    A[1].shoulder.rotation.set(p.shRx * D, 0, p.shRz * D);
+    A[-1].elbow.rotation.x = p.elL * D; A[1].elbow.rotation.x = p.elR * D;
+    L[-1].hip.rotation.x = p.hipL * D; L[1].hip.rotation.x = p.hipR * D;
+    L[-1].knee.rotation.x = p.kneeL * D; L[1].knee.rotation.x = p.kneeR * D;
+    ch.head.rotation.set(p.headX * D, p.headY * D, 0);
+    ch.torso.rotation.set(p.torsoX * D, p.torsoY * D, 0);
+    return;
+  }
+  const motion = def.motion || 'idle';
+  const baseY = ch.root.userData.baseHipsY ?? 0.92;
   switch (motion) {
     case 'idle': {
       const b = Math.sin(t * 1.6) * 0.02;
-      ch.hips.position.y = 0.92 + b * 0.5;
+      ch.hips.position.y = baseY + b * 0.5;
       set(ch.torso.rotation, 0); ch.torso.rotation.y = Math.sin(t * 0.6) * 0.06;
       set(A[-1].shoulder.rotation, 0.08 + b); set(A[1].shoulder.rotation, 0.08 - b);
       set(A[-1].elbow.rotation, -0.15); set(A[1].elbow.rotation, -0.15);
@@ -188,7 +236,7 @@ function poseCharacter(ch, motion, t) {
       set(L[-1].knee.rotation, Math.max(0, -s) * 0.7 + 0.08); set(L[1].knee.rotation, Math.max(0, s) * 0.7 + 0.08);
       set(A[-1].shoulder.rotation, -s * 0.4); set(A[1].shoulder.rotation, s * 0.4);
       set(A[-1].elbow.rotation, -0.25); set(A[1].elbow.rotation, -0.25);
-      ch.hips.position.y = 0.92 + Math.abs(c) * 0.03;
+      ch.hips.position.y = baseY + Math.abs(c) * 0.03;
       ch.torso.rotation.y = s * 0.08;
       break;
     }
@@ -198,12 +246,12 @@ function poseCharacter(ch, motion, t) {
       set(L[-1].knee.rotation, Math.max(0, -s) * 1.25 + 0.15); set(L[1].knee.rotation, Math.max(0, s) * 1.25 + 0.15);
       set(A[-1].shoulder.rotation, s * 0.85); set(A[1].shoulder.rotation, -s * 0.85);
       set(A[-1].elbow.rotation, -1.1); set(A[1].elbow.rotation, -1.1);
-      ch.hips.position.y = 0.92 + Math.abs(c) * 0.06; ch.torso.rotation.x = 0.22;
+      ch.hips.position.y = baseY + Math.abs(c) * 0.06; ch.torso.rotation.x = 0.22;
       break;
     }
     case 'wave': {
       const w = Math.sin(t * 5.5);
-      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.hips.position.y = baseY; set(ch.torso.rotation, 0);
       A[1].shoulder.rotation.set(0, 0, -2.35); A[1].elbow.rotation.x = -0.35 + w * 0.45;
       set(A[-1].shoulder.rotation, 0.1); set(A[-1].elbow.rotation, -0.2);
       set(L[-1].hip.rotation, 0); set(L[1].hip.rotation, 0);
@@ -211,7 +259,7 @@ function poseCharacter(ch, motion, t) {
     }
     case 'celebrate': {
       const p = Math.abs(Math.sin(t * 4.4));
-      ch.hips.position.y = 0.92 + p * 0.22;
+      ch.hips.position.y = baseY + p * 0.22;
       for (const s of [-1, 1]) {
         A[s].shoulder.rotation.set(0, 0, s * -2.6);
         A[s].elbow.rotation.x = -0.4 + Math.sin(t * 6 + s) * 0.3;
@@ -223,7 +271,7 @@ function poseCharacter(ch, motion, t) {
     case 'jump': {
       const T = (t % 0.9), air = Math.sin(Math.min(T / 0.7, 1) * Math.PI);
       const crouch = T < 0.12 ? T / 0.12 : (T > 0.62 && T < 0.74) ? (0.74 - T) / 0.12 : 0;
-      ch.hips.position.y = 0.92 + air * 0.85 - crouch * 0.2;
+      ch.hips.position.y = baseY + air * 0.85 - crouch * 0.2;
       set(ch.torso.rotation, 0);
       for (const s of [-1, 1]) {
         set(A[s].shoulder.rotation, -0.3 - air * 0.9); set(A[s].elbow.rotation, -0.35);
@@ -234,7 +282,7 @@ function poseCharacter(ch, motion, t) {
     }
     case 'dance': {
       const b = Math.sin(t * 5.2), w = Math.sin(t * 2.6);
-      ch.hips.position.y = 0.92 + Math.abs(b) * 0.15;
+      ch.hips.position.y = baseY + Math.abs(b) * 0.15;
       ch.hips.position.x = w * 0.1;
       ch.torso.rotation.y = -w * 0.25; set(ch.torso.rotation, b * 0.1);
       for (const s of [-1, 1]) {
@@ -247,7 +295,7 @@ function poseCharacter(ch, motion, t) {
     }
     case 'point': {
       const raise = Math.min(1, t / 0.25);
-      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.hips.position.y = baseY; set(ch.torso.rotation, 0);
       ch.torso.rotation.y = 0.18 * raise;
       A[1].shoulder.rotation.set(-1.35 * raise, 0, 0.35 * raise);
       A[1].elbow.rotation.x = -0.15 * raise;
@@ -256,19 +304,19 @@ function poseCharacter(ch, motion, t) {
       break;
     }
     case 'nod': {
-      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.hips.position.y = baseY; set(ch.torso.rotation, 0);
       ch.head.rotation.x = Math.sin(t * 4.4) * 0.22;
       break;
     }
     case 'shakehead': {
-      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.hips.position.y = baseY; set(ch.torso.rotation, 0);
       ch.head.rotation.y = Math.sin(t * 5.6) * 0.35;
       break;
     }
     case 'punch': {
       const P = t % 1.1;
       const jab = P < 0.18 ? P / 0.18 : P < 0.4 ? 1 - (P - 0.18) / 0.22 : 0;
-      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.hips.position.y = baseY; set(ch.torso.rotation, 0);
       ch.torso.rotation.y = -jab * 0.5;
       A[1].shoulder.rotation.set(-0.4 - jab * 0.3, 0, 0.7 - jab * 0.6);
       A[1].elbow.rotation.x = -1.5 + jab * 1.35;
@@ -279,14 +327,14 @@ function poseCharacter(ch, motion, t) {
     case 'bow': {
       let p;
       if (t < 0.45) p = t / 0.45; else if (t < 1.35) p = 1; else if (t < 1.8) p = 1 - (t - 1.35) / 0.45; else p = 0;
-      ch.hips.position.y = 0.92 - p * 0.06;
+      ch.hips.position.y = baseY - p * 0.06;
       set(ch.torso.rotation, 0.75 * p);
       ch.head.rotation.x = 0.35 * p;
       for (const s of [-1, 1]) { set(A[s].shoulder.rotation, 0.5 * p); set(A[s].elbow.rotation, -0.1); set(L[s].hip.rotation, 0); }
       break;
     }
     case 'sit': {
-      ch.hips.position.y = 0.92 - 0.55;
+      ch.hips.position.y = baseY - 0.55;
       set(ch.torso.rotation, 0.06);
       for (const s of [-1, 1]) {
         set(A[s].shoulder.rotation, -0.25); set(A[s].elbow.rotation, -0.9);
@@ -295,7 +343,7 @@ function poseCharacter(ch, motion, t) {
       break;
     }
     default: {
-      ch.hips.position.y = 0.92; set(ch.torso.rotation, 0);
+      ch.hips.position.y = baseY; set(ch.torso.rotation, 0);
       for (const s of [-1, 1]) { set(A[s].shoulder.rotation, 0); set(A[s].elbow.rotation, 0); set(L[s].hip.rotation, 0); set(L[s].knee.rotation, 0); }
     }
   }
@@ -596,7 +644,7 @@ export function renderScene(scene, t, w, h, opts = {}) {
       rec.node.rotation.set(0, v.rot[1], 0);
       const sc = (v.scale[0] + v.scale[1] + v.scale[2]) / 3;
       rec.node.scale.setScalar(sc);
-      poseCharacter(rec.char, def.motion || 'idle', tt);
+      poseCharacter(rec.char, def, tt);
     } else if (def.type === 'fx') {
       rec.node.position.set(v.pos[0], v.pos[1], v.pos[2]);
       rec.node.scale.setScalar((v.scale[0] + v.scale[1] + v.scale[2]) / 3 || 1);
