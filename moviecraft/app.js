@@ -11,12 +11,13 @@ import { JOINTS, MOTIONS, cameraTracks, exportSize, normalizeCustomClip } from '
 import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js';
 import { buildModel } from './models.js';
 import { defaultLook, GRADES, createLookEngine } from './effects.js?v=0.10.0';
-import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
+import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js?v=0.12.0';
 import { boneJoints, isPresetCompatible } from './charcraft.js';
 import { buildCharacterGroup, sketchCharacter } from './charbuild.js';
 import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './cutscene.js?v=0.7.0';
 import { createCutsceneOverlay } from './overlay.js?v=0.7.0';
 import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.10.0';
+import { initSoundStudio, renderSoundStudio, onShowSoundStudio, onHideSoundStudio, normalizeScore } from './soundstudio.js?v=0.12.0';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 installWorkspaceShell();
@@ -44,6 +45,7 @@ function defaultProject() {
     fps: 30,
     exportAspect: '16:9',
     customClips: {},     // user-authored motion clips: { name: { duration, loop, keys } }
+    scores: [],          // SoundStudio scores: { name, bpm, bars, root, scale, tracks }
     studio: defaultStudio(),
     drawings: [],        // { id, name, dataURL } raster assets (movie-wide)
     glbAssets: [],       // { id, name, dataURL } imported GLB models (movie-wide)
@@ -106,6 +108,9 @@ function migrateProject(data) {
     const norm = normalizeCustomClip(def);
     if (norm && /^[^:]{1,40}$/.test(name)) data.customClips[name] = norm;
   }
+  // SoundStudio scores (validated + cleaned)
+  data.scores = (Array.isArray(data.scores) ? data.scores : [])
+    .map(s => normalizeScore(s)).filter(Boolean);
   if (!Array.isArray(data.glbAssets)) data.glbAssets = []; // v0.3: imported GLB models
   data.look = { ...defaultLook(), ...(data.look || {}) }; // additive: old projects get the cinematic defaults
   if (!data.shots.some(s => s.id === data.activeShotId)) data.activeShotId = data.shots[0].id;
@@ -119,6 +124,7 @@ function serializeProject() {
     shots: project.shots, activeShotId: project.activeShotId,
     audioAssets: project.audioAssets, audioClips: project.audioClips,
     studio: project.studio, look: project.look, customClips: project.customClips,
+    scores: project.scores,
   };
 }
 function loadProjectData(data) {
@@ -222,11 +228,12 @@ function toast(msg) {
    Workspace switching
    ============================================================ */
 const railBtns = [...document.querySelectorAll('.rail-btn')];
-const workspaces = ['draw', 'char', 'scene', 'anim', ...PRODUCTION_TABS];
+const workspaces = ['draw', 'char', 'scene', 'anim', 'music', ...PRODUCTION_TABS];
 let activeWs = 'draw';
 
 function setWorkspace(ws) {
   if (!workspaces.includes(ws)) return;
+  const prevWs = activeWs;
   if (recMode || exportPreparing || exportFinalizing) return;
   if (ws !== activeWs && moviePlaying) stopMovie();
   if (ws !== activeWs) setPlaying(false);
@@ -246,9 +253,31 @@ function setWorkspace(ws) {
   }
   if (ws === 'draw') syncDrawSize();
   if (ws === 'char') { renderCharList(); drawCharPreview(); }
+  if (prevWs === 'music' && ws !== 'music') onHideSoundStudio();
+  if (ws === 'music') onShowSoundStudio();
   updatePlaybar();
 }
 railBtns.forEach(b => b.addEventListener('click', () => setWorkspace(b.dataset.ws)));
+
+// SoundStudio — full in-browser music & sound creator
+initSoundStudio({
+  getScores: () => project.scores,
+  getAudioAsset: (id) => project.audioAssets.find(a => a.id === id),
+  addAudioAsset: (asset) => { project.audioAssets.push(asset); renderAudioList(); },
+  addScoreToMovie: (blob, name, duration) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const asset = { id: uid('aud'), name: 'Score — ' + name, dataURL: reader.result, duration };
+      project.audioAssets.push(asset);
+      project.audioClips.push({ id: uid('clip'), assetId: asset.id, start: 0, volume: 1 });
+      markDirty(); renderAudioList();
+      toast('Score placed at 0:00 on the movie timeline');
+    };
+    reader.readAsDataURL(blob);
+  },
+  markDirty,
+  toast,
+});
 
 document.getElementById('project-tag').textContent = project.name;
 

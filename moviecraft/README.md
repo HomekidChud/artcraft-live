@@ -4,6 +4,19 @@ MovieCraft is a static, browser-based scene and movie editor. This upgrade is a
 practical foundation for stylised 3D filmmaking, not a claim of feature parity
 with a Hollywood production pipeline.
 
+Version 0.12.0 adds a **full music and sound creator** (Music tab):
+
+- **Multi-track scores** with synthesized instruments — synth, bass, pad and
+  pluck voices, an 8-voice drum kit and mic-recorded vocals — no samples, no
+  network, everything generated in the browser
+- **Piano-roll editing**: draw, move, resize and delete notes by hand, or use
+  the groove, arpeggio and melody generators
+- **Key and scale aware**: pick a root note and scale; generators and editing
+  snap to it
+- **Per-track effects**: reverb, tempo-synced delay, drive, pan, mute/solo
+- **Export to movie**: render the score offline to WAV and drop it onto the
+  movie timeline in one click; scores save with the project
+
 Version 0.11.0 makes motion open-ended instead of preset-driven:
 
 - **Custom motion clips** — author any motion by posing: scrub the timeline,
@@ -65,7 +78,7 @@ confirmation. Save your current project first if you want to retain it.
 
 ## Production workspaces
 
-The studio now has eleven labelled tabs. The navigation rail scrolls on shorter
+The studio now has twelve labelled tabs. The navigation rail scrolls on shorter
 screens, and the production pages stack for phones.
 
 - **Planning**: movie title, production stage, genre, audience, logline,
@@ -89,6 +102,10 @@ screens, and the production pages stack for phones.
   individual shots in Animate. The reference image is chosen explicitly;
   blank cards are labelled shot cards, not fake scene renders.
 - **Animate**: the existing movie timeline, actor rigs and camera animation.
+- **Music**: the full music and sound creator — multi-track scores with
+  synthesized instruments, a drum kit, mic-recorded vocals, piano-roll editing,
+  per-track effects and one-click WAV export to the movie timeline (see
+  GUIDE.md).
 - **Sound**: dedicated access to the actual audio clip importer, global start
   and volume controls, plus sound-direction/dialogue-cue notes.
 - **Delivery**: a non-blocking production checklist, project backup and the
@@ -339,8 +356,10 @@ npm test
 use Node's built-in test runner and have no dependencies. They check skeleton
 names, finite motion, deterministic scrubbing, independent instances, clip
 bounds, strengths, speed/phase, camera tracks and frame sizes; character
-validation (limits, cycles, parents, colours) and the forge data model; and
-cutscene event evaluation (fades, titles, bars, shake, transitions).
+validation (limits, cycles, parents, colours) and the forge data model;
+cutscene event evaluation (fades, titles, bars, shake, transitions); and the
+music engine (note-frequency math, scale membership, score validation and WAV
+encoding).
 Browser regression checks should also cover legacy load/upgrade, project
 round-trip, joint key editing, shot playback, export teardown, forge
 round-trip (save/place/key joints) and 375px layout.

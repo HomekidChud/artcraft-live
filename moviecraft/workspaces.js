@@ -28,8 +28,8 @@ export function installWorkspaceShell() {
     section.className = 'ws production-ws'; section.setAttribute('aria-label', names[key]);
     document.getElementById('content').append(section);
   }
-  const labels = { ...names, draw: 'Draw', char: 'Cast', scene: 'Scene', anim: 'Animate' };
-  for (const key of ['plan', 'design', 'draw', 'char', 'forge', 'assets', 'scene', 'board', 'anim', 'sound', 'delivery']) {
+  const labels = { ...names, draw: 'Draw', char: 'Cast', scene: 'Scene', anim: 'Animate', music: 'Music' };
+  for (const key of ['plan', 'design', 'draw', 'char', 'forge', 'assets', 'scene', 'board', 'anim', 'music', 'sound', 'delivery']) {
     const button = rail.querySelector(`[data-ws="${key}"]`);
     const label = document.createElement('span'); label.className = 'rail-label'; label.textContent = labels[key];
     button.append(label); rail.append(button);

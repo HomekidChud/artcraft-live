@@ -60,6 +60,25 @@ This guide is also embedded in the app page itself (`<script type="application/j
   }],
   "activeShotId": "shot-1",
   "audioAssets": [], "audioClips": [],
+  "scores": [
+    {
+      "id": "sc1", "name": "Chase theme", "bpm": 128, "bars": 16,
+      "root": 57, "scale": "Natural minor",
+      "tracks": [
+        {
+          "id": "trk1", "name": "Bass", "kind": "bass", "osc": "saw",
+          "cutoff": 900, "attack": 0.01, "release": 0.2, "volume": 0.8,
+          "pan": 0, "mute": false, "solo": false,
+          "reverb": 0.1, "delay": 0, "delayBeats": 0.75, "drive": 0,
+          "notes": [{ "t": 0, "d": 1, "m": 45, "v": 0.8 }]
+        },
+        {
+          "id": "trk2", "name": "Drums", "kind": "drum",
+          "notes": [{ "t": 0, "d": 0.25, "m": 0, "v": 0.9 }]
+        }
+      ]
+    }
+  ],
   "studio": {}, "look": {}
 }
 ```
@@ -68,6 +87,28 @@ This guide is also embedded in the app page itself (`<script type="application/j
 - `drawing`/`character`/`glb` objects reference `assetId`.
 - GLB URLs are fetched at load and before export (`ensureGlbAssetsReady`); a broken URL aborts export with a toast.
 - Recommended authoring path: build a small project in the UI, save, diff the file — or load your JSON through the real Open flow so migration runs.
+
+## Music & Sound Studio (Music tab)
+
+A full in-browser music and sound creator — no samples, no network, every
+instrument is synthesized with WebAudio (`soundstudio.js`).
+
+- Scores are multi-track: synth, bass, pad and pluck melodic voices (saw,
+  square, sine or triangle oscillators with cutoff/attack/release controls),
+  an 8-voice synthesized drum kit (kick, snare, closed/open hat, clap, tom,
+  crash, ride) and vocal tracks recorded from the mic (`getUserMedia`).
+- Editing is a piano-roll: drag to draw notes, drag to move, drag the right
+  edge to resize, right-click or Delete to remove. Drum tracks use a step
+  grid. All times are quarter-note beats, quantized to 0.25.
+- Per-track effects: reverb, tempo-synced delay, drive, pan, mute/solo.
+- Key and scale aware: pick a root note and scale (natural minor, major,
+  dorian, phrygian, lydian, mixolydian, locrian, harmonic minor, blues,
+  chromatic); the generators (groove, arpeggio, melody) and the note editor
+  snap into the chosen scale.
+- Playback loops live with a moving playhead. "Add to movie" renders the
+  score offline to a WAV and places it as an audio clip at 0:00 on the movie
+  timeline; "Download WAV" exports the file. Scores save with the project
+  (`project.scores`).
 
 ## Determinism & FX
 

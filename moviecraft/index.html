@@ -14,7 +14,7 @@
 <script type="application/json" id="ai-guide">
 {
   "app": "MovieCraft",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "what": "Browser-native 3D movie studio. Pure client-side SPA — no backend, no auth. Automate by authoring project JSON, injecting it, and rendering sections via the export UI.",
   "headless": {
     "chromeFlags": "--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required",
@@ -23,7 +23,7 @@
   },
   "persistence": "localStorage key 'videocraft_project_v2' (yes, VideoCraft's name — shared key family) holds the raw JSON of serializeProject(). Write it BEFORE first load (e.g. Playwright addInitScript), then reload; the app autosaves back to the same key.",
   "selectors": {
-    "workspaceSwitch": ".rail-btn[data-ws=\"draw|char|scene|anim\"] (also production tabs)",
+    "workspaceSwitch": ".rail-btn[data-ws=\"draw|char|scene|anim|music\"] (also production tabs)",
     "topBar": "#btn-starter #btn-race #btn-new #btn-open #btn-save #btn-download-video #btn-help",
     "openProject": "#btn-open then #file-open (inject File via DataTransfer)",
     "playback": "#btn-play (shot) #btn-movie (whole film) Space toggles",
@@ -34,7 +34,7 @@
     "status": "#rec-status textContent: 'Rendering N%…', 'Movie rendered · N frames…', 'Export failed: …'"
   },
   "projectJSON": {
-    "root": "version:2, name, fps, exportAspect, drawings[], glbAssets[], characters[], shots[], audioAssets[], audioClips[], look, studio, activeShotId",
+    "root": "version:2, name, fps, exportAspect, drawings[], glbAssets[], characters[], shots[], audioAssets[], audioClips[], scores[], look, studio, activeShotId",
     "shot": "id, name, duration, lighting (studio|daylight|sunset|night|neon|candlelight|moonlight|horror|golden|sunrise|storm|forest), sceneObjects[], keyframes{}, events[], transition (cut|fade|fade-white|flash|wipe), transitionDur",
     "objectTypes": "box sphere cylinder cone torus plane engineKit drawing text fx glb character model",
     "object": "id, name, type, pos[3] rot[3](degrees) scale[3] color(#hex) opacity emissive(number, glow strength — color doubles as glow color) assetId(for drawing/glb/character) fxKind+intensity+fxSize+fxSpeed+fxStart",
@@ -43,7 +43,8 @@
     "characters": "objects reference characters[].id via assetId; animate limbs by keyframing BONE ids (hips, chest, head, armL, armR, legL, legR, …) on channel rot; or set the object's clip + speed for built-in motion clips (idle, walk, run, wave, celebrate, jump, dance, point, nod, shakehead, punch, bow, sit) — or ANY authored motion via customClips (custom:<name>)",
     "customClips": "user-authored motion, no presets needed: project.customClips[name] = { duration, loop, keys: [{ t, ease, pose: {jointId: [x,y,z] deg}}] }. Author interactively: scrub, pose the character with the joint editor, 'Capture pose at playhead' — each capture is a key and the clip interpolates between poses. Apply with motion.clip = 'custom:<name>'. Works on avatars AND forge characters (joints just need to match). Saved with the project.",
     "fx": "fxKind: fire|smoke|sparks|explosion|fountain|rain|snow|embers|magic|dust|fireworks|lightning|portal|hearts|stars (explosion + lightning are one-shot via fxStart); deterministic seeds — same timeline position renders identically in preview and export",
-    "events": "shot.events[]: type title|subtitle|lowerthird|fadein|fadeout|letterbox|shake with start + duration (shot-local seconds), text/speaker/color/strength optional. Lower third renders bottom-left with the speaker name in gold. Letterbox no longer clips subtitle descenders (fixed v0.6.7 — subtitles lift above the bars)."
+    "events": "shot.events[]: type title|subtitle|lowerthird|fadein|fadeout|letterbox|shake with start + duration (shot-local seconds), text/speaker/color/strength optional. Lower third renders bottom-left with the speaker name in gold. Letterbox no longer clips subtitle descenders (fixed v0.6.7 — subtitles lift above the bars).",
+    "scores": "project.scores[] — full music/sound creator (Music tab, soundstudio.js). score = { id, name, bpm(20-300), bars(1-128), root(midi 0-120), scale (Natural minor|Major|...|Blues|Harmonic minor|Chromatic), tracks: [{ id, name, kind synth|bass|pad|pluck|drum|vocal, osc saw|square|sine|triangle, cutoff, attack, release, volume, pan, mute, solo, reverb, delay, delayBeats, drive, notes [{t,d in beats (0.25-quantized), m midi (drum rows 0-7: kick snare hatC hatO clap tom crash ride), v}], assetId+startBeats (vocals) }] }. Everything is synthesized with WebAudio — no samples needed. 'Add to movie' renders offline to WAV and places it as an audioClip at 0:00. Vocals: record via mic (getUserMedia). Scores save with the project."
   },
   "longFilmsRecipe": [
     "render in <=60s sections: set #export-start / #export-end, click #btn-record",
@@ -140,6 +141,42 @@ canvas { display: block; }
 #content { position: relative; overflow: hidden; background: var(--bg); }
 .ws { position: absolute; inset: 0; display: none; }
 .ws.active { display: grid; }
+
+/* ============ SOUND STUDIO workspace ============ */
+#ws-music.active { grid-template-columns: 1fr; display: block; overflow: hidden; }
+#sound-shell { display: flex; flex-direction: column; height: 100%; min-width: 0; }
+#sound-top {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; border-bottom: 1px solid var(--line-soft); background: var(--panel);
+}
+#sound-top .spacer { flex: 1; }
+#sound-top .btn { padding: 6px 12px; }
+.snd-lbl { font-size: var(--text-xs); color: var(--text-muted); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.snd-lbl input, .snd-lbl select { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--text); padding: 4px 6px; }
+#sound-body { display: flex; flex: 1; min-height: 0; }
+#sound-tracks {
+  width: 210px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--line-soft);
+  padding: var(--space-3); overflow-y: auto;
+}
+#sound-tracks .list-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 6px; border-radius: var(--radius-sm); cursor: pointer; gap: 4px; }
+#sound-tracks .list-item.selected { background: rgba(242, 178, 92, 0.15); }
+#sound-tracks .list-item .meta { display: flex; gap: 8px; color: var(--text-muted); font-size: var(--text-xs); }
+#sound-tracks .list-item .meta span { cursor: pointer; }
+#sound-tracks .list-item .meta span:hover { color: var(--text); }
+#snd-addtracks { display: flex; flex-direction: column; gap: 6px; }
+#sound-rollwrap { flex: 1; min-width: 0; overflow: auto; background: #16130f; }
+#sound-roll { display: block; cursor: crosshair; touch-action: none; }
+#sound-insp {
+  width: 250px; flex-shrink: 0; background: var(--panel); border-left: 1px solid var(--line-soft);
+  padding: var(--space-3); overflow-y: auto;
+}
+#sound-insp .joint-editor { display: block; margin-bottom: 8px; }
+#sound-insp .joint-editor .side-title { display: block; margin-bottom: 3px; }
+#sound-insp .btn { width: 100%; margin-bottom: 6px; justify-content: center; }
+@media (max-width: 900px) {
+  #sound-tracks { width: 130px; }
+  #sound-insp { width: 170px; }
+}
 
 /* ============ DRAW workspace ============ */
 #ws-draw.active { grid-template-columns: 1fr 232px; }
@@ -476,6 +513,7 @@ body.any-sheet-open #sheet-backdrop { display: block; }
     <button class="rail-btn" data-ws="char" title="Characters" aria-label="Character workspace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg></button>
     <button class="rail-btn" data-ws="scene" title="Scene (3D)" aria-label="3D scene workspace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg></button>
     <button class="rail-btn" data-ws="anim" title="Animate" aria-label="Animate workspace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m10 2 2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/><path d="M19 15l1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/></svg></button>
+    <button class="rail-btn" data-ws="music" title="Music studio" aria-label="Music studio workspace"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></button>
   </nav>
 
   <div id="main">
@@ -720,6 +758,9 @@ body.any-sheet-open #sheet-backdrop { display: block; }
         </div>
       </section>
 
+      <!-- MUSIC STUDIO (filled by soundstudio.js) -->
+      <section class="ws" id="ws-music" aria-label="Music studio"></section>
+
     </div>
   </div>
 </div>
@@ -787,6 +828,6 @@ body.any-sheet-open #sheet-backdrop { display: block; }
   }
 }
 </script>
-<script type="module" src="app.js?v=0.11.0"></script>
+<script type="module" src="app.js?v=0.12.0"></script>
 </body>
 </html>
