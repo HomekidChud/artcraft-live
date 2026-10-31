@@ -7,11 +7,19 @@
   <title>FilmCraft</title>
   <link rel="icon" href="favicon.png" type="image/png">
   <!-- AI-HELP — start here if you are an AI agent driving this app.
-     Full machine-readable guide: filmcraft/GUIDE.md.
-     Fast facts: the web build is a single Rust/WASM canvas (egui) with NO automation
-     hooks — no DOM controls, no window.* API, no ?headless mode, no localStorage
-     project. Do not attempt to screen-scrape it. For browser video automation use
-     VideoCraft (?headless=1) or MovieCraft (see their GUIDE.md files). -->
+     The COMPLETE agent guide is embedded below in <script type="application/json" id="ai-guide">
+     and exposed at runtime as window.AI_GUIDE. Everything you need is in this page —
+     no repo access or reverse-engineering required. The same content lives at filmcraft/GUIDE.md. -->
+  <script type="application/json" id="ai-guide">
+  {
+    "app": "FilmCraft",
+    "what": "Rust/WASM non-linear video editor running in a single egui canvas (filmcraft_web.js + filmcraft_web_bg.wasm). Native desktop builds exist separately.",
+    "automation": "NOT automatable from the web build. No DOM controls, no window.* hooks, no ?headless mode, no localStorage project file — everything renders inside one WebGL canvas. Screen-scraping coordinates is brittle and unsupported. The scripting/control channel exists in the native (desktop) builds only.",
+    "alternative": "For browser video automation use VideoCraft (index.html?headless=1 — see its window.AI_GUIDE) or MovieCraft (author project JSON, localStorage key 'videocraft_project_v2' — see its window.AI_GUIDE).",
+    "usefulFor": "rendering for a human editor; reference for the Premiere-style workflow."
+  }
+  </script>
+  <script>window.AI_GUIDE = JSON.parse(document.getElementById('ai-guide').textContent); console.info('[AI] ' + window.AI_GUIDE.app + ' agent guide loaded: window.AI_GUIDE (full guide embedded in this page — no repo needed)');</script>
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1c1f; }
     canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }

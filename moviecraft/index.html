@@ -6,13 +6,58 @@
 <title>MovieCraft — 3D Movie Studio</title>
 <meta name="description" content="MovieCraft: plan films, design reusable 3D models, organise assets, storyboard, build scenes, animate rigged characters, mix sound and export movies in a ten-workspace browser studio.">
 <!-- AI-HELP — start here if you are an AI agent driving this app.
-     Full machine-readable guide: moviecraft/GUIDE.md (stable selectors, project JSON schema,
-     headless Chrome recipe, render gotchas, honest limits).
-     Fast facts: pure client-side SPA, no backend/auth; localStorage autosave key
-     'videocraft_project_v2' (raw serializeProject JSON — write it before page load);
-     camera keyframes live in shot.keyframes.__camera__; character bone ids animate limbs;
-     scale must be [x,y,z]; export long films in sections + ffmpeg concat. -->
+     The COMPLETE agent guide is embedded below in <script type="application/json" id="ai-guide">
+     and exposed at runtime as window.AI_GUIDE. Everything you need is in this page —
+     no repo access or reverse-engineering required. The same content (plus contributor
+     notes) lives at moviecraft/GUIDE.md. -->
 <link rel="ai-guide" href="GUIDE.md">
+<script type="application/json" id="ai-guide">
+{
+  "app": "MovieCraft",
+  "version": "0.6.7",
+  "what": "Browser-native 3D movie studio. Pure client-side SPA — no backend, no auth. Automate by authoring project JSON, injecting it, and rendering sections via the export UI.",
+  "headless": {
+    "chromeFlags": "--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required",
+    "notes": "WebGL2 via SwiftShader works. WebCodecs in headless Chrome encodes VP8+Opus only (no H.264/AAC). Verify with canvas.getContext('webgl2') before trusting renders.",
+    "dialogs": "Native confirm() appears on destructive actions and >300s exports — stub window.confirm = () => true."
+  },
+  "persistence": "localStorage key 'videocraft_project_v2' (yes, VideoCraft's name — shared key family) holds the raw JSON of serializeProject(). Write it BEFORE first load (e.g. Playwright addInitScript), then reload; the app autosaves back to the same key.",
+  "selectors": {
+    "workspaceSwitch": ".rail-btn[data-ws=\"draw|char|scene|anim\"] (also production tabs)",
+    "topBar": "#btn-starter #btn-race #btn-new #btn-open #btn-save #btn-download-video #btn-help",
+    "openProject": "#btn-open then #file-open (inject File via DataTransfer)",
+    "playback": "#btn-play (shot) #btn-movie (whole film) Space toggles",
+    "shots": "#btn-shot-add #btn-shot-dup #btn-shot-up #btn-shot-down #btn-shot-del #shot-duration #shot-list (chips: .shot-chip)",
+    "fps": "#anim-fps (range 10-60)",
+    "export": "#btn-record (frame-accurate, video-only) / #btn-download-video (real-time, has audio)",
+    "exportOptions": "#export-mode=offline #export-res #export-aspect #export-quality=high #export-start #export-end (seconds, blank = full)",
+    "status": "#rec-status textContent: 'Rendering N%…', 'Movie rendered · N frames…', 'Export failed: …'"
+  },
+  "projectJSON": {
+    "root": "version:2, name, fps, exportAspect, drawings[], glbAssets[], characters[], shots[], audioAssets[], audioClips[], look, studio, activeShotId",
+    "shot": "id, name, duration, lighting (studio|daylight|sunset|night), sceneObjects[], keyframes{}, events[], transition, transitionDur",
+    "objectTypes": "box sphere cylinder cone torus plane engineKit drawing text fx glb character model",
+    "object": "id, name, type, pos[3] rot[3](degrees) scale[3] color(#hex) opacity emissive(number, glow strength — color doubles as glow color) assetId(for drawing/glb/character) fxKind+intensity+fxSize+fxSpeed+fxStart",
+    "keyframes": "shot.keyframes[objId][channel] = [{t, v, ease}] — t is SHOT-LOCAL seconds; ease: ease|linear|step; v type matches channel (pos/rot/scale = [x,y,z], others scalar)",
+    "camera": "shot.keyframes.__camera__ with channels cam.px cam.py cam.pz cam.tx cam.ty cam.tz cam.fov — or shot.camera = { base: {pos,target,fov}, cam: {channel: [kf]} }",
+    "characters": "objects reference characters[].id via assetId; animate limbs by keyframing BONE ids (hips, chest, head, armL, armR, legL, legR, …) on channel rot; or set the object's clip + speed for built-in motion clips (walk, wave, celebrate, …)",
+    "fx": "fxKind: fire|smoke|sparks|explosion|fountain (explosion is one-shot via fxStart); deterministic seeds — same timeline position renders identically in preview and export",
+    "events": "shot.events[]: type title|subtitle|fadein|fadeout|letterbox|shake with start + duration (shot-local seconds), text/speaker/color/strength optional. Letterbox no longer clips subtitle descenders (fixed v0.6.7 — subtitles lift above the bars)."
+  },
+  "longFilmsRecipe": [
+    "render in <=60s sections: set #export-start / #export-end, click #btn-record",
+    "stitch: ffmpeg -f concat -safe 0 -i list.txt -c copy out.webm",
+    "headless 2-core speed: ~0.65-0.7x realtime per section (~50 MB per 50 s at 720p high)",
+    "validate each shot with a 3-second snippet render before committing to the full render"
+  ],
+  "limits": [
+    "frame-accurate export is video-only; real-time mode has audio",
+    "whole-movie export beyond ~5 min (720p) risks tab crash — use section export + ffmpeg concat",
+    ">300 s movies trigger a confirm() warning (not a hard block)"
+  ]
+}
+</script>
+<script>window.AI_GUIDE = JSON.parse(document.getElementById('ai-guide').textContent); console.info('[AI] ' + window.AI_GUIDE.app + ' agent guide loaded: window.AI_GUIDE (full guide embedded in this page — no repo needed)');</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='13' height='13' rx='3' fill='%23f2b25c'/%3E%3Crect x='17' y='17' width='13' height='13' rx='3' fill='%23e05d5d'/%3E%3Crect x='17' y='2' width='13' height='13' rx='3' fill='%234fb3a4'/%3E%3Crect x='2' y='17' width='13' height='13' rx='3' fill='%23c77b9e'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

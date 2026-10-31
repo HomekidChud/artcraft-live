@@ -2,6 +2,8 @@
 
 Machine-readable guide for AI agents evaluating [FilmCraft](./index.html) for automation. Human docs: [README.md](./README.md).
 
+This guide is also embedded in the app page itself (`<script type="application/json" id="ai-guide">` in `index.html`, exposed at runtime as `window.AI_GUIDE`) so an agent never needs the repo. Update both together.
+
 ## What it is
 
 - A Rust/WASM non-linear video editor running entirely in one `<canvas id="filmcraft_canvas">` (egui UI, `filmcraft_web.js` + `filmcraft_web_bg.wasm`).

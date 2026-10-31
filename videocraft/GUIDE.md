@@ -2,6 +2,8 @@
 
 Machine-readable guide for AI agents driving [VideoCraft](./index.html), a browser-native video editor (single-page app, no backend, no auth). Human docs: [README.md](./README.md). Working notes for contributors: `FLOWS.md` in the repo root. Verify selectors against the current `index.html`/`app.js` before relying on them.
 
+This guide is also embedded in the app page itself (`<script type="application/json" id="ai-guide">` in `index.html`, exposed at runtime as `window.AI_GUIDE`) so an agent never needs the repo. Update both together.
+
 ## Environment
 
 - Pure client-side app: `index.html` + ES modules. Three.js from CDN via import map.

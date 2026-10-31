@@ -2,6 +2,8 @@
 
 Machine-readable guide for AI agents driving [MovieCraft](./index.html), a browser-native 3D movie studio (single-page app, no backend, no auth). The docs page for humans is [docs.html](./docs.html). Verify selectors against the current `index.html`/`app.js` before relying on them.
 
+This guide is also embedded in the app page itself (`<script type="application/json" id="ai-guide">` in `index.html`, exposed at runtime as `window.AI_GUIDE`) so an agent never needs the repo. Update both together.
+
 ## Environment
 
 - Pure client-side app: `index.html` + ES modules (`app.js`, `fx.js`, `fx-core.js`), Three.js from CDN via import map.

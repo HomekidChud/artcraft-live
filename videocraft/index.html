@@ -6,14 +6,52 @@
 <title>VideoCraft — Video Studio for Shorts & Long-form</title>
 <meta name="description" content="VideoCraft: a browser video studio — import clips, images and audio, trim and arrange on a timeline, add captions, build 3D film and anime scenes, and export YouTube Shorts or widescreen videos.">
 <!-- AI-HELP — start here if you are an AI agent driving this app.
-     Full machine-readable guide: videocraft/GUIDE.md (headless API, UI selectors, export
-     paths, gotchas, end-to-end recipe, honest limits).
-     Fast facts: open with ?headless=1 for window.vc.loadProject()/render() with a
-     __vcPostUrl blob receiver (receiver must answer CORS OPTIONS); a fresh page has a
-     default 6s hero scene clip — delete it before importing media, or clips append at
-     t=6s and desync; media items are '#insp-body .list-item' (id, not class);
-     real-time WebM export also POSTs to window.__vcPostUrl since v1.1.1. -->
+     The COMPLETE agent guide is embedded below in <script type="application/json" id="ai-guide">
+     and exposed at runtime as window.AI_GUIDE. Everything you need is in this page —
+     no repo access or reverse-engineering required. The same content (plus contributor
+     notes) lives at videocraft/GUIDE.md. -->
 <link rel="ai-guide" href="GUIDE.md">
+<script type="application/json" id="ai-guide">
+{
+  "app": "VideoCraft",
+  "version": "1.1.1",
+  "what": "Browser-native video editor (SPA, no backend/auth). Timeline with video/audio tracks, captions, 3D scene clips. Exports MP4 (WebCodecs, faster) or WebM (real-time, has audio).",
+  "headless": {
+    "chromeFlags": "--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required",
+    "notes": "WebCodecs in headless Chrome encodes VP8/VP9+Opus only (no H.264/AAC) — the MP4 path then auto-falls back to real-time WebM recording. Audio needs a running AudioContext (autoplay policy).",
+    "dialogs": "alert() on empty-timeline export — dismiss dialogs (page.on('dialog', d => d.dismiss()))."
+  },
+  "preferredPath": {
+    "url": "open this page with ?headless=1",
+    "api": "window.vc.loadProject(projectJson) — REPLACES clips/scenes/captions/media (the default hero clip disappears); returns {name, aspect, duration, clips, scenes, captions}. window.vc.render({ postUrl, quality: 'high'|'standard'|'draft' }) — encodes and POSTs the result blob to postUrl; progress in window.__vcProgress {stage, frame, frames}; result in window.__vcResult.",
+    "receiver": "must answer CORS preflight (OPTIONS -> 204 + Access-Control-Allow-Origin: *) — the blob POST sends a non-simple Content-Type and triggers preflight; a POST-only receiver silently swallows the export."
+  },
+  "uiFallback": {
+    "import": "page.setInputFiles('#file-import', [files]) — video/image/audio, multiple; import is ASYNC (metadata probing + audio decode, up to ~10s) so POLL for items",
+    "mediaPanel": "media tab via .rail-btn[data-tab=\"media\"]; items are '#insp-body .list-item' — #insp-body is an ID (the aside is '#inspector', also an id, NOT a class: '.inspector .list-item' matches nothing)",
+    "addToTimeline": "click each list item — video -> 'v' track, audio -> 'a' track; clips APPEND after existing clips on that track",
+    "timeline": "'#track-v .clip' / '#track-a .clip'; style.left in px at 80 px/s; captions render as '.cap-pill'",
+    "exportTab": ".rail-btn[data-tab=\"export\"]",
+    "exportButtons": "#btn-export (MP4 WebCodecs) / #btn-export-webm (real-time WebM, has audio)",
+    "quality": "#ex-quality: 0.2 high / 0.12 standard / 0.07 draft",
+    "postUrl": "window.__vcPostUrl = url — BOTH export paths POST the exported blob there since v1.1.1 (WebM previously only downloaded)",
+    "progress": "window.__vcProgress; overlay '#export-overlay', timer '#export-time' (timer stops advancing when finished, then wait for the POSTed blob)"
+  },
+  "gotchas": [
+    "a fresh page is NOT empty: init adds a 6s hero SCENE clip on the video track plus a demo caption. In the UI flow delete it first (click '#track-v .clip.scene', press Delete) — otherwise imported video APPENDS at t=6s and desyncs from audio placed at t=0",
+    "export tab Length is totalDur() — 6s on an 'empty' timeline means the hero clip is still there",
+    "the media list re-renders on selection — click items by re-querying (querySelectorAll) each time, never hold stale element handles",
+    "export resolution/framerate: fixed per aspect (16:9 -> 1920x1080 @ 30fps; no fps control in the UI); real-time WebM capture is 1x wall-clock"
+  ],
+  "verifySync": "frame-match 1fps thumbnails of master vs source; cross-correlate audio (offset > 0.2s means the hero clip was present); then transcode: ffmpeg -i master.webm -c:v libx264 -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart out.mp4",
+  "limits": [
+    "real-time WebM capture can drop frames on slow machines; WebCodecs MP4 is faster but needs H.264/AAC encode support",
+    "audio clips play through WebAudio — a suspended AudioContext (autoplay policy) yields silent exports",
+    "no keyframe audio mixing"
+  ]
+}
+</script>
+<script>window.AI_GUIDE = JSON.parse(document.getElementById('ai-guide').textContent); console.info('[AI] ' + window.AI_GUIDE.app + ' agent guide loaded: window.AI_GUIDE (full guide embedded in this page — no repo needed)');</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='7' fill='%23e8a13d'/%3E%3Cpath d='M13 10.5v11l9-5.5z' fill='%23141312'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://api.fontshare.com">
 <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
