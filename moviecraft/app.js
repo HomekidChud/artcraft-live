@@ -17,7 +17,7 @@ import { buildCharacterGroup, sketchCharacter } from './charbuild.js';
 import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './cutscene.js?v=0.7.0';
 import { createCutsceneOverlay } from './overlay.js?v=0.7.0';
 import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.10.0';
-import { initSoundStudio, renderSoundStudio, onShowSoundStudio, onHideSoundStudio, normalizeScore } from './soundstudio.js?v=0.12.0';
+import { initSoundStudio, renderSoundStudio, onShowSoundStudio, onHideSoundStudio, normalizeScore } from './soundstudio.js?v=0.12.1';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 installWorkspaceShell();

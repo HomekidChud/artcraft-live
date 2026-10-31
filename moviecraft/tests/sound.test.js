@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { midiToFreq, scaleSet, normalizeScore, encodeWav, SCALES, DRUMS } from '../soundstudio.js';
+import { midiToFreq, scaleSet, normalizeScore, encodeWav, SCALES, DRUMS, makeTrack } from '../soundstudio.js';
 
 test('midiToFreq: A4 = 440, octaves double', () => {
   assert.equal(midiToFreq(69), 440);
@@ -50,6 +50,19 @@ test('normalizeScore: vocal fields survive, ids stable-ish', () => {
   assert.equal(tr.startBeats, 0);
   const s2 = normalizeScore({ id: 'keepme', tracks: [] });
   assert.equal(s2.id, 'keepme');
+});
+
+test('makeTrack: every kind returns a full track (startup regression v0.12.1)', () => {
+  for (const kind of ['synth', 'bass', 'pad', 'pluck', 'drum', 'vocal']) {
+    const t = makeTrack(kind);
+    assert.ok(t && typeof t === 'object', `${kind} track exists`);
+    assert.equal(t.kind, kind);
+    assert.ok(Array.isArray(t.notes), `${kind} has notes array`);
+    assert.ok(t.id && t.name);
+  }
+  const dr = makeTrack('drum');
+  assert.ok(dr.notes.length > 0, 'drum track ships with a starter groove');
+  assert.equal(dr.notes[0].m, 0, 'first drum note is a kick');
 });
 
 test('encodeWav: 44-byte PCM header + interleaved samples', () => {

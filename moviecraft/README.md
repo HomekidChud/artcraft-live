@@ -4,6 +4,9 @@ MovieCraft is a static, browser-based scene and movie editor. This upgrade is a
 practical foundation for stylised 3D filmmaking, not a claim of feature parity
 with a Hollywood production pipeline.
 
+Version 0.12.1 fixes a startup crash in the music engine (track factory
+received a malformed score and aborted app loading).
+
 Version 0.12.0 adds a **full music and sound creator** (Music tab):
 
 - **Multi-track scores** with synthesized instruments — synth, bass, pad and

@@ -410,9 +410,9 @@ export function renderSoundStudio() {
   renderTrackList(); renderInspector(); draw();
 }
 
-function makeTrack(kind) {
+export function makeTrack(kind) {
   const names = { synth: 'Lead', bass: 'Bass', pad: 'Pad', pluck: 'Pluck', drum: 'Drums', vocal: 'Vocals' };
-  const t = normalizeScore({ kind, name: names[kind] }).tracks[0];
+  const t = normalizeScore({ tracks: [{ kind, name: names[kind] }] }).tracks[0];
   if (kind === 'pad') { t.attack = 0.4; t.release = 1.2; t.cutoff = 1400; }
   if (kind === 'bass') { t.osc = 'saw'; t.cutoff = 700; t.attack = 0.005; t.release = 0.15; }
   if (kind === 'pluck') { t.osc = 'triangle'; t.release = 0.4; }
