@@ -352,11 +352,25 @@ p.note code {
   let ffmpeg = null, engineReady = null;
   const CORE = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
 
+  async function loadEngine(ff) {
+    const coreURL = CORE + '/ffmpeg-core.js', wasmURL = CORE + '/ffmpeg-core.wasm';
+    try {
+      // same-origin worker script (browsers block cross-origin worker scripts)
+      const workerURL = new URL('vendor/ffmpeg-worker.js', location.href).href;
+      await ff.load({ classWorkerURL: workerURL, coreURL, wasmURL });
+    } catch (e) {
+      // sandboxed contexts (origin null): fetch the worker script, run it from a blob
+      const src = await (await fetch('vendor/ffmpeg-worker.js')).text();
+      const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      await ff.load({ classWorkerURL: blobURL, coreURL, wasmURL });
+    }
+  }
+
   function getEngine() {
     if (engineReady) return engineReady;
     engineReady = (async () => {
       const ff = new FFmpeg();
-      await ff.load({ coreURL: CORE + '/ffmpeg-core.js', wasmURL: CORE + '/ffmpeg-core.wasm' });
+      await loadEngine(ff);
       ffmpeg = ff;
       return ff;
     })();
