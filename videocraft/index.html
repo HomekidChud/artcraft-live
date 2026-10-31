@@ -14,7 +14,7 @@
 <script type="application/json" id="ai-guide">
 {
   "app": "VideoCraft",
-  "version": "1.1.1",
+  "version": "1.1.3",
   "what": "Browser-native video editor (SPA, no backend/auth). Timeline with video/audio tracks, captions, 3D scene clips. Exports MP4 (WebCodecs, faster) or WebM (real-time, has audio).",
   "headless": {
     "chromeFlags": "--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required",
@@ -23,8 +23,23 @@
   },
   "preferredPath": {
     "url": "open this page with ?headless=1",
-    "api": "window.vc.loadProject(projectJson) — REPLACES clips/scenes/captions/media (the default hero clip disappears); returns {name, aspect, duration, clips, scenes, captions}. window.vc.render({ postUrl, quality: 'high'|'standard'|'draft' }) — encodes and POSTs the result blob to postUrl; progress in window.__vcProgress {stage, frame, frames}; result in window.__vcResult.",
+    "api": "window.vc.loadProject(projectJson) — REPLACES clips/scenes/captions/media (the default hero clip disappears); returns {name, aspect, duration, clips, scenes, captions}. window.vc.render({ postUrl, quality: 'high'|'standard'|'draft' }) — encodes, POSTs the result blob to postUrl and RESOLVES ONLY WHEN THE EXPORT HAS FULLY FINISHED (both MP4 and WebM paths); progress in window.__vcProgress {stage, frame, frames}; result in window.__vcResult {name, size, type}. Scenes missing objects/camKeys/events/look are auto-normalized on load.",
     "receiver": "must answer CORS preflight (OPTIONS -> 204 + Access-Control-Allow-Origin: *) — the blob POST sends a non-simple Content-Type and triggers preflight; a POST-only receiver silently swallows the export."
+  },
+  "projectSchema": {
+    "top": "{ app: 'videocraft', version: 1, name, aspect: '16:9'|'9:16'|'1:1'|'4:5'|'2.39:1', fps: 24|25|30|50|60, clips[], scenes[], captions[], media[] }",
+    "clip": "{ id, track: 'v'|'a', kind: 'scene'|'media', mediaId?|sceneId?, start (s), dur (s), in (s, media offset), volume (0-1), fit: 'contain'|'cover'|'stretch' (v-track media only) } — v-track clips must not overlap; a scene clip's dur should equal its scene duration",
+    "scene": "{ id, name, duration, sky: '#rrggbb', fog: 0-1 (FogExp2 density = fog*0.045; >0.3 hides distant objects), lighting: 'three-point'|'sunset'|'night'|'dramatic'|'daylight'|'neon'|'candlelight'|'horror'|'sunrise'|'storm'|'forest', camera: { pos: [x,y,z], target: [x,y,z] }, camKeys: [{ t, pos, target, ease }], look: { style, grade, bloom, vignette, grain, chroma, streak, exposure, outline, toonSteps }, objects[], events[] }",
+    "camKey": "{ t (scene-local s), pos: [x,y,z], target: [x,y,z], ease: 'smooth'|'linear'|'easein'|'easeout'|'back'|'bounce'|'step' } — camera interpolates between time-sorted keys; with no keys the static camera is used",
+    "lookFields": "style: 'film'|'anime'|'clean'; grade: natural|cine|noir|vibrant|scifi|sunset|comic|pastel|night|teal-orange|bleach|sepia|dream|moonlight|cyberpunk|forest|crimson|arctic; bloom 0-2; vignette 0-1; grain 0-0.3; chroma 0-2; streak 0-1.5; exposure 0.3-2 (dim presets night/storm/candlelight/horror need ~1.5-2.3 or scenes render nearly black); outline 0-2 (anime); toonSteps 2-8 (anime)",
+    "objectCommon": "{ id, type, name, pos: [x,y,z], rot: [rx,ry,rz] (radians), scale: [sx,sy,sz], color: '#rrggbb', opacity: 1, keys: [{ t, pos?, rot?, scale?, ease }] } — keys animate the transform (scene-local seconds, eased, time-sorted)",
+    "objectTypes": "ground (scale [w,1,d], locked to the floor); box (1x1x1); sphere (r=0.5, emissive); cylinder (r=0.5 h=1 — scale y = height); text ({ text, size } — billboard title plane, color = fill); character (see characterSchema); fx ({ fx, size } — particle emitter)",
+    "characterSchema": "{ motion: 'none'|'idle'|'walk'|'run'|'wave'|'celebrate'|'jump'|'dance'|'point'|'nod'|'shakehead'|'punch'|'bow'|'sit', skin/hair/shirt/pants: '#rrggbb', build: { height, head, arms, legs, torso } (proportion factors, default 1), poseKeys: [{ t, pose }] } — non-empty poseKeys override motion entirely; poses interpolate (smoothstep) in scene-local seconds",
+    "poseParams": "degrees: shLx, shLz, elL (left arm), shRx, shRz, elR (right arm), hipL, kneeL, hipR, kneeR (legs), headX, headY, torsoX, torsoY. Defaults: shLx 8, shRx 8, elL -15, elR -15, kneeL 4, kneeR 4, rest 0. shLz/shRz raise arms sideways (try ~65 / -65 for raised arms)",
+    "fxKinds": "fire, explosion, confetti, sparks, fountain, rain, snow, embers, magic, smoke, lightning, portal, hearts, stars",
+    "events": "[{ type: 'fadein'|'fadeout', t, dur }] black-overlay ramps; [{ type: 'letterbox', t, dur: 0 }] cinema bars from t on",
+    "caption": "{ id, start, dur, text (multiline \\n), pos: 'bottom'|'middle'|'top', size (1 = 4.2% of frame height), color: '#rrggbb', bg: true|false } — burned into the export",
+    "media": "{ id, type: 'video'|'image'|'audio', name, duration, data?: dataURL } — entries with data are restored on load (audio must be decodable: mp3/wav/ogg); entries without data re-link by file name on re-import"
   },
   "uiFallback": {
     "import": "page.setInputFiles('#file-import', [files]) — video/image/audio, multiple; import is ASYNC (metadata probing + audio decode, up to ~10s) so POLL for items",
@@ -34,14 +49,17 @@
     "exportTab": ".rail-btn[data-tab=\"export\"]",
     "exportButtons": "#btn-export (MP4 WebCodecs) / #btn-export-webm (real-time WebM, has audio)",
     "quality": "#ex-quality: 0.2 high / 0.12 standard / 0.07 draft",
+    "fps": "#ex-fps select — 24/25/30/50/60; also settable via the project fps field",
     "postUrl": "window.__vcPostUrl = url — BOTH export paths POST the exported blob there since v1.1.1 (WebM previously only downloaded)",
     "progress": "window.__vcProgress; overlay '#export-overlay', timer '#export-time' (timer stops advancing when finished, then wait for the POSTed blob)"
   },
   "gotchas": [
-    "a fresh page is NOT empty: init adds a 6s hero SCENE clip on the video track plus a demo caption. In the UI flow delete it first (click '#track-v .clip.scene', press Delete) — otherwise imported video APPENDS at t=6s and desyncs from audio placed at t=0",
+    "a fresh page is NOT empty: init adds a 6s hero SCENE clip on the video track plus a demo caption. In the UI flow delete it first (click '#track-v .clip.scene', press Delete) — otherwise imported video APPENDS at t=6s and desyncs from audio placed at t=0. loadProject replaces everything, so headless agents are unaffected.",
     "export tab Length is totalDur() — 6s on an 'empty' timeline means the hero clip is still there",
     "the media list re-renders on selection — click items by re-querying (querySelectorAll) each time, never hold stale element handles",
-    "export resolution/framerate: fixed per aspect (16:9 -> 1920x1080 @ 30fps; no fps control in the UI); real-time WebM capture is 1x wall-clock"
+    "export resolution per aspect: 16:9 -> 1920x1080, 9:16 -> 1080x1920, 1:1 -> 1080x1080, 4:5 -> 1080x1350, 2.39:1 -> 1920x804; fps via #ex-fps; real-time WebM capture is 1x wall-clock",
+    "dim lighting presets (night, storm, candlelight, horror, dramatic) need look.exposure ~1.5-2.3 and bright ground colors or scenes render nearly black",
+    "fog is 0-1 (not 0-100): 0.15 subtle, 0.5 heavy; above ~0.3 distant objects disappear"
   ],
   "verifySync": "frame-match 1fps thumbnails of master vs source; cross-correlate audio (offset > 0.2s means the hero clip was present); then transcode: ffmpeg -i master.webm -c:v libx264 -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart out.mp4",
   "limits": [
@@ -360,6 +378,6 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<script type="module" src="app.js?v=1.4.0"></script>
+<script type="module" src="app.js?v=1.4.2"></script>
 </body>
 </html>

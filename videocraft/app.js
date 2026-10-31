@@ -31,7 +31,7 @@ const $ = (s) => document.querySelector(s);
 const preview = $('#preview');
 const ctx = preview.getContext('2d');
 const fmt = (t) => { t = Math.max(0, t); const m = Math.floor(t / 60), s = t - m * 60; return `${m}:${s < 10 ? '0' : ''}${s.toFixed(2)}`; };
-const fmt1 = (t) => { const m = Math.floor(t / 60), s = Math.round(t % 60); return `${m}:${s < 10 ? '0' : ''}${s}`; };
+const fmt1 = (t) => { t = Math.max(0, Math.round(t)); const m = Math.floor(t / 60), s = t % 60; return `${m}:${s < 10 ? '0' : ''}${s}`; };
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const clipEnd = (c) => c.start + c.dur;
 const totalDur = () => Math.max(0, ...state.clips.map(clipEnd), ...state.captions.map(clipEnd), 0.001);
@@ -377,7 +377,7 @@ function drawCaptions(t, W, H) {
 function drawSceneEvents(scene, localT, W, H) {
   for (const ev of scene.events || []) {
     if (ev.type === 'fadein' || ev.type === 'fadeout') {
-      const p = (localT - ev.t) / ev.dur;
+      const p = ev.dur > 0 ? (localT - ev.t) / ev.dur : -1;
       if (p < 0 || p > 1) continue;
       const a = ev.type === 'fadein' ? 1 - p : p;
       ctx.fillStyle = `rgba(0,0,0,${a})`; ctx.fillRect(0, 0, W, H);
@@ -903,7 +903,7 @@ function renderSceneTab(sel) {
   html += `<div class="insp-section"><div class="insp-title">Lighting</div>
     <div class="row"><select id="sc-light" style="flex:1.4">${LIGHT_PRESETS.map((p) => `<option ${scene.lighting === p ? 'selected' : ''}>${p}</option>`).join('')}</select></div>
     <div class="row"><label>Sky color</label><input type="color" id="sc-sky" value="${scene.sky}"></div>
-    <div class="row"><label>Fog</label><input type="range" id="sc-fog" min="0" max="100" value="${scene.fog}"><span class="val">${scene.fog}</span></div>
+    <div class="row"><label>Fog</label><input type="range" id="sc-fog" min="0" max="1" step="0.05" value="${scene.fog}"><span class="val">${(+scene.fog || 0).toFixed(2)}</span></div>
   </div>
   <div class="insp-section"><div class="insp-title">Events</div>
     <div class="grid-3">
@@ -912,7 +912,7 @@ function renderSceneTab(sel) {
       <button class="btn tiny" data-addev="letterbox">Letterbox</button>
     </div>`;
   for (const ev of scene.events || []) {
-    html += `<div class="list-item"><span class="nm">${ev.type} @ ${ev.t.toFixed(1)}s (${ev.dur.toFixed(1)}s)</span><span class="meta" data-evdel="${scene.events.indexOf(ev)}">remove</span></div>`;
+    html += `<div class="list-item"><span class="nm">${ev.type} @ ${(ev.t ?? 0).toFixed(1)}s (${(ev.dur ?? 0).toFixed(1)}s)</span><span class="meta" data-evdel="${scene.events.indexOf(ev)}">remove</span></div>`;
   }
   html += `</div>`;
 
@@ -1094,6 +1094,8 @@ function renderLookTab() {
     inspBody.innerHTML = `<div class="empty">Add a 3D scene to control its look.<br>Video and image clips use their own pixels.</div>`;
     return;
   }
+  // fall back to stock look settings when a hand-written project omits them
+  scene.look = { style: 'film', grade: 'cine', bloom: 0.55, vignette: 0.4, grain: 0.05, chroma: 0.5, streak: 0.25, exposure: 1.0, outline: 0, toonSteps: 4, ...(scene.look || {}) };
   const L = scene.look;
   const slider = (id, label, min, max, step, val, fmtv) =>
     `<div class="row"><label>${label}</label><input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}"><span class="val">${fmtv(val)}</span></div>`;
@@ -1165,7 +1167,7 @@ function renderExportTab() {
     </div>`;
   $('#btn-export').addEventListener('click', () => (mp4ok ? exportMp4() : startExport()));
   $('#btn-export-webm')?.addEventListener('click', startExport);
-  $('#ex-fps')?.addEventListener('change', (e) => { state.fps = +e.target.value; bump(); });
+  $('#ex-fps')?.addEventListener('change', (e) => { state.fps = +e.target.value; });
 }
 $('#btn-export-top').addEventListener('click', () => {
   state.tab = 'export'; renderRail(); renderInspector();
@@ -1210,19 +1212,23 @@ async function startExport() {
   recorder = new MediaRecorder(stream, { mimeType: mime || undefined, videoBitsPerSecond: 10_000_000, audioBitsPerSecond: 160_000 });
   exportChunks = [];
   recorder.ondataavailable = (e) => { if (e.data.size) exportChunks.push(e.data); };
-  recorder.onstop = () => {
+  recorder.onstop = async () => {
     const blob = new Blob(exportChunks, { type: mime.split(';')[0] || 'video/webm' });
     const name = (state.name || 'video').replace(/[^\w\- ]+/g, '').trim() || 'video';
+    const fname = `${name} (${state.aspect.replace(':', 'x')}).webm`;
     if (window.__vcPostUrl) {
       // agent channel: POST the exported blob instead of downloading
-      fetch(window.__vcPostUrl, { method: 'POST', body: blob }).catch(() => {});
+      try { await fetch(window.__vcPostUrl, { method: 'POST', body: blob }); } catch (e) {}
     } else {
       const a2 = document.createElement('a');
       a2.href = URL.createObjectURL(blob);
-      a2.download = `${name} (${state.aspect.replace(':', 'x')}).webm`;
+      a2.download = fname;
       a2.click();
       setTimeout(() => URL.revokeObjectURL(a2.href), 30_000);
     }
+    // report completion for the headless API (the WebM path previously never set this)
+    window.__vcResult = { name: fname, size: blob.size, type: blob.type || 'video/webm' };
+    window.__vcProgress = { ...window.__vcProgress, stage: 'done' };
   };
   exporting = true;
   $('#export-overlay').style.display = 'grid';
@@ -1322,6 +1328,26 @@ async function exportMp4() {
   }
   if (!vconf) { alert('This browser can\u2019t encode H.264 — falling back to real-time WebM recording.'); return startExport(); }
 
+  // Pre-flight: some builds (headless / software GL) report the config as supported
+  // but the encoder never produces output, which would hang the export forever.
+  // Encode one tiny test frame and verify a chunk actually comes out.
+  const preOk = await new Promise((res) => {
+    let settled = false;
+    let to = 0;
+    let v = null;
+    const done = (ok) => { if (settled) return; settled = true; clearTimeout(to); try { if (v) v.close(); } catch (e) {} res(ok); };
+    const c = document.createElement('canvas'); c.width = 64; c.height = 64;
+    c.getContext('2d').fillRect(0, 0, 64, 64);
+    try {
+      v = new VideoEncoder({ output: () => done(true), error: () => done(false) });
+      v.configure({ ...vconf, width: 64, height: 64 });
+      const f = new VideoFrame(c, { timestamp: 0, duration: 1e6 });
+      v.encode(f); f.close();
+    } catch (e) { return done(false); }
+    to = setTimeout(() => done(false), 8000);
+  });
+  if (!preOk) { alert('H.264 encoder stalled in pre-flight — falling back to real-time WebM recording.'); return startExport(); }
+
   const prevW = preview.width, prevH = preview.height;
   preview.width = W; preview.height = H;
   exporting = true;
@@ -1360,7 +1386,13 @@ async function exportMp4() {
       const frame = new VideoFrame(preview, { timestamp: Math.round(t * 1e6), duration: Math.round(1e6 / fps) });
       venc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
       frame.close();
-      while (venc.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 0));
+      // watchdog: if the encoder stops consuming frames (some headless/software
+      // GL builds accept the config but stall mid-encode), abort instead of hanging forever
+      let stall = 0;
+      while (venc.encodeQueueSize > 8) {
+        await new Promise((r) => setTimeout(r, 50));
+        if (++stall > 1200) throw new Error('video encoder stalled');
+      }
       if ((i & 15) === 0 || i === frames - 1) {
         const done = (i + 1) / frames;
         const speed = done > 0.01 ? ((i + 1) / ((performance.now() - t0) / 1000)).toFixed(1) : '…';
@@ -1403,7 +1435,11 @@ async function exportMp4() {
           const ad = new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: n, numberOfChannels: CH, timestamp: Math.round((off / 48000) * 1e6), data });
           aenc.encode(ad);
           ad.close();
-          while (aenc.encodeQueueSize > 16) await new Promise((r) => setTimeout(r, 0));
+          let astall = 0;
+          while (aenc.encodeQueueSize > 16) {
+            await new Promise((r) => setTimeout(r, 50));
+            if (++astall > 1200) { aenc.close(); throw new Error('audio encoder stalled'); }
+          }
         }
         await aenc.flush();
         aenc.close();
@@ -1487,8 +1523,20 @@ async function applyProjectData(data) {
   if (data.app !== 'videocraft') throw new Error('Not a VideoCraft project');
   state.name = data.name || 'Untitled video';
   state.aspect = data.aspect || '16:9';
+  state.fps = data.fps || 30;
   state.clips = data.clips || [];
-  state.scenes = data.scenes || [];
+  // normalize scenes so hand-written projects (missing arrays/objects) don't crash the UI
+  const stockScene = () => makeScene('empty');
+  state.scenes = (data.scenes || []).map((s) => {
+    const base = stockScene();
+    const sc = { ...base, ...s };
+    sc.objects = Array.isArray(s.objects) ? s.objects : [];
+    sc.camKeys = Array.isArray(s.camKeys) ? s.camKeys : [];
+    sc.events = Array.isArray(s.events) ? s.events : [];
+    sc.camera = s.camera || { pos: [7, 4, 11], target: [0, 1.4, 0] };
+    sc.look = { ...base.look, ...(s.look || {}) };
+    return sc;
+  });
   state.captions = data.captions || [];
   state.media = [];
   for (const entry of data.media || []) {
@@ -1606,6 +1654,16 @@ if (new URLSearchParams(location.search).has('headless')) {
       if (opts.postUrl) window.__vcPostUrl = opts.postUrl;
       window.__vcQuality = { high: 0.2, standard: 0.12, draft: 0.07 }[opts.quality] ?? 0.12;
       await exportMp4();
+      // The WebM fallback resolves as soon as real-time playback starts, and
+      // `exporting` flips false in finishExport() before the async onstop
+      // handler has finished uploading — so wait on __vcResult itself, not the
+      // exporting flag. Bounded so a failed export path can't hang forever.
+      if (!window.__vcResult) {
+        const deadline = Date.now() + Math.max(120_000, (totalDur() * 1.5 + 60_000));
+        await new Promise((res) => {
+          (function chk() { (window.__vcResult || Date.now() > deadline) ? res() : setTimeout(chk, 250); })();
+        });
+      }
       return window.__vcResult;
     },
   };

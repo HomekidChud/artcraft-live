@@ -20,8 +20,8 @@ await window.vc.loadProject(projectJson)   // replaces clips/scenes/captions/med
 await window.vc.render({ postUrl, quality })  // 'high' | 'standard' | 'draft'
 ```
 
-- `loadProject` **replaces** `state.clips` (the default hero scene clip disappears) — this is the clean path for agents.
-- `render` runs the WebCodecs MP4 export and **POSTs the result blob to `postUrl`**; progress lands in `window.__vcProgress` (`{stage, frame, frames}`), result in `window.__vcResult`. If the browser can't encode H.264 it falls back to real-time WebM recording (also POSTs).
+- `loadProject` **replaces** `state.clips` (the default hero scene clip disappears) — this is the clean path for agents. Scenes missing `objects`/`camKeys`/`events`/`look` are auto-normalized on load.
+- `render` runs the WebCodecs MP4 export and **POSTs the result blob to `postUrl`**; progress lands in `window.__vcProgress` (`{stage, frame, frames}`), result in `window.__vcResult` (`{name, size, type}`). It **resolves only when the export has fully finished** — including the real-time WebM fallback (which previously resolved as soon as playback started and never set `__vcResult`; fixed in v1.1.2). The MP4 path also runs an encoder pre-flight and a stall watchdog — if the browser reports H.264 support but the encoder stalls (common in headless/software-GL builds), the export falls back to WebM instead of hanging forever (fixed in v1.1.3).
 - Your receiver must answer CORS preflights (`OPTIONS` → 204 with `Access-Control-Allow-Origin: *`); the blob POST sends `Content-Type: video/webm`/`video/mp4`, which triggers preflight.
 
 ## Fallback path: driving the UI
@@ -52,6 +52,8 @@ await window.vc.render({ postUrl, quality })  // 'high' | 'standard' | 'draft'
 ## Project JSON
 
 - `app: "videocraft"` required by `applyProjectData`.
+- **The complete schema (clips, scenes, objects, characters + pose params, look fields, grades, FX kinds, captions, media, headless API) is documented in the [Project file format section of README.md](./README.md#project-file-format-vfprojectjson--complete-schema) and embedded in the page itself as `window.AI_GUIDE.projectSchema` — author projects from those, no source-code reading required.**
+- Quick orientation: aspect `16:9|9:16|1:1|4:5|2.39:1`, fps `24|25|30|50|60`; scene `fog` is **0-1** (not 0-100; density = fog×0.045); dim lighting presets (`night`, `storm`, `candlelight`, `horror`, `dramatic`) need `look.exposure` ≈ 1.5-2.3 and bright ground colors or scenes render nearly black.
 - **Characters are fully authorable**: scene objects of `type: 'character'` accept `build: { height, head, arms, legs, torso }` (proportion factors, default 1) plus `skin/hair/shirt/pants` colors — and `poseKeys: [{ t, pose }]` for free-form motion. Pose params (degrees): `shLx/shLz/elL`, `shRx/shRz/elR` (arms), `hipL/kneeL/hipR/kneeR` (legs), `headX/headY`, `torsoX/torsoY`. When `poseKeys` is non-empty it **replaces** the preset `motion` entirely; the rig interpolates between captured poses (scene-local seconds, smoothstep). Capture interactively with the inspector pose sliders + "Capture pose" button.
 - `media` entries can embed files as `data` (data URL) — restored via `importFiles`, ids re-mapped so existing clips re-link.
 - Persistence: **no autosave key of its own** — projects are files (`#btn-save` downloads JSON; `#btn-open` loads). MovieCraft's autosave key is `videocraft_project_v2` (shared key family); don't confuse the two apps' storage.

@@ -50,46 +50,137 @@ node tools/vc.mjs render my.vfproject.json \
 
 How it works: the CLI serves `videocraft/` locally, launches Chrome `--headless=new`, opens it with `?headless=1` (which exposes a small `window.vc` automation API: `loadProject()`, `render()`), loads the project, runs the same WebCodecs export, and the finished MP4 is streamed back over a local HTTP POST. Progress is printed per stage.
 
-## Project file format (`.vfproject.json`)
+## Project file format (`.vfproject.json`) — complete schema
+
+Everything an agent needs to author a project from scratch — no source-code reading required. The same schema is embedded in the page itself (the `ai-guide` JSON, exposed as `window.AI_GUIDE`).
+
+### Top level
 
 ```jsonc
 {
-  "app": "videocraft", "version": 1,
-  "name": "My video", "aspect": "16:9", "fps": 30,
-  "clips": [ /* timeline entries, see below */ ],
-  "scenes": [ /* 3D scenes, see below */ ],
-  "captions": [ /* burned-in text */ ],
-  "media": [ /* imported files; images/audio < 8 MB embedded as data URLs */ ]
+  "app": "videocraft",            // required — anything else is rejected on open
+  "version": 1,
+  "name": "My video",
+  "aspect": "16:9",               // 16:9 | 9:16 | 1:1 | 4:5 | 2.39:1
+  "fps": 30,                      // 24 | 25 | 30 | 50 | 60
+  "clips":  [ /* see Clips */ ],
+  "scenes": [ /* see Scenes */ ],
+  "captions": [ /* see Captions */ ],
+  "media":  [ /* see Media */ ]
 }
 ```
 
-**Clips** (video and audio tracks; the v-track clips must not overlap in time):
+### Clips
+
+Timeline entries. Video-track clips must not overlap in time; a scene clip's `dur` should equal its scene's `duration`.
 
 ```jsonc
-{ "id": "c1", "track": "v" | "a", "kind": "scene" | "media",
-  "mediaId"?: "m1", "sceneId"?: "sc1",   // one of these, matching the kind
-  "start": 0, "dur": 6, "in": 0, "volume": 1, "fit": "contain" } // fit: v-track media only
+{ "id": "c1",
+  "track": "v",                  // "v" video track | "a" audio track
+  "kind": "scene",               // "scene" | "media"
+  "mediaId"?: "m1",              // required when kind = "media"
+  "sceneId"?: "sc1",             // required when kind = "scene"
+  "start": 0,                    // timeline position, seconds
+  "dur": 6,                      // duration, seconds
+  "in": 0,                       // media offset into the source, seconds
+  "volume": 1,                   // 0-1
+  "fit": "contain" }             // contain | cover | stretch (v-track media only)
 ```
 
-**Scenes** (one scene per scene-clip; `duration` must match the clip's `dur`):
+### Scenes
+
+One scene per scene clip. `duration` is in seconds (1-120); camera and object times are **scene-local seconds**.
 
 ```jsonc
 { "id": "sc1", "name": "3D Scene", "duration": 6,
-  "sky": "#0d1522", "fog": 0, "lighting": "three-point",  // lighting: three-point | studio | daylight | sunset | night | dramatic
-  "camera": { "pos": [7, 4, 11], "target": [0, 1.4, 0] },
-  "camKeys": [ { "t": 3, "pos": [...], "target": [...] } ],  // optional camera moves
-  "look": { "style": "film", "grade": "cine", "bloom": 0.55, "vignette": 0.4,
-            "grain": 0.05, "chroma": 0.5, "streak": 0.25, "exposure": 1.0 },
-  "objects": [ /* boxes, spheres, cylinders, text, characters, fx — see app */ ],
-  "events": [ { "type": "fadein" | "fadeout", "t": 0, "dur": 0.6 },
-              { "type": "letterbox", "t": 0, "dur": 0 } ] }
+  "sky": "#0d1522",              // background / fog color
+  "fog": 0,                      // 0-1 (NOT 0-100). FogExp2 density = fog * 0.045.
+                                 // 0.15 subtle, 0.5 heavy; above ~0.3 distant objects vanish
+  "lighting": "three-point",     // three-point | sunset | night | dramatic | daylight |
+                                 // neon | candlelight | horror | sunrise | storm | forest
+  "camera": { "pos": [7, 4, 11], "target": [0, 1.4, 0] },   // static camera (no keys)
+  "camKeys": [                   // optional camera moves, time-sorted
+    { "t": 3, "pos": [4, 2, 6], "target": [0, 1.4, 0],
+      "ease": "smooth" }          // smooth | linear | easein | easeout | back | bounce | step
+  ],
+  "look": {                       // post-processing; all fields optional (defaults shown)
+    "style": "film",             // film | anime | clean
+    "grade": "cine",             // see grades below
+    "bloom": 0.55,               // 0-2
+    "vignette": 0.4,             // 0-1
+    "grain": 0.05,               // 0-0.3
+    "chroma": 0.5,               // 0-2 (chromatic aberration)
+    "streak": 0.25,              // 0-1.5 (flare streaks)
+    "exposure": 1.0,             // 0.3-2 — dim presets (night/storm/candlelight/horror)
+                                 //   need ~1.5-2.3 or the scene renders nearly black
+    "outline": 0,                // 0-2 (anime ink outline)
+    "toonSteps": 4 },            // 2-8 (anime toon shading)
+  "objects": [ /* see Objects */ ],
+  "events": [                    // scene-local overlay events
+    { "type": "fadein",  "t": 0,   "dur": 0.6 },   // black overlay ramps
+    { "type": "fadeout", "t": 5.4, "dur": 0.6 },
+    { "type": "letterbox", "t": 0, "dur": 0 } ] }  // cinema bars from t on
 ```
 
-**Captions:** `{ "id", "start", "dur", "text", "pos": "bottom|middle|top", "size", "color", "bg" }`
+**Grades:** natural, cine, noir, vibrant, scifi, sunset, comic, pastel, night, teal-orange, bleach, sepia, dream, moonlight, cyberpunk, forest, crimson, arctic.
 
-**Media:** `{ "id", "type": "video|image|audio", "name", "duration", "data"?: "<data URL>" }` — entries without `data` re-link by file name when re-imported.
+### Objects
 
-Gotchas learned the hard way: keep `fog` at 0 for scenes with the camera far away (FogExp2 fully swallows distant scenes); the `dramatic`/`night` presets are dim — prefer `three-point` and raise `look.exposure`; cap `bloom` around 0.5 and keep `streak` low or titles smear.
+Every object: `{ "id", "type", "name", "pos": [x,y,z], "rot": [rx,ry,rz] (radians), "scale": [sx,sy,sz], "color": "#rrggbb", "opacity": 1, "keys": [...] }`. Keys animate the transform — `{ "t" (scene-local s), "pos"?, "rot"?, "scale"?, "ease"? }`, time-sorted and eased between keys; before the first key the first key's value holds, after the last key the last value holds.
+
+| `type` | Extra fields | Notes |
+|---|---|---|
+| `ground` | — | scale `[width, 1, depth]`, locked to the floor (y fixed) |
+| `box` | — | 1×1×1 base, scaled by `scale` |
+| `sphere` | — | radius 0.5, emissive (glows) |
+| `cylinder` | — | radius 0.5, height 1 — `scale[1]` is the height |
+| `text` | `text`, `size` | billboard title plane; `color` is the fill |
+| `character` | see below | rigged figure with motion/poses |
+| `fx` | `fx`, `size` | particle emitter; kinds: fire, explosion, confetti, sparks, fountain, rain, snow, embers, magic, smoke, lightning, portal, hearts, stars |
+
+### Characters
+
+```jsonc
+{ "id": "o1", "type": "character", "name": "Hero",
+  "pos": [0, 0, 0], "rot": [0, 0, 0], "scale": [1, 1, 1],
+  "motion": "walk",              // none | idle | walk | run | wave | celebrate | jump |
+                                 // dance | point | nod | shakehead | punch | bow | sit
+  "skin": "#e8b88a", "hair": "#2a2018",
+  "shirt": "#c9553d", "pants": "#31465e",
+  "build": { "height": 1, "head": 1, "arms": 1, "legs": 1, "torso": 1 },  // proportion factors
+  "poseKeys": [                  // OPTIONAL — non-empty poseKeys override motion entirely
+    { "t": 2.5, "pose": { "shLz": 65, "shRz": -65 } } ] }
+```
+
+**Pose parameters** (degrees; interpolated with smoothstep between keys in scene-local seconds):
+
+| Group | Params | Defaults |
+|---|---|---|
+| Left arm | `shLx`, `shLz`, `elL` | 8, 0, -15 |
+| Right arm | `shRx`, `shRz`, `elR` | 8, 0, -15 |
+| Legs | `hipL`, `kneeL`, `hipR`, `kneeR` | 0, 4, 0, 4 |
+| Head / torso | `headX`, `headY`, `torsoX`, `torsoY` | 0 |
+
+`shLz` / `shRz` raise the arms sideways — try ~65 / -65 for a raised-arms pose.
+
+### Captions
+
+Burned into the export: `{ "id", "start", "dur", "text" (multiline with \n), "pos": "bottom|middle|top", "size" (1 = 4.2% of frame height), "color": "#rrggbb", "bg": true|false }`
+
+### Media
+
+`{ "id", "type": "video|image|audio", "name", "duration", "data"?: "<data URL>" }` — entries with `data` are restored on load (audio must be decodable: mp3/wav/ogg); entries without `data` re-link by file name when re-imported. Images and audio under 8 MB are embedded when saving.
+
+### Headless automation API
+
+Open the page with `?headless=1` to expose `window.vc`:
+
+- `await window.vc.loadProject(projectJson)` — replaces clips/scenes/captions/media; returns `{ name, aspect, duration, clips, scenes, captions }`. Scenes missing `objects`/`camKeys`/`events`/`look` are auto-normalized.
+- `await window.vc.render({ postUrl, quality })` — encodes and POSTs the result blob to `postUrl`; **resolves only when the export has fully finished** (both MP4 and WebM paths). Progress in `window.__vcProgress` (`{ stage, frame, frames }`), result in `window.__vcResult` (`{ name, size, type }`). `quality`: `high | standard | draft`.
+- The POST receiver must answer CORS preflight (`OPTIONS` → `204` + `Access-Control-Allow-Origin: *`); a POST-only receiver silently swallows the export.
+- Headless Chrome flags: `--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required`. Headless WebCodecs has no H.264, so exports fall back to real-time WebM (audio included); transcode to MP4 with `ffmpeg -i out.webm -c:v libx264 -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart out.mp4`.
+
+Gotchas learned the hard way: keep `fog` ≤ 0.3 for scenes with the camera far away (FogExp2 swallows distant objects); the `dramatic`/`night`/`storm`/`candlelight`/`horror` presets are dim — raise `look.exposure` to ~1.5-2.3 and use bright ground colors; cap `bloom` around 0.5 and keep `streak` low or titles smear.
 
 ## Honest limits
 
