@@ -3,8 +3,10 @@
 // usage: node tools/push-live.mjs <project.json> <name> [commit-message]
 //
 // Copies <project.json> to videocraft/projects/<name>.json, adds it to the
-// manifest, commits and pushes. Viewers with ?project=<name>&live=1 pick the
-// update up within seconds (the live page polls raw.githubusercontent.com).
+// manifest, appends an activity entry (AdminCraft's live feed reads
+// projects/activity.json), commits and pushes. Viewers with
+// ?project=<name>&live=1 pick the update up within seconds (the live page
+// polls raw.githubusercontent.com).
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -15,19 +17,30 @@ if (!src || !nameArg) {
   process.exit(1);
 }
 const name = nameArg.replace(/[^a-zA-Z0-9._-]/g, '');
-const root = path.resolve(path.dirname(new URL(import.meta.url).pathname, ), '../..'); // repo root (videocraft/tools/../..)
+const toolDir = path.dirname(new URL(import.meta.url).pathname);
+const root = path.resolve(toolDir, '../..'); // repo root
 const destDir = path.join(root, 'videocraft', 'projects');
 const dest = path.join(destDir, `${name}.json`);
 const manifestPath = path.join(destDir, 'index.json');
+const activityPath = path.join(destDir, 'activity.json');
 
 fs.copyFileSync(src, dest);
+
+// manifest
 let manifest = [];
 try { manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')); } catch (e) {}
 if (!manifest.includes(`${name}.json`)) {
   manifest.push(`${name}.json`);
   manifest.sort();
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 0) + '\n');
 }
+fs.writeFileSync(manifestPath, JSON.stringify(manifest) + '\n');
+
+// activity feed (AdminCraft polls this)
+let activity = { entries: [] };
+try { activity = JSON.parse(fs.readFileSync(activityPath, 'utf8')); } catch (e) {}
+activity.entries.push({ t: new Date().toISOString(), msg: msgRest.join(' ') || `update ${name}`, project: name });
+activity.entries = activity.entries.slice(-60);
+fs.writeFileSync(activityPath, JSON.stringify(activity) + '\n');
 
 const msg = msgRest.join(' ') || `live: update ${name}`;
 const out = execSync(
@@ -35,4 +48,4 @@ const out = execSync(
   { encoding: 'utf8' },
 );
 console.log(out.split('\n').filter((l) => l.includes('main') || l.includes('file')).join('\n'));
-console.log(`pushed: projects/${name}.json`);
+console.log(`pushed: projects/${name}.json + activity entry`);

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VideoCraft Admin — live projects</title>
+<title>AdminCraft — omniobservant</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -12,11 +12,18 @@
     background: radial-gradient(1200px 500px at 50% -10%, #1b2230, transparent), #0d1117;
     color: #d7dee8; padding: 32px clamp(16px, 5vw, 64px);
   }
-  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
-  h1 { font-size: 20px; letter-spacing: 0.3px; }
+  header { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; flex-wrap: wrap; }
+  h1 { font-size: 21px; letter-spacing: 0.3px; }
   h1 b { color: #7fb4ff; }
   .sub { color: #8b95a5; font-size: 12.5px; }
   .spacer { flex: 1; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font: 11px/1 monospace; color: #e8f0f8; background: rgba(0,0,0,0.55);
+    padding: 7px 11px; border-radius: 99px;
+  }
+  .pill .dot { width: 8px; height: 8px; border-radius: 99px; background: #e05252; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.25 } }
   button {
     font: inherit; color: #d7dee8; background: #212836; border: 1px solid #2d3748;
     border-radius: 8px; padding: 7px 14px; cursor: pointer;
@@ -24,57 +31,114 @@
   button:hover { background: #2a3344; }
   button.primary { background: #2f6fd8; border-color: #2f6fd8; }
   button.primary:hover { background: #3d7fe8; }
-  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-top: 22px; }
+  .cols { display: grid; grid-template-columns: minmax(280px, 5fr) minmax(320px, 7fr); gap: 20px; margin-top: 20px; align-items: start; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: #8b95a5; margin-bottom: 12px; }
+  #feed { display: flex; flex-direction: column; gap: 8px; max-height: 70vh; overflow-y: auto; padding-right: 4px; }
+  .entry {
+    background: #151b26; border: 1px solid #232c3d; border-left: 3px solid #2f6fd8;
+    border-radius: 10px; padding: 10px 14px;
+  }
+  .entry.new { border-left-color: #e05252; animation: flash 2.5s ease-out; }
+  @keyframes flash { from { background: #2a1d24 } to { background: #151b26 } }
+  .entry .t { font: 11px/1 monospace; color: #6f7a8a; }
+  .entry .m { margin-top: 3px; }
+  .entry .p { color: #7fb4ff; font-size: 12px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
   .card {
     background: #151b26; border: 1px solid #232c3d; border-radius: 12px; padding: 16px 18px;
     display: flex; flex-direction: column; gap: 10px;
   }
-  .card h2 { font-size: 16px; }
+  .card h3 { font-size: 16px; }
   .meta { display: flex; flex-wrap: wrap; gap: 6px; }
   .badge {
     font: 11px/1 monospace; color: #9fb0c4; background: #1d2534;
     border: 1px solid #2a344a; border-radius: 99px; padding: 4px 9px;
   }
   .actions { display: flex; gap: 8px; margin-top: auto; }
-  #msg { color: #8b95a5; margin-top: 18px; font-size: 12.5px; }
+  #msg { color: #8b95a5; margin-top: 16px; font-size: 12.5px; }
   .err { color: #e07a7a; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>VideoCraft <b>Admin</b></h1>
-  <span class="sub">every live project in the repo — rendered by your GPU</span>
+  <h1>Admin<b>Craft</b></h1>
+  <span class="sub">omniobservant — every project, every action, as it happens</span>
   <span class="spacer"></span>
+  <span class="pill"><span class="dot"></span><span id="watch-state">watching</span></span>
   <button id="refresh">Refresh</button>
   <button class="primary" id="new">＋ New project</button>
 </header>
 
-<div id="grid"></div>
-<div id="msg">loading projects…</div>
+<div class="cols">
+  <section>
+    <h2>Live activity</h2>
+    <div id="feed"></div>
+  </section>
+  <section>
+    <h2>Projects</h2>
+    <div id="grid"></div>
+    <div id="msg">loading…</div>
+  </section>
+</div>
 
 <script>
-  // session gate: the admin page is only reachable through the secret
-  // redirect (?admin=<secret> on the app) which sets the flag below.
-  if (!sessionStorage.getItem('vcAdmin')) location.replace('.');
+  // session gate: AdminCraft opens only through the secret link on the render
+  // page (?admin=<secret>), which sets the flag below before redirecting.
+  if (!sessionStorage.getItem('vcAdmin')) location.replace('./');
 
+  const RAW = (p) => `https://raw.githubusercontent.com/HomekidChud/artcraft-live/main/videocraft/${p}`;
   const GH_API = 'https://api.github.com/repos/HomekidChud/artcraft-live/contents/videocraft/projects';
+  const $feed = document.getElementById('feed');
   const $grid = document.getElementById('grid');
   const $msg = document.getElementById('msg');
+  const seen = new Set();
 
-  function fmtDur(s) {
-    const m = Math.floor(s / 60), r = Math.round(s % 60);
-    return `${m}:${String(r).padStart(2, '0')}`;
+  function ago(iso) {
+    const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
   }
 
+  function entry(e) {
+    const el = document.createElement('div');
+    el.className = 'entry' + (seen.has(e.t + e.msg) ? '' : ' new');
+    seen.add(e.t + e.msg);
+    el.innerHTML = `<div class="t">${ago(e.t)}</div><div class="m">${e.msg}${e.project ? ` <span class="p">· ${e.project}</span>` : ''}</div>`;
+    return el;
+  }
+
+  async function pollActivity() {
+    try {
+      const r = await fetch(`${RAW('projects/activity.json')}?t=${Date.now()}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      const list = (d.entries || []).slice(-60).reverse();
+      const known = list.every((e) => seen.has(e.t + e.msg));
+      if ($feed.children.length === 0 || !known) {
+        $feed.innerHTML = '';
+        for (const e of list) $feed.appendChild(entry(e));
+      }
+      document.getElementById('watch-state').textContent = 'watching';
+    } catch (e) {
+      document.getElementById('watch-state').textContent = 'reconnecting…';
+    }
+  }
+
+  function fmtDur(s) { const m = Math.floor(s / 60), r = Math.round(s % 60); return `${m}:${String(r).padStart(2, '0')}`; }
+
   function card(p, name, size) {
-    const clips = (p.clips || []);
+    const clips = p.clips || [];
     const total = clips.reduce((m, c) => Math.max(m, c.start + (c.dur || 0)), 0);
     const el = document.createElement('div');
     el.className = 'card';
     el.innerHTML = `
-      <h2>${p.name || name}</h2>
+      <h3>${p.name || name}</h3>
       <div class="meta">
+        <span class="badge">${name}</span>
         <span class="badge">${fmtDur(total)}</span>
         <span class="badge">${(p.scenes || []).length} scenes</span>
         <span class="badge">${(p.captions || []).length} captions</span>
@@ -82,45 +146,45 @@
         ${size ? `<span class="badge">${(size / 1e6).toFixed(1)} MB</span>` : ''}
       </div>
       <div class="actions">
-        <button class="primary" data-watch="${name}">▶ Watch</button>
+        <button class="primary" data-watch="${name}">▶ Watch live</button>
         <button data-edit="${name}">Edit</button>
       </div>`;
     el.querySelector('[data-watch]').onclick = () =>
-      location.href = `?project=${encodeURIComponent(name)}&cinema=1&play=1`;
+      location.href = `./?project=${encodeURIComponent(name)}&live=1&cinema=1&play=1`;
     el.querySelector('[data-edit]').onclick = () =>
-      location.href = `?project=${encodeURIComponent(name)}`;
+      location.href = `./?project=${encodeURIComponent(name)}`;
     return el;
   }
 
-  async function load() {
+  async function loadProjects() {
     $grid.innerHTML = ''; $msg.className = ''; $msg.textContent = 'loading projects…';
     let files = null;
     try {
       const r = await fetch(GH_API, { headers: { Accept: 'application/vnd.github+json' } });
       if (!r.ok) throw new Error('api ' + r.status);
-      files = (await r.json()).filter((f) => f.type === 'file' && f.name.endsWith('.json') && f.name !== 'index.json');
+      files = (await r.json()).filter((f) => f.type === 'file' && f.name.endsWith('.json') && !['index.json', 'activity.json'].includes(f.name));
     } catch (e) {
-      // fallback: local manifest (no rate limits, updated by the render workflow)
       try {
-        const r2 = await fetch('projects/index.json');
-        const list = await r2.json();
+        const list = await (await fetch(`projects/index.json?t=${Date.now()}`)).json();
         files = list.map((n) => ({ name: n, size: null }));
       } catch (e2) { $msg.className = 'err'; $msg.textContent = 'could not list projects: ' + e.message; return; }
     }
     for (const f of files) {
       try {
-        const res = await fetch(`projects/${encodeURIComponent(f.name)}`);
+        const res = await fetch(`projects/${encodeURIComponent(f.name)}?t=${Date.now()}`);
         if (!res.ok) continue;
         const p = await res.json();
         $grid.appendChild(card(p, f.name.replace(/\.json$/, ''), f.size));
       } catch (e) { /* skip unreadable */ }
     }
-    $msg.textContent = `${files.length} project${files.length === 1 ? '' : 's'} · watch links render at full frame rate on your GPU · esc returns here`;
+    $msg.textContent = `${files.length} project${files.length === 1 ? '' : 's'} · watch links are live feeds (hot-swap on every push) · esc in the player returns here`;
   }
 
-  document.getElementById('refresh').onclick = load;
-  document.getElementById('new').onclick = () => location.href = '.';
-  load();
+  document.getElementById('refresh').onclick = loadProjects;
+  document.getElementById('new').onclick = () => location.href = './';
+  loadProjects();
+  pollActivity();
+  setInterval(pollActivity, 8000);
 </script>
 </body>
 </html>
