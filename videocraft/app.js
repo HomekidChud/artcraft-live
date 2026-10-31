@@ -1671,6 +1671,23 @@ syncEditorCamToShot();
 drawFrame(0);
 requestAnimationFrame(tick);
 
+// ---------------------------------------------------------------- admin redirect
+// ?admin=<secret> hands off to admin.html, the live-project browser.
+// admin.html itself only opens with the session flag set here, so it is
+// reachable only through this link (client-side gate — the site is static).
+
+(() => {
+  const q = new URLSearchParams(location.search);
+  const key = q.get('admin');
+  if (!key || q.has('headless')) return;
+  if (key === 'k2x9-hollow-admin') {
+    sessionStorage.setItem('vcAdmin', '1');
+    location.replace('admin.html');
+  } else {
+    location.replace('.');
+  }
+})();
+
 // ---------------------------------------------------------------- watch mode
 // Open the app with ?project=<name>&cinema=1&play=1 to watch a saved project
 // (projects/<name>.json) fullscreen at full frame rate — this machine's GPU
