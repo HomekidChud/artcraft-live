@@ -202,6 +202,14 @@ Speed depends on the path and the machine:
 
 - **WebM (real-time) path**: each chunk records for its own duration, so N chunks in parallel finish in ~1/N the wall time — a 60s film renders in ~10s with 6 chunks. Works even without a GPU.
 - **MP4 (WebCodecs) path**: each chunk encodes only its frames — near-linear speedup with cores/GPUs; on GPU machines this is the fastest and highest-quality option.
+
+### Render scale
+
+`render({ scale })` (0 < scale <= 1) exports at `ex x scale` resolution — a slow machine renders far smoother motion at 720p than at 1080p (each frame takes ~1/2 the time, so the canvas updates twice as often). Upscale afterwards if you need the pixels:
+
+```bash
+ffmpeg -i out.webm -vf "scale=1920:1080:flags=lanczos" -c:v libx264 -crf 18 -c:a aac final.mp4
+```
 - Rule of thumb: chunks of 5-15s, one concurrent page per CPU core (software GL) or per GPU (hardware). More pages than that just starve each chunk's draw loop.
 
 ## Honest limits

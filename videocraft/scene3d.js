@@ -1,7 +1,7 @@
 // scene3d.js — 3D scene clips: objects, characters, FX, camera moves, keyframes
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createLookEngine } from './look.js?v=1.3.0';
+import { createLookEngine } from './look.js?v=1.3.2';
 
 let uid = 1;
 export const newId = (p = 'id') => `${p}${(uid++).toString(36)}${Date.now().toString(36).slice(-4)}`;

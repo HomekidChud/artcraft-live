@@ -1,5 +1,5 @@
 // app.js — VideoCraft editor core
-import { renderScene, makeScene, makeObject, attachControls, editorCamera, pickObject, sampleCamera, newId, CHAR_MOTIONS, FX_KINDS, LIGHT_PRESETS, controls, POSE_PARAMS } from './scene3d.js?v=1.4.0';
+import { renderScene, makeScene, makeObject, attachControls, editorCamera, pickObject, sampleCamera, newId, CHAR_MOTIONS, FX_KINDS, LIGHT_PRESETS, controls, POSE_PARAMS } from './scene3d.js?v=1.4.2';
 import { LOOK_GRADES } from './look.js?v=1.3.0';
 
 // ---------------------------------------------------------------- state
@@ -1189,6 +1189,15 @@ function pickMime() {
 // range for chunked/parallel rendering: null = full timeline.
 // Set via vc.render({ start, end }) — see README "Parallel rendering".
 let exportRange = null; // { start, end } in timeline seconds
+// render scale (0 < scale <= 1): exports at ex * scale — a speed/smoothness
+// vs sharpness tradeoff for slow machines (software GL). Set via vc.render({ scale }).
+let exportScale = 1;
+
+function exportDims() {
+  const a = ASPECTS[state.aspect];
+  // keep even dimensions (H.264 requires them)
+  return [Math.max(2, Math.round((a.ex[0] * exportScale) / 2) * 2), Math.max(2, Math.round((a.ex[1] * exportScale) / 2) * 2)];
+}
 
 async function startExport() {
   if (!state.clips.length) { alert('Add some clips first — the timeline is empty.'); return; }
@@ -1197,8 +1206,9 @@ async function startExport() {
   pause();
   const a = ASPECTS[state.aspect];
   const prevW = preview.width, prevH = preview.height;
-  // resize canvases to export resolution
-  preview.width = a.ex[0]; preview.height = a.ex[1];
+  // resize canvases to export resolution (scaled when render({ scale }) is set)
+  const [exW, exH] = exportDims();
+  preview.width = exW; preview.height = exH;
   const stream = preview.captureStream(state.fps);
   exportStream = stream;
   // only record audio when the context is actually running — a suspended context's
@@ -1327,7 +1337,7 @@ async function exportMp4() {
   pause();
   const { Muxer, ArrayBufferTarget } = await import('./vendor/mp4-muxer.mjs');
   const a = ASPECTS[state.aspect];
-  const [W, H] = a.ex;
+  const [W, H] = exportDims();
   const fps = state.fps;
   const total = totalDur();
   // chunked/parallel rendering: only frames inside [start, end), with
@@ -1683,6 +1693,9 @@ if (new URLSearchParams(location.search).has('headless')) {
       exportRange = (isFinite(opts.start) && isFinite(opts.end) && opts.end > opts.start)
         ? { start: Math.max(0, opts.start), end: Math.min(opts.end, total) }
         : null;
+      // optional render scale: export at ex * scale (slow machines render
+      // smoother motion at lower resolution)
+      exportScale = (typeof opts.scale === 'number' && opts.scale > 0 && opts.scale <= 1) ? opts.scale : 1;
       window.__vcResult = null; // a fresh render must not see the previous result
       try {
         await exportMp4();
@@ -1699,6 +1712,7 @@ if (new URLSearchParams(location.search).has('headless')) {
         }
       } finally {
         exportRange = null;
+        exportScale = 1;
       }
       return window.__vcResult;
     },

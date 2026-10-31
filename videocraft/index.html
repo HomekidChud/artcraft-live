@@ -14,7 +14,7 @@
 <script type="application/json" id="ai-guide">
 {
   "app": "VideoCraft",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "what": "Browser-native video editor (SPA, no backend/auth). Timeline with video/audio tracks, captions, 3D scene clips. Exports MP4 (WebCodecs, faster) or WebM (real-time, has audio).",
   "headless": {
     "chromeFlags": "--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required",
@@ -23,7 +23,7 @@
   },
   "preferredPath": {
     "url": "open this page with ?headless=1",
-    "api": "window.vc.loadProject(projectJson) — REPLACES clips/scenes/captions/media (the default hero clip disappears); returns {name, aspect, duration, clips, scenes, captions}. window.vc.render({ postUrl, quality: 'high'|'standard'|'draft', start, end }) — encodes, POSTs the result blob to postUrl and RESOLVES ONLY WHEN THE EXPORT HAS FULLY FINISHED (both MP4 and WebM paths); progress in window.__vcProgress {stage, frame, frames}; result in window.__vcResult {name, size, type}. Optional start/end render only that timeline range (chunk-local timestamps) so several pages can render chunks in parallel; stitch the chunk files in order (ffmpeg concat). Scenes missing objects/camKeys/events/look are auto-normalized on load.",
+    "api": "window.vc.loadProject(projectJson) — REPLACES clips/scenes/captions/media (the default hero clip disappears); returns {name, aspect, duration, clips, scenes, captions}. window.vc.render({ postUrl, quality: 'high'|'standard'|'draft', start, end, scale }) — encodes, POSTs the result blob to postUrl and RESOLVES ONLY WHEN THE EXPORT HAS FULLY FINISHED (both MP4 and WebM paths); progress in window.__vcProgress {stage, frame, frames}; result in window.__vcResult {name, size, type}. Optional start/end render only that timeline range (chunk-local timestamps) so several pages can render chunks in parallel; stitch the chunk files in order (ffmpeg concat). scale (0 < scale <= 1) exports at ex x scale — lower resolution renders smoother motion on slow machines; upscale with ffmpeg if needed. Scenes missing objects/camKeys/events/look are auto-normalized on load.",
     "receiver": "must answer CORS preflight (OPTIONS -> 204 + Access-Control-Allow-Origin: *) — the blob POST sends a non-simple Content-Type and triggers preflight; a POST-only receiver silently swallows the export."
   },
   "projectSchema": {
@@ -378,6 +378,6 @@ select:focus, input:focus { border-color: var(--accent); outline: none; }
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<script type="module" src="app.js?v=1.4.4"></script>
+<script type="module" src="app.js?v=1.4.7"></script>
 </body>
 </html>

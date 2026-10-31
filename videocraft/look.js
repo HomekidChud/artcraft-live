@@ -5,6 +5,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 
 const GRADES = {
   natural: { shadow: [0.98, 0.98, 1.0], high: [1.02, 1.01, 0.98], sat: 1.0, con: 1.0 },
@@ -44,12 +45,17 @@ const FinalShader = {
     void main(){
       vec2 uv = vUv;
       vec2 d = uv - 0.5;
-      // chromatic aberration toward edges
-      float ca = uChroma * 0.0025 * dot(d, d) * 4.0;
       vec3 col;
-      col.r = texture2D(tDiffuse, uv + d * ca).r;
-      col.g = texture2D(tDiffuse, uv).g;
-      col.b = texture2D(tDiffuse, uv - d * ca).b;
+      // chromatic aberration toward edges — skipped entirely when off
+      // (uniform branch is coherent, and saves 2 full-res fetches in software GL)
+      if (uChroma > 0.001) {
+        float ca = uChroma * 0.0025 * dot(d, d) * 4.0;
+        col.r = texture2D(tDiffuse, uv + d * ca).r;
+        col.g = texture2D(tDiffuse, uv).g;
+        col.b = texture2D(tDiffuse, uv - d * ca).b;
+      } else {
+        col = texture2D(tDiffuse, uv).rgb;
+      }
       col += texture2D(tBloom, uv).rgb * 1.0;
       col += texture2D(tStreak, uv).rgb * uStreakMix;
       // exposure
@@ -67,24 +73,27 @@ const FinalShader = {
       // vignette
       float vig = smoothstep(0.95, 0.35, length(d) * 1.15);
       col *= mix(1.0, vig, uVignette);
-      // grain
-      float g = rand(uv * 512.0 + fract(uTime) * 91.7) - 0.5;
-      col += g * uGrain;
+      // grain — skipped when off (sin-based rand is not free in software GL)
+      if (uGrain > 0.001) {
+        float g = rand(uv * 512.0 + fract(uTime) * 91.7) - 0.5;
+        col += g * uGrain;
+      }
       gl_FragColor = vec4(col, 1.0);
     }`,
 };
 
-const StreakShader = {
-  uniforms: { tDiffuse: { value: null }, uStrength: { value: 1.0 }, uTint: { value: new THREE.Color('#7fb4ff') } },
-  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-  fragmentShader: `
+// Streak (anamorphic horizontal glow). 12 narrow taps on GPU; software GL gets
+// 4 wide taps over the same span — ~3x fewer fetches, visually near-identical
+// for this soft glow effect.
+function streakShaderSource(taps, spacing) {
+  return `
     uniform sampler2D tDiffuse; uniform float uStrength; uniform vec3 uTint; varying vec2 vUv;
     void main(){
       vec3 acc = vec3(0.0); float total = 0.0;
-      for (int i = 1; i <= 12; i++) {
+      for (int i = 1; i <= ${taps}; i++) {
         float w = 1.0 / float(i);
-        acc += texture2D(tDiffuse, vUv + vec2(float(i) * 0.008, 0.0)).rgb * w;
-        acc += texture2D(tDiffuse, vUv - vec2(float(i) * 0.008, 0.0)).rgb * w;
+        acc += texture2D(tDiffuse, vUv + vec2(float(i) * ${spacing.toFixed(4)}, 0.0)).rgb * w;
+        acc += texture2D(tDiffuse, vUv - vec2(float(i) * ${spacing.toFixed(4)}, 0.0)).rgb * w;
         total += w * 2.0;
       }
       vec3 streak = acc / total;
@@ -92,8 +101,149 @@ const StreakShader = {
       streak = streak * smoothstep(0.55, 0.9, bright) * uTint * 2.2;
       vec3 base = texture2D(tDiffuse, vUv).rgb;
       gl_FragColor = vec4(base + streak, 1.0);
-    }`,
+    }`;
+}
+
+const StreakShader = {
+  uniforms: { tDiffuse: { value: null }, uStrength: { value: 1.0 }, uTint: { value: new THREE.Color('#7fb4ff') } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: streakShaderSource(12, 0.008),
 };
+
+// streak-only variant for the half-res software path (output has no base)
+function streakOnlyShaderSource(taps, spacing) {
+  return `
+    uniform sampler2D tDiffuse; uniform vec3 uTint; varying vec2 vUv;
+    void main(){
+      vec3 acc = vec3(0.0); float total = 0.0;
+      for (int i = 1; i <= ${taps}; i++) {
+        float w = 1.0 / float(i);
+        acc += texture2D(tDiffuse, vUv + vec2(float(i) * ${spacing.toFixed(4)}, 0.0)).rgb * w;
+        acc += texture2D(tDiffuse, vUv - vec2(float(i) * ${spacing.toFixed(4)}, 0.0)).rgb * w;
+        total += w * 2.0;
+      }
+      vec3 streak = acc / total;
+      float bright = dot(streak, vec3(0.33));
+      streak = streak * smoothstep(0.55, 0.9, bright) * uTint * 2.2;
+      gl_FragColor = vec4(streak, 1.0);
+    }`;
+}
+
+// Half-res streak for software GL: downsample, 4-tap streak at 1/2 res, hand
+// to FinalShader's tStreak. Full-res streak costs ~290ms/frame at 1080p in
+// SwiftShader; this is ~1/6 the fetches.
+class CheapStreakPass extends Pass {
+  constructor() {
+    super();
+    this.needsSwap = false;
+    this.enabled = true;
+    this.quad = new FullScreenQuad(null);
+    this.rtDown = null; this.rtStreak = null;
+    this.streakTexture = null;
+    this.matDown = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null } },
+      vertexShader: QUAD_VERT,
+      fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ gl_FragColor = texture2D(tDiffuse, vUv); }`,
+    });
+    this.matStreak = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, uTint: { value: new THREE.Color('#7fb4ff') } },
+      vertexShader: QUAD_VERT,
+      fragmentShader: streakOnlyShaderSource(4, 0.024),
+    });
+  }
+  setSize(w, h) {
+    const hw = Math.max(2, w >> 1), hh = Math.max(2, h >> 1);
+    if (this.rtDown?.width === hw && this.rtStreak?.height === hh) return;
+    this.rtDown?.dispose(); this.rtStreak?.dispose();
+    this.rtDown = new THREE.WebGLRenderTarget(hw, hh);
+    this.rtStreak = new THREE.WebGLRenderTarget(hw, hh);
+    this.streakTexture = this.rtStreak.texture;
+  }
+  render(renderer, writeBuffer, readBuffer) {
+    if (!this.rtDown) this.setSize(renderer.domElement.width, renderer.domElement.height);
+    this.matDown.uniforms.tDiffuse.value = readBuffer.texture;
+    renderer.setRenderTarget(this.rtDown);
+    this.quad.material = this.matDown; this.quad.render(renderer);
+    this.matStreak.uniforms.tDiffuse.value = this.rtDown.texture;
+    renderer.setRenderTarget(this.rtStreak);
+    this.quad.material = this.matStreak; this.quad.render(renderer);
+    renderer.setRenderTarget(null);
+  }
+  dispose() { this.rtDown?.dispose(); this.rtStreak?.dispose(); this.quad.dispose(); }
+}
+
+// Cheap bloom for software GL: threshold + downsample to 1/4 res, separable
+// 9-tap gaussian, handed to FinalShader via its tBloom uniform. UnrealBloom's
+// full-res high-pass + 5-mip chain costs ~360ms/frame at 1080p in SwiftShader;
+// this does the same job at 1/16th the pixels for a soft glow.
+const QUAD_VERT = `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+class CheapBloomPass extends Pass {
+  constructor() {
+    super();
+    this.needsSwap = false;
+    this.enabled = true;
+    this.strength = 0.6;
+    this.threshold = 0.85;
+    this.quad = new FullScreenQuad(null);
+    this.rtA = null; this.rtB = null;
+    this.bloomTexture = null;
+    this.matThreshold = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, uStrength: { value: 0.6 }, uThreshold: { value: 0.85 } },
+      vertexShader: QUAD_VERT,
+      fragmentShader: `
+        uniform sampler2D tDiffuse; uniform float uStrength, uThreshold; varying vec2 vUv;
+        void main(){
+          vec3 c = texture2D(tDiffuse, vUv).rgb;
+          float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+          float f = smoothstep(uThreshold, uThreshold + 0.15, lum);
+          gl_FragColor = vec4(c * f * uStrength, 1.0);
+        }`,
+    });
+    this.matBlur = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, uStep: { value: new THREE.Vector2() } },
+      vertexShader: QUAD_VERT,
+      fragmentShader: `
+        uniform sampler2D tDiffuse; uniform vec2 uStep; varying vec2 vUv;
+        void main(){
+          vec3 acc = texture2D(tDiffuse, vUv).rgb * 0.2270270270;
+          acc += ( texture2D(tDiffuse, vUv + uStep * 1.0).rgb + texture2D(tDiffuse, vUv - uStep * 1.0).rgb ) * 0.1945945946;
+          acc += ( texture2D(tDiffuse, vUv + uStep * 2.0).rgb + texture2D(tDiffuse, vUv - uStep * 2.0).rgb ) * 0.1216216216;
+          acc += ( texture2D(tDiffuse, vUv + uStep * 3.0).rgb + texture2D(tDiffuse, vUv - uStep * 3.0).rgb ) * 0.0540540541;
+          acc += ( texture2D(tDiffuse, vUv + uStep * 4.0).rgb + texture2D(tDiffuse, vUv - uStep * 4.0).rgb ) * 0.0162162162;
+          gl_FragColor = vec4(acc, 1.0);
+        }`,
+    });
+  }
+  setSize(w, h) {
+    const qw = Math.max(2, w >> 2), qh = Math.max(2, h >> 2);
+    if (this.rtA?.width === qw && this.rtB?.height === qh) return;
+    this.rtA?.dispose(); this.rtB?.dispose();
+    this.rtA = new THREE.WebGLRenderTarget(qw, qh);
+    this.rtB = new THREE.WebGLRenderTarget(qw, qh);
+    this.bloomTexture = this.rtA.texture;
+  }
+  render(renderer, writeBuffer, readBuffer) {
+    if (!this.rtA) this.setSize(renderer.domElement.width, renderer.domElement.height);
+    // threshold + downsample
+    this.matThreshold.uniforms.tDiffuse.value = readBuffer.texture;
+    this.matThreshold.uniforms.uStrength.value = this.strength;
+    this.matThreshold.uniforms.uThreshold.value = this.threshold;
+    renderer.setRenderTarget(this.rtA);
+    this.quad.material = this.matThreshold; this.quad.render(renderer);
+    // horizontal blur
+    this.matBlur.uniforms.tDiffuse.value = this.rtA.texture;
+    this.matBlur.uniforms.uStep.value.set(1 / this.rtA.width, 0);
+    renderer.setRenderTarget(this.rtB);
+    this.quad.material = this.matBlur; this.quad.render(renderer);
+    // vertical blur
+    this.matBlur.uniforms.tDiffuse.value = this.rtB.texture;
+    this.matBlur.uniforms.uStep.value.set(0, 1 / this.rtB.height);
+    renderer.setRenderTarget(this.rtA);
+    this.quad.material = this.matBlur; this.quad.render(renderer);
+    renderer.setRenderTarget(null);
+  }
+  dispose() { this.rtA?.dispose(); this.rtB?.dispose(); this.quad.dispose(); }
+}
 
 const OutlineShader = {
   uniforms: {
@@ -161,10 +311,18 @@ export function createLookEngine(canvas, opts = {}) {
   const outlinePass = new ShaderPass(OutlineShader);
   composer.addPass(outlinePass);
 
-  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.4, 0.85);
+  // software GL: quarter-res bloom instead of UnrealBloom's full-res mip chain
+  const cheapBloom = softGL ? new CheapBloomPass() : null;
+  const bloomPass = softGL ? cheapBloom : new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.4, 0.85);
   composer.addPass(bloomPass);
 
-  const streakPass = new ShaderPass(StreakShader);
+  // software GL: half-res streak pass feeding FinalShader's tStreak
+  const cheapStreak = softGL ? new CheapStreakPass() : null;
+  const streakPass = softGL ? cheapStreak : new ShaderPass({
+    uniforms: StreakShader.uniforms,
+    vertexShader: StreakShader.vertexShader,
+    fragmentShader: streakShaderSource(12, 0.008),
+  });
   composer.addPass(streakPass);
 
   const finalPass = new ShaderPass(FinalShader);
@@ -239,8 +397,10 @@ export function createLookEngine(canvas, opts = {}) {
       bloomPass.enabled = L.bloom > 0.001 && L.style !== 'clean';
       bloomPass.strength = L.bloom;
       bloomPass.threshold = L.style === 'anime' ? 0.7 : 0.85;
+      if (cheapBloom) finalPass.uniforms.tBloom.value = cheapBloom.bloomTexture;
+      if (cheapStreak) finalPass.uniforms.tStreak.value = cheapStreak.streakTexture;
       streakPass.enabled = L.streak > 0.001 && L.style === 'film';
-      streakPass.uniforms.uStrength.value = L.streak;
+      if (!cheapStreak) streakPass.uniforms.uStrength.value = L.streak;
 
       // final grade
       const g = GRADES[L.grade] || GRADES.cine;
@@ -255,7 +415,7 @@ export function createLookEngine(canvas, opts = {}) {
       restore();
       return renderer.domElement;
     },
-    dispose() { renderer.dispose(); depthRT?.dispose(); },
+    dispose() { renderer.dispose(); depthRT?.dispose(); cheapBloom?.dispose(); cheapStreak?.dispose(); },
   };
   return engine;
 }
