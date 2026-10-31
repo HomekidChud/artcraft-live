@@ -1671,6 +1671,53 @@ syncEditorCamToShot();
 drawFrame(0);
 requestAnimationFrame(tick);
 
+// ---------------------------------------------------------------- watch mode
+// Open the app with ?project=<name>&cinema=1&play=1 to watch a saved project
+// (projects/<name>.json) fullscreen at full frame rate — this machine's GPU
+// renders it, so it plays as smoothly as the hardware allows. Export it
+// yourself from the normal editor (open the same URL without &cinema=1).
+// This is the "watch what's being created" channel: every push of a project
+// file to GitHub Pages updates the link.
+
+(() => {
+  const q = new URLSearchParams(location.search);
+  const proj = q.get('project');
+  if (!proj || q.has('headless')) return;
+  const safe = proj.replace(/[^a-zA-Z0-9._-]/g, '');
+  fetch(`projects/${encodeURIComponent(safe)}.json`)
+    .then((r) => { if (!r.ok) throw new Error(`project "${safe}" not found`); return r.json(); })
+    .then(async (data) => {
+      await applyProjectData(data);
+      document.title = `${state.name || safe} — VideoCraft`;
+      if (q.has('cinema')) {
+        document.body.classList.add('cinema');
+        const hint = document.createElement('div');
+        hint.id = 'exit-hint';
+        hint.textContent = 'space: play/pause · esc: editor';
+        document.body.appendChild(hint);
+        // render the preview at full export resolution while watching
+        const a = ASPECTS[state.aspect];
+        preview.width = a.ex[0]; preview.height = a.ex[1];
+        const exit = (ev) => {
+          if (ev.key !== 'Escape') return;
+          document.body.classList.remove('cinema');
+          hint.remove();
+          setPreviewSize();
+          window.removeEventListener('keydown', exit);
+        };
+        window.addEventListener('keydown', exit);
+      }
+      if (q.has('play')) {
+        play();
+        // audio needs one user gesture to start — grab the first click/key
+        const kick = () => { audioCtx?.resume?.(); };
+        window.addEventListener('pointerdown', kick, { once: true });
+        window.addEventListener('keydown', kick, { once: true });
+      }
+    })
+    .catch((e) => console.warn('[watch]', e.message));
+})();
+
 // ---------------------------------------------------------------- headless automation
 // Open the app with ?headless=1 to expose a small automation API on window.vc.
 // Used by tools/vc.mjs (the VideoCraft CLI) — see videocraft/README.md.

@@ -203,6 +203,16 @@ Speed depends on the path and the machine:
 - **WebM (real-time) path**: each chunk records for its own duration, so N chunks in parallel finish in ~1/N the wall time — a 60s film renders in ~10s with 6 chunks. Works even without a GPU.
 - **MP4 (WebCodecs) path**: each chunk encodes only its frames — near-linear speedup with cores/GPUs; on GPU machines this is the fastest and highest-quality option.
 
+### Watch mode (share what you're building)
+
+Saved projects live in `projects/<name>.json`. Anyone can watch one play fullscreen — on *their* GPU, at full frame rate — by opening:
+
+```
+https://<site>/videocraft/?project=<name>&cinema=1&play=1
+```
+
+`space` pauses, `esc` returns to the editor, and exporting from the editor is the normal UI (the MP4 path on a GPU machine is faster than real time). This is the workflow for "watch what you're creating": push the project file, share the link.
+
 ### Render scale
 
 `render({ scale })` (0 < scale <= 1) exports at `ex x scale` resolution — a slow machine renders far smoother motion at 720p than at 1080p (each frame takes ~1/2 the time, so the canvas updates twice as often). Upscale afterwards if you need the pixels:
