@@ -17,11 +17,11 @@ Open the app with `?headless=1` to expose `window.vc`:
 
 ```js
 await window.vc.loadProject(projectJson)   // replaces clips/scenes/captions/media; returns {name, aspect, duration, clips, scenes, captions}
-await window.vc.render({ postUrl, quality })  // 'high' | 'standard' | 'draft'
+await window.vc.render({ postUrl, quality, start, end })  // 'high' | 'standard' | 'draft'; optional start/end render only that range (parallel chunk renders)
 ```
 
 - `loadProject` **replaces** `state.clips` (the default hero scene clip disappears) — this is the clean path for agents. Scenes missing `objects`/`camKeys`/`events`/`look` are auto-normalized on load.
-- `render` runs the WebCodecs MP4 export and **POSTs the result blob to `postUrl`**; progress lands in `window.__vcProgress` (`{stage, frame, frames}`), result in `window.__vcResult` (`{name, size, type}`). It **resolves only when the export has fully finished** — including the real-time WebM fallback (which previously resolved as soon as playback started and never set `__vcResult`; fixed in v1.1.2). The MP4 path also runs an encoder pre-flight and a stall watchdog — if the browser reports H.264 support but the encoder stalls (common in headless/software-GL builds), the export falls back to WebM instead of hanging forever (fixed in v1.1.3).
+- `render` runs the WebCodecs MP4 export and **POSTs the result blob to `postUrl`**; progress lands in `window.__vcProgress` (`{stage, frame, frames}`), result in `window.__vcResult` (`{name, size, type}`). It **resolves only when the export has fully finished** — including the real-time WebM fallback (which previously resolved as soon as playback started and never set `__vcResult`; fixed in v1.1.2). The MP4 path also runs an encoder pre-flight and a stall watchdog — if the browser reports H.264 support but the encoder stalls (common in headless/software-GL builds), the export falls back to WebM instead of hanging forever (fixed in v1.1.3). v1.1.4 adds `render({ start, end })` range renders — chunk the timeline across parallel pages and stitch with ffmpeg concat for ~1/N render time (see README "Parallel rendering").
 - Your receiver must answer CORS preflights (`OPTIONS` → 204 with `Access-Control-Allow-Origin: *`); the blob POST sends `Content-Type: video/webm`/`video/mp4`, which triggers preflight.
 
 ## Fallback path: driving the UI

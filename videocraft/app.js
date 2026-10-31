@@ -241,8 +241,9 @@ function tick() {
   if (state.playing) {
     const t = playStartHead + (playClock() - playCtxTime);
     const total = totalDur();
-    if (t >= total) {
-      state.playhead = total;
+    const endT = exporting && exportRange ? Math.min(exportRange.end, total) : total;
+    if (t >= endT) {
+      state.playhead = endT;
       pause();
       if (exporting) finishExport();
     } else {
@@ -1176,7 +1177,7 @@ $('#btn-export-top').addEventListener('click', () => {
 
 // ---------------------------------------------------------------- export
 
-let exporting = false, recorder = null, exportChunks = [], exportStartWall = 0, exportStream = null;
+let exporting = false, recorder = null, exportChunks = [], exportStartWall = 0, exportStream = null, exportStopTimer = null;
 
 function pickMime() {
   for (const m of ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']) {
@@ -1184,6 +1185,10 @@ function pickMime() {
   }
   return '';
 }
+
+// range for chunked/parallel rendering: null = full timeline.
+// Set via vc.render({ start, end }) — see README "Parallel rendering".
+let exportRange = null; // { start, end } in timeline seconds
 
 async function startExport() {
   if (!state.clips.length) { alert('Add some clips first — the timeline is empty.'); return; }
@@ -1232,15 +1237,25 @@ async function startExport() {
   };
   exporting = true;
   $('#export-overlay').style.display = 'grid';
-  state.playhead = 0;
-  drawFrame(0);
+  state.playhead = exportRange ? exportRange.start : 0;
+  drawFrame(state.playhead);
   recorder.start(400);
   exportStartWall = performance.now();
   play();
+  // range renders must stop at a deterministic wall-clock time — the rAF tick
+  // that normally ends the export can be starved on slow/software GL builds,
+  // which would pad every chunk with seconds of frozen tail
+  if (exportRange) {
+    const spanMs = Math.max(0, (exportRange.end - state.playhead) * 1000 - 60);
+    clearTimeout(exportStopTimer);
+    exportStopTimer = setTimeout(() => { if (exporting) finishExport(); }, spanMs);
+  }
 }
 
 function finishExport() {
   if (!exporting) return;
+  clearTimeout(exportStopTimer);
+  exportStopTimer = null;
   setTimeout(() => {
     try { recorder.stop(); } catch (e) {}
     // release the canvas capture stream (keep the shared audio track alive)
@@ -1251,7 +1266,7 @@ function finishExport() {
     exporting = false;
     state.playhead = 0;
     drawFrame(0);
-  }, 350);
+  }, exportRange ? 80 : 350);
 }
 
 // ---------------------------------------------------------------- export: WebCodecs MP4
@@ -1315,7 +1330,13 @@ async function exportMp4() {
   const [W, H] = a.ex;
   const fps = state.fps;
   const total = totalDur();
-  const frames = Math.max(1, Math.ceil(total * fps));
+  // chunked/parallel rendering: only frames inside [start, end), with
+  // chunk-local timestamps so separately rendered chunks stitch seamlessly
+  const tStart = exportRange ? Math.max(0, Math.min(exportRange.start, total)) : 0;
+  const tEnd = exportRange ? Math.max(tStart + 1 / fps, Math.min(exportRange.end, total)) : total;
+  const i0 = Math.max(0, Math.floor(tStart * fps + 1e-6));
+  const i1 = Math.max(i0 + 1, Math.ceil(tEnd * fps - 1e-6));
+  const frames = i1 - i0;
   const quality = +(window.__vcQuality ?? document.querySelector('#ex-quality')?.value ?? 0.12);
   const bitrate = Math.round(Math.min(40e6, Math.max(1.5e6, W * H * fps * quality)));
 
@@ -1375,7 +1396,7 @@ async function exportMp4() {
     });
     venc.configure(vconf);
     const vTrack = state.clips.filter((c) => c.track === 'v');
-    for (let i = 0; i < frames; i++) {
+    for (let i = i0; i < i1; i++) {
       const t = i / fps;
       const cur = vTrack.find((c) => t >= c.start - 1e-4 && t < clipEnd(c) - 1e-4);
       if (cur && cur.kind === 'media') {
@@ -1383,8 +1404,8 @@ async function exportMp4() {
         if (m && m.type === 'video' && m.el) await seekVideoEl(m.el, cur.in + (t - cur.start));
       }
       drawFrame(t, true);
-      const frame = new VideoFrame(preview, { timestamp: Math.round(t * 1e6), duration: Math.round(1e6 / fps) });
-      venc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
+      const frame = new VideoFrame(preview, { timestamp: Math.round((t - tStart) * 1e6), duration: Math.round(1e6 / fps) });
+      venc.encode(frame, { keyFrame: i === i0 || i % (fps * 2) === 0 });
       frame.close();
       // watchdog: if the encoder stops consuming frames (some headless/software
       // GL builds accept the config but stall mid-encode), abort instead of hanging forever
@@ -1425,14 +1446,17 @@ async function exportMp4() {
         });
         aenc.configure(aconf);
         const CH = 2, CHUNK = 4800; // 100 ms at 48 kHz
+        // for range renders, encode only the audio inside [tStart, tEnd), chunk-local
+        const aOff = exportRange ? Math.min(mix.length, Math.floor(tStart * 48000)) : 0;
+        const aEnd = exportRange ? Math.min(mix.length, Math.ceil(tEnd * 48000)) : mix.length;
         const L = mix.getChannelData(0);
         const R = mix.numberOfChannels > 1 ? mix.getChannelData(1) : L;
-        for (let off = 0; off < mix.length; off += CHUNK) {
+        for (let off = aOff; off < aEnd; off += CHUNK) {
           const n = Math.min(CHUNK, mix.length - off);
           const data = new Float32Array(n * CH);
           data.set(L.subarray(off, off + n), 0);
           data.set(R.subarray(off, off + n), n);
-          const ad = new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: n, numberOfChannels: CH, timestamp: Math.round((off / 48000) * 1e6), data });
+          const ad = new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: n, numberOfChannels: CH, timestamp: Math.round(((off - aOff) / 48000) * 1e6), data });
           aenc.encode(ad);
           ad.close();
           let astall = 0;
@@ -1653,16 +1677,28 @@ if (new URLSearchParams(location.search).has('headless')) {
     async render(opts = {}) {
       if (opts.postUrl) window.__vcPostUrl = opts.postUrl;
       window.__vcQuality = { high: 0.2, standard: 0.12, draft: 0.07 }[opts.quality] ?? 0.12;
-      await exportMp4();
-      // The WebM fallback resolves as soon as real-time playback starts, and
-      // `exporting` flips false in finishExport() before the async onstop
-      // handler has finished uploading — so wait on __vcResult itself, not the
-      // exporting flag. Bounded so a failed export path can't hang forever.
-      if (!window.__vcResult) {
-        const deadline = Date.now() + Math.max(120_000, (totalDur() * 1.5 + 60_000));
-        await new Promise((res) => {
-          (function chk() { (window.__vcResult || Date.now() > deadline) ? res() : setTimeout(chk, 250); })();
-        });
+      // optional timeline range — the core of parallel chunk rendering:
+      // render [start, end) in several pages at once, then stitch the files
+      const total = totalDur();
+      exportRange = (isFinite(opts.start) && isFinite(opts.end) && opts.end > opts.start)
+        ? { start: Math.max(0, opts.start), end: Math.min(opts.end, total) }
+        : null;
+      window.__vcResult = null; // a fresh render must not see the previous result
+      try {
+        await exportMp4();
+        // The WebM fallback resolves as soon as real-time playback starts, and
+        // `exporting` flips false in finishExport() before the async onstop
+        // handler has finished uploading — so wait on __vcResult itself, not the
+        // exporting flag. Bounded so a failed export path can't hang forever.
+        if (!window.__vcResult) {
+          const span = (exportRange ? exportRange.end - exportRange.start : total) || 1;
+          const deadline = Date.now() + Math.max(120_000, span * 1.5 + 60_000);
+          await new Promise((res) => {
+            (function chk() { (window.__vcResult || Date.now() > deadline) ? res() : setTimeout(chk, 250); })();
+          });
+        }
+      } finally {
+        exportRange = null;
       }
       return window.__vcResult;
     },

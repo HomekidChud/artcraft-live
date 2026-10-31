@@ -133,8 +133,24 @@ function toonStepTexture(steps) {
   return tex;
 }
 
+// Software GL (SwiftShader/llvmpipe) pays ~4x fragment cost for MSAA — detect it
+// and skip antialiasing there. Real GPUs keep AA. Override with opts.forceAA.
+function isSoftwareGL() {
+  try {
+    // probe on a detached canvas so we never disturb the render canvas's context
+    const probe = document.createElement('canvas');
+    const gl = probe.getContext('webgl2') || probe.getContext('webgl');
+    if (!gl) return false;
+    const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    const r = (dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) || '';
+    return /swiftshader|llvmpipe|softpipe|software/i.test(r);
+  } catch (e) { return false; }
+}
+
 export function createLookEngine(canvas, opts = {}) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+  const softGL = isSoftwareGL(canvas);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: opts.forceAA ?? !softGL, alpha: false });
+  if (softGL) console.info('[look] software GL detected — antialiasing off for speed');
   renderer.setClearColor(0x000000, 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 

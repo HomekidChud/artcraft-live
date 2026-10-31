@@ -176,11 +176,33 @@ Burned into the export: `{ "id", "start", "dur", "text" (multiline with \n), "po
 Open the page with `?headless=1` to expose `window.vc`:
 
 - `await window.vc.loadProject(projectJson)` — replaces clips/scenes/captions/media; returns `{ name, aspect, duration, clips, scenes, captions }`. Scenes missing `objects`/`camKeys`/`events`/`look` are auto-normalized.
-- `await window.vc.render({ postUrl, quality })` — encodes and POSTs the result blob to `postUrl`; **resolves only when the export has fully finished** (both MP4 and WebM paths). Progress in `window.__vcProgress` (`{ stage, frame, frames }`), result in `window.__vcResult` (`{ name, size, type }`). `quality`: `high | standard | draft`.
+- `await window.vc.render({ postUrl, quality, start, end })` — encodes and POSTs the result blob to `postUrl`; **resolves only when the export has fully finished** (both MP4 and WebM paths). Progress in `window.__vcProgress` (`{ stage, frame, frames }`), result in `window.__vcResult` (`{ name, size, type }`). `quality`: `high | standard | draft`. Optional `start`/`end` (timeline seconds) render only that range — see **Parallel rendering** below.
 - The POST receiver must answer CORS preflight (`OPTIONS` → `204` + `Access-Control-Allow-Origin: *`); a POST-only receiver silently swallows the export.
 - Headless Chrome flags: `--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required`. Headless WebCodecs has no H.264, so exports fall back to real-time WebM (audio included); transcode to MP4 with `ffmpeg -i out.webm -c:v libx264 -crf 18 -pix_fmt yuv420p -c:a aac -b:a 192k -movflags +faststart out.mp4`.
 
 Gotchas learned the hard way: keep `fog` ≤ 0.3 for scenes with the camera far away (FogExp2 swallows distant objects); the `dramatic`/`night`/`storm`/`candlelight`/`horror` presets are dim — raise `look.exposure` to ~1.5-2.3 and use bright ground colors; cap `bloom` around 0.5 and keep `streak` low or titles smear.
+
+### Parallel rendering (fast renders)
+
+`vc.render({ start, end })` renders only that timeline range, with **chunk-local timestamps and correctly sliced audio** — so several headless pages can render chunks of the same project simultaneously, and the chunk files stitched in order are frame-accurate:
+
+1. Split the duration into N chunks (e.g. 10s each).
+2. Open N pages with `?headless=1` (one browser, N tabs — or N browsers), `loadProject(project)` in each.
+3. Call `render({ postUrl, quality, start, end })` per chunk — give each chunk its own receiver path (`?name=chunk_i.webm`) or port.
+4. Stitch: `ffmpeg -f concat -i list.txt -c copy merged.webm`, then transcode to MP4 as usual (or concat the MP4 chunks directly — each starts with a keyframe).
+
+Or just use the bundled driver, which does all of the above (parallel pages, per-chunk exact trim, stitch, transcode) in one command:
+
+```bash
+python3 -m http.server 8000          # from the repo root, serves videocraft/
+node tools/render-parallel.mjs path/to/project.json 10 3 myfilm
+```
+
+Speed depends on the path and the machine:
+
+- **WebM (real-time) path**: each chunk records for its own duration, so N chunks in parallel finish in ~1/N the wall time — a 60s film renders in ~10s with 6 chunks. Works even without a GPU.
+- **MP4 (WebCodecs) path**: each chunk encodes only its frames — near-linear speedup with cores/GPUs; on GPU machines this is the fastest and highest-quality option.
+- Rule of thumb: chunks of 5-15s, one concurrent page per CPU core (software GL) or per GPU (hardware). More pages than that just starve each chunk's draw loop.
 
 ## Honest limits
 
