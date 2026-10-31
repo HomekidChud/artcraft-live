@@ -258,8 +258,6 @@ p.note code {
 
 <div id="toast"></div>
 
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
-<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 <script>
 (function () {
   'use strict';
@@ -347,39 +345,65 @@ p.note code {
     return out;
   }
 
-  /* ---------- ffmpeg ---------- */
-  const { FFmpeg } = FFmpegWASM;
-  let ffmpeg = null, engineReady = null;
+  /* ---------- ffmpeg engine (direct classic worker — the FFmpeg class makes a
+     module worker for classWorkerURL, which can't importScripts the core) ---------- */
+  let engine = null, engineReady = null, progressListener = null;
   const CORE = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
 
-  async function loadEngine(ff) {
-    const coreURL = CORE + '/ffmpeg-core.js', wasmURL = CORE + '/ffmpeg-core.wasm';
+  async function createEngine() {
+    let worker;
+    const wurl = new URL('vendor/ffmpeg-worker.js', location.href);
     try {
-      // same-origin worker script (browsers block cross-origin worker scripts)
-      const workerURL = new URL('vendor/ffmpeg-worker.js', location.href).href;
-      await ff.load({ classWorkerURL: workerURL, coreURL, wasmURL });
+      worker = new Worker(wurl);
     } catch (e) {
-      // sandboxed contexts (origin null): fetch the worker script, run it from a blob
-      const src = await (await fetch('vendor/ffmpeg-worker.js')).text();
-      const blobURL = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
-      await ff.load({ classWorkerURL: blobURL, coreURL, wasmURL });
+      // sandboxed embeds (origin null) can't start URL workers — run from a blob
+      const src = await (await fetch(wurl)).text();
+      worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
     }
+    let msgId = 0;
+    const pending = new Map();
+    worker.onmessage = ({ data }) => {
+      if (data.type === 'PROGRESS') { if (progressListener) progressListener(data.data); return; }
+      if (data.type === 'LOG') { console.log('[ffmpeg]', data.data && data.data.message); return; }
+      const p = pending.get(data.id);
+      if (!p) return;
+      pending.delete(data.id);
+      data.type === 'ERROR' ? p.reject(new Error(data.data)) : p.resolve(data.data);
+    };
+    const call = (type, data, transfer) => new Promise((resolve, reject) => {
+      const id = ++msgId;
+      pending.set(id, { resolve, reject });
+      worker.postMessage({ id, type, data }, transfer || []);
+    });
+    return {
+      worker,
+      load: () => call('LOAD', { coreURL: CORE + '/ffmpeg-core.js', wasmURL: CORE + '/ffmpeg-core.wasm' }),
+      writeFile: (path, bytes) => call('WRITE_FILE', { path, data: bytes }, [bytes.buffer]),
+      exec: (args) => call('EXEC', { args, timeout: -1 }),
+      readFile: (path) => call('READ_FILE', { path, encoding: 'binary' }),
+      terminate: () => worker.terminate()
+    };
   }
 
   function getEngine() {
     if (engineReady) return engineReady;
-    engineReady = (async () => {
-      const ff = new FFmpeg();
-      await loadEngine(ff);
-      ffmpeg = ff;
+    engineReady = createEngine().then(async ff => {
+      await ff.load();
+      engine = ff;
       return ff;
-    })();
+    });
     return engineReady;
   }
 
-  async function convert(vBytes, aBytes, opts, onProgress, signal) {
+  function killEngine() {
+    if (engine) { try { engine.terminate(); } catch (e) {} engine = null; }
+    engineReady = null;
+    progressListener = null;
+  }
+
+  async function convert(vBytes, aBytes, opts, onProgress) {
     const ff = await getEngine();
-    ff.on('progress', ({ progress }) => { if (job && !job.cancelled) onProgress(Math.min(1, progress || 0)); });
+    progressListener = p => { if (job && !job.cancelled) onProgress(Math.min(1, p.progress || 0)); };
     await ff.writeFile('in.mp4', vBytes);
     if (aBytes) await ff.writeFile('in.m4a', aBytes);
     let fontOK = false;
@@ -403,9 +427,10 @@ p.note code {
     );
     if (aBytes) args.push('-c:a', 'aac', '-b:a', '160k', '-shortest');
     args.push('-movflags', '+faststart', 'out.mp4');
-    await ff.exec(args);
+    const ret = await ff.exec(args);
+    if (ret !== 0) throw new Error('ffmpeg exited with code ' + ret);
     const data = await ff.readFile('out.mp4');
-    ff.on('progress', null);
+    progressListener = null;
     return data;
   }
 
@@ -484,7 +509,7 @@ p.note code {
 
       setStep('st-enc', 'active');
       $('pct').textContent = 'encoding…';
-      const data = await convert(vBytes, aBytes, opts, progress, ctrl.signal);
+      const data = await convert(vBytes, aBytes, opts, progress);
       if (job.cancelled) return;
       setStep('st-enc', 'done');
       progress(1);
