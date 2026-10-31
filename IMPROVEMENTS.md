@@ -1,3 +1,54 @@
+# Improvements — all changes, this build
+
+## Build 4: VideoCraft v1.1 — fast MP4 export + render CLI
+
+VideoCraft's export was a real-time MediaRecorder capture (WebM only,
+tab had to stay visible and foreground for the whole movie). This build
+adds a proper encoder path and terminal automation. Tested end-to-end
+in this sandbox: headless Chrome for Testing 156 (Linux, SwiftShader
+WebGL, no GPU) rendered test projects through the CLI — H.264 1080p MP4
+out, frames visually verified, audio verified with volumedetect. On
+this Linux build Chrome ships no AAC encoder, so the audio codec
+cascades AAC → Opus (mp4-muxer muxes Opus-in-MP4); Windows/macOS get
+AAC. No-GPU CLI rendering is correct but roughly real-time speed or
+slower — with a GPU it is much faster (verified in-browser paths only
+for speed; the codec cascade and fallbacks are runtime-probed, not
+hardcoded per platform).
+
+### 1. WebCodecs MP4 export (videocraft/app.js)
+- `exportMp4()` draws every timeline frame (frame-accurate seek of
+  imported video clips), encodes H.264 via `VideoEncoder` (codec
+  candidates High→Main→Baseline, runtime-probed), mixes the project
+  audio in an `OfflineAudioContext` at 48 kHz stereo, encodes AAC/Opus
+  via `AudioEncoder`, and muxes everything into an MP4 with the
+  vendored mp4-muxer 5.2.1 (MIT, `videocraft/vendor/`). Works in
+  background tabs, usually faster than real time, keyframe every 2 s.
+- Quality presets (bits-per-pixel): High / Standard / Draft.
+- The audio mix is rebuilt offline (clip volumes, in-points), so the
+  export no longer depends on live playback at all.
+- Automatic fallbacks: no H.264 encode → old real-time WebM recording;
+  no AAC encode → Opus; no WebCodecs at all → WebM recording. The
+  Export tab and the top-bar Export button use the best available path.
+- Progress/stage log exposed on `window.__vcProgress` / `window.__vcLog`.
+
+### 2. Headless automation hooks (videocraft/app.js)
+- `?headless=1` exposes `window.vc` with `loadProject(json)` and
+  `render({postUrl, quality})`; the MP4 is POSTed to a local URL, so
+  nothing depends on browser downloads.
+
+### 3. CLI (tools/vc.mjs)
+- `vc render <project> [--out] [--quality] [--chrome] [--timeout]`,
+  `vc info`, `vc new` (scaffolds a starter project with a preset scene).
+- Zero npm dependencies: includes a minimal RFC 6455 WebSocket client
+  and a minimal CDP client (Node 18+). Serves the app locally,
+  launches `chrome --headless=new` with SwiftShader WebGL, drives the
+  page over CDP, streams the finished MP4 back over a local POST.
+
+### 4. Docs (videocraft/README.md)
+- Full `.vfproject.json` format reference (clips, scenes, look,
+  captions, media), export notes, CLI usage, and the render gotchas
+  (fog, dim presets, bloom caps) learned while producing a 4:51 film.
+
 # ChatCraft improvements — all changes, this build
 
 Everything below is implemented; the server-side work is tested (137/137

@@ -1089,6 +1089,7 @@ function renderLookTab() {
 // ---- export tab
 function renderExportTab() {
   const a = ASPECTS[state.aspect];
+  const mp4ok = webCodecsOk();
   inspBody.innerHTML = `
     <div class="insp-section">
       <div class="insp-title">Output</div>
@@ -1096,15 +1097,28 @@ function renderExportTab() {
       <div class="row"><label>Export size</label><span class="val" style="min-width:90px">${a.ex[0]} × ${a.ex[1]}</span></div>
       <div class="row"><label>Frame rate</label><span class="val">${state.fps} fps</span></div>
       <div class="row"><label>Length</label><span class="val">${fmt1(totalDur())}</span></div>
-      <div class="row"><label>Container</label><span class="val">WebM (VP9/VP8)</span></div>
+      <div class="row"><label>Container</label><span class="val">${mp4ok ? 'MP4 (H.264 + AAC)' : 'WebM (VP9/VP8)'}</span></div>
+      <div class="row"><label>Quality</label>
+        <select id="ex-quality" style="flex:1.4">
+          <option value="0.2">High</option>
+          <option value="0.12" selected>Standard</option>
+          <option value="0.07">Draft</option>
+        </select></div>
     </div>
     <div class="insp-section">
-      <button class="btn primary" id="btn-export" style="width:100%;justify-content:center">Record & export video</button>
-      <p class="note">The movie is recorded in real time as it plays once — audio included, captions burned in. Keep this tab in the foreground until it finishes, then the .webm downloads automatically.</p>
+      <button class="btn primary" id="btn-export" style="width:100%;justify-content:center">${mp4ok ? 'Export MP4 video' : 'Record & export video'}</button>
+      ${mp4ok ? `<button class="btn" id="btn-export-webm" style="width:100%;justify-content:center;margin-top:6px">Record WebM in real time</button>` : ''}
+      <p class="note">${mp4ok
+        ? 'Frame-by-frame H.264/AAC encode via WebCodecs — usually faster than real time, works while the tab is in the background, audio and burned-in captions included. If the browser can\u2019t encode H.264 it falls back to real-time WebM recording.'
+        : 'This browser has no WebCodecs, so the movie is recorded in real time as it plays once — audio included, captions burned in. Keep this tab in the foreground until it finishes, then the .webm downloads automatically.'}</p>
     </div>`;
-  $('#btn-export').addEventListener('click', startExport);
+  $('#btn-export').addEventListener('click', () => (mp4ok ? exportMp4() : startExport()));
+  $('#btn-export-webm')?.addEventListener('click', startExport);
 }
-$('#btn-export-top').addEventListener('click', () => { state.tab = 'export'; renderRail(); renderInspector(); startExport(); });
+$('#btn-export-top').addEventListener('click', () => {
+  state.tab = 'export'; renderRail(); renderInspector();
+  webCodecsOk() ? exportMp4() : startExport();
+});
 
 // ---------------------------------------------------------------- export
 
@@ -1177,6 +1191,208 @@ function finishExport() {
   }, 350);
 }
 
+// ---------------------------------------------------------------- export: WebCodecs MP4
+// Frame-by-frame H.264 + AAC encode into a real .mp4 — faster than real time,
+// no tab-visibility requirement, higher quality than MediaRecorder capture.
+
+const webCodecsOk = () => typeof VideoEncoder !== 'undefined' && typeof AudioEncoder !== 'undefined';
+const vcLog = (stage, note) => { window.__vcProgress = { ...window.__vcProgress, stage, note }; (window.__vcLog = window.__vcLog || []).push({ stage, note, at: Date.now() }); };
+
+function seekVideoEl(el, t) {
+  return new Promise((res) => {
+    if (!isFinite(t) || t < 0) t = 0;
+    if (Math.abs(el.currentTime - t) < 1e-4) return res();
+    let done = false;
+    const finish = () => { if (done) return; done = true; el.removeEventListener('seeked', finish); clearTimeout(to); res(); };
+    const to = setTimeout(finish, 800);
+    el.addEventListener('seeked', finish);
+    try { el.currentTime = t; } catch (e) { finish(); }
+  });
+}
+
+async function renderAudioOffline(total) {
+  // Rebuild the project's audio mix in an OfflineAudioContext at 48 kHz stereo.
+  // Returns an AudioBuffer, or null when the project has no (decodable) audio.
+  const SR = 48000;
+  const candidates = state.clips.filter((c) => {
+    if (c.kind !== 'media') return false;
+    const m = mediaById(c.mediaId);
+    if (!m || !m.file) return false;
+    return c.track === 'a' || (c.track === 'v' && m.type === 'video');
+  });
+  if (!candidates.length) return null;
+  const oc = new OfflineAudioContext(2, Math.max(SR / 10, Math.ceil(total * SR)), SR);
+  const master = oc.createGain(); master.gain.value = 0.9; master.connect(oc.destination);
+  let any = false;
+  for (const c of candidates) {
+    const m = mediaById(c.mediaId);
+    let buf = m.buf || null;
+    if (!buf && m.file) {
+      try { buf = await oc.decodeAudioData(await m.file.arrayBuffer()); m.buf = buf; } catch (e) { continue; }
+    }
+    if (!buf) continue;
+    const src = oc.createBufferSource(); src.buffer = buf;
+    const gain = oc.createGain(); gain.gain.value = c.volume ?? 1;
+    src.connect(gain); gain.connect(master);
+    const when = Math.max(0, c.start);
+    const offset = Math.max(0, c.in || 0);
+    const dur = Math.min(c.dur, buf.duration - offset);
+    if (dur > 0.005) { src.start(when, offset, dur); any = true; }
+  }
+  if (!any) return null;
+  return await oc.startRendering();
+}
+
+async function exportMp4() {
+  if (!state.clips.length) { alert('Add some clips first — the timeline is empty.'); return; }
+  if (exporting) return;
+  pause();
+  const { Muxer, ArrayBufferTarget } = await import('./vendor/mp4-muxer.mjs');
+  const a = ASPECTS[state.aspect];
+  const [W, H] = a.ex;
+  const fps = state.fps;
+  const total = totalDur();
+  const frames = Math.max(1, Math.ceil(total * fps));
+  const quality = +(window.__vcQuality ?? document.querySelector('#ex-quality')?.value ?? 0.12);
+  const bitrate = Math.round(Math.min(40e6, Math.max(1.5e6, W * H * fps * quality)));
+
+  // pick the first H.264 config this browser actually supports
+  let vconf = null;
+  for (const codec of ['avc1.640034', 'avc1.640028', 'avc1.4d0028', 'avc1.42e01e']) {
+    const conf = { codec, width: W, height: H, bitrate, framerate: fps, avc: { format: 'avc' } };
+    const s = await VideoEncoder.isConfigSupported(conf).catch(() => null);
+    if (s?.supported) { vconf = conf; break; }
+  }
+  if (!vconf) { alert('This browser can\u2019t encode H.264 — falling back to real-time WebM recording.'); return startExport(); }
+
+  const prevW = preview.width, prevH = preview.height;
+  preview.width = W; preview.height = H;
+  exporting = true;
+  const overlay = $('#export-overlay'), note = $('#export-note'), bar = $('#export-bar'), et = $('#export-time');
+  overlay.querySelector('h3').textContent = 'Exporting MP4';
+  overlay.style.display = 'grid';
+  const t0 = performance.now();
+  vcLog('video'); window.__vcProgress = { stage: 'video', frame: 0, frames };
+
+  const restore = () => {
+    preview.width = prevW; preview.height = prevH;
+    overlay.style.display = 'none';
+    overlay.querySelector('h3').textContent = 'Recording export';
+    exporting = false;
+    state.playhead = 0;
+    drawFrame(0);
+  };
+
+  try {
+    // ---- video: draw each frame, encode it, keep the encoded chunks
+    const videoChunks = [];
+    const venc = new VideoEncoder({
+      output: (chunk, meta) => videoChunks.push({ chunk, meta }),
+      error: (e) => console.error('VideoEncoder', e),
+    });
+    venc.configure(vconf);
+    const vTrack = state.clips.filter((c) => c.track === 'v');
+    for (let i = 0; i < frames; i++) {
+      const t = i / fps;
+      const cur = vTrack.find((c) => t >= c.start - 1e-4 && t < clipEnd(c) - 1e-4);
+      if (cur && cur.kind === 'media') {
+        const m = mediaById(cur.mediaId);
+        if (m && m.type === 'video' && m.el) await seekVideoEl(m.el, cur.in + (t - cur.start));
+      }
+      drawFrame(t, true);
+      const frame = new VideoFrame(preview, { timestamp: Math.round(t * 1e6), duration: Math.round(1e6 / fps) });
+      venc.encode(frame, { keyFrame: i % (fps * 2) === 0 });
+      frame.close();
+      while (venc.encodeQueueSize > 8) await new Promise((r) => setTimeout(r, 0));
+      if ((i & 15) === 0 || i === frames - 1) {
+        const done = (i + 1) / frames;
+        const speed = done > 0.01 ? ((i + 1) / ((performance.now() - t0) / 1000)).toFixed(1) : '…';
+        bar.style.width = `${Math.round(done * 100)}%`;
+        note.textContent = `Encoding frame ${i + 1} / ${frames} (${speed}\u00d7 real time)`;
+        et.textContent = fmt(done * total);
+        window.__vcProgress = { stage: 'video', frame: i + 1, frames };
+      }
+    }
+    await venc.flush();
+    venc.close();
+
+    // ---- audio: offline mix, then encode (AAC when the browser can encode it, Opus otherwise)
+    note.textContent = 'Encoding audio…';
+    const audioChunks = [];
+    let audioCodec = null;
+    const mix = await renderAudioOffline(total);
+    vcLog('audio-mix', mix ? `${mix.length} samples` : 'no decodable audio');
+    if (mix) {
+      let aconf = null;
+      for (const c of ['mp4a.40.2', 'opus']) {
+        const conf = { codec: c, sampleRate: 48000, numberOfChannels: 2, bitrate: 192000 };
+        const s = await AudioEncoder.isConfigSupported(conf).catch(() => null);
+        if (s?.supported) { aconf = conf; audioCodec = c === 'mp4a.40.2' ? 'aac' : 'opus'; break; }
+      }
+      if (aconf) {
+        const aenc = new AudioEncoder({
+          output: (chunk, meta) => audioChunks.push({ chunk, meta }),
+          error: (e) => console.error('AudioEncoder', e),
+        });
+        aenc.configure(aconf);
+        const CH = 2, CHUNK = 4800; // 100 ms at 48 kHz
+        const L = mix.getChannelData(0);
+        const R = mix.numberOfChannels > 1 ? mix.getChannelData(1) : L;
+        for (let off = 0; off < mix.length; off += CHUNK) {
+          const n = Math.min(CHUNK, mix.length - off);
+          const data = new Float32Array(n * CH);
+          data.set(L.subarray(off, off + n), 0);
+          data.set(R.subarray(off, off + n), n);
+          const ad = new AudioData({ format: 'f32-planar', sampleRate: 48000, numberOfFrames: n, numberOfChannels: CH, timestamp: Math.round((off / 48000) * 1e6), data });
+          aenc.encode(ad);
+          ad.close();
+          while (aenc.encodeQueueSize > 16) await new Promise((r) => setTimeout(r, 0));
+        }
+        await aenc.flush();
+        aenc.close();
+        vcLog('audio-encode', `${audioChunks.length} chunks (${aconf.codec})`);
+      } else {
+        vcLog('audio-encode', 'no audio encoder available — exporting video only');
+      }
+    }
+
+    // ---- mux
+    note.textContent = 'Writing MP4…';
+    vcLog('mux', `${videoChunks.length} video + ${audioChunks.length} audio chunks`);
+    const muxer = new Muxer({
+      target: new ArrayBufferTarget(),
+      video: { codec: 'avc', width: W, height: H },
+      ...(audioChunks.length ? { audio: { codec: audioCodec, numberOfChannels: 2, sampleRate: 48000 } } : {}),
+      fastStart: 'in-memory',
+    });
+    for (const { chunk, meta } of videoChunks) muxer.addVideoChunk(chunk, meta);
+    for (const { chunk, meta } of audioChunks) muxer.addAudioChunk(chunk, meta);
+    muxer.finalize();
+    const blob = new Blob([muxer.target.buffer], { type: 'video/mp4' });
+
+    const name = (state.name || 'video').replace(/[^\w\- ]+/g, '').trim() || 'video';
+    const fname = `${name} (${state.aspect.replace(':', 'x')}).mp4`;
+    window.__vcResult = { name: fname, size: blob.size, type: 'video/mp4' };
+    if (window.__vcPostUrl) {
+      note.textContent = 'Sending to the CLI…';
+      await fetch(window.__vcPostUrl, { method: 'POST', body: blob }).catch(() => {});
+    } else {
+      const a2 = document.createElement('a');
+      a2.href = URL.createObjectURL(blob);
+      a2.download = fname;
+      a2.click();
+      setTimeout(() => URL.revokeObjectURL(a2.href), 30_000);
+    }
+    restore();
+    vcLog('done', 'wrote ' + blob.size + ' bytes');
+  } catch (err) {
+    console.error(err);
+    restore();
+    alert('MP4 export failed (' + (err?.message || err) + ').\nFalling back to real-time WebM recording.');
+    return startExport();
+  }
+}
+
 // ---------------------------------------------------------------- save / open
 
 async function saveProject() {
@@ -1210,36 +1426,39 @@ function fileToDataURL(file) {
   });
 }
 
+async function applyProjectData(data) {
+  if (data.app !== 'videocraft') throw new Error('Not a VideoCraft project');
+  state.name = data.name || 'Untitled video';
+  state.aspect = data.aspect || '16:9';
+  state.clips = data.clips || [];
+  state.scenes = data.scenes || [];
+  state.captions = data.captions || [];
+  state.media = [];
+  for (const entry of data.media || []) {
+    if (entry.data) {
+      // restore embedded media
+      const blob = await (await fetch(entry.data)).blob();
+      const f = new File([blob], entry.name, { type: blob.type });
+      await importFiles([f]);
+      const m = state.media[state.media.length - 1];
+      if (m) m.id = entry.id;
+    } else {
+      state.media.push({ id: entry.id, type: entry.type, name: entry.name, duration: entry.duration, missing: true, url: null });
+    }
+  }
+  // re-map ids for embedded (importFiles assigned new ids) — clips reference entry ids
+  $('#project-name').value = state.name;
+  $('#aspect').value = state.aspect;
+  setPreviewSize();
+  renderTimeline(); renderInspector(); drawFrame(0);
+}
+
 $('#file-open').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   e.target.value = '';
   if (!file) return;
   try {
-    const data = JSON.parse(await file.text());
-    if (data.app !== 'videocraft') throw new Error('Not a VideoCraft project');
-    state.name = data.name || 'Untitled video';
-    state.aspect = data.aspect || '16:9';
-    state.clips = data.clips || [];
-    state.scenes = data.scenes || [];
-    state.captions = data.captions || [];
-    state.media = [];
-    for (const entry of data.media || []) {
-      if (entry.data) {
-        // restore embedded media
-        const blob = await (await fetch(entry.data)).blob();
-        const f = new File([blob], entry.name, { type: blob.type });
-        await importFiles([f]);
-        const m = state.media[state.media.length - 1];
-        if (m) m.id = entry.id;
-      } else {
-        state.media.push({ id: entry.id, type: entry.type, name: entry.name, duration: entry.duration, missing: true, url: null });
-      }
-    }
-    // re-map ids for embedded (importFiles assigned new ids) — clips reference entry ids
-    $('#project-name').value = state.name;
-    $('#aspect').value = state.aspect;
-    setPreviewSize();
-    renderTimeline(); renderInspector(); drawFrame(0);
+    await applyProjectData(JSON.parse(await file.text()));
   } catch (err) {
     alert('Could not open project: ' + err.message);
   }
@@ -1312,3 +1531,26 @@ renderRail(); renderTimeline(); renderInspector();
 syncEditorCamToShot();
 drawFrame(0);
 requestAnimationFrame(tick);
+
+// ---------------------------------------------------------------- headless automation
+// Open the app with ?headless=1 to expose a small automation API on window.vc.
+// Used by tools/vc.mjs (the VideoCraft CLI) — see videocraft/README.md.
+
+if (new URLSearchParams(location.search).has('headless')) {
+  window.__vcProgress = { stage: 'boot' };
+  window.vc = {
+    state,
+    async loadProject(json) {
+      const data = typeof json === 'string' ? JSON.parse(json) : json;
+      await applyProjectData(data);
+      return { name: state.name, aspect: state.aspect, duration: totalDur(), clips: state.clips.length, scenes: state.scenes.length, captions: state.captions.length };
+    },
+    async render(opts = {}) {
+      if (opts.postUrl) window.__vcPostUrl = opts.postUrl;
+      window.__vcQuality = { high: 0.2, standard: 0.12, draft: 0.07 }[opts.quality] ?? 0.12;
+      await exportMp4();
+      return window.__vcResult;
+    },
+  };
+  window.__vcProgress = { stage: 'ready' };
+}
