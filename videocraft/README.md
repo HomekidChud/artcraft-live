@@ -7,8 +7,8 @@ A browser video studio for YouTube Shorts and long-form video. Runs entirely cli
 - **Import anything** — video, images and audio files, arranged on a multi-track timeline (video, audio, captions)
 - **Edit for real** — trim, split, drag and reorder clips, scrub, set per-clip volume and fit (contain/cover/stretch)
 - **Captions** — timed text overlays with position, size, color and backdrop, burned into the exported video
-- **3D scenes** — optional creation mode: build shots with objects, animated characters (idle/walk/run/wave/celebrate), particle FX, camera keyframes, lighting presets
-- **Film & anime looks** — cinematic post-processing (bloom, flare streaks, grades, grain, vignette) or toon shading with ink outlines
+- **3D scenes** — optional creation mode: build shots with objects, animated characters (idle/walk/run/wave/celebrate), particle FX (fire, rain, snow, embers, magic, smoke and more), camera keyframes, lighting presets (three-point, sunset, night, dramatic, daylight, neon, candlelight, horror)
+- **Film & anime looks** — cinematic post-processing (bloom, flare streaks, 15 colour grades incl. teal-orange, bleach bypass, sepia, moonlight and cyberpunk, grain, vignette) or toon shading with ink outlines
 - **Any format** — 16:9 widescreen, 9:16 Shorts, 1:1, 4:5 and 2.39:1, with Shorts 3:00 duration checking
 - **Export MP4** — frame-by-frame H.264 encode via WebCodecs: faster than real time, works in a background tab, audio mixed in, captions burned in (real-time WebM recording remains as a fallback for browsers without WebCodecs)
 - **CLI** — render any project to MP4 from the terminal with `tools/vc.mjs`, no browser tab needed

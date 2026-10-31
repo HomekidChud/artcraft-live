@@ -4,6 +4,13 @@ MovieCraft is a static, browser-based scene and movie editor. This upgrade is a
 practical foundation for stylised 3D filmmaking, not a claim of feature parity
 with a Hollywood production pipeline.
 
+Version 0.9.1 widens the creative palette for AI-driven filmmaking: six new
+deterministic FX kinds (**rain, snow, embers, magic, dust and fireworks**),
+five new shot-lighting looks (**neon city, candlelight, moonlight, horror and
+amber golden**) and six new colour grades (**teal-orange, sepia, pastel,
+moonlight, cyberpunk and vintage**). All are keyframable, scrub-safe and baked
+into exports exactly like the originals.
+
 Version 0.8 adds the **cinematic FX engine** (timeline-driven GPU particle
 effects — fire, smoke, sparks, explosions and fountains — driven by the shot
 timeline, so preview, playback and export repeat the same motion) and **GLB

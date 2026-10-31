@@ -28,6 +28,12 @@ export const GRADES = {
   golden:     { lift: [0.03, 0.01, -0.02], gain: [0.07, 0.04, 0.0], contrast: 1.05, sat: 1.1, warm: 0.1 },
   noir:       { lift: [-0.02, -0.02, -0.01], gain: [0.0, 0.0, 0.02], contrast: 1.25, sat: 0.35, warm: -0.04 },
   neon:       { lift: [0.0, 0.0, 0.06], gain: [0.05, 0.0, 0.02], contrast: 1.1, sat: 1.3, warm: -0.05 },
+  'teal-orange': { lift: [0.0, 0.04, 0.07], gain: [0.07, 0.03, -0.01], contrast: 1.12, sat: 1.18, warm: -0.02 },
+  sepia:      { lift: [0.02, 0.01, -0.01], gain: [0.05, 0.03, 0.0], contrast: 1.0, sat: 0.5, warm: 0.12 },
+  pastel:     { lift: [0.03, 0.03, 0.04], gain: [0.02, 0.02, 0.02], contrast: 0.92, sat: 0.85, warm: 0.02 },
+  moonlight:  { lift: [0.0, 0.01, 0.06], gain: [0.0, 0.02, 0.07], contrast: 1.1, sat: 0.85, warm: -0.08 },
+  cyberpunk:  { lift: [0.0, 0.0, 0.06], gain: [0.08, 0.0, 0.04], contrast: 1.18, sat: 1.4, warm: -0.06 },
+  vintage:    { lift: [0.03, 0.02, 0.0], gain: [0.04, 0.03, 0.0], contrast: 0.95, sat: 0.7, warm: 0.08 },
 };
 
 const GradeShader = {

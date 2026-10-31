@@ -31,7 +31,7 @@ This guide is also embedded in the app page itself (`<script type="application/j
 
 ## Key flows
 
-1. **Build**: switch to Scene (`data-ws="scene"`), add objects, set `pos/rot/scale/color/opacity` in `#scene-props`. FX objects: kind in `fire | smoke | sparks | explosion | fountain`, params `intensity`, `fxSize`, `fxSpeed`, `fxStart` (all keyframable).
+1. **Build**: switch to Scene (`data-ws="scene"`), add objects, set `pos/rot/scale/color/opacity` in `#scene-props`. FX objects: kind in `fire | smoke | sparks | explosion | fountain | rain | snow | embers | magic | dust | fireworks`, params `intensity`, `fxSize`, `fxSpeed`, `fxStart` (all keyframable).
 2. **Animate**: Animate workspace. Select object, move gizmo, `#btn-key-add` (keyframe). Channels: `pos`, `rot`, `scale` (+ FX params). Shots are sequential; `totalDuration = Σ shot.duration`.
 3. **Export frame-accurate**: set `#export-start`/`#export-end` (seconds; blank = full movie), click `#btn-record`. Output WebM (VP8, 720p/1080p, 8/4/2.5 Mbps). Sections start at timestamp 0 with a keyframe — stitch with ffmpeg concat (`-c copy`), do not byte-concatenate.
 4. **Export real-time**: `#btn-download-video` (MediaRecorder; has audio; keep tab visible).
@@ -87,7 +87,7 @@ Lessons from an agent-built 10-shot, 242 s, 720p/24fps film ("The Spark") — al
 - **Character keyframes target bone ids, not the character id.** A character object's `id` is what `assetId` references; to animate limbs, keyframe the joint names (`hips`, `chest`, `head`, `armL`, `armR`, `legL`, `legR`…) as keyframe subjects with channel `rot` (degrees). Built-in motion clips (`walk`, `wave`, `celebrate`, …) are set via the object's `clip` + `speed` props and are much cheaper than hand-keying.
 - **`scale` must be `[x,y,z]`** — a single number or `[s]` is silently ignored (object renders at default size).
 - **`color` doubles as the emissive glow color**: set `emissive` (number, 0–~2) for glow strength. High-emissive colors bloom nicely against `night`/`sunset` lighting.
-- **`shot.lighting`**: `studio | daylight | sunset | night`.
+- **`shot.lighting`**: `studio | daylight | sunset | night | neon | candlelight | moonlight | horror | golden`.
 - **Events** (`shot.events`): `title` (`text`, `start`, `dur`, optional `color`), `subtitle` (same + optional `speaker`), `fadein`/`fadeout` (`start`, `dur`), `letterbox`, `shake`. `start`/`dur` are shot-local seconds.
 - **Letterbox + subtitles (fixed in v0.6.7)**: the letterbox bars used to overlap the subtitle plane and clip descenders; subtitles are now lifted above the bottom bar whenever letterbox is active. Projects that avoided letterbox for this reason can re-enable it.
 - **Long films**: render in ≤60 s sections (`#export-start`/`#export-end`), stitch with `ffmpeg -f concat -safe 0 -c copy`. On a 2-core headless Chrome (SwiftShader WebGL2), expect roughly 0.65–0.7× real time per section (a 52 s section ≈ 11–12 min, ~50 MB). WebCodecs in headless Chrome supports **VP8 + Opus only** — no H.264/AAC encode; plan the VideoCraft/MovieCraft export path accordingly.

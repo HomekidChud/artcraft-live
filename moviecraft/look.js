@@ -16,6 +16,12 @@ const GRADES = {
   comic: { shadow: [0.92, 0.95, 1.0], high: [1.05, 1.03, 1.0], sat: 1.25, con: 1.18 },
   pastel: { shadow: [1.0, 0.99, 1.02], high: [1.02, 1.0, 1.0], sat: 0.85, con: 0.92 },
   night: { shadow: [0.85, 0.92, 1.15], high: [0.95, 1.0, 1.08], sat: 0.9, con: 1.2 },
+  'teal-orange': { shadow: [0.72, 0.95, 1.08], high: [1.1, 1.0, 0.84], sat: 1.15, con: 1.16 },
+  bleach: { shadow: [1.02, 1.0, 0.98], high: [1.06, 1.03, 0.97], sat: 0.45, con: 1.3 },
+  sepia: { shadow: [0.94, 0.89, 0.78], high: [1.08, 1.0, 0.8], sat: 0.55, con: 1.05 },
+  dream: { shadow: [1.02, 1.0, 1.05], high: [1.05, 1.02, 1.0], sat: 0.95, con: 0.85 },
+  moonlight: { shadow: [0.78, 0.88, 1.12], high: [0.9, 0.98, 1.15], sat: 0.8, con: 1.18 },
+  cyberpunk: { shadow: [0.8, 0.9, 1.15], high: [1.12, 0.95, 1.05], sat: 1.35, con: 1.2 },
 };
 
 const FinalShader = {

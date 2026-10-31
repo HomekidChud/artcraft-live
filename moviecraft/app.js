@@ -10,13 +10,13 @@ import { buildAvatar } from './avatar3d.js';
 import { JOINTS, MOTIONS, cameraTracks, exportSize } from './motion.js';
 import { defaultStudio, normalizeStudio, hasProductionWork, PRODUCTION_TABS, modelInstance } from './production.js';
 import { buildModel } from './models.js';
-import { defaultLook, GRADES, createLookEngine } from './effects.js';
+import { defaultLook, GRADES, createLookEngine } from './effects.js?v=0.9.0';
 import { installWorkspaceShell, createStudioWorkspaces } from './workspaces.js';
 import { boneJoints, isPresetCompatible } from './charcraft.js';
 import { buildCharacterGroup, sketchCharacter } from './charbuild.js';
 import { evalShotOverlay, shakeOffset, newEvent, EVENT_TYPES, EVENT_LABELS, TRANSITIONS } from './cutscene.js';
 import { createCutsceneOverlay } from './overlay.js?v=0.6.7';
-import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.8.1';
+import { FX_KINDS, FX_LABELS, FX_PRESETS, buildFxPoints } from './fx.js?v=0.9.0';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 installWorkspaceShell();
@@ -1185,6 +1185,11 @@ function applyLighting(preset) {
     daylight: ['#9ab9ce', '#fff2d9', 2.8, '#c7e4ff', 1.2, 1.15],
     sunset: ['#493b47', '#ffb56b', 3.4, '#759eff', 2.3, 1.0],
     night: ['#101b2b', '#d3e8ff', 2.1, '#70a8ff', 3.0, 0.95],
+    neon: ['#12081c', '#7cf3ff', 2.2, '#ff3ecf', 3.4, 1.05],
+    candlelight: ['#241708', '#ffb45e', 2.6, '#8f5b2a', 1.6, 1.0],
+    moonlight: ['#0c1425', '#cfe0ff', 1.6, '#5f7fd0', 2.6, 0.9],
+    horror: ['#140b0c', '#cfd8d2', 1.4, '#ff4030', 2.2, 0.85],
+    golden: ['#4a3220', '#ffd9a0', 3.2, '#b78a4f', 2.0, 1.1],
   };
   const [bg, key, intensity, rim, rimIntensity, exposure] = looks[preset] || looks.studio;
   three.background.set(bg); three.fog.color.set(bg);

@@ -1,7 +1,7 @@
 // scene3d.js — 3D scene clips: objects, characters, FX, camera moves, keyframes
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { createLookEngine } from './look.js';
+import { createLookEngine } from './look.js?v=1.2.0';
 
 let uid = 1;
 export const newId = (p = 'id') => `${p}${(uid++).toString(36)}${Date.now().toString(36).slice(-4)}`;
@@ -9,8 +9,8 @@ export const newId = (p = 'id') => `${p}${(uid++).toString(36)}${Date.now().toSt
 // ---------------------------------------------------------------- scene defs
 
 const CHAR_MOTIONS = ['none', 'idle', 'walk', 'run', 'wave', 'celebrate'];
-const FX_KINDS = ['fire', 'explosion', 'confetti', 'sparks', 'fountain'];
-const LIGHT_PRESETS = ['three-point', 'sunset', 'night', 'dramatic'];
+const FX_KINDS = ['fire', 'explosion', 'confetti', 'sparks', 'fountain', 'rain', 'snow', 'embers', 'magic', 'smoke'];
+const LIGHT_PRESETS = ['three-point', 'sunset', 'night', 'dramatic', 'daylight', 'neon', 'candlelight', 'horror'];
 
 export function makeObject(type, over = {}) {
   const base = {
@@ -228,6 +228,11 @@ const FX_COLORS = {
   confetti: [[1, 0.4, 0.5], [0.4, 0.8, 1], [1, 0.9, 0.3], [0.6, 1, 0.6]],
   sparks: [[1, 0.9, 0.6], [1, 0.75, 0.4]],
   fountain: [[0.5, 0.8, 1], [0.7, 0.9, 1], [1, 1, 1]],
+  rain: [[0.75, 0.85, 0.95], [0.6, 0.72, 0.88]],
+  snow: [[1, 1, 1], [0.9, 0.95, 1]],
+  embers: [[1, 0.8, 0.45], [1, 0.55, 0.2], [0.85, 0.3, 0.1]],
+  magic: [[0.96, 0.8, 1], [0.7, 0.6, 1], [0.5, 0.9, 1]],
+  smoke: [[0.45, 0.45, 0.5], [0.3, 0.3, 0.35], [0.2, 0.2, 0.25]],
 };
 
 function updateFX(def, pts, t) {
@@ -259,6 +264,36 @@ function updateFX(def, pts, t) {
     } else if (kind === 'sparks') {
       const a = seed * Math.PI * 2, v = 1.4 + seed * 1.6, tt = (t + seed * 2) % 1.1;
       pos[i * 3] = Math.cos(a) * v * tt * S; pos[i * 3 + 1] = 1.2 * S + v * 0.7 * tt - tt * tt * 2.2; pos[i * 3 + 2] = Math.sin(a) * v * tt * S;
+    } else if (kind === 'rain') {
+      // fast falling streaks across a wide column, wrapping forever
+      const fall = ((t * (2.4 + seed * 0.8) + seed * 5) % 3.8) * S;
+      const a = seed * Math.PI * 2;
+      const r = (0.35 + seed * 0.65) * 2.2 * S;
+      pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = 3.6 * S - fall; pos[i * 3 + 2] = Math.sin(a) * r;
+    } else if (kind === 'snow') {
+      // slow drifting flakes with sinusoidal sway
+      const fall = ((t * (0.35 + seed * 0.25) + seed * 4) % 4.2) * S;
+      const sway = Math.sin(t * (0.8 + seed) + seed * 9) * 0.5;
+      pos[i * 3] = (seed - 0.5) * 3.6 * S + sway; pos[i * 3 + 1] = 3.8 * S - fall; pos[i * 3 + 2] = (Math.cos(seed * 7.3) * 1.6) * S;
+    } else if (kind === 'embers') {
+      // rising glowing motes with a wobble
+      const life = ((t * (0.45 + seed * 0.3) + seed * 3) % 2.6);
+      const wobble = Math.sin(life * 3 + seed * 12) * 0.25;
+      const a = seed * Math.PI * 2;
+      pos[i * 3] = Math.cos(a) * (0.15 + seed * 0.5) * S + wobble; pos[i * 3 + 1] = 0.2 + life * 1.1 * S; pos[i * 3 + 2] = Math.sin(a) * (0.15 + seed * 0.5) * S;
+    } else if (kind === 'magic') {
+      // slow twinkling rise, shrinking with age
+      const life = ((t * (0.3 + seed * 0.25) + seed * 6) % 3);
+      const twinkle = 0.5 + 0.5 * Math.sin(t * 5 + seed * 20);
+      const a = seed * Math.PI * 2;
+      pos[i * 3] = Math.cos(a) * (0.2 + seed * 0.8) * S; pos[i * 3 + 1] = 0.2 + life * 0.9 * S; pos[i * 3 + 2] = Math.sin(a) * (0.2 + seed * 0.8) * S;
+      col[i * 3] *= 0.6 + twinkle * 0.7; col[i * 3 + 1] *= 0.6 + twinkle * 0.7; col[i * 3 + 2] *= 0.6 + twinkle * 0.7;
+    } else if (kind === 'smoke') {
+      // slow expanding plume
+      const life = ((t * (0.3 + seed * 0.2) + seed * 4) % 3.4);
+      const a = seed * Math.PI * 2;
+      const r = (0.15 + life * 0.45 + seed * 0.2) * S;
+      pos[i * 3] = Math.cos(a) * r; pos[i * 3 + 1] = 0.2 + life * 2.2 * S; pos[i * 3 + 2] = Math.sin(a) * r;
     } else { // fountain
       const a = seed * Math.PI * 2, tt = (t * 0.9 + seed * 2.3) % 1.9;
       const v = (1.5 + seed) * S;
@@ -309,6 +344,27 @@ function applyLighting(scene3, preset) {
     add(new THREE.AmbientLight('#ffffff', 0.12));
     const spot = add(new THREE.SpotLight('#ffffff', 90, 30, 0.45, 0.4)); spot.position.set(0, 12, 2);
     const rim = add(new THREE.DirectionalLight('#ffd9a0', 1.2)); rim.position.set(0, 4, -10);
+  }
+  if (preset === 'daylight') {
+    add(new THREE.AmbientLight('#ffffff', 0.5));
+    const sun = add(new THREE.DirectionalLight('#fff6e0', 3.4)); sun.position.set(12, 16, 8);
+    const sky = add(new THREE.HemisphereLight('#bcd8ff', '#8a7a5f', 0.9));
+    const fill = add(new THREE.DirectionalLight('#dce8ff', 0.7)); fill.position.set(-10, 6, -6);
+  } else if (preset === 'neon') {
+    add(new THREE.AmbientLight('#2a2438', 0.9));
+    const cyan = add(new THREE.PointLight('#22e0ff', 30, 22)); cyan.position.set(-5, 3.5, 3);
+    const magenta = add(new THREE.PointLight('#ff2fd0', 30, 22)); magenta.position.set(5, 3, -3);
+    const rim = add(new THREE.DirectionalLight('#7f9fff', 1.4)); rim.position.set(0, 6, -10);
+  } else if (preset === 'candlelight') {
+    add(new THREE.AmbientLight('#3a2a18', 1.2));
+    const flame = add(new THREE.PointLight('#ffb45e', 18, 16, 2)); flame.position.set(0.4, 1.1, 0.8);
+    const bounce = add(new THREE.PointLight('#ff8a3c', 7, 14, 2)); bounce.position.set(-1.2, 0.5, 1.4);
+    const rim = add(new THREE.DirectionalLight('#c9a27a', 0.5)); rim.position.set(0, 4, -8);
+  } else if (preset === 'horror') {
+    add(new THREE.AmbientLight('#1a0f10', 0.8));
+    const spot = add(new THREE.SpotLight('#e8f4ff', 45, 26, 0.35, 0.55)); spot.position.set(0, 1.2, 6); // under-lit faces
+    const blood = add(new THREE.PointLight('#ff3020', 9, 18)); blood.position.set(-4, 2.5, -5);
+    const rim = add(new THREE.DirectionalLight('#4f8f6f', 0.7)); rim.position.set(0, 5, -10);
   }
 }
 

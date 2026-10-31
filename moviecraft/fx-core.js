@@ -4,8 +4,11 @@
 // so scrubbing backwards, playing and frame-accurate export all produce
 // identical frames. Effects are scene objects: they transform, keyframe,
 // save and export like any other object.
-export const FX_KINDS = ['fire', 'smoke', 'sparks', 'explosion', 'fountain'];
-export const FX_LABELS = { fire: 'Fire', smoke: 'Smoke', sparks: 'Sparks', explosion: 'Explosion', fountain: 'Fountain' };
+export const FX_KINDS = ['fire', 'smoke', 'sparks', 'explosion', 'fountain', 'rain', 'snow', 'embers', 'magic', 'dust', 'fireworks'];
+export const FX_LABELS = {
+  fire: 'Fire', smoke: 'Smoke', sparks: 'Sparks', explosion: 'Explosion', fountain: 'Fountain',
+  rain: 'Rain', snow: 'Snow', embers: 'Embers', magic: 'Magic', dust: 'Dust', fireworks: 'Fireworks',
+};
 
 // Per-kind look: velocity, physics and colour ramp shared by the shader.
 export const FX_PRESETS = {
@@ -14,6 +17,12 @@ export const FX_PRESETS = {
   sparks:   { life: 0.9, count: 150, size: 0.09, vel: [1.6, 3.4, 1.6], gravity: -7.5, spread: 1.0, grow: 0.2, turb: 0.08, additive: true, oneShot: false, colors: ['#fff3c4', '#ffca6e', '#ff5f1e'] },
   explosion:{ life: 1.5, count: 460, size: 0.75, vel: [3.4, 2.6, 3.4], gravity: -3.2, spread: 1.0, grow: 1.1, turb: 0.22, additive: true, oneShot: true, colors: ['#fff6d8', '#ffb24a', '#b3300c'] },
   fountain: { life: 1.7, count: 320, size: 0.14, vel: [0.7, 5.2, 0.7], gravity: -9.0, spread: 0.22, grow: 0.1, turb: 0.05, additive: true, oneShot: false, colors: ['#eafffb', '#7fe3d4', '#2fa8c9'] },
+  rain:     { life: 0.6, count: 420, size: 0.05, vel: [0.4, -13.0, 0.4], gravity: -1.5, spread: 0.95, grow: 0.0, turb: 0.04, additive: false, oneShot: false, colors: ['#cfe4f7', '#9fc6e8', '#7fa8cc'] },
+  snow:     { life: 4.0, count: 300, size: 0.13, vel: [0.35, -1.0, 0.35], gravity: -0.25, spread: 0.95, grow: 0.08, turb: 0.6, additive: false, oneShot: false, colors: ['#ffffff', '#e8f2fb', '#c9d9ea'] },
+  embers:   { life: 2.4, count: 220, size: 0.08, vel: [0.25, 1.5, 0.25], gravity: 0.35, spread: 0.7, grow: -0.2, turb: 0.85, additive: true, oneShot: false, colors: ['#ffd9a0', '#ff9a45', '#c2451a'] },
+  magic:    { life: 2.6, count: 260, size: 0.11, vel: [0.3, 0.8, 0.3], gravity: 0.15, spread: 0.85, grow: -0.35, turb: 0.95, additive: true, oneShot: false, colors: ['#f5c2ff', '#b48cf5', '#7fe8ff'] },
+  dust:     { life: 6.0, count: 200, size: 0.16, vel: [0.18, 0.12, 0.18], gravity: -0.04, spread: 1.0, grow: 0.35, turb: 0.3, additive: false, oneShot: false, colors: ['#b8ac97', '#94897a', '#6f675e'] },
+  fireworks:{ life: 1.9, count: 380, size: 0.09, vel: [0.9, 4.6, 0.9], gravity: -2.6, spread: 1.0, grow: -0.25, turb: 0.08, additive: true, oneShot: false, colors: ['#fff6cf', '#ffc466', '#e05a8f'] },
 };
 
 export function defaultFxProps(kind) {

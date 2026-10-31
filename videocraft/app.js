@@ -1,6 +1,6 @@
 // app.js — VideoCraft editor core
-import { renderScene, makeScene, makeObject, attachControls, editorCamera, pickObject, sampleCamera, newId, CHAR_MOTIONS, FX_KINDS, LIGHT_PRESETS, controls } from './scene3d.js';
-import { LOOK_GRADES } from './look.js';
+import { renderScene, makeScene, makeObject, attachControls, editorCamera, pickObject, sampleCamera, newId, CHAR_MOTIONS, FX_KINDS, LIGHT_PRESETS, controls } from './scene3d.js?v=1.2.0';
+import { LOOK_GRADES } from './look.js?v=1.2.0';
 
 // ---------------------------------------------------------------- state
 
