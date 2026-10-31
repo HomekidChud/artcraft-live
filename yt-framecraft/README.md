@@ -11,7 +11,7 @@ Paste a YouTube link, get a frame-perfect MP4 built for AI vision — every fram
 - **Web inspector** — step frame-by-frame (±1, ±10), jump to a frame number, export the exact frame as PNG, copy a machine-readable frame reference, download the MP4 + JSON sidecar
 - **Custom mirror** — under "advanced", paste any Piped API or Invidious base URL (saved in your browser, tried first)
 - **Drop a video file** — same frame-perfect conversion for anything you already have
-- **CLI does the download too** — `yt-framecraft` (Python 3, stdlib only) tries `yt-dlp` first; when YouTube bot-walls it, the same mirror network is raced in parallel automatically. `--mirror URL` forces a single mirror. Long videos, PNG frame dumps and contact sheets included
+- **CLI does the download too — fast** — `yt-framecraft` (Python 3, stdlib only) races the mirror network first (yt-dlp is only the fallback, so a bot-walled YouTube costs zero seconds), caps the source at 720p (3x smaller download, `--hq` for full res), pulls the video over parallel HTTP range connections, downloads the audio concurrently and races it across mirrors, copies the audio stream instead of re-encoding, and encodes with x264 veryfast. Long videos, PNG frame dumps and contact sheets included
 
 ## Usage
 
@@ -21,6 +21,8 @@ Open `index.html` (or the hosted `/yt-framecraft/` page), paste a YouTube link �
 # CLI: paste-and-go, same frame-perfect output
 python3 yt-framecraft https://www.youtube.com/watch?v=VIDEO_ID
 python3 yt-framecraft VIDEO_ID --fps 24 --scale 1280 --frames png_out --grid sheets
+python3 yt-framecraft VIDEO_ID --hq          # full-res source, archival quality
+python3 yt-framecraft VIDEO_ID --no-audio   # pure AI-vision mode, fastest
 
 # force a specific mirror (any Piped API or Invidious base URL)
 python3 yt-framecraft VIDEO_ID --mirror https://yt.chocolatemoo53.com

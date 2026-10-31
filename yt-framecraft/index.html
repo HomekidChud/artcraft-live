@@ -353,7 +353,8 @@ p.note code {
     const muxed = all.filter(s => !s.videoOnly && mp4(s) && heightOf(s) > 0); // skip LBRY dups here
     const lbry = all.filter(s => !s.videoOnly && mp4(s) && heightOf(s) === 0);
     const auds = (d.audioStreams || []).filter(mp4);
-    const pick = arr => arr.slice().sort((a, b) => heightOf(b) - heightOf(a) || (b.bitrate || 0) - (a.bitrate || 0))[0];
+    const capAt = (arr, cap) => { const fit = arr.filter(s => heightOf(s) <= cap); return fit.length ? fit : arr; }; // 720p is plenty for AI vision and ~3x faster
+    const pick = arr => capAt(arr, 720).slice().sort((a, b) => heightOf(b) - heightOf(a) || (b.bitrate || 0) - (a.bitrate || 0))[0];
     let vUrl = null, aUrl = null, single = false;
     if (vOnly.length && auds.length) {
       vUrl = pick(vOnly).url; aUrl = pick(auds).url;
@@ -376,7 +377,8 @@ p.note code {
     const lv = itag => base + '/latest_version?id=' + d.videoId + '&itag=' + itag + '&local=true';
     let vItag = null, aItag = null, single = false;
     if (vids.length) {
-      vItag = vids.slice().sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0].itag;
+      const vFit = vids.filter(s => heightOf(s) <= 720); // cap at 720p for speed
+      vItag = (vFit.length ? vFit : vids).slice().sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0].itag;
       if (auds.length) aItag = auds.slice().sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0].itag;
       else single = true;
     } else if (d.formatStreams && d.formatStreams.length) {

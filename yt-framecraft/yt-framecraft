@@ -2,16 +2,27 @@
 """
 yt-framecraft — turn any YouTube video into a frame-perfect MP4 for AI vision.
 
-Fetching is a chain: yt-dlp first; if YouTube bot-walls it, the public mirror
-network (Piped + Invidious) is raced in parallel and the video is pulled
-through whichever mirror answers. Then ffmpeg re-encodes it so every frame
-lands exactly on the clock: constant frame rate, deinterlaced, yuv420p H.264,
-closed GOPs with keyframes every second, faststart, optional burned-in frame
-numbers + timestamps. A JSON sidecar describes the result so AI pipelines can
-reference frames exactly ("frame 1234 @ 41.133s, 30.000 fps").
+SPEED-FIRST PIPELINE (v1.2):
+  * Mirrors are raced first — yt-dlp is only the fallback, so a bot-walled
+    YouTube costs zero seconds.
+  * The source stream is capped at 720p by default (--hq for full res):
+    ~3x smaller download, ~2x faster encode — plenty for AI vision.
+  * The video downloads over multiple parallel HTTP range connections
+    (--connections, default 4) instead of one slow stream.
+  * Audio downloads concurrently with the video and is raced across the
+    fastest mirrors so one slow proxy can't stall the pipeline (--no-audio
+    skips it entirely for pure vision use).
+  * Encode defaults to x264 superfast CRF 23 with the audio stream copied
+    straight through (no audio re-encode) — ~2.5x realtime on two cores.
+  * Every frame still lands exactly on the clock: constant frame rate,
+    deinterlaced, yuv420p H.264, closed GOPs with keyframes every second,
+    faststart, burned-in frame numbers + timestamps. A JSON sidecar describes
+    the result so AI pipelines can reference frames exactly
+    ("frame 1234 @ 41.133s, 30.000 fps").
 
 Usage:
   yt-framecraft https://www.youtube.com/watch?v=dQw4w9WgXcQ
+  yt-framecraft dQw4w9WgXcQ --hq            # full-res source, crf 18
   yt-framecraft dQw4w9WgXcQ --fps 24 --scale 1280
   yt-framecraft --file lecture.mp4 -o lecture_ai.mp4
   yt-framecraft --file clip.mp4 --frames png_out --grid sheets
@@ -32,9 +43,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import urllib.request
 import urllib.error
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -94,9 +107,8 @@ def run(cmd, **kw):
         die(f"command failed ({proc.returncode}): {' '.join(map(str, cmd))}")
 
 
-def check_tools(need_ytdlp):
-    missing = [t for t in (["yt-dlp"] if need_ytdlp else []) + ["ffmpeg", "ffprobe"]
-               if shutil.which(t) is None]
+def check_tools():
+    missing = [t for t in ("ffmpeg", "ffprobe") if shutil.which(t) is None]
     if missing:
         die(f"missing required tools on PATH: {', '.join(missing)}")
 
@@ -109,27 +121,138 @@ def http_json(url, timeout=MIRROR_TIMEOUT):
         return json.loads(r.read().decode("utf-8", "replace"))
 
 
-def http_download(url, dst, label=""):
-    """Stream a URL to a file with a simple progress line."""
+def _progress_line(label, got, total):
+    pct = f" ({100 * got // total}%)" if total else ""
+    sys.stderr.write(f"\r          {label}: {got / 1048576:.1f} MB{pct}   ")
+    sys.stderr.flush()
+
+
+def _stream_to_handle(url, fh, label="", total_hint=0):
+    """Stream a URL into an open file handle; returns bytes written."""
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    with urllib.request.urlopen(req, timeout=60) as r, open(dst, "wb") as f:
-        total = int(r.headers.get("Content-Length") or 0)
+    with urllib.request.urlopen(req, timeout=60) as r:
         got = 0
         last = 0.0
         while True:
             chunk = r.read(1 << 16)
             if not chunk:
                 break
-            f.write(chunk)
+            fh.write(chunk)
             got += len(chunk)
-            if label and (total and got - last >= total / 20 or got - last >= 5 << 20):
+            if label and (total_hint and got - last >= total_hint / 20
+                         or got - last >= 5 << 20):
                 last = got
-                pct = f" ({100 * got // total}%)" if total else ""
-                sys.stderr.write(f"\r          {label}: {got / 1048576:.1f} MB{pct}   ")
-                sys.stderr.flush()
-    if label:
-        sys.stderr.write("\n")
+                _progress_line(label, got, total_hint)
     return got
+
+
+def http_download(url, dst, label="", connections=4):
+    """Download fast: parallel HTTP range connections when the server allows
+    it, plain streaming otherwise. Falls back to a single stream if any
+    ranged part fails."""
+    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        total = int(r.headers.get("Content-Length") or 0)
+        can_range = r.headers.get("Accept-Ranges") == "bytes"
+    if not (can_range and total > (2 << 20) and connections > 1):
+        with open(dst, "wb") as f:
+            return _stream_to_handle(url, f, label, total)
+
+    # preallocate the file, then fetch the ranges in parallel
+    with open(dst, "wb") as f:
+        f.truncate(total)
+    nparts = max(2, min(connections, total // (4 << 20)))
+    step = total // nparts
+    bounds = [(i * step, (i + 1) * step - 1) for i in range(nparts)]
+    bounds[-1] = (bounds[-1][0], total - 1)
+
+    got = [0]
+    lock = threading.Lock()
+    failures = []
+    last_seen = [0.0]
+
+    def part(start, end):
+        try:
+            rq = urllib.request.Request(
+                url, headers={"User-Agent": UA, "Range": f"bytes={start}-{end}"})
+            with urllib.request.urlopen(rq, timeout=90) as r, open(dst, "r+b") as f:
+                if not r.headers.get("Content-Range"):
+                    raise RuntimeError("server ignored Range")
+                f.seek(start)
+                pos = start
+                while True:
+                    chunk = r.read(1 << 17)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    pos += len(chunk)
+                    with lock:
+                        got[0] += len(chunk)
+                        if label and got[0] - last_seen[0] >= total / 20:
+                            last_seen[0] = got[0]
+                            _progress_line(label, got[0], total)
+            if pos != end + 1:
+                raise RuntimeError(
+                    f"range short read ({pos - start}/{end - start + 1})")
+        except Exception as e:
+            failures.append(str(e)[:120])
+
+    threads = [threading.Thread(target=part, args=(a, b), daemon=True)
+               for a, b in bounds]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if failures or os.path.getsize(dst) != total:
+        if label:
+            sys.stderr.write("\n")
+        print(f"[fetch] ranged download failed — retrying as a single stream")
+        with open(dst, "wb") as f:
+            return _stream_to_handle(url, f, label)
+    if label:
+        _progress_line(label, got[0], total)
+        sys.stderr.write("\n")
+    return total
+
+
+def race_download(candidates, dst, label):
+    """Download from the first of several (mirror, url) candidates to finish.
+
+    Used for the audio track so a slow proxy can't stall the pipeline.
+    """
+    if len(candidates) <= 1:
+        if candidates:
+            http_download(candidates[0][1], dst, label, connections=4)
+        return
+    won = threading.Event()
+    winner = [None]
+
+    def worker(i, url):
+        tmp = f"{dst}.p{i}"
+        try:
+            if won.is_set():
+                return
+            http_download(url, tmp, label if i == 0 else "")
+            if not won.is_set():
+                won.set()
+                winner[0] = tmp
+        except Exception:
+            pass
+
+    threads = [threading.Thread(target=worker, args=(i, u), daemon=True)
+               for i, (_, u) in enumerate(candidates)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if not won.is_set():
+        return
+    os.replace(winner[0], dst)
+    for i in range(len(candidates)):
+        try:
+            os.remove(f"{dst}.p{i}")
+        except OSError:
+            pass
 
 
 def video_id_from(source):
@@ -153,8 +276,12 @@ def _height(quality):
     return int(m.group(1)) if m else 0
 
 
-def from_piped(d, base):
-    """Pick best mp4 video + audio from a Piped /streams response."""
+def from_piped(d, base, cap=720):
+    """Pick best mp4 video + audio from a Piped /streams response.
+
+    Video height is capped at `cap` by default — a 720p source downloads
+    ~3x faster than 1080p and is plenty for AI vision.
+    """
     if not isinstance(d, dict) or d.get("error") or not d.get("videoStreams"):
         return None
     mp4 = lambda s: "mp4" in (s.get("mimeType") or "")
@@ -165,6 +292,8 @@ def from_piped(d, base):
             and _height(s.get("quality")) == 0]
     auds = [s for s in (d.get("audioStreams") or []) if mp4(s)]
     best = lambda arr, key: max(arr, key=key) if arr else None
+    fit = lambda arr: [s for s in arr if _height(s.get("quality")) <= cap] or arr
+    vonly, muxed = fit(vonly), fit(muxed)
     v = best(vonly, key=lambda s: (_height(s.get("quality")), _int(s.get("bitrate"))))
     a = best(auds, key=lambda s: _int(s.get("bitrate")))
     if v and a:
@@ -178,7 +307,16 @@ def from_piped(d, base):
     return None
 
 
-def from_invidious(d, vid, base):
+def _fmt_height(f):
+    ql = str(f.get("qualityLabel") or f.get("quality") or "")
+    m = re.search(r"(\d+)", ql)
+    if m:
+        return int(m.group(1))
+    m = re.match(r"(\d+)x", str(f.get("resolution") or ""))
+    return int(m.group(1)) if m else 0
+
+
+def from_invidious(d, vid, base, cap=720):
     """Pick best mp4 video + audio from an Invidious /api/v1/videos response."""
     if not isinstance(d, dict) or d.get("error"):
         return None
@@ -187,7 +325,8 @@ def from_invidious(d, vid, base):
     auds = [f for f in fmts if str(f.get("type") or "").startswith("audio/mp4")]
     lv = lambda itag: f"{base}/latest_version?id={vid}&itag={itag}&local=true"
     if vids:
-        v = max(vids, key=lambda f: _int(f.get("bitrate")))
+        fit = [f for f in vids if _fmt_height(f) <= cap] or vids
+        v = max(fit, key=lambda f: _int(f.get("bitrate")))
         a = max(auds, key=lambda f: _int(f.get("bitrate"))) if auds else None
         return {"title": d.get("title"), "duration": d.get("lengthSeconds"),
                 "video": lv(v["itag"]), "audio": lv(a["itag"]) if a else None,
@@ -199,38 +338,56 @@ def from_invidious(d, vid, base):
     return None
 
 
-def try_piped(base, vid):
-    return from_piped(http_json(f"{base}/streams/{vid}"), base)
+def try_piped(base, vid, cap=720):
+    return from_piped(http_json(f"{base}/streams/{vid}"), base, cap)
 
 
-def try_invidious(base, vid):
+def try_invidious(base, vid, cap=720):
     d = http_json(f"{base}/api/v1/videos/{vid}"
                   "?fields=title,lengthSeconds,videoId,adaptiveFormats,formatStreams")
-    return from_invidious(d, vid, base)
+    return from_invidious(d, vid, base, cap)
 
 
-def resolve_mirrors(vid, only=None):
-    """Race every mirror in parallel; return the first workable result.
+def resolve_mirrors(vid, only=None, cap=720):
+    """Race every mirror in parallel; return a list of workable results,
+    fastest-first. The first winner unblocks the download immediately; a
+    short grace window collects a few more mirrors so the audio track can
+    be raced across them too.
 
     only: optional base URL to use a single custom mirror (tries both kinds).
     """
     jobs = []
     if only:
-        jobs = [(f"piped:{only}", lambda: try_piped(only, vid)),
-                (f"invidious:{only}", lambda: try_invidious(only, vid))]
+        jobs = [(f"piped:{only}", lambda: try_piped(only, vid, cap)),
+                (f"invidious:{only}", lambda: try_invidious(only, vid, cap))]
     else:
-        jobs += [(f"piped:{b}", lambda b=b: try_piped(b, vid)) for b in PIPED_MIRRORS]
-        jobs += [(f"invidious:{b}", lambda b=b: try_invidious(b, vid)) for b in INVIDIOUS_MIRRORS]
+        jobs += [(f"piped:{b}", lambda b=b: try_piped(b, vid, cap)) for b in PIPED_MIRRORS]
+        jobs += [(f"invidious:{b}", lambda b=b: try_invidious(b, vid, cap)) for b in INVIDIOUS_MIRRORS]
+    results = []
     with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
-        futs = {pool.submit(fn): name for name, fn in jobs}
-        for fut in list(futs):
+        futs = [pool.submit(fn) for _, fn in jobs]
+        # wait for the first success (futures self-timeout via MIRROR_TIMEOUT)
+        for fut in as_completed(futs):
             try:
                 res = fut.result(timeout=MIRROR_TIMEOUT + 6)
-                if res:
-                    return res
             except Exception:
                 continue
-    return None
+            if res:
+                results.append(res)
+                break
+        # grace window: scoop up other fast mirrors for the audio race
+        if results:
+            end = time.time() + 5.0
+            for fut in futs:
+                if time.time() >= end:
+                    break
+                try:
+                    res = fut.result(timeout=max(0.05, end - time.time()))
+                except Exception:
+                    continue
+                if res:
+                    results.append(res)
+    return results[:4]
 
 
 def fetch_via_ytdlp(url, tmpdir):
@@ -248,19 +405,36 @@ def fetch_via_ytdlp(url, tmpdir):
     return os.path.join(tmpdir, files[0])
 
 
-def fetch_via_mirrors(vid, tmpdir, only=None):
+def fetch_via_mirrors(vid, tmpdir, only=None, cap=720, connections=4,
+                      no_audio=False):
     print(f"[fetch] racing public mirrors for {vid}…")
-    streams = resolve_mirrors(vid, only)
+    streams = resolve_mirrors(vid, only, cap)
     if not streams:
         raise RuntimeError("every mirror failed (Piped + Invidious)")
-    print(f"[fetch] won via {streams['mirror']}"
-          + (f" — {streams['title']}" if streams.get("title") else ""))
+    s = streams[0]
+    print(f"[fetch] won via {s['mirror']}"
+          + (f" — {s['title']}" if s.get("title") else ""))
     vpath = os.path.join(tmpdir, "mirror_vid.mp4")
-    http_download(streams["video"], vpath, "video")
     apath = None
-    if streams.get("audio"):
+
+    # audio downloads concurrently with the video, raced across mirrors
+    audio_thread = None
+    if not no_audio and s.get("audio"):
         apath = os.path.join(tmpdir, "mirror_aud.m4a")
-        http_download(streams["audio"], apath, "audio")
+        cands = [(x["mirror"], x["audio"]) for x in streams[:4] if x.get("audio")]
+        audio_thread = threading.Thread(
+            target=race_download, args=(cands, apath, "audio"), daemon=True)
+        audio_thread.start()
+        if len(cands) > 1:
+            print(f"[fetch] audio racing across {len(cands)} mirrors")
+
+    http_download(s["video"], vpath, "video", connections)
+    if audio_thread is not None:
+        audio_thread.join()
+        if not os.path.isfile(apath):
+            apath = None
+            print("[fetch] audio race lost — continuing video-only")
+
     if apath:
         merged = os.path.join(tmpdir, "merged.mp4")
         run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
@@ -269,22 +443,23 @@ def fetch_via_mirrors(vid, tmpdir, only=None):
     return vpath
 
 
-def download(source, tmpdir, mirror=None):
-    """Full fetch chain: yt-dlp, then the mirror network."""
+def download(source, tmpdir, mirror=None, cap=720, connections=4,
+              no_audio=False):
+    """Full fetch chain: mirror network first (fast), yt-dlp as fallback."""
     vid = video_id_from(source)
-    try:
-        print(f"[fetch] {source} (yt-dlp)")
-        path = fetch_via_ytdlp(source, tmpdir)
-        print(f"[fetch] got {os.path.basename(path)} via yt-dlp")
-        return path, "yt-dlp"
-    except FileNotFoundError:
-        die("yt-dlp is not installed and no --file was given")
-    except Exception as e:
-        print(f"[fetch] yt-dlp unavailable ({str(e)[:80]}…) — falling back to public mirrors")
     if not vid:
         die(f"could not extract a YouTube video ID from: {source}")
-    path = fetch_via_mirrors(vid, tmpdir, mirror)
-    return path, "mirror network"
+    try:
+        path = fetch_via_mirrors(vid, tmpdir, mirror, cap, connections,
+                                 no_audio)
+        return path, "mirror network"
+    except Exception as e:
+        if shutil.which("yt-dlp") is None:
+            die(f"mirrors failed and yt-dlp is not installed: {str(e)[:120]}")
+        print(f"[fetch] mirrors failed ({str(e)[:80]}…) — trying yt-dlp")
+    path = fetch_via_ytdlp(source, tmpdir)
+    print(f"[fetch] got {os.path.basename(path)} via yt-dlp")
+    return path, "yt-dlp"
 
 
 # ---------------------------------------------------------------- encode
@@ -306,6 +481,7 @@ def probe(path):
         die(f"could not determine source frame rate ({video['r_frame_rate']})")
     fmt = data.get("format", {})
     duration = float(fmt.get("duration", 0) or 0)
+    audio = next((s for s in data.get("streams", []) if s.get("codec_type") == "audio"), None)
     return {
         "path": path,
         "width": int(video.get("width", 0)),
@@ -313,7 +489,8 @@ def probe(path):
         "fps": fps,
         "fps_exact": video["r_frame_rate"],
         "duration": duration,
-        "has_audio": any(s.get("codec_type") == "audio" for s in data.get("streams", [])),
+        "has_audio": audio is not None,
+        "audio_codec": (audio or {}).get("codec_name"),
         "nb_frames": video.get("nb_frames"),
         "interlaced": (video.get("field_order") or "progressive") not in ("progressive", ""),
     }
@@ -367,7 +544,10 @@ def encode(src, dst, meta, args, fps, font):
         "-force_key_frames", "expr:gte(t,n_forced*1)",
     ]
     if meta["has_audio"]:
-        cmd += ["-c:a", "aac", "-b:a", "160k"]
+        if meta.get("audio_codec") == "aac":
+            cmd += ["-c:a", "copy"]   # stream copy: zero re-encode cost
+        else:
+            cmd += ["-c:a", "aac", "-b:a", "160k"]
     cmd += ["-movflags", "+faststart", dst]
     print(f"[encode] -> {os.path.basename(dst)}  "
           f"(cfr {fps:g} fps, crf {args.crf}, keyframe every 1s)")
@@ -390,7 +570,8 @@ def sidecar(dst, meta, args, fps, source_url, fetched_via):
         "frame_count": int(frames),
         "duration_seconds": round(out["duration"], 3),
         "video": "h264 yuv420p",
-        "audio": "aac 160k" if out["has_audio"] else "none",
+        "audio": ("copied" if out["has_audio"] and meta.get("audio_codec") == "aac"
+                  else ("aac 160k" if out["has_audio"] else "none")),
         "keyframes": "every 1 second (closed GOP)",
         "burned_frame_numbers": not args.no_burn,
         "frame_reference_format": "frame N @ (N / fps) seconds",
@@ -437,8 +618,17 @@ def main():
                     help="skip burning frame numbers + timestamps into the video")
     ap.add_argument("--frames", metavar="DIR", help="also export every frame as PNG")
     ap.add_argument("--grid", metavar="DIR", help="also export 5x5 contact sheets (1 sheet/25s)")
-    ap.add_argument("--crf", type=int, default=18, help="x264 quality, lower=better (default 18)")
-    ap.add_argument("--preset", default="medium", help="x264 speed preset (default medium)")
+    ap.add_argument("--crf", type=int, default=23,
+                    help="x264 quality, lower=better (default 23)")
+    ap.add_argument("--preset", default="superfast",
+                    help="x264 speed preset (default superfast; --hq bumps to crf 18 + medium)")
+    ap.add_argument("--hq", action="store_true",
+                    help="full-resolution source + crf 18 + medium preset "
+                         "(slower, archival quality)")
+    ap.add_argument("--connections", type=int, default=4, metavar="N",
+                    help="parallel HTTP range connections per stream (default 4)")
+    ap.add_argument("--no-audio", action="store_true",
+                    help="skip the audio track entirely (pure AI-vision mode)")
     ap.add_argument("--keep-temp", action="store_true", help="keep the intermediate download")
     args = ap.parse_args()
 
@@ -447,7 +637,11 @@ def main():
     if args.source and args.file:
         ap.error("use either a URL or --file, not both")
 
-    check_tools(need_ytdlp=not args.file and shutil.which("yt-dlp") is not None)
+    check_tools()
+    if args.hq:
+        args.crf = min(args.crf, 18)
+        if args.preset == "superfast":
+            args.preset = "medium"
 
     source_url = None
     tmpdir = None
@@ -463,7 +657,9 @@ def main():
         if "youtube.com" in url or "youtu.be" in url:
             source_url = url
         tmpdir = tempfile.mkdtemp(prefix="ytframecraft_")
-        src, fetched_via = download(url, tmpdir, args.mirror)
+        cap = 4320 if args.hq else 720
+        src, fetched_via = download(url, tmpdir, args.mirror, cap,
+                                    args.connections, args.no_audio)
 
     meta = probe(src)
     fps = args.fps or meta["fps"]
