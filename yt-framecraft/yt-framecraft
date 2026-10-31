@@ -20,8 +20,16 @@ SPEED-FIRST PIPELINE (v1.2):
     the result so AI pipelines can reference frames exactly
     ("frame 1234 @ 41.133s, 30.000 fps").
 
+TURBO MODE (--turbo): when the source stream already satisfies the spec
+(H.264 yuv420p, constant frame rate), the re-encode is skipped entirely and
+the stream is remuxed with +faststart — the whole conversion becomes
+download-bound (~20s for an 8-minute video). Frame numbers are not burned
+in that mode (burning requires an encode); the sidecar still documents
+exact frame math. Auto-falls back to a full encode if the source is VFR.
+
 Usage:
   yt-framecraft https://www.youtube.com/watch?v=dQw4w9WgXcQ
+  yt-framecraft dQw4w9WgXcQ --turbo        # remux only — download-bound speed
   yt-framecraft dQw4w9WgXcQ --hq            # full-res source, crf 18
   yt-framecraft dQw4w9WgXcQ --fps 24 --scale 1280
   yt-framecraft --file lecture.mp4 -o lecture_ai.mp4
@@ -434,13 +442,9 @@ def fetch_via_mirrors(vid, tmpdir, only=None, cap=720, connections=4,
         if not os.path.isfile(apath):
             apath = None
             print("[fetch] audio race lost — continuing video-only")
-
-    if apath:
-        merged = os.path.join(tmpdir, "merged.mp4")
-        run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-             "-i", vpath, "-i", apath, "-c", "copy", "-shortest", merged])
-        return merged
-    return vpath
+    # no merge step: the encode/mux consumes the video and audio directly,
+    # so the pipeline never waits on a redundant file copy
+    return vpath, apath
 
 
 def download(source, tmpdir, mirror=None, cap=720, connections=4,
@@ -450,16 +454,16 @@ def download(source, tmpdir, mirror=None, cap=720, connections=4,
     if not vid:
         die(f"could not extract a YouTube video ID from: {source}")
     try:
-        path = fetch_via_mirrors(vid, tmpdir, mirror, cap, connections,
-                                 no_audio)
-        return path, "mirror network"
+        path, apath = fetch_via_mirrors(vid, tmpdir, mirror, cap,
+                                        connections, no_audio)
+        return path, apath, "mirror network"
     except Exception as e:
         if shutil.which("yt-dlp") is None:
             die(f"mirrors failed and yt-dlp is not installed: {str(e)[:120]}")
         print(f"[fetch] mirrors failed ({str(e)[:80]}…) — trying yt-dlp")
     path = fetch_via_ytdlp(source, tmpdir)
     print(f"[fetch] got {os.path.basename(path)} via yt-dlp")
-    return path, "yt-dlp"
+    return path, None, "yt-dlp"
 
 
 # ---------------------------------------------------------------- encode
@@ -482,18 +486,41 @@ def probe(path):
     fmt = data.get("format", {})
     duration = float(fmt.get("duration", 0) or 0)
     audio = next((s for s in data.get("streams", []) if s.get("codec_type") == "audio"), None)
+    try:
+        anum, aden = (int(x) for x in video["avg_frame_rate"].split("/"))
+        fps_avg = anum / aden if aden else 0.0
+    except Exception:
+        fps_avg = 0.0
     return {
         "path": path,
         "width": int(video.get("width", 0)),
         "height": int(video.get("height", 0)),
         "fps": fps,
         "fps_exact": video["r_frame_rate"],
+        "fps_avg": fps_avg,
+        "cfr": bool(fps_avg) and abs(fps_avg - fps) / fps < 0.001,
         "duration": duration,
         "has_audio": audio is not None,
         "audio_codec": (audio or {}).get("codec_name"),
         "nb_frames": video.get("nb_frames"),
         "interlaced": (video.get("field_order") or "progressive") not in ("progressive", ""),
     }
+
+
+def probe_audio(path):
+    """Return the audio codec name inside a file, or None."""
+    proc = subprocess.run(
+        ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_streams", path],
+        capture_output=True, text=True)
+    if proc.returncode != 0:
+        return None
+    try:
+        data = json.loads(proc.stdout)
+        audio = next(s for s in data.get("streams", [])
+                     if s.get("codec_type") == "audio")
+        return audio.get("codec_name")
+    except Exception:
+        return None
 
 
 def find_font():
@@ -530,10 +557,13 @@ def build_filters(meta, args, fps, font):
     return filters
 
 
-def encode(src, dst, meta, args, fps, font):
+def encode(src, dst, meta, args, fps, font, audio_path=None):
     filters = build_filters(meta, args, fps, font)
     cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-stats",
            "-i", src]
+    if audio_path:
+        cmd += ["-i", audio_path, "-map", "0:v:0", "-map", "1:a:0",
+                "-shortest"]
     if filters:
         cmd += ["-vf", ",".join(filters)]
     gop = max(1, int(math.ceil(fps)))
@@ -572,8 +602,11 @@ def sidecar(dst, meta, args, fps, source_url, fetched_via):
         "video": "h264 yuv420p",
         "audio": ("copied" if out["has_audio"] and meta.get("audio_codec") == "aac"
                   else ("aac 160k" if out["has_audio"] else "none")),
-        "keyframes": "every 1 second (closed GOP)",
-        "burned_frame_numbers": not args.no_burn,
+        "keyframes": ("inherited from source (turbo remux)"
+                      if args.turbo else "every 1 second (closed GOP)"),
+        "burned_frame_numbers": not (args.no_burn or args.turbo),
+        "mode": ("turbo remux (stream copy, no re-encode)" if args.turbo
+                 else "encode"),
         "frame_reference_format": "frame N @ (N / fps) seconds",
     }
     path = dst + ".json"
@@ -581,6 +614,24 @@ def sidecar(dst, meta, args, fps, source_url, fetched_via):
         json.dump(info, fh, indent=2)
     print(f"[sidecar] {os.path.basename(path)}  "
           f"({info['frame_count']} frames @ {fps:g} fps)")
+
+
+def turbo_remux(src, dst, meta, audio_path=None):
+    """--turbo: no re-encode — copy the stream into a faststart MP4.
+
+    Only allowed when the source already meets the frame-perfect spec
+    (H.264, constant frame rate); VFR sources fall back to a real encode.
+    """
+    cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-stats",
+           "-i", src]
+    if audio_path:
+        cmd += ["-i", audio_path, "-map", "0:v:0", "-map", "1:a:0",
+                "-shortest"]
+    cmd += ["-c", "copy", "-movflags", "+faststart", dst]
+    print(f"[turbo] stream copy -> {os.path.basename(dst)}  "
+          f"(no re-encode, no burn-in)")
+    run(cmd)
+    return dst
 
 
 def dump_frames(dst, outdir):
@@ -629,6 +680,11 @@ def main():
                     help="parallel HTTP range connections per stream (default 4)")
     ap.add_argument("--no-audio", action="store_true",
                     help="skip the audio track entirely (pure AI-vision mode)")
+    ap.add_argument("--turbo", action="store_true",
+                    help="remux the source stream with no re-encode — "
+                         "download-bound speed (~20s for an 8-min video); "
+                         "no frame-number burn-in, auto-falls back to an "
+                         "encode if the source is variable-frame-rate")
     ap.add_argument("--keep-temp", action="store_true", help="keep the intermediate download")
     args = ap.parse_args()
 
@@ -658,10 +714,16 @@ def main():
             source_url = url
         tmpdir = tempfile.mkdtemp(prefix="ytframecraft_")
         cap = 4320 if args.hq else 720
-        src, fetched_via = download(url, tmpdir, args.mirror, cap,
-                                    args.connections, args.no_audio)
+        src, audio_path, fetched_via = download(url, tmpdir, args.mirror, cap,
+                                               args.connections, args.no_audio)
 
     meta = probe(src)
+    if audio_path:
+        meta["has_audio"] = True
+        meta["audio_codec"] = probe_audio(audio_path) or "aac"
+    if args.turbo and not meta["cfr"]:
+        print("[turbo] source is variable-frame-rate — falling back to encode")
+        args.turbo = False
     fps = args.fps or meta["fps"]
     if args.fps is None:
         print(f"[probe] {meta['width']}x{meta['height']}, "
@@ -681,7 +743,10 @@ def main():
         dst += ".mp4"
 
     font = find_font()
-    encode(src, dst, meta, args, fps, font)
+    if args.turbo:
+        turbo_remux(src, dst, meta, audio_path)
+    else:
+        encode(src, dst, meta, args, fps, font, audio_path)
     sidecar(dst, meta, args, fps, source_url, fetched_via)
     if args.frames:
         dump_frames(dst, args.frames)
