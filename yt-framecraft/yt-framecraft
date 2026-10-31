@@ -27,9 +27,18 @@ download-bound (~20s for an 8-minute video). Frame numbers are not burned
 in that mode (burning requires an encode); the sidecar still documents
 exact frame math. Auto-falls back to a full encode if the source is VFR.
 
+ULTRATURBO MODE (--ultraturbo): turbo with the startup fat trimmed. The
+mirror-race grace window drops from 5s to 0.8s (when few mirrors are
+alive the old window was pure dead time), and the audio-codec probe and
+the post-remux output re-probe are skipped — a stream-copy remux is
+byte-identical to the source, so the sidecar reuses the source probe.
+Saves ~1-5s on every run; the biggest wins are on short videos, where
+startup dominates. Implies --turbo.
+
 Usage:
   yt-framecraft https://www.youtube.com/watch?v=dQw4w9WgXcQ
   yt-framecraft dQw4w9WgXcQ --turbo        # remux only — download-bound speed
+  yt-framecraft dQw4w9WgXcQ --ultraturbo   # turbo + stripped startup
   yt-framecraft dQw4w9WgXcQ --hq            # full-res source, crf 18
   yt-framecraft dQw4w9WgXcQ --fps 24 --scale 1280
   yt-framecraft --file lecture.mp4 -o lecture_ai.mp4
@@ -356,13 +365,15 @@ def try_invidious(base, vid, cap=720):
     return from_invidious(d, vid, base, cap)
 
 
-def resolve_mirrors(vid, only=None, cap=720):
+def resolve_mirrors(vid, only=None, cap=720, grace=5.0):
     """Race every mirror in parallel; return a list of workable results,
     fastest-first. The first winner unblocks the download immediately; a
     short grace window collects a few more mirrors so the audio track can
     be raced across them too.
 
     only: optional base URL to use a single custom mirror (tries both kinds).
+    grace: seconds to wait for extra mirrors after the first win (--ultraturbo
+    passes 0.8 — with few live mirrors the default 5s is pure dead time).
     """
     jobs = []
     if only:
@@ -385,7 +396,7 @@ def resolve_mirrors(vid, only=None, cap=720):
                 break
         # grace window: scoop up other fast mirrors for the audio race
         if results:
-            end = time.time() + 5.0
+            end = time.time() + grace
             for fut in futs:
                 if time.time() >= end:
                     break
@@ -414,9 +425,9 @@ def fetch_via_ytdlp(url, tmpdir):
 
 
 def fetch_via_mirrors(vid, tmpdir, only=None, cap=720, connections=4,
-                      no_audio=False):
+                      no_audio=False, ultraturbo=False):
     print(f"[fetch] racing public mirrors for {vid}…")
-    streams = resolve_mirrors(vid, only, cap)
+    streams = resolve_mirrors(vid, only, cap, grace=0.8 if ultraturbo else 5.0)
     if not streams:
         raise RuntimeError("every mirror failed (Piped + Invidious)")
     s = streams[0]
@@ -448,14 +459,14 @@ def fetch_via_mirrors(vid, tmpdir, only=None, cap=720, connections=4,
 
 
 def download(source, tmpdir, mirror=None, cap=720, connections=4,
-              no_audio=False):
+              no_audio=False, ultraturbo=False):
     """Full fetch chain: mirror network first (fast), yt-dlp as fallback."""
     vid = video_id_from(source)
     if not vid:
         die(f"could not extract a YouTube video ID from: {source}")
     try:
         path, apath = fetch_via_mirrors(vid, tmpdir, mirror, cap,
-                                        connections, no_audio)
+                                        connections, no_audio, ultraturbo)
         return path, apath, "mirror network"
     except Exception as e:
         if shutil.which("yt-dlp") is None:
@@ -586,10 +597,19 @@ def encode(src, dst, meta, args, fps, font, audio_path=None):
 
 
 def sidecar(dst, meta, args, fps, source_url, fetched_via):
-    out = probe(dst)
-    frames = out.get("nb_frames")
-    if frames is None:
-        frames = int(round(out["duration"] * fps))
+    if args.turbo and args.ultraturbo:
+        # stream-copy remux: output is byte-identical to the source stream,
+        # so reuse the source probe instead of re-probing the output file
+        frames = meta.get("nb_frames")
+        if frames is None:
+            frames = int(round(meta["duration"] * fps))
+        out = {"width": meta["width"], "height": meta["height"],
+               "duration": meta["duration"], "has_audio": meta["has_audio"]}
+    else:
+        out = probe(dst)
+        frames = out.get("nb_frames")
+        if frames is None:
+            frames = int(round(out["duration"] * fps))
     info = {
         "file": os.path.basename(dst),
         "source": source_url or meta["path"],
@@ -605,7 +625,9 @@ def sidecar(dst, meta, args, fps, source_url, fetched_via):
         "keyframes": ("inherited from source (turbo remux)"
                       if args.turbo else "every 1 second (closed GOP)"),
         "burned_frame_numbers": not (args.no_burn or args.turbo),
-        "mode": ("turbo remux (stream copy, no re-encode)" if args.turbo
+        "mode": ("ultraturbo remux (stream copy, stripped startup)"
+                 if args.turbo and args.ultraturbo
+                 else "turbo remux (stream copy, no re-encode)" if args.turbo
                  else "encode"),
         "frame_reference_format": "frame N @ (N / fps) seconds",
     }
@@ -685,6 +707,11 @@ def main():
                          "download-bound speed (~20s for an 8-min video); "
                          "no frame-number burn-in, auto-falls back to an "
                          "encode if the source is variable-frame-rate")
+    ap.add_argument("--ultraturbo", action="store_true",
+                    help="turbo + stripped startup: 0.8s mirror grace "
+                         "window (vs 5s), no audio/output re-probes — "
+                         "saves ~1-5s per run, most on short videos. "
+                         "Implies --turbo")
     ap.add_argument("--keep-temp", action="store_true", help="keep the intermediate download")
     args = ap.parse_args()
 
@@ -694,6 +721,8 @@ def main():
         ap.error("use either a URL or --file, not both")
 
     check_tools()
+    if args.ultraturbo:
+        args.turbo = True
     if args.hq:
         args.crf = min(args.crf, 18)
         if args.preset == "superfast":
@@ -715,12 +744,19 @@ def main():
         tmpdir = tempfile.mkdtemp(prefix="ytframecraft_")
         cap = 4320 if args.hq else 720
         src, audio_path, fetched_via = download(url, tmpdir, args.mirror, cap,
-                                               args.connections, args.no_audio)
+                                               args.connections,
+                                               args.no_audio,
+                                               args.ultraturbo)
 
     meta = probe(src)
     if audio_path:
         meta["has_audio"] = True
-        meta["audio_codec"] = probe_audio(audio_path) or "aac"
+        if args.ultraturbo and args.turbo:
+            # stream-copy remux doesn't care about the audio codec — skip
+            # the probe subprocess; YouTube audio is aac in practice
+            meta["audio_codec"] = meta["audio_codec"] or "aac"
+        else:
+            meta["audio_codec"] = probe_audio(audio_path) or "aac"
     if args.turbo and not meta["cfr"]:
         print("[turbo] source is variable-frame-rate — falling back to encode")
         args.turbo = False

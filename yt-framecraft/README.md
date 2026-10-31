@@ -11,7 +11,7 @@ Paste a YouTube link, get a frame-perfect MP4 built for AI vision — every fram
 - **Web inspector** — step frame-by-frame (±1, ±10), jump to a frame number, export the exact frame as PNG, copy a machine-readable frame reference, download the MP4 + JSON sidecar
 - **Custom mirror** — under "advanced", paste any Piped API or Invidious base URL (saved in your browser, tried first)
 - **Drop a video file** — same frame-perfect conversion for anything you already have
-- **CLI does the download too — fast** — `yt-framecraft` (Python 3, stdlib only) races the mirror network first (yt-dlp is only the fallback, so a bot-walled YouTube costs zero seconds), caps the source at 720p (3x smaller download, `--hq` for full res), pulls the video over parallel HTTP range connections (~15 MB/s), downloads the audio concurrently and races it across mirrors, skips the merge step, copies the audio stream instead of re-encoding, and encodes with x264 superfast. `--turbo` goes further: when the source stream is already H.264 + constant frame rate, it skips the re-encode entirely and just remuxes — the whole conversion becomes download-bound (~16s for an 8-minute 60fps video; no frame-number burn-in in that mode, and it auto-falls back to an encode on variable-frame-rate sources). Long videos, PNG frame dumps and contact sheets included
+- **CLI does the download too — fast** — `yt-framecraft` (Python 3, stdlib only) races the mirror network first (yt-dlp is only the fallback, so a bot-walled YouTube costs zero seconds), caps the source at 720p (3x smaller download, `--hq` for full res), pulls the video over parallel HTTP range connections (~15 MB/s), downloads the audio concurrently and races it across mirrors, skips the merge step, copies the audio stream instead of re-encoding, and encodes with x264 superfast. `--turbo` goes further: when the source stream is already H.264 + constant frame rate, it skips the re-encode entirely and just remuxes — the whole conversion becomes download-bound (~16s for an 8-minute 60fps video; no frame-number burn-in in that mode, and it auto-falls back to an encode on variable-frame-rate sources). `--ultraturbo` adds stripped startup on top of `--turbo`: the mirror-race grace window is capped at 0.8s (instead of 5s) and the audio/output re-probes are skipped, which bounds the worst-case startup at ~1s — saving up to ~5s per run when dead mirrors fail slowly, and ~0.5s when they fail fast. Long videos, PNG frame dumps and contact sheets included
 
 ## Usage
 
@@ -24,6 +24,7 @@ python3 yt-framecraft VIDEO_ID --fps 24 --scale 1280 --frames png_out --grid she
 python3 yt-framecraft VIDEO_ID --hq          # full-res source, archival quality
 python3 yt-framecraft VIDEO_ID --no-audio   # pure AI-vision mode
 python3 yt-framecraft VIDEO_ID --turbo      # remux only: ~16s for an 8-min video
+python3 yt-framecraft VIDEO_ID --ultraturbo   # turbo + stripped startup (0.8s mirror grace, no re-probes)
 
 # force a specific mirror (any Piped API or Invidious base URL)
 python3 yt-framecraft VIDEO_ID --mirror https://yt.chocolatemoo53.com
