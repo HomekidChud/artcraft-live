@@ -14,8 +14,8 @@
 <script type="application/json" id="ai-guide">
 {
  "app": "VideoCraft",
- "version": "1.1.6",
- "what": "Browser-native video editor (SPA, no backend/auth). Timeline with video/audio tracks, captions, 3D scene clips. Exports MP4 (WebCodecs, faster) or WebM (real-time, has audio). Watch mode: ?project=<name>&cinema=1&play=1 loads projects/<name>.json and plays it fullscreen — share that URL so a human can watch (and export) the film on their own GPU.",
+ "version": "1.1.7",
+ "what": "Browser-native video editor (SPA, no backend/auth). Timeline with video/audio tracks, captions, 3D scene clips. Exports MP4 (WebCodecs, faster) or WebM (real-time, has audio). Watch mode: ?project=<name>&cinema=1&play=1 loads projects/<name>.json and plays it fullscreen — share that URL so a human can watch (and export) the film on their own GPU. Live: add &live=1 — the page polls the raw GitHub copy of projects/<name>.json every 4s and hot-swaps the project while it keeps playing, so viewers see every push within seconds (author workflow: node tools/push-live.mjs <project.json> <name>).",
  "headless": {
   "chromeFlags": "--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required",
   "notes": "WebCodecs in headless Chrome encodes VP8/VP9+Opus only (no H.264/AAC) — the MP4 path then auto-falls back to real-time WebM recording. Audio needs a running AudioContext (autoplay policy). Parallel rendering: open N pages with ?headless=1, call render({start, end}) per chunk, stitch with ffmpeg concat — the WebM path records each chunk in real time, so N chunks render in ~1/N the wall time. Watch mode: ?project=<name>&cinema=1&play=1.",
@@ -395,6 +395,6 @@ body.cinema #exit-hint {
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<script type="module" src="app.js?v=1.4.9"></script>
+<script type="module" src="app.js?v=1.4.10"></script>
 </body>
 </html>

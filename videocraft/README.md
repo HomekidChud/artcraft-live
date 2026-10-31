@@ -213,6 +213,16 @@ https://<site>/videocraft/?project=<name>&cinema=1&play=1
 
 `space` pauses, `esc` returns to the editor, and exporting from the editor is the normal UI (the MP4 path on a GPU machine is faster than real time). This is the workflow for "watch what you're creating": push the project file, share the link.
 
+### Live mode (watch every action as it happens)
+
+Add `&live=1` to a watch URL and the page becomes a live feed: it polls the raw copy of `projects/<name>.json` on GitHub every 4 seconds and hot-swaps the project while it keeps playing — new sky colors, moved cameras, new scenes appear within seconds of each push. The author-side command:
+
+```bash
+node tools/push-live.mjs path/to/project.json my-film "tweak: warmer moonlight"
+```
+
+copies the file into `projects/`, commits and pushes. (The raw.githubusercontent.com feed updates in seconds; the Pages site itself lags a minute or two — the live page reads the raw feed directly.)
+
 ### Render scale
 
 `render({ scale })` (0 < scale <= 1) exports at `ex x scale` resolution — a slow machine renders far smoother motion at 720p than at 1080p (each frame takes ~1/2 the time, so the canvas updates twice as often). Upscale afterwards if you need the pixels:

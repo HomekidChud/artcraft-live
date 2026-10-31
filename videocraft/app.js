@@ -1553,6 +1553,8 @@ function fileToDataURL(file) {
   });
 }
 
+let applyRev = 0; // bumped per project application — scene3d runtimes cache by _rev
+
 async function applyProjectData(data) {
   if (data.app !== 'videocraft') throw new Error('Not a VideoCraft project');
   state.name = data.name || 'Untitled video';
@@ -1560,10 +1562,14 @@ async function applyProjectData(data) {
   state.fps = data.fps || 30;
   state.clips = data.clips || [];
   // normalize scenes so hand-written projects (missing arrays/objects) don't crash the UI
+  const revBase = ++applyRev;
   const stockScene = () => makeScene('empty');
-  state.scenes = (data.scenes || []).map((s) => {
+  state.scenes = (data.scenes || []).map((s, i) => {
     const base = stockScene();
     const sc = { ...base, ...s };
+    // unique, increasing revision: scene3d caches built runtimes by _rev —
+    // without this, reloading the same project reuses stale scene objects
+    sc._rev = revBase * 1000 + i;
     sc.objects = Array.isArray(s.objects) ? s.objects : [];
     sc.camKeys = Array.isArray(s.camKeys) ? s.camKeys : [];
     sc.events = Array.isArray(s.events) ? s.events : [];
@@ -1730,6 +1736,49 @@ requestAnimationFrame(tick);
         const kick = () => { audioCtx?.resume?.(); };
         window.addEventListener('pointerdown', kick, { once: true });
         window.addEventListener('keydown', kick, { once: true });
+      }
+      if (q.has('live')) {
+        // live mode: poll the raw file on GitHub (it updates within seconds
+        // of a push — much faster than the Pages rebuild) and hot-swap the
+        // project while it keeps playing. This is "watch every action":
+        // the author pushes each edit, the viewer's page picks it up.
+        // liveSrc=<url> overrides the feed URL (for self-hosted mirrors).
+        const RAW = q.get('liveSrc') || `https://raw.githubusercontent.com/HomekidChud/artcraft-live/main/videocraft/projects/${encodeURIComponent(safe)}.json`;
+        let lastText = null;
+        window.__vcLiveUpdates = 0;
+        const pill = document.createElement('div');
+        pill.id = 'live-pill';
+        pill.style.cssText = 'position:fixed;top:12px;left:16px;z-index:10;font:11px/1 monospace;color:#e8f0f8;background:rgba(0,0,0,0.55);padding:7px 11px;border-radius:99px;pointer-events:none;display:flex;align-items:center;gap:7px;';
+        pill.innerHTML = '<span style="width:8px;height:8px;border-radius:99px;background:#e05252;display:inline-block;animation:vcpulse 1.6s infinite"></span>LIVE';
+        const style = document.createElement('style');
+        style.textContent = '@keyframes vcpulse{0%,100%{opacity:1}50%{opacity:0.25}}';
+        document.head.appendChild(style);
+        document.body.appendChild(pill);
+        const poll = async () => {
+          try {
+            const r = await fetch(`${RAW}?t=${Date.now()}`);
+            if (!r.ok) return;
+            const text = await r.text();
+            if (text === lastText) return;
+            const first = lastText === null;
+            lastText = text;
+            const data = JSON.parse(text);
+            const wasPlaying = state.playing;
+            const ph = state.playhead;
+            await applyProjectData(data);
+            window.__vcLiveUpdates++;
+            if (!first) {
+              state.playhead = Math.min(ph, Math.max(0, totalDur() - 0.05));
+              if (q.has('cinema')) {
+                const a = ASPECTS[state.aspect];
+                preview.width = a.ex[0]; preview.height = a.ex[1];
+              }
+              if (wasPlaying) play();
+            }
+          } catch (e) { /* keep the last good project */ }
+        };
+        poll();
+        setInterval(poll, 4000);
       }
     })
     .catch((e) => console.warn('[watch]', e.message));
