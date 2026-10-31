@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { midiToFreq, scaleSet, normalizeScore, encodeWav, SCALES, DRUMS, makeTrack } from '../soundstudio.js';
+import { midiToFreq, scaleSet, normalizeScore, encodeWav, SCALES, DRUMS, makeTrack, STYLES, applyStyle } from '../soundstudio.js';
 
 test('midiToFreq: A4 = 440, octaves double', () => {
   assert.equal(midiToFreq(69), 440);
@@ -17,7 +17,8 @@ test('scaleSet: root membership across every scale', () => {
   // natural minor = major shifted: C natural minor has Eb, no E natural
   const cm = scaleSet(60, 'Natural minor');
   assert.ok(cm.has(63) && !cm.has(64));
-  assert.equal(DRUMS.length, 8);
+  assert.equal(DRUMS.length, 12);
+  assert.ok(DRUMS.includes('808 kick') && DRUMS.includes('Shaker'));
 });
 
 test('normalizeScore: fills defaults, clamps, quantizes', () => {
@@ -64,6 +65,32 @@ test('makeTrack: every kind returns a full track (startup regression v0.12.1)', 
   assert.ok(dr.notes.length > 0, 'drum track ships with a starter groove');
   assert.equal(dr.notes[0].m, 0, 'first drum note is a kick');
 });
+
+test('styles: every template builds a valid, in-range arrangement', () => {
+  for (const [name, st] of Object.entries(STYLES)) {
+    const score = { id: 'x', name: 't', bpm: 120, bars: 8, root: 60, scale: 'Major', tracks: [] };
+    assert.ok(applyStyle(score, name), name + ' applies');
+    assert.equal(score.bpm, st.bpm);
+    assert.ok(score.tracks.length >= 3, name + ' has several tracks');
+    for (const tr of score.tracks) {
+      assert.ok(KIND_OK(tr.kind), name + ' track kind valid: ' + tr.kind);
+      assert.ok(Array.isArray(tr.notes) && tr.notes.length, name + ' track has notes');
+      for (const n of tr.notes) {
+        assert.ok(n.t >= 0 && n.d >= 0.25 && n.v > 0, name + ' note sane');
+        if (tr.kind !== 'drum') assert.ok(n.m >= 24 && n.m <= 96, name + ' melodic note in roll range: ' + n.m);
+        else assert.ok(n.m >= 0 && n.m < DRUMS.length, name + ' drum row valid: ' + n.m);
+        assert.ok(n.t <= score.bars * 4 + 0.01, name + ' note inside score length');
+      }
+    }
+  }
+  assert.equal(applyStyle({ id: 'x' }, 'Nope'), false);
+  assert.equal(applyStyle(null, 'Pop'), false);
+});
+
+function KIND_OK(k) {
+  return ['synth', 'lead', 'bass', 'bass808', 'pad', 'pluck', 'piano', 'epiano', 'organ', 'guitar',
+    'strings', 'brass', 'flute', 'bell', 'marimba', 'drum', 'sfx', 'vocal'].includes(k);
+}
 
 test('encodeWav: 44-byte PCM header + interleaved samples', () => {
   const buf = {

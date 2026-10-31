@@ -14,7 +14,7 @@
 <script type="application/json" id="ai-guide">
 {
   "app": "MovieCraft",
-  "version": "0.12.1",
+  "version": "0.13.0",
   "what": "Browser-native 3D movie studio. Pure client-side SPA — no backend, no auth. Automate by authoring project JSON, injecting it, and rendering sections via the export UI.",
   "headless": {
     "chromeFlags": "--no-sandbox --enable-unsafe-swiftshader --use-angle=swiftshader --autoplay-policy=no-user-gesture-required",
@@ -44,7 +44,7 @@
     "customClips": "user-authored motion, no presets needed: project.customClips[name] = { duration, loop, keys: [{ t, ease, pose: {jointId: [x,y,z] deg}}] }. Author interactively: scrub, pose the character with the joint editor, 'Capture pose at playhead' — each capture is a key and the clip interpolates between poses. Apply with motion.clip = 'custom:<name>'. Works on avatars AND forge characters (joints just need to match). Saved with the project.",
     "fx": "fxKind: fire|smoke|sparks|explosion|fountain|rain|snow|embers|magic|dust|fireworks|lightning|portal|hearts|stars (explosion + lightning are one-shot via fxStart); deterministic seeds — same timeline position renders identically in preview and export",
     "events": "shot.events[]: type title|subtitle|lowerthird|fadein|fadeout|letterbox|shake with start + duration (shot-local seconds), text/speaker/color/strength optional. Lower third renders bottom-left with the speaker name in gold. Letterbox no longer clips subtitle descenders (fixed v0.6.7 — subtitles lift above the bars).",
-    "scores": "project.scores[] — full music/sound creator (Music tab, soundstudio.js). score = { id, name, bpm(20-300), bars(1-128), root(midi 0-120), scale (Natural minor|Major|...|Blues|Harmonic minor|Chromatic), tracks: [{ id, name, kind synth|bass|pad|pluck|drum|vocal, osc saw|square|sine|triangle, cutoff, attack, release, volume, pan, mute, solo, reverb, delay, delayBeats, drive, notes [{t,d in beats (0.25-quantized), m midi (drum rows 0-7: kick snare hatC hatO clap tom crash ride), v}], assetId+startBeats (vocals) }] }. Everything is synthesized with WebAudio — no samples needed. 'Add to movie' renders offline to WAV and places it as an audioClip at 0:00. Vocals: record via mic (getUserMedia). Scores save with the project."
+    "scores": "project.scores[] — full music/sound creator (Music tab, soundstudio.js). score = { id, name, bpm(20-300), bars(1-128), root(midi 0-120), scale (Natural minor|Major|...|Blues|Harmonic minor|Chromatic), tracks: [{ id, name, kind synth|lead|bass|bass808|pad|pluck|piano|epiano|organ|guitar|strings|brass|flute|bell|marimba|drum|sfx|vocal, preset (sfx: Riser|Impact|Whoosh|Sub drop|Tape stop|Vinyl crackle|Zap), osc saw|square|sine|triangle, cutoff, attack, release, volume, pan, mute, solo, reverb, delay, delayBeats, drive, notes [{t,d in beats (0.25-quantized), m midi (drum rows 0-11: kick snare hatC hatO clap tom crash ride 808kick rim cowbell shaker; sfx: pitch tunes the effect), v}], assetId+startBeats (vocals) }] }. Style dropdown builds a full arrangement: Hip-hop|EDM|Horror|Lofi|Cinematic|Pop|Rock. Everything is synthesized with WebAudio — no samples needed. 'Add to movie' renders offline to WAV and places it as an audioClip at 0:00. Vocals: record via mic (getUserMedia). Scores save with the project."
   },
   "longFilmsRecipe": [
     "render in <=60s sections: set #export-start / #export-end, click #btn-record",
@@ -828,6 +828,6 @@ body.any-sheet-open #sheet-backdrop { display: block; }
   }
 }
 </script>
-<script type="module" src="app.js?v=0.12.1"></script>
+<script type="module" src="app.js?v=0.13.0"></script>
 </body>
 </html>

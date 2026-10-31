@@ -93,10 +93,18 @@ This guide is also embedded in the app page itself (`<script type="application/j
 A full in-browser music and sound creator — no samples, no network, every
 instrument is synthesized with WebAudio (`soundstudio.js`).
 
-- Scores are multi-track: synth, bass, pad and pluck melodic voices (saw,
-  square, sine or triangle oscillators with cutoff/attack/release controls),
-  an 8-voice synthesized drum kit (kick, snare, closed/open hat, clap, tom,
-  crash, ride) and vocal tracks recorded from the mic (`getUserMedia`).
+- Scores are multi-track. Instruments: lead synth, square lead, bass synth,
+  808 sub bass, pad, pluck, piano, electric piano (FM), organ, guitar,
+  strings, brass, flute, bell, marimba, a 12-piece synthesized drum kit
+  (kick, snare, closed/open hat, clap, tom, crash, ride, 808 kick, rimshot,
+  cowbell, shaker), sound-effect tracks and vocal tracks recorded from the
+  mic (`getUserMedia`).
+- Sound FX tracks play preset effects where you draw notes: Riser, Impact,
+  Whoosh, Sub drop, Tape stop, Vinyl crackle, Zap — note pitch tunes each
+  effect, drag height sets intensity.
+- The Style dropdown (top bar) builds a complete arrangement in one click —
+  Hip-hop, EDM, Horror, Lofi, Cinematic, Pop or Rock — with drums, bass,
+  chords and effects, all in the score's key. Then edit anything.
 - Editing is a piano-roll: drag to draw notes, drag to move, drag the right
   edge to resize, right-click or Delete to remove. Drum tracks use a step
   grid. All times are quarter-note beats, quantized to 0.25.

@@ -4,6 +4,18 @@ MovieCraft is a static, browser-based scene and movie editor. This upgrade is a
 practical foundation for stylised 3D filmmaking, not a claim of feature parity
 with a Hollywood production pipeline.
 
+Version 0.13.0 makes the Music studio feel like a PC music app:
+
+- **New instruments** — piano, electric piano, organ, guitar, strings, brass,
+  flute, bells, marimba, 808 sub bass and square lead, all synthesized in the
+  browser (no samples), each with its own voice recipe
+- **Bigger drum kit** — 12 pieces now: kick, snare, hats, clap, tom, crash,
+  ride, 808 boom kick, rimshot, cowbell and shaker
+- **Sound FX tracks** — risers, impacts, whooshes, sub drops, tape stops,
+  vinyl crackle and zaps, drawn on the piano roll like notes
+- **Style templates** — one click builds a full arrangement in Hip-hop, EDM,
+  Horror, Lofi, Cinematic, Pop or Rock, then tweak anything
+
 Version 0.12.1 fixes a startup crash in the music engine (track factory
 received a malformed score and aborted app loading).
 
@@ -105,10 +117,10 @@ screens, and the production pages stack for phones.
   individual shots in Animate. The reference image is chosen explicitly;
   blank cards are labelled shot cards, not fake scene renders.
 - **Animate**: the existing movie timeline, actor rigs and camera animation.
-- **Music**: the full music and sound creator — multi-track scores with
-  synthesized instruments, a drum kit, mic-recorded vocals, piano-roll editing,
-  per-track effects and one-click WAV export to the movie timeline (see
-  GUIDE.md).
+- **Music**: the full music and sound creator — multi-track scores with 15+
+  synthesized instruments, a 12-piece drum kit, sound-effect tracks, style
+  templates, mic-recorded vocals, piano-roll editing, per-track effects and
+  one-click WAV export to the movie timeline (see GUIDE.md).
 - **Sound**: dedicated access to the actual audio clip importer, global start
   and volume controls, plus sound-direction/dialogue-cue notes.
 - **Delivery**: a non-blocking production checklist, project backup and the
