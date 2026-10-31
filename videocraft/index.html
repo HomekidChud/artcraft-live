@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>VideoCraft — Video Studio for Shorts & Long-form</title>
 <meta name="description" content="VideoCraft: a browser video studio — import clips, images and audio, trim and arrange on a timeline, add captions, build 3D film and anime scenes, and export YouTube Shorts or widescreen videos.">
 <!-- AI-HELP — start here if you are an AI agent driving this app.
@@ -187,11 +187,26 @@ body.cinema #preview-wrap {
 }
 body.cinema #preview { border-radius: 0; box-shadow: none; cursor: default; }
 body.cinema #exit-hint {
-  position: fixed; top: 12px; right: 16px; z-index: 10;
-  font: 12px/1.4 var(--font-mono); color: #9aa; opacity: 0.55;
-  background: rgba(0,0,0,0.55); padding: 6px 10px; border-radius: 8px;
+  position: fixed; z-index: 11;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(68px + env(safe-area-inset-right));
+  font: 12px/1.4 var(--font-mono); color: #c8d2dd; opacity: 0.8;
+  background: rgba(0,0,0,0.6); padding: 6px 10px; border-radius: 8px;
   pointer-events: none;
 }
+/* touch devices have no keyboard — keep the hint to what works there */
+@media (pointer: coarse) { body.cinema #exit-hint { right: calc(14px + env(safe-area-inset-right)); top: calc(62px + env(safe-area-inset-top)); } }
+body.cinema #cinema-exit {
+  position: fixed; z-index: 12;
+  top: calc(10px + env(safe-area-inset-top));
+  right: calc(14px + env(safe-area-inset-right));
+  width: 42px; height: 42px; display: grid; place-items: center;
+  color: #d7dee8; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 99px; cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+body.cinema #cinema-exit:hover { background: rgba(30,36,50,0.8); }
+body.cinema #live-pill { top: calc(12px + env(safe-area-inset-top)) !important; left: calc(16px + env(safe-area-inset-left)) !important; }
+
 #transport {
   height: 52px; display: flex; align-items: center; gap: var(--space-3); padding: 0 var(--space-4);
   background: var(--surface); border-top: 1px solid var(--border); user-select: none;
@@ -293,6 +308,23 @@ body.cinema #exit-hint {
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
+
+/* mobile editor: watch/scrub/export on phones — rail is an icon bar, the
+   inspector (editing panels) waits for a larger screen, cinema mode is the
+   first-class mobile experience */
+@media (max-width: 820px) {
+  #topbar { flex-wrap: wrap; gap: 6px; padding: 8px 10px; height: auto; }
+  #topbar .brand span:last-child { display: none; }
+  #project-name { width: 110px; }
+  #rail { flex-direction: row; overflow-x: auto; width: auto; border-right: none; }
+  .rail-btn { padding: 6px 8px; min-width: 56px; }
+  #main { flex-direction: column; height: auto; min-height: 46dvh; }
+  #stage { min-height: 34dvh; }
+  #inspector { display: none; }
+  #timeline { height: 170px; }
+  #transport { height: 46px; flex-wrap: wrap; }
+  #transport .time { min-width: 0; font-size: 11px; }
+}
 </style>
 </head>
 <body>
@@ -395,6 +427,6 @@ body.cinema #exit-hint {
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<script type="module" src="app.js?v=1.4.10"></script>
+<script type="module" src="app.js?v=1.4.11"></script>
 </body>
 </html>

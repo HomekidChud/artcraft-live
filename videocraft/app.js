@@ -1716,19 +1716,41 @@ requestAnimationFrame(tick);
         document.body.classList.add('cinema');
         const hint = document.createElement('div');
         hint.id = 'exit-hint';
-        hint.textContent = 'space: play/pause · esc: editor';
+        hint.textContent = matchMedia('(pointer: coarse)').matches
+          ? 'tap: play/pause · tap the X to exit'
+          : 'tap: play/pause · space · esc: editor';
         document.body.appendChild(hint);
+        const exitBtn = document.createElement('button');
+        exitBtn.id = 'cinema-exit';
+        exitBtn.setAttribute('aria-label', 'Back to editor');
+        exitBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+        document.body.appendChild(exitBtn);
         // render the preview at full export resolution while watching
         const a = ASPECTS[state.aspect];
         preview.width = a.ex[0]; preview.height = a.ex[1];
-        const exit = (ev) => {
-          if (ev.key !== 'Escape') return;
+        let cinema = true;
+        const leaveCinema = () => {
+          if (!cinema) return;
+          cinema = false;
           document.body.classList.remove('cinema');
           hint.remove();
+          exitBtn.remove();
           setPreviewSize();
-          window.removeEventListener('keydown', exit);
+          window.removeEventListener('keydown', onKey);
+          $('#preview-wrap').removeEventListener('pointerdown', onTap);
         };
-        window.addEventListener('keydown', exit);
+        const onKey = (ev) => { if (ev.key === 'Escape') leaveCinema(); };
+        // tap the video to pause/resume (mobile has no space bar)
+        let tapGuard = 0;
+        const onTap = () => {
+          if (Date.now() - tapGuard < 300) return; // ignore double-fires
+          tapGuard = Date.now();
+          togglePlay();
+        };
+        window.addEventListener('keydown', onKey);
+        // tap anywhere on the video area (letterbox bars included) to pause
+        $('#preview-wrap').addEventListener('pointerdown', onTap);
+        exitBtn.addEventListener('click', leaveCinema);
       }
       if (q.has('play')) {
         play();
